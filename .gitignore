@@ -15,7 +15,8 @@ build/
 tests/fixtures/_generated/
 *.tmp
 
-# Large reference photos (commit small ones deliberately)
+# Large reference photos (commit small ones deliberately) and pipeline output
+reference/out/
 reference/*.jpg
 reference/*.jpeg
 reference/*.png

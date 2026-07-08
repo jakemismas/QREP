@@ -1,96 +1,141 @@
-# QREP: Overnight Build Prompt
+# QREP: Overnight Build Contract
 
 ## Mission
 
-Build QREP, an open-source Python system that reverse engineers quilts from photographs into production-ready patterns. Tonight's run builds v1 per the design doc (qrep-design-doc.md, in repo root, read it first and treat it as binding). v1 proves the architecture on grid-based quilts with the Double Irish Chain as the benchmark.
+Build QREP, an open-source Python system that reverse engineers quilts from photographs into production-ready patterns. Tonight's run builds v1 per the design doc (qrep-design-doc.md, repo root, read it first and treat it as binding; where CLAUDE.md's Environment section conflicts with a stack pin, CLAUDE.md wins). v1 proves the architecture on grid-based quilts with the Double Irish Chain as the benchmark.
 
-This is not a one-off script. Build a reusable library with a CLI.
+This is not a one-off script. Build a reusable library with a CLI, packaged and presentable as an open-source project.
 
 ## Ground rules
 
-1. Build back-to-front. The quilt model, construction engine, and exports come first because they need no computer vision and are fully testable. The CV pipeline comes last and is validated against synthetic renders.
-2. Each phase gates on green tests. Do not start a phase until the previous phase passes.
-3. No thrashing. If a component fails after 3 genuinely distinct approaches, write the failure up in KNOWN_ISSUES.md (what you tried, why it failed, best partial result) and move on.
-4. No GUI, no web app, no manual editing tools. Editing is JSON or the Python API.
-5. Never present inferred data as certain. Every CV-derived attribute carries a confidence score. Hand-authored data is confidence 1.0.
-6. Commit at the end of each phase with a message summarizing what passed.
-7. Stack per design doc: Python 3.12, pydantic, numpy, OpenCV, scikit-image, Pillow, svgwrite, weasyprint or reportlab, typer, pytest, ruff.
+1. Build back-to-front. Model, construction engine, and exports first; CV last, validated against synthetic renders.
+2. Each slice gates on green tests (pytest + ruff locally, CI green on main for the previous slice). A gate is satisfied when all tests pass OR each failing test is marked `xfail(reason="KNOWN_ISSUES: <entry>", strict=False)` with a matching KNOWN_ISSUES.md entry recording actual numbers — permitted only after 3 documented distinct attempts. Never delete or weaken an assertion, never lower a threshold.
+3. No thrashing. Each abandoned approach is recorded as an issue comment starting with `APPROACH FAILED:` (what was tried, why it died, best partial numbers). Three such comments on one criterion trigger the xfail-plus-KNOWN_ISSUES path. Parameter tweaks within one approach do not increment the counter, but an approach that consumes a whole wakeup with no measured improvement is failed.
+4. Interfaces are the CLI, JSON, and the Python API — plus exactly one GUI artifact: the quilter-facing sizing viewer defined in S5. Nothing else visual. No web app, no server.
+5. Never present inferred data as certain. CV-derived values carry confidence per the design doc formulas; hand-authored data defaults to 1.0.
+6. Work lands via branch + PR, one per slice: branch `slice/s<n>-<short-name>`, PR body contains `Fixes #<issue>`, merge with `gh pr merge --merge --delete-branch`, then `git checkout main && git pull`. Direct pushes to main are blocked by policy. Git author is Jake Mismas <jake@jakemismas.com> — verify `git config user.name` and `user.email` before every commit; set repo-local if wrong. Plain `-m` messages, no co-author trailers of any kind.
+7. Stack, units, fixture geometry, CLI signatures, determinism rules, and confidence formulas are pinned in the design doc. Do not re-derive them. All Python runs through `.venv/Scripts/python -m ...` explicitly.
+8. State lives outside the chat: git log, issue state, issue comments, and files are the only durable memory. Re-derive; never trust recalled context.
 
-## Phase 1: Quilt model and benchmark fixture
+## S0: Scaffolding, packaging, CI
 
-Build the model package.
-
-- Pydantic schema: Quilt with metadata, palette (named fabrics, hex colors), regions (center Grid of rows x cols x finished cell size x fabric ids, border bands, binding), quilting layer (motif regions, authored only), settings (seam allowance, WOF, binding width, all defaulted per design doc).
-- Confidence wrapper on inferable attributes.
-- JSON serialize and deserialize with schema_version.
-- Author the benchmark fixture from pattern knowledge: a two-fabric Double Irish Chain, light blue chain on cream. Standard structure: 5x5 pieced Block A alternating with a mostly-plain Block B carrying corner squares, laid out so chains connect diagonally across block boundaries. Verify connectivity yourself before accepting the fixture. Roughly 75 x 90 inches finished with a plain border. Fidelity to the exact Tori Jones antique is not required, structural correctness of the pattern is.
+venv; pyproject.toml (hatchling, flat layout, deps and [dev] extra per design doc, console script `qrep`); package skeleton per repo layout; `.gitattributes` forcing LF (load-bearing for goldens); GitHub Actions CI (ubuntu-latest, 3.12/3.13 matrix, ruff + pytest); KNOWN_ISSUES.md header; import-smoke test importing every qrep subpackage plus cv2, reportlab, svgwrite.
 
 Acceptance:
-- JSON round trip test passes (model -> JSON -> model, equal)
-- Fixture validates against the schema
-- A test asserts chain continuity across at least one Block A to Block B boundary
+- `python -m venv .venv` then `.venv/Scripts/python -m pip install -e ".[dev]"` completes on this machine
+- Import-smoke test passes; ruff clean
+- `.gitattributes` LF rules present
+- CI workflow runs green on main after the S0 merge (verify with `gh run list`)
 
-## Phase 2: Construction engine
+## S1: Quilt model and benchmark fixture
 
-Strategy interface: pure function, Model in, ConstructionPlan out. ConstructionPlan holds cut list, strip sets with subcuts, assembly steps, metrics (piece count, cut count, seam count, strip sets, waste estimate, bias percent, difficulty heuristic, rough time heuristic).
-
-Implement three strategies:
-1. historical: literal patch-by-patch
-2. strip: detect repeated row or column fabric sequences, emit strip sets and subcut instructions
-3. modern: merge same-fabric adjacent cells into larger cut pieces where no seam is visually required
-
-Stub fpp, epp, hand, longarm behind the interface, raising NotImplementedError with a message.
+Pydantic schema per design doc: Quilt = metadata, palette, regions (Grid: rows, cols, finished cell size, fabric ids; border bands; binding), quilting layer (authored only), settings (defaults per design doc), provenance (stage_confidence dict + per-cell confidence array, defaults 1.0). Integer-eighths units. schema_version "1", validated on load. Fixture: the exact Double Irish Chain geometry in the design doc — 1.5" cells, 5x5 blocks A/B as specified, 9x11 blocks, 3.75" border, exactly 75x90. Generated by `make_double_irish_chain(...)`, serialized to tests/fixtures/double_irish_chain.json, ASCII block-pair rendering in the fixture docstring.
 
 Acceptance:
-- Yardage unit test on a known simple grid with hand-computed expected values written in the test comments
-- For the benchmark fixture: strip plan total cuts < historical plan total cuts
-- For the benchmark fixture: modern plan piece count < historical plan piece count
-- All three plans agree on total fabric area within 5 percent (waste may differ, patch area may not)
+- JSON round trip: model -> JSON -> model, exact equality
+- Loading JSON with missing/unknown-major schema_version raises a clear error (tested)
+- Fixture validates; committed JSON matches regeneration (tested)
+- Chain continuity: diagonal blue-blue pair across EVERY A-to-B boundary, and a main diagonal 8-connected end to end, asserted at the coordinates the docstring ASCII shows
+- Fixture finished dimensions exactly 75" x 90" including border, asserted; cell census 1246 blue / 1229 cream asserted
+- All confidences on the hand-authored fixture equal 1.0, asserted
 
-## Phase 3: Exports
+## S2: Construction engine
 
-- Cut list (markdown and CSV): per fabric, per piece size, quantities, strip cutting chart
-- Yardage report per fabric including binding and backing
-- SVG: full quilt top diagram, per-block diagrams, strip set diagrams, numbered assembly diagram
-- PDF pattern booklet assembling the above into sections: intro, fabric list, cutting, strip sets, assembly, borders, binding, finishing. The booklet composes existing exports, it is not a layout engine.
-- CLI: qrep validate, qrep plan --strategy, qrep export
+Strategy = pure function, Model in, ConstructionPlan out. Metrics per the design doc definitions (cut count, waste, bias=0.0 hardcoded for v1, difficulty/time labeled heuristics). Strategies: historical (patch by patch), strip (block-granularity WOF strip sets per design doc — five distinct sets for the fixture, 21 segments per 42" set), modern (merge same-fabric adjacent cells). Stub fpp/epp/hand/longarm raising NotImplementedError. Hierarchical assembly steps (block level, ~25 steps).
 
 Acceptance:
-- Golden file tests for the fixture's SVG top diagram and cut list
-- PDF generates without error and contains every section
-- Cut list quantities reconcile with the plan's piece counts (tested)
+- Yardage unit test on a small hand-designed grid (not the fixture) with step-by-step hand arithmetic in comments, asserting those literals
+- Subcut-count unit test on a synthetic repeating grid, hand-computed expectations in comments
+- Fixture: strip total cut operations < historical; modern piece count < historical; strip plan has >= 2 distinct strip sets (>= 5 expected)
+- Every plan's summed finished piece area equals the quilt-top area exactly (integer eighths); computed independently in the test from rows x cols x cell size
+- Determinism: same strategy twice yields equal serialized plans
+- Stubs raise NotImplementedError (tested)
 
-## Phase 4: Synthetic renderer
+## S3: Text exports and CLI
 
-Model to PNG at difficulty levels per design doc: L0 clean orthographic, L1 texture noise and color variance, L2 perspective warp and lighting gradient, L3 fold shading, clutter, partial occlusion. CLI: qrep render --level.
+Cut list (markdown + CSV): per fabric, per piece size, quantities, strip cutting chart. Yardage report per fabric including binding and backing (backing formula per design doc — dedicated line item, never a palette fabric). CLI per pinned signatures: validate, plan, export. Deterministic output (sorted, fixed formatting, no timestamps). Bless the cut-list goldens via `pytest --bless`, commit with `[bless]` in the message, then frozen.
 
 Acceptance:
-- Fixture renders at all four levels
-- Pixel tests on L0: image dimensions match model aspect, sampled cell centers match palette colors
+- Golden tests: cut list md + csv byte-equal to blessed goldens
+- Reconciliation: parsing the CSV reproduces the plan's piece count exactly (test parses the file, not exporter internals)
+- Yardage includes binding and backing lines; every value is a multiple of 0.25 yd; fixture backing ≈ 5.5 yd
+- `qrep validate` exits 0 on the fixture, nonzero with a readable message on corrupted JSON (both tested)
+- `qrep plan` prints metrics; `qrep export` writes expected files; export twice is byte-identical
+- Missing golden without --bless fails with "run --bless" (tested)
 
-## Phase 5: CV pipeline against synthetic images
+## S4: Visual exports — SVG diagrams and PDF booklet
 
-Pipeline stages per design doc: rectify (corners detected or supplied), palette via k-means in Lab, grid via edge projections and autocorrelation, cell fabric assignment, repeat detection via 2D autocorrelation, border detection, emit model with per-stage confidence. CLI: qrep reverse image.png -o recovered.json.
+SVG via svgwrite: full quilt top (with inch rulers on x and y axes per design doc diagram conventions — labeled majors every 5", minors every 1", extents matching computed finished dimensions), per-block diagrams, strip set diagrams, numbered assembly diagram. PDF booklet via reportlab ONLY: sections intro, fabric list, cutting, strip sets, assembly, borders, binding, finishing, built from unit-tested section objects (cutting lists both fabrics nonzero; >= 5 strip sets; >= 10 assembly steps; yardage has binding + backing). Bless the SVG top-diagram golden, then frozen.
 
-Round-trip test harness: author model, render, reverse, compare to ground truth.
+Acceptance:
+- Golden test: top SVG byte-equal to blessed golden; export twice byte-identical
+- Cell-fidelity test: parsed SVG cell rectangle count equals grid cell count; fill colors equal palette hexes
+- Ruler test: parsed SVG ruler extents and major-tick labels match the model's finished dimensions
+- PDF generates; pypdf-extracted text contains all eight section headings; every fabric name and distinct piece size from the cut list CSV appears in the PDF text
+- Section-object unit tests pass pre-render
+- No commit after the [bless] commit touches tests/golden/
 
-Acceptance thresholds:
-- L0: exact grid dimensions, 100 percent cell assignment accuracy
-- L1: exact grid dimensions, >= 98 percent cell accuracy
-- L2: grid spacing within 2 percent, >= 90 percent cell accuracy
-- Confidence populated for every stage, and confidence must be lower on L2 than L0
+## S5: Quilter-facing sizing viewer
 
-If a threshold is unreachable after real effort, record actual numbers in KNOWN_ISSUES.md and continue. Do not silently lower thresholds in the tests.
+One static HTML file (vanilla JS, no framework, no server, no build step), emitted by `qrep view quilt.json -o viewer.html` with the model JSON embedded. Designed for quilters, not developers:
 
-## Phase 6 (stretch): real photos
+- Renders the quilt top true to scale with inch rulers on x and y axes
+- Size controls: finished width, height, and cell size, entered and displayed as inches with mixed fractions (2 1/2, not 2.5); a presets dropdown for standard quilt sizes (crib 36x52, throw 50x65, twin 70x90, full 84x90, queen 90x108, king 110x108)
+- Live re-render of quilt and rulers on any change
+- A per-fabric summary panel: fabric swatch, name, cell count, and an estimated yardage figure labeled "estimate — export the pattern for exact yardage" (JS reimplements only the simple area/WOF/quarter-yard math; the Python export stays authoritative)
+- Copy-to-clipboard of the adjusted settings JSON snippet so changes round-trip back into the project file
+- If docs/viewer-mock.html exists in the repo, treat it as the design reference for look and layout; match its visual intent, keep the functional contract above
 
-Check reference/ for photos. If any exist, run the pipeline on them, save recovered models and rendered diffs, and document per-stage confidence and failure modes. If reference/ is empty, spend the time on L3 robustness instead and report results the same way.
+Hard bounds: no cell editing, no fabric recoloring, no persistence, one file, no external assets (works offline from file://).
 
-## Final deliverables
+Acceptance:
+- `qrep view` emits a single self-contained HTML file with the model embedded (tested: file exists, contains model JSON, no external http references)
+- Emitted HTML contains ruler markup and the preset values (string-asserted in tests)
+- The sizing math is mirrored in a small pure-Python helper used by the emitter and unit-tested against the same numbers the JS uses (keeps JS honest without a browser test rig)
+- Fraction formatter shared with exports (one implementation)
 
-- Repo per the design doc layout, all gated tests green
-- README.md: what QREP is, install, CLI walkthrough using the benchmark fixture end to end
-- KNOWN_ISSUES.md: honest failures and dead ends
-- REPORT.md: per-phase status, per-CV-stage confidence and accuracy numbers, the three construction plans' metrics for the benchmark side by side, and a prioritized next-steps list
+## S6: Synthetic renderer
 
-Quality bar: a quilter with the generated PDF and no other context could cut and assemble the benchmark quilt. Everything upstream serves that.
+Model to PNG per design doc renderer spec: seeded (default 42), scale 10 px/inch, 8 percent #404040 margin at every level, L0 flat/no antialiasing, L1 seeded noise/variance, L2 bounded seeded perspective + lighting, L3 folds/clutter/occlusion. Sidecar JSON ground truth (corners, seed, level). CLI: `qrep render --level 0..3 --seed --scale`.
+
+Acceptance:
+- Fixture renders at all four levels via CLI, nonzero files
+- L0: quilt rectangle (canvas minus known margin) matches model aspect within 1 px; every cell center sampled via the renderer's model-to-pixel transform matches its palette hex exactly; border band pixels match border fabric
+- Determinism: same seed twice = byte-identical at L1 and L3; different seed differs
+- L2 sidecar corners verified consistent with the applied homography (inverse-warp a cell center, re-check color)
+
+## S7: CV pipeline and round-trip harness
+
+Stages, k-selection, identity-rectification path, confidence formulas, and accuracy definitions per design doc. CLI: `qrep reverse img.png -o recovered.json [--corners ...] [--fabrics N]` — escape hatches for real photos only; round-trip tests pass the image path alone. Test images generated by the S6 renderer with fixed seeds at test time, never committed or hand-edited. Thresholds below are copied verbatim into test literals and never edited.
+
+Acceptance:
+- L0: exact interior grid dims (45x55 after border exclusion), 100 percent cell accuracy, identity-homography path exercised
+- L1: exact dims, >= 98 percent cell accuracy
+- L2: grid spacing within 2 percent both axes, >= 90 percent cell accuracy, rectification found a non-identity homography itself
+- L2 diagnostic with supplied ground-truth corners exists and reports its numbers regardless of pass/fail
+- Recovered fabric count == 2 at L0/L1; repeat detection recovers block size exactly (10, 10) cell pitch period at L0/L1; border detection recovers 3.75" border width within 5 percent on all four sides at L0/L1
+- Every stage populates confidence; min stage confidence strictly lower on L2 than L0
+- Threshold literals grep-verified against issue body before closing; zero tests deleted or deselected; any xfail carries a KNOWN_ISSUES reference and 3 APPROACH FAILED comments
+
+## S8 (stretch): real photos or L3 robustness
+
+If reference/ contains images: run the pipeline on each, save recovered models and rendered diffs to reference/out/ with committed notes in docs/stretch/NOTES.md. Else: run the harness at L3 with 3 seeds, record accuracy/confidence tables, one timeboxed focused improvement attempt, stop. Report-only: no gating thresholds; may not modify any earlier test, threshold, or golden.
+
+Acceptance:
+- docs/stretch/NOTES.md records branch taken, per-stage confidences, measured numbers, >= 3 concrete failure modes with one-line hypotheses
+- L3 branch: an L3 test asserts only run-to-completion and records accuracy
+- `git diff <S7 gate> -- tests/` shows no threshold or golden changes
+
+## S9: Docs, REPORT.md, README
+
+README: what QREP is, install (venv + pip install -e .), CI badge, and a CLI walkthrough running the full benchmark story end to end (validate, plan all three strategies, export everything, view, render L0, reverse it, compare) — every command executed verbatim during this slice. REPORT.md: per-slice status from gh/git; three strategies' metrics side by side from a fresh run; per-level CV accuracy and per-stage confidence from a fresh harness run; prioritized next steps. KNOWN_ISSUES sweep against all xfails and APPROACH FAILED comments. Fresh-venv install honesty check (`pip install -e .` then `qrep --help` exits 0).
+
+Acceptance:
+- Every README command ran verbatim and succeeded (command list in closing comment)
+- REPORT.md numbers match fresh runs, not memory
+- Every xfail has a KNOWN_ISSUES entry (grep-audited)
+- Fresh-venv check passes; CI green on main for the final merge (wait for it — the only slice that waits on its own CI)
+
+## Final quality bar
+
+A quilter with the generated PDF and no other context could cut and assemble the benchmark quilt — and a quilter with the viewer HTML could resize it confidently. Everything upstream serves that.
