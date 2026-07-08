@@ -10,6 +10,7 @@ from pathlib import Path
 from qrep.construct.plan import ConstructionPlan
 from qrep.construct.yardage import compute_purchase_lines
 from qrep.export.cutlist import render_cutlist_csv, render_cutlist_md
+from qrep.export.pdf import build_sections, render_booklet
 from qrep.export.svg import (
     render_assembly_svg,
     render_block_svgs,
@@ -48,10 +49,17 @@ def export_svg(quilt: Quilt, plan: ConstructionPlan, out_dir: Path) -> list[Path
     return written
 
 
+def export_pdf(quilt: Quilt, plan: ConstructionPlan, out_dir: Path) -> list[Path]:
+    path = out_dir / "booklet.pdf"
+    render_booklet(quilt, plan, path)
+    return [path]
+
+
 EXPORTERS = {
     "cutlist": export_cutlist,
     "yardage": export_yardage,
     "svg": export_svg,
+    "pdf": export_pdf,
 }
 
 
@@ -74,8 +82,14 @@ def export_all(
 
 __all__ = [
     "EXPORTERS",
+    "build_sections",
     "export_all",
+    "render_assembly_svg",
+    "render_block_svgs",
+    "render_booklet",
     "render_cutlist_csv",
     "render_cutlist_md",
+    "render_strip_sets_svg",
+    "render_top_svg",
     "render_yardage_md",
 ]
