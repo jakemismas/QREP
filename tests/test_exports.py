@@ -83,6 +83,10 @@ def test_export_twice_is_byte_identical(fixture_quilt, tmp_path):
     second = export_all(fixture_quilt, plan, tmp_path / "two")
     assert [p.name for p in first] == [p.name for p in second]
     for a, b in zip(first, second):
+        # PDF is structure-tested via pypdf, never byte-tested: reportlab
+        # embeds timestamps (design doc, determinism section)
+        if a.suffix == ".pdf":
+            continue
         assert a.read_bytes() == b.read_bytes(), a.name
 
 
