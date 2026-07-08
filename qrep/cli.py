@@ -8,8 +8,10 @@ from pydantic import ValidationError
 from qrep.construct import compute_yardage, get_strategy
 from qrep.export import export_all
 from qrep.model import QrepSchemaError, load
+from qrep.model.io import save
 from qrep.render import save_render
 from qrep.viewer import write_viewer
+from qrep.vision import compare_models, render_comparison, reverse as reverse_pipeline
 
 app = typer.Typer(
     no_args_is_help=True,
@@ -97,6 +99,44 @@ def render(
     png_path, sidecar_path = save_render(quilt, output, level=level, seed=seed, scale=scale)
     typer.echo(f"wrote {png_path}")
     typer.echo(f"wrote {sidecar_path}")
+
+
+@app.command()
+def reverse(
+    image_path: Path,
+    output: Path = typer.Option(Path("recovered.json"), "--output", "-o"),
+    corners: str | None = typer.Option(
+        None, "--corners", help="x1,y1,...,x4,y4 escape hatch for real photos"
+    ),
+    fabrics: int | None = typer.Option(None, "--fabrics", help="force the fabric count"),
+) -> None:
+    """Reverse engineer a quilt photo into a recovered model JSON."""
+    corner_points = None
+    if corners is not None:
+        values = [float(v) for v in corners.split(",")]
+        if len(values) != 8:
+            typer.echo("error: --corners needs exactly 8 comma-separated numbers", err=True)
+            raise typer.Exit(1)
+        corner_points = [(values[i], values[i + 1]) for i in range(0, 8, 2)]
+    try:
+        result = reverse_pipeline(image_path, corners=corner_points, fabrics=fabrics)
+    except ValueError as e:
+        typer.echo(f"error: {e}", err=True)
+        raise typer.Exit(1) from None
+    output.parent.mkdir(parents=True, exist_ok=True)
+    save(result.quilt, output)
+    typer.echo(f"wrote {output}")
+    for stage, conf in result.quilt.provenance.stage_confidence.items():
+        typer.echo(f"confidence {stage}: {conf:.4f}")
+
+
+@app.command()
+def compare(truth_file: Path, recovered_file: Path) -> None:
+    """Compare a truth model against a recovered model (the harness view)."""
+    truth = _load_or_exit(truth_file)
+    recovered = _load_or_exit(recovered_file)
+    report = compare_models(truth, recovered)
+    typer.echo(render_comparison(report))
 
 
 @app.command()
