@@ -1,0 +1,24 @@
+name: Feature request
+description: Propose a new capability
+labels: ["type: feature", "priority: med"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: The why and the outcome. What is true now, what should be true after.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Testable, observable outcomes as checkboxes.
+      value: "- [ ] "
+    validations:
+      required: true
+  - type: textarea
+    id: non-goals
+    attributes:
+      label: Non-goals
+      description: Explicitly out of scope.

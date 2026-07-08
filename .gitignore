@@ -1,0 +1,26 @@
+# Per-machine Claude settings
+.claude/settings.local.json
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+
+# Test/render output that is not a committed golden file
+tests/fixtures/_generated/
+*.tmp
+
+# Large reference photos (commit small ones deliberately)
+reference/*.jpg
+reference/*.jpeg
+reference/*.png
+!reference/README.md
+
+# OS noise
+Thumbs.db
+.DS_Store

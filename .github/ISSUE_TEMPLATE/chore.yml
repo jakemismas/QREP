@@ -1,0 +1,11 @@
+name: Chore
+description: Maintenance, dependencies, tooling
+labels: ["type: chore", "priority: low"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What needs maintaining and why now.
+    validations:
+      required: true
