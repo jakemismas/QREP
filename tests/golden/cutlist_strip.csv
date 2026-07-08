@@ -1,0 +1,6 @@
+fabric_id,fabric_name,component,source,label,quantity,cut_width_eighths,cut_height_eighths,finished_width_eighths,finished_height_eighths,cut_size,finished_size
+b,Chain blue,center,strip_set,"1 1/2"" square, cut 2"" x 2""",1246,16,16,12,12,"2"" x 2""","1 1/2"" x 1 1/2"""
+c,Background cream,center,strip_set,"1 1/2"" square, cut 2"" x 2""",1229,16,16,12,12,"2"" x 2""","1 1/2"" x 1 1/2"""
+c,Background cream,border,rotary,"border 1 side, 3 3/4"" x 82 1/2"" finished",2,34,664,30,660,"4 1/4"" x 83""","3 3/4"" x 82 1/2"""
+c,Background cream,border,rotary,"border 1 top/bottom, 75"" x 3 3/4"" finished",2,604,34,600,30,"75 1/2"" x 4 1/4""","75"" x 3 3/4"""
+b,Chain blue,binding,rotary,"binding strip, 2 1/2"" x WOF",9,20,336,20,336,"2 1/2"" x 42""","2 1/2"" x 42"""

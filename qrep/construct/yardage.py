@@ -19,6 +19,7 @@ BACKING_NAME = "backing, any 42-inch WOF fabric"
 class YardageLine(BaseModel):
     fabric_id: str | None = Field(default=None, description="None for the backing line")
     name: str
+    purpose: str = Field(default="top", description="top | binding | backing")
     length_needed: int = Field(ge=0, description="fabric length required, eighths")
     quarter_yards: int = Field(ge=0)
 
@@ -40,9 +41,57 @@ def backing_line(quilt: Quilt) -> YardageLine:
     return YardageLine(
         fabric_id=None,
         name=BACKING_NAME,
+        purpose="backing",
         length_needed=length,
         quarter_yards=ceil(length / QUARTER_YARD),
     )
+
+
+def _line_from_area(fabric_id: str, name: str, purpose: str, area: int, wof: int) -> YardageLine:
+    length = ceil(area / wof) if area else 0
+    return YardageLine(
+        fabric_id=fabric_id,
+        name=name,
+        purpose=purpose,
+        length_needed=length,
+        quarter_yards=ceil(length / QUARTER_YARD) if length else 0,
+    )
+
+
+def compute_purchase_lines(quilt: Quilt, plan: "ConstructionPlan") -> YardageReport:
+    """Human-facing purchase table: one line per palette fabric for the top
+    (center + borders, strip sets included), a dedicated line per binding
+    fabric, and the backing line. Rounding happens per line, so this can
+    exceed the aggregate compute_yardage totals that metrics use."""
+    wof = quilt.settings.wof
+    top_area: dict[str, int] = {f.id: 0 for f in quilt.palette.fabrics}
+    binding_area: dict[str, int] = {}
+    for piece in plan.cut_pieces:
+        if piece.component == "binding":
+            binding_area[piece.fabric_id] = (
+                binding_area.get(piece.fabric_id, 0) + piece.cut_area
+            )
+        elif piece.source == "rotary":
+            top_area[piece.fabric_id] += piece.cut_area
+    for strip_set in plan.strip_sets:
+        strip_area = strip_set.strip_cut_width * wof
+        for fabric_id in strip_set.sequence:
+            top_area[fabric_id] += strip_area * strip_set.sets_needed
+    lines = []
+    for fabric in quilt.palette.fabrics:
+        if top_area[fabric.id]:
+            lines.append(
+                _line_from_area(fabric.id, f"{fabric.name}", "top", top_area[fabric.id], wof)
+            )
+    for fabric in quilt.palette.fabrics:
+        if fabric.id in binding_area:
+            lines.append(
+                _line_from_area(
+                    fabric.id, f"Binding - {fabric.name}", "binding", binding_area[fabric.id], wof
+                )
+            )
+    lines.append(backing_line(quilt))
+    return YardageReport(strategy=plan.strategy, lines=lines)
 
 
 def cut_area_by_fabric(
