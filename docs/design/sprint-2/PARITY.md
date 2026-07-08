@@ -43,7 +43,7 @@ Historical / Strip piecing / Modern optimized. UI copy never says "cell",
    do NOT change exports or plans in v2. A tweaked selected card shows the
    "hand-tweaked" badge and clearly-estimated adjusted numbers; switching
    strategy resets tweaks with a toast (as the mock does). Feeding tweaks
-   into the construction engine is logged as future work (#49).
+   into the construction engine is logged as future work (#50).
 3. PDF split. The mock's "PDF booklet" button opens the browser print dialog
    on a one-page plan. The app ships BOTH: "Pattern booklet - PDF" downloads
    the engine's reportlab booklet (the sprint 1 flagship, S0-gated), and
