@@ -22,6 +22,9 @@ reference/*.jpeg
 reference/*.png
 !reference/README.md
 
+# Design input dropped in by Jake; extracted to docs/viewer-mock.html + docs/support.js
+Quilt Sizing Viewer.zip
+
 # OS noise
 Thumbs.db
 .DS_Store
