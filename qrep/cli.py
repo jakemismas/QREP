@@ -8,6 +8,7 @@ from pydantic import ValidationError
 from qrep.construct import compute_yardage, get_strategy
 from qrep.export import export_all
 from qrep.model import QrepSchemaError, load
+from qrep.viewer import write_viewer
 
 app = typer.Typer(
     no_args_is_help=True,
@@ -79,6 +80,18 @@ def plan(
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(result.model_dump_json(indent=2) + "\n", encoding="utf-8", newline="\n")
         typer.echo(f"wrote {output}")
+
+
+@app.command()
+def view(
+    quilt_file: Path,
+    output: Path = typer.Option(Path("viewer.html"), "--output", "-o"),
+) -> None:
+    """Emit the self-contained sizing viewer HTML for a quilt."""
+    quilt = _load_or_exit(quilt_file)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    write_viewer(quilt, output)
+    typer.echo(f"wrote {output}")
 
 
 @app.command()
