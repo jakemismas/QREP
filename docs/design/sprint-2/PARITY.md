@@ -81,6 +81,16 @@ Historical / Strip piecing / Modern optimized. UI copy never says "cell",
      size (~12 MB opencv) formatted at build time.
    - Backing panel math in the mock (orientation-optimized) differs from the
      engine's formula; the engine's yardage is displayed as-is.
+   - Loading language: "download" and "install" are banned from all loading
+     and progress copy (they read as files landing on the device); asset
+     fetches say "loading". "Download" is reserved for user-initiated file
+     saves and exports. The mock's "Downloading vision engine" line becomes
+     "Loading the vision engine".
+17. Vision prefetch. After the engine is ready and the page is idle, the app
+    quietly prefetches the vision stack in the background (skipped when the
+    browser signals Save-Data). The analysis progress screen shows a loading
+    bar only when a reverse starts before the prefetch has finished. Nothing
+    about the app's core editing flow ever waits on any of this.
 9. Batting row. The mock's yardage table ends with a Batting row showing
    size-needed (quilt + 4" per side). Surface it from bridge data (finished
    dims + 8") in the UI table; extend the engine yardage report with the
