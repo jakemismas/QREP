@@ -2,18 +2,22 @@
 
 QREP is an open-source Python library and CLI that reverse engineers quilts
 from photographs into production-ready patterns. The design doc
-(qrep-design-doc.md) is binding; the build prompt (qrep-claude-code-prompt.md)
-implements it. Anything not in those docs is out of scope for v1.
+(qrep-design-doc.md) is binding; the build contract
+(qrep-claude-code-prompt.md) implements it. Anything not in those docs is out
+of scope for v1. Where this Environment section conflicts with a stack pin in
+either doc, this section wins.
 
 ## Environment
 
-- Windows 11, Git Bash shell. Python 3.13 at `python`.
-- Work inside the repo venv: `python -m venv .venv` then
-  `source .venv/Scripts/activate` (Git Bash path). Install with
-  `pip install -e ".[dev]"`.
-- Use `opencv-python-headless`, not `opencv-python`. Use `reportlab` for PDF,
-  not `weasyprint` (GTK native deps do not install cleanly on Windows).
-- Run tests with `python -m pytest`, lint with `python -m ruff check .`.
+- Windows 11, Git Bash shell. Python 3.13.3 at `python`.
+- All Python runs through the repo venv interpreter EXPLICITLY:
+  `.venv/Scripts/python -m pip install -e ".[dev]"`,
+  `.venv/Scripts/python -m pytest -q`,
+  `.venv/Scripts/python -m ruff check .`.
+  Never rely on `source activate` persisting between tool calls; never install
+  into system Python.
+- Use `opencv-python-headless`, never `opencv-python`. Use `reportlab` for
+  PDF, never `weasyprint` (GTK native deps do not install on this box).
 
 ## Project tracking — GitHub Issues are the source of truth
 
@@ -22,23 +26,37 @@ relevant issue; if none exists, create one. Status lives on the project board,
 not in chat or code.
 
 - Hierarchy: feature = parent issue (`type: feature`); tasks/sub-bugs = native
-  sub-issues (`gh sub-issue create --parent <n>` via the gh-sub-issue
-  extension).
+  sub-issues (`gh sub-issue create --parent <n>`). If the extension is
+  unavailable, fall back to plain issues with a "Parent: #n" line; never block
+  work on tracking mechanics.
 - Labels: one `type:` (feature|bug|task|chore), one `priority:`, one `area:`
   (model|construct|export|render|vision|cli|infra|docs).
 - Issue bodies use Description / Acceptance criteria (testable checkboxes) /
-  Non-goals, written in AWS docs style: active voice, present tense, second
-  person, concise, sentence-case headings, no "please/simply/just".
-- On starting: comment the plan on the issue. On finishing: comment
-  implementation notes (approach, files, test evidence) and commit with
-  `Fixes #<n>` in the message so the merge to main closes the issue.
-- Log discovered work as new issues. Never leave a code-only TODO.
+  Non-goals, in AWS docs style: active voice, present tense, second person,
+  concise, sentence-case headings, no "please/simply/just".
+- On starting: comment the plan on the issue. Progress notes and abandoned
+  approaches (`APPROACH FAILED:`) go to issue comments — they are the durable
+  memory that survives context compaction.
+- Work lands via branch + PR: branch `slice/s<n>-<name>` (or
+  `fix/<name>`), PR body contains `Fixes #<n>`, merge with
+  `gh pr merge --merge --delete-branch`, then `git checkout main && git pull`.
+  Direct pushes to main are blocked by policy — do not attempt them.
+- Log discovered work as new issues (no `S<n>:` title prefix — that prefix is
+  reserved for ordered sprint slices). Never leave a code-only TODO.
 
 ## Non-negotiables
 
 - Never edit a test threshold, golden file, or acceptance criterion to force a
-  pass. Golden files are generated once via the bless step, reviewed, then
-  frozen; regenerating one requires a stated reason in the commit message.
+  pass. Golden files under tests/golden/ are created once via `pytest --bless`
+  in a commit whose message contains `[bless]`, then frozen; before every
+  commit check `git diff --cached --name-only` does not touch tests/golden/.
+  The only honest escape for an unreachable criterion is
+  `xfail(reason="KNOWN_ISSUES: <entry>")` after 3 documented
+  `APPROACH FAILED:` comments.
+- Expected test values flow one way: hand computation (in comments) to
+  assertion. Never observed output to assertion, except through bless, once.
 - Every CV-derived value carries a confidence score; hand-authored data is 1.0.
-- Commits are authored by Jake Mismas <jake@jakemismas.com> only. No AI
-  co-author trailers.
+- Commits are authored by Jake Mismas <jake@jakemismas.com> only — verify
+  `git config user.name` / `user.email` before committing. No AI co-author
+  trailers of any kind.
+- Never force-push, never amend a pushed commit, never disable or delete CI.
