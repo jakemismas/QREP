@@ -8,6 +8,7 @@ from pydantic import ValidationError
 from qrep.construct import compute_yardage, get_strategy
 from qrep.export import export_all
 from qrep.model import QrepSchemaError, load
+from qrep.render import save_render
 from qrep.viewer import write_viewer
 
 app = typer.Typer(
@@ -80,6 +81,22 @@ def plan(
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(result.model_dump_json(indent=2) + "\n", encoding="utf-8", newline="\n")
         typer.echo(f"wrote {output}")
+
+
+@app.command()
+def render(
+    quilt_file: Path,
+    level: int = typer.Option(0, "--level", min=0, max=3),
+    seed: int = typer.Option(42, "--seed"),
+    scale: int = typer.Option(10, "--scale", help="pixels per finished inch"),
+    output: Path = typer.Option(Path("render.png"), "--output", "-o"),
+) -> None:
+    """Render the quilt to a synthetic PNG (plus ground-truth sidecar JSON)."""
+    quilt = _load_or_exit(quilt_file)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    png_path, sidecar_path = save_render(quilt, output, level=level, seed=seed, scale=scale)
+    typer.echo(f"wrote {png_path}")
+    typer.echo(f"wrote {sidecar_path}")
 
 
 @app.command()
