@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body{margin:0;background:#f2ebdc;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    a{color:#a5502f;}
+    a:hover{color:#8c3f22;}
+    ::selection{background:#ecd9b8;}
+    @keyframes qsvFade{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+    @keyframes qsvToast{from{opacity:0;transform:translate(-50%,10px);}to{opacity:1;transform:translate(-50%,0);}}
+    @page{size:letter;margin:0.45in;}
+    @media print{
+      body{background:#ffffff;}
+      [data-app]{display:none !important;}
+      [data-noprint]{display:none !important;}
+      [data-printsheet]{display:block !important;}
+    }
+  </style>
+</helmet>
+<div style="min-height:100vh;font-family:Seravek,'Gill Sans','Trebuchet MS',Verdana,sans-serif;color:#453a2a;font-size:17px;">
+<div data-app="true">
+
+  <sc-if value="{{ showPhoto }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="Uploaded photo" style="min-height:100vh;display:grid;place-items:center;padding:36px 24px;">
+      <div style="display:flex;flex-wrap:wrap;gap:56px;align-items:center;justify-content:center;max-width:980px;animation:qsvFade .4s ease;">
+        <div style="flex:none;transform:rotate(-2.5deg);background:#fffdf7;padding:16px 16px 14px;border:1px solid #e7dcc4;border-radius:4px;box-shadow:0 22px 44px rgba(96,66,28,0.26);">
+          <svg width="{{ photoW }}" height="{{ photoH }}" style="display:block;background:#e3d8bf;">
+            <rect x="{{ pQx }}" y="{{ pQy }}" width="{{ pQw }}" height="{{ pQh }}" fill="#f7f1e0" stroke="{{ bindColor }}" style="stroke-width:2;"></rect>
+            <path d="{{ pBlue1 }}" fill="{{ chain1 }}"></path>
+            <path d="{{ pBlue2 }}" fill="{{ chain2 }}"></path>
+            <path d="{{ pBlue3 }}" fill="{{ chain3 }}"></path>
+            <path d="{{ pQuilting }}" style="stroke:rgba(70,45,15,0.07);stroke-width:1;fill:none;"></path>
+            <rect x="0" y="0" width="{{ photoW }}" height="{{ photoH }}" fill="#d99a4e" opacity="0.09"></rect>
+          </svg>
+          <div style="margin-top:11px;display:flex;justify-content:space-between;align-items:baseline;gap:16px;">
+            <span style="font:italic 15px 'Bookman Old Style','URW Bookman',Bookman,'Iowan Old Style',Palatino,serif;color:#8a7a61;">IMG_2847.jpeg</span>
+            <span style="font-size:13px;color:#b3a488;">uploaded just now</span>
+          </div>
+        </div>
+        <div style="flex:1 1 340px;max-width:430px;display:flex;flex-direction:column;gap:18px;">
+          <div style="font-size:13px;letter-spacing:0.18em;text-transform:uppercase;color:#a5502f;font-weight:700;">Quilt Sizing Viewer</div>
+          <h1 style="margin:0;font:700 40px 'Bookman Old Style','URW Bookman',Bookman,'Iowan Old Style',Palatino,serif;color:#3f3423;line-height:1.12;">We read your quilt.</h1>
+          <p style="margin:0;font-size:18px;line-height:1.6;color:#6d5f49;">It looks like a <strong>Double Irish Chain</strong> — light blue chains on a cream background. Check the numbers, then open the sizing tool to try new sizes and see how much fabric each one takes.</p>
+          <div style="display:flex;flex-wrap:wrap;gap:10px;">
+            <span style="padding:8px 15px;border:1px solid #ddcfb2;border-radius:999px;background:#fbf7ec;font-size:15px;color:#5d4f39;">45 × 55 squares</span>
+            <span style="padding:8px 15px;border:1px solid #ddcfb2;border-radius:999px;background:#fbf7ec;font-size:15px;color:#5d4f39;">1½″ squares</span>
+            <span style="padding:8px 15px;border:1px solid #ddcfb2;border-radius:999px;background:#fbf7ec;font-size:15px;color:#5d4f39;">3¾″ border</span>
+            <span style="padding:8px 15px;border:1px solid #ddcfb2;border-radius:999px;background:#fbf7ec;font-size:15px;color:#5d4f39;">75″ × 90″ finished</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:20px;margin-top:8px;flex-wrap:wrap;">
+            <button onClick="{{ openTool }}" style="background:#a5502f;color:#fdf6e9;border:none;border-radius:12px;padding:16px 28px;font:600 18px Seravek,'Gill Sans','Trebuchet MS',Verdana,sans-serif;cursor:pointer;box-shadow:0 4px 12px rgba(140,63,34,0.28);" style-hover="background:#8c3f22;">Open the sizing tool</button>
+            <button onClick="{{ nudgeUpload }}" style="background:none;border:none;padding:4px 0;font-size:16px;font-family:inherit;color:#a5502f;cursor:pointer;text-decoration:underline;text-underline-offset:3px;">Use a different photo</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ showTool }}" hint-placeholder-val="{{ true }}">
+    <div data-screen-label="Sizing tool" style="max-width:1360px;margin:0 auto;padding:20px 28px 40px;animation:qsvFade .35s ease;">
+
+      <header style="display:flex;align-items:flex-start;gap:18px;margin-bottom:16px;flex-wrap:wrap;">
+        <div style="flex:1 1 300px;min-width:260px;padding-top:6px;">
+          <h1 style="margin:0;font:700 28px 'Bookman Old Style','URW Bookman',Bookman,'Iowan Old Style',Palatino,serif;color:#3f3423;">Double Irish Chain</h1>
+          <div style="font-size:15px;color:#8a7a61;margin-top:4px;">From your photo · IMG_2847.jpeg — every size shown is a finished measurement</div>
+        </div>
+        <button onClick="{{ newPlan }}" title="Reset everything to the photo's measurements" style="flex:none;margin-top:10px;background:#fffdf7;border:1.5px solid #d9c8a8;border-radius:10px;padding:11px 18px;font:500 16px Seravek,'Gill Sans','Trebuchet MS',Verdana,sans-serif;color:#6b573d;cursor:pointer;" style-hover="background:#f4ead6;">↺ Start a new plan</button>
+        <button onClick="{{ backToPhoto }}" title="See your photo full size" style="flex:none;background:#fffdf7;border:1px solid #e0d2b4;border-radius:4px;padding:7px 7px 4px;cursor:pointer;transform:rotate(1.8deg);box-shadow:0 6px 14px rgba(96,66,28,0.22);" style-hover="transform:rotate(0deg) scale(1.04);">
+          <svg width="{{ thumbW }}" height="{{ thumbH }}" style="display:block;">
+            <rect x="0" y="0" width="{{ thumbW }}" height="{{ thumbH }}" fill="#f7f1e0" stroke="{{ bindColor }}" style="stroke-width:1;"></rect>
+            <path d="{{ tBlue1 }}" fill="{{ chain1 }}"></path>
+            <path d="{{ tBlue2 }}" fill="{{ chain2 }}"></path>
+            <path d="{{ tBlue3 }}" fill="{{ chain3 }}"></path>
+          </svg>
+          <div style="font:italic 12px 'Bookman Old Style','URW Bookman',Bookman,'Iowan Old Style',Palatino,serif;color:#8a7a61;padding:4px 0 2px;text-align:center;">your photo</div>
+        </button>
+      </header>
+
+      <div data-grid="true" style="display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start;">
+
+        <section data-card="true" style="flex:1 1 560px;min-width:0;background:#fffdf7;border:1px solid #e7dcc4;border-radius:16px;box-shadow:0 2px 10px rgba(96,66,28,0.07);padding:16px 16px 10px;">
+          <div data-stage="true" style="position:relative;background:#e9dfc9;border-radius:12px;box-shadow:inset 0 1px 8px rgba(96,66,28,0.13);height:clamp(430px,calc(100vh - 280px),820px);overflow:hidden;">
+            <div ref="{{ stageRef }}" style="position:absolute;inset:14px;display:flex;align-items:center;justify-content:center;">
+              <svg width="{{ svgW }}" height="{{ svgH }}" style="display:block;">
+                <rect x="0" y="0" width="{{ svgW }}" height="27" fill="#f8f1e0"></rect>
+                <rect x="0" y="0" width="41" height="{{ svgH }}" fill="#f8f1e0"></rect>
+                <path d="{{ bandEdgeD }}" style="stroke:#d9cbae;stroke-width:1;fill:none;"></path>
+                <text x="19" y="18" style="font:italic 12px 'Bookman Old Style','URW Bookman',Bookman,Palatino,serif;fill:#a5906c;text-anchor:middle;">in</text>
+                <path d="{{ topMinorD }}" style="stroke:#8d7c60;stroke-width:1;fill:none;"></path>
+                <path d="{{ topMajorD }}" style="stroke:#6f5e44;stroke-width:1.6;fill:none;"></path>
+                <path d="{{ leftMinorD }}" style="stroke:#8d7c60;stroke-width:1;fill:none;"></path>
+                <path d="{{ leftMajorD }}" style="stroke:#6f5e44;stroke-width:1.6;fill:none;"></path>
+                <sc-for list="{{ topLabels }}" as="lb" hint-placeholder-count="1">
+                  <text x="{{ lb.x }}" y="12" style="font:11.5px Seravek,'Trebuchet MS',Verdana,sans-serif;fill:#8a795e;text-anchor:middle;">{{ lb.t }}</text>
+                </sc-for>
+                <sc-for list="{{ leftLabels }}" as="lb" hint-placeholder-count="1">
+                  <text x="27" y="{{ lb.y }}" style="font:11.5px Seravek,'Trebuchet MS',Verdana,sans-serif;fill:#8a795e;text-anchor:end;">{{ lb.t }}</text>
+                </sc-for>
+                <text x="{{ topEndX }}" y="12" style="font:700 12px Seravek,'Trebuchet MS',Verdana,sans-serif;fill:#a5502f;text-anchor:middle;">{{ topEndT }}</text>
+                <text x="27" y="{{ leftEndY }}" style="font:700 12px Seravek,'Trebuchet MS',Verdana,sans-serif;fill:#a5502f;text-anchor:end;">{{ leftEndT }}</text>
+                <g style="filter:drop-shadow(0 5px 13px rgba(96,66,28,0.3));">
+                  <rect x="44" y="30" width="{{ qw }}" height="{{ qh }}" rx="2" fill="#f7f1e0" stroke="{{ bindColor }}" style="stroke-width:2.5;"></rect>
+                  <path d="{{ blueD1 }}" fill="{{ chain1 }}"></path>
+                  <path d="{{ blueD2 }}" fill="{{ chain2 }}"></path>
+                  <path d="{{ blueD3 }}" fill="{{ chain3 }}"></path>
+                  <path d="{{ seamD }}" style="stroke:rgba(110,80,45,0.12);stroke-width:1;fill:none;"></path>
+                  <path d="{{ quiltingD }}" style="stroke:rgba(70,45,15,0.055);stroke-width:1;fill:none;"></path>
+                </g>
+              </svg>
+            </div>
+          </div>
+          <div style="display:flex;align-items:baseline;justify-content:space-between;gap:14px;padding:12px 8px 6px;flex-wrap:wrap;">
+            <span style="font-size:14px;color:#a3937a;">Preview at about 1:{{ scaleDen }} of real size</span>
+            <span style="font:600 22px 'Bookman Old Style','URW Bookman',Bookman,'Iowan Old Style',Palatino,serif;color:#3f3423;">{{ prettyW }}″ × {{ prettyH }}″ <span style="font:400 15px Seravek,'Gill Sans','Trebuchet MS',Verdana,sans-serif;color:#a3937a;">finished</span></span>
+          </div>
+        </section>
+
+        <div data-col="true" style="flex:1 1 330px;max-width:430px;display:flex;flex-direction:column;gap:20px;">
+
+          <section data-card="true" style="background:#fffdf7;border:1px solid #e7dcc4;border-radius:16px;box-shadow:0 2px 10px rgba(96,66,28,0.07);padding:20px;display:flex;flex-direction:column;gap:16px;">
+            <div style="display:flex;align-items:center;gap:12px;">
+              <h2 style="margin:0;font:700 21px 'Bookman Old Style','URW Bookman',Bookman,'Iowan Old Style',Palatino,serif;color:#3f3423;">Quilt size</h2>
+              <span style="flex:1;border-top:2px dashed #e0d2b4;"></span>
+            </div>
+            <label style="display:block;">
+              <span style="display:block;font-size:15px;color:#8a7a61;margin-bottom:6px;">Standard size</span>
+              <select value="{{ presetVal }}" onChange="{{ onPreset }}" style="width:100%;padding:13px 14px;font-size:17px;font-family:inherit;color:#453a2a;background:#fffdf7;border:1.5px solid #d9c8a8;border-radius:10px;cursor:pointer;">
+                <option value="custom">Custom size</option>
+                <option value="crib">Crib — 36 × 52</option>
+                <option value="throw">Throw — 50 × 65</option>
+                <option value="twin">Twin — 70 × 90</option>
+                <option value="full">Full — 84 × 90</option>
+                <option value="queen">Queen — 90 × 108</option>
+                <option value="king">King — 110 × 108</option>
+              </select>
+            </label>
+            <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:9px;align-items:end;">
+              <div>
+                <span style="display:block;font-size:15px;color:#8a7a61;margin-bottom:6px;">Width <span style="color:#bcac8d;">· in</span></span>
+                <div style="display:flex;gap:6px;">
+                  <button onClick="{{ decW }}" title="{{ wStepTitle }}" style="width:38px;height:52px;flex:none;font-size:22px;color:#6b573d;background:#faf5e8;border:1.5px solid #d9c8a8;border-radius:10px;cursor:pointer;line-height:1;" style-hover="background:#f1e6cf;">−</button>
+                  <input value="{{ wDraft }}" onChange="{{ typeW }}" onBlur="{{ commitW }}" onKeyDown="{{ enterKey }}" style="width:100%;min-width:0;text-align:center;font:600 18px 'Bookman Old Style','URW Bookman',Bookman,Palatino,serif;color:#3f3423;background:#fffdf7;border:1.5px solid #d9c8a8;border-radius:10px;padding:6px 2px;" style-focus="border-color:#a5502f;box-shadow:0 0 0 3px rgba(165,80,47,0.16);outline:none;">
+                  <button onClick="{{ incW }}" title="{{ wStepTitle }}" style="width:38px;height:52px;flex:none;font-size:22px;color:#6b573d;background:#faf5e8;border:1.5px solid #d9c8a8;border-radius:10px;cursor:pointer;line-height:1;" style-hover="background:#f1e6cf;">+</button>
+                </div>
+              </div>
+              <sc-if value="{{ locked }}" hint-placeholder-val="{{ true }}">
+                <button onClick="{{ toggleLock }}" title="{{ lockTitle }}" style="width:42px;height:52px;flex:none;background:#f6e7da;border:1.5px solid #cf9a7f;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;" style-hover="background:#f1dcc9;">
+                  <svg width="22" height="24" style="display:block;">
+                    <path d="M6.5 11V7.5a4.5 4.5 0 0 1 9 0V11" style="fill:none;stroke:#a5502f;stroke-width:2.4;"></path>
+                    <rect x="3.5" y="11" width="15" height="10.5" rx="2.5" fill="#a5502f"></rect>
+                  </svg>
+                </button>
+              </sc-if>
+              <sc-if value="{{ unlocked }}" hint-placeholder-val="{{ false }}">
+                <button onClick="{{ toggleLock }}" title="{{ lockTitle }}" style="width:42px;height:52px;flex:none;background:#faf5e8;border:1.5px solid #d9c8a8;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;" style-hover="background:#f1e6cf;">
+                  <svg width="24" height="24" style="display:block;">
+                    <path d="M9.5 11V6.5a4.5 4.5 0 0 1 9 0V8" style="fill:none;stroke:#98876b;stroke-width:2.4;"></path>
+                    <rect x="3.5" y="11" width="15" height="10.5" rx="2.5" fill="#98876b"></rect>
+                  </svg>
+                </button>
+              </sc-if>
+              <div>
+                <span style="display:block;font-size:15px;color:#8a7a61;margin-bottom:6px;">Height <span style="color:#bcac8d;">· in</span></span>
+                <div style="display:flex;gap:6px;">
+                  <button onClick="{{ decH }}" title="{{ hStepTitle }}" style="width:38px;height:52px;flex:none;font-size:22px;color:#6b573d;background:#faf5e8;border:1.5px solid #d9c8a8;border-radius:10px;cursor:pointer;line-height:1;" style-hover="background:#f1e6cf;">−</button>
+                  <input value="{{ hDraft }}" onChange="{{ typeH }}" onBlur="{{ commitH }}" onKeyDown="{{ enterKey }}" style="width:100%;min-width:0;text-align:center;font:600 18px 'Bookman Old Style','URW Bookman',Bookman,Palatino,serif;color:#3f3423;background:#fffdf7;border:1.5px solid #d9c8a8;border-radius:10px;padding:6px 2px;" style-focus="border-color:#a5502f;box-shadow:0 0 0 3px rgba(165,80,47,0.16);outline:none;">
+                  <button onClick="{{ incH }}" title="{{ hStepTitle }}" style="width:38px;height:52px;flex:none;font-size:22px;color:#6b573d;background:#faf5e8;border:1.5px solid #d9c8a8;border-radius:10px;cursor:pointer;line-height:1;" style-hover="background:#f1e6cf;">+</button>
+                </div>
+              </div>
+            </div>
+            <div style="font-size:14px;color:#a3937a;line-height:1.5;margin-top:-6px;">{{ lockModeLine }}</div>
+            <sc-if value="{{ showReqNote }}" hint-placeholder-val="{{ false }}">
+              <div style="background:#eef2e2;border:1px solid #d4dcba;border-radius:10px;padding:11px 14px;font-size:15px;color:#59663f;line-height:1.55;">{{ reqNote }}</div>
+            </sc-if>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:end;">
+              <div>
+                <span style="display:block;font-size:15px;color:#8a7a61;margin-bottom:6px;">Square size <span style="color:#bcac8d;">· in</span></span>
+                <div style="display:flex;gap:6px;">
+                  <button onClick="{{ decCell }}" title="A quarter inch smaller" style="width:38px;height:52px;flex:none;font-size:22px;color:#6b573d;background:#faf5e8;border:1.5px solid #d9c8a8;border-radius:10px;cursor:pointer;line-height:1;" style-hover="background:#f1e6cf;">−</button>
+                  <input value="{{ cellDraft }}" onChange="{{ typeCell }}" onBlur="{{ commitCell }}" onKeyDown="{{ enterKey }}" style="width:100%;min-width:0;text-align:center;font:600 18px 'Bookman Old Style','URW Bookman',Bookman,Palatino,serif;color:#3f3423;background:#fffdf7;border:1.5px solid #d9c8a8;border-radius:10px;padding:6px 2px;" style-focus="border-color:#a5502f;box-shadow:0 0 0 3px rgba(165,80,47,0.16);outline:none;">
+                  <button onClick="{{ incCell }}" title="A quarter inch bigger" style="width:38px;height:52px;flex:none;font-size:22px;color:#6b573d;background:#faf5e8;border:1.5px solid #d9c8a8;border-radius:10px;cursor:pointer;line-height:1;" style-hover="background:#f1e6cf;">+</button>
+                </div>
+              </div>
+              <div style="font-size:15px;color:#8a7a61;line-height:1.5;padding-bottom:6px;">Cut squares at <strong style="color:#5d4f39;">{{ cutText }}″</strong> — ¼″ seams included.</div>
+            </div>
+            <div>
+              <span style="display:block;font-size:15px;color:#8a7a61;margin-bottom:6px;">Border <span style="color:#bcac8d;">· in, cream on all four sides</span></span>
+              <div style="display:flex;gap:6px;align-items:center;">
+                <svg width="44" height="52" title="Cream Background" style="flex:none;display:block;">
+                  <rect x="2" y="5" width="40" height="42" rx="9" fill="#f7f1e0" stroke="#cbb894" style="stroke-width:1;"></rect>
+                </svg>
+                <button onClick="{{ decB }}" title="A quarter inch narrower" style="width:38px;height:52px;flex:none;font-size:22px;color:#6b573d;background:#faf5e8;border:1.5px solid #d9c8a8;border-radius:10px;cursor:pointer;line-height:1;" style-hover="background:#f1e6cf;">−</button>
+                <input value="{{ bDraft }}" onChange="{{ typeB }}" onBlur="{{ commitB }}" onKeyDown="{{ enterKey }}" style="width:100%;min-width:0;max-width:130px;text-align:center;font:600 18px 'Bookman Old Style','URW Bookman',Bookman,Palatino,serif;color:#3f3423;background:#fffdf7;border:1.5px solid #d9c8a8;border-radius:10px;padding:6px 2px;align-self:stretch;" style-focus="border-color:#a5502f;box-shadow:0 0 0 3px rgba(165,80,47,0.16);outline:none;">
+                <button onClick="{{ incB }}" title="A quarter inch wider" style="width:38px;height:52px;flex:none;font-size:22px;color:#6b573d;background:#faf5e8;border:1.5px solid #d9c8a8;border-radius:10px;cursor:pointer;line-height:1;" style-hover="background:#f1e6cf;">+</button>
+                <span style="font-size:14px;color:#a3937a;line-height:1.4;padding-left:6px;">Handy for fine-tuning the finished size.</span>
+              </div>
+            </div>
+            <div style="background:#f8f1df;border:1px dashed #d9c8a8;border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:7px;">
+              <div style="display:flex;justify-content:space-between;gap:12px;font-size:16.5px;color:#5d4f39;"><span>Squares</span><strong style="font-weight:600;">{{ eqSquares }}</strong></div>
+              <div style="display:flex;justify-content:space-between;gap:12px;font-size:16.5px;color:#5d4f39;"><span>Border</span><strong style="font-weight:600;">{{ eqBorder }}</strong></div>
+              <div style="border-top:1px dashed #d9c8a8;margin-top:3px;padding-top:9px;display:flex;justify-content:space-between;align-items:baseline;gap:12px;"><span style="font-size:15px;color:#8a7a61;">Finished quilt</span><strong style="font:700 20px 'Bookman Old Style','URW Bookman',Bookman,'Iowan Old Style',Palatino,serif;color:#a5502f;">{{ eqTotal }}</strong></div>
+              <div style="font-size:14px;color:#a3937a;line-height:1.5;">{{ blocksLine }}</div>
+            </div>
+          </section>
+
+          <section data-card="true" style="background:#fffdf7;border:1px solid #e7dcc4;border-radius:16px;box-shadow:0 2px 10px rgba(96,66,28,0.07);padding:20px;">
+            <div style="display:flex;align-items:center;gap:12px;">
+              <h2 style="margin:0;font:700 21px 'Bookman Old Style','URW Bookman',Bookman,'Iowan Old Style',Palatino,serif;color:#3f3423;">Fabric</h2>
+              <span style="flex:1;border-top:2px dashed #e0d2b4;"></span>
+              <span style="font-size:13px;color:#8a7a61;border:1px solid #ddcfb2;border-radius:999px;padding:4px 12px;background:#fbf7ec;">estimates</span>
+            </div>
+            <sc-for list="{{ fabrics }}" as="f" hint-placeholder-count="2">
+              <div style="display:flex;align-items:center;gap:14px;padding:14px 2px;border-bottom:1px dashed #ecdfc4;">
+                <svg width="46" height="46" style="flex:none;display:block;">
+                  <rect x="1" y="1" width="44" height="44" rx="9" fill="{{ f.color }}" stroke="#cbb894" style="stroke-width:1;"></rect>
+                </svg>
+                <div style="flex:1;min-width:0;">
+                  <div style="font-weight:600;font-size:17px;color:#3f3423;">{{ f.name }}</div>
+                  <div style="font-size:15px;color:#8a7a61;margin-top:3px;line-height:1.45;">{{ f.detail }}</div>
+                </div>
+                <div style="text-align:right;flex:none;">
+                  <div style="font:700 19px 'Bookman Old Style','URW Bookman',Bookman,'Iowan Old Style',Palatino,serif;color:#3f3423;white-space:nowrap;">{{ f.yards }}</div>
+                  <div style="font-size:13px;color:#b3a488;font-style:italic;">{{ f.sub }}</div>
+                </div>
+              </div>
+            </sc-for>
+            <div style="display:flex;align-items:center;gap:12px;margin-top:16px;">
+              <span style="font-size:13px;letter-spacing:0.14em;text-transform:uppercase;color:#a5906c;font-weight:700;">To finish</span>
+              <span style="flex:1;border-top:2px dashed #e0d2b4;"></span>
+            </div>
+            <sc-for list="{{ finishing }}" as="f" hint-placeholder-count="3">
+              <div style="display:flex;align-items:center;gap:14px;padding:14px 2px;border-bottom:1px dashed #ecdfc4;">
+                <svg width="46" height="46" style="flex:none;display:block;">
+                  <rect x="1" y="1" width="44" height="44" rx="9" fill="{{ f.color }}" stroke="#cbb894" style="stroke-width:1;"></rect>
+                </svg>
+                <div style="flex:1;min-width:0;">
+                  <div style="font-weight:600;font-size:17px;color:#3f3423;">{{ f.name }}</div>
+                  <div style="font-size:15px;color:#8a7a61;margin-top:3px;line-height:1.45;">{{ f.detail }}</div>
+                </div>
+                <div style="text-align:right;flex:none;">
+                  <div style="font:700 19px 'Bookman Old Style','URW Bookman',Bookman,'Iowan Old Style',Palatino,serif;color:#3f3423;white-space:nowrap;">{{ f.yards }}</div>
+                  <div style="font-size:13px;color:#b3a488;font-style:italic;">{{ f.sub }}</div>
+                </div>
+              </div>
+            </sc-for>
+            <p style="margin:12px 2px 0;font-size:14px;color:#a3937a;line-height:1.55;">Yardage rounds up to the next ¼ yard and assumes 40″ of usable fabric width. Batting is shown as the size you need — packaged sizes vary by brand.</p>
+          </section>
+
+          <div>
+            <sc-if value="{{ notCopied }}" hint-placeholder-val="{{ true }}">
+              <button onClick="{{ copySettings }}" style="width:100%;padding:17px;font:600 18px Seravek,'Gill Sans','Trebuchet MS',Verdana,sans-serif;background:#a5502f;color:#fdf6e9;border:none;border-radius:12px;cursor:pointer;box-shadow:0 4px 12px rgba(140,63,34,0.28);" style-hover="background:#8c3f22;">Copy my settings</button>
+            </sc-if>
+            <sc-if value="{{ copied }}" hint-placeholder-val="{{ false }}">
+              <button style="width:100%;padding:17px;font:600 18px Seravek,'Gill Sans','Trebuchet MS',Verdana,sans-serif;background:#4c7a5a;color:#f2f7ee;border:none;border-radius:12px;cursor:default;">Copied ✓</button>
+            </sc-if>
+            <button onClick="{{ printPage }}" style="width:100%;margin-top:10px;padding:16px;font:600 18px Seravek,'Gill Sans','Trebuchet MS',Verdana,sans-serif;background:#53718b;color:#f1f5f8;border:none;border-radius:12px;cursor:pointer;box-shadow:0 4px 12px rgba(60,85,105,0.25);" style-hover="background:#43607a;">Print this plan</button>
+            <p style="margin:10px 4px 0;font-size:14px;color:#a3937a;line-height:1.5;text-align:center;">Copy pastes a plain-text summary; Print makes a one-page plan to take to the fabric store.</p>
+          </div>
+
+        </div>
+      </div>
+
+      <p style="margin:24px 4px 0;font-size:14px;color:#a3937a;line-height:1.6;">All measurements are <strong>finished</strong> sizes; cutting numbers include ¼″ seam allowance. Fabric numbers are a planning guide, not a promise — buy a little extra for insurance.</p>
+    </div>
+  </sc-if>
+
+</div>
+
+  <div data-printsheet="true" style="display:none;font-family:Seravek,'Gill Sans','Trebuchet MS',Verdana,sans-serif;color:#3b3020;">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:16px;border-bottom:2.5px solid #3b3020;padding-bottom:10px;">
+      <div style="font:700 25px 'Bookman Old Style','URW Bookman',Bookman,'Iowan Old Style',Palatino,serif;">Double Irish Chain — quilt plan</div>
+      <div style="font-size:13px;color:#6d5f49;white-space:nowrap;">{{ todayStr }} · Quilt Sizing Viewer</div>
+    </div>
+    <div style="display:flex;gap:20px;align-items:baseline;flex-wrap:wrap;padding:14px 0 4px;">
+      <span style="font:700 30px 'Bookman Old Style','URW Bookman',Bookman,'Iowan Old Style',Palatino,serif;">{{ eqTotal }}</span>
+      <span style="font-size:15px;color:#6d5f49;">finished · {{ printPresetLine }}</span>
+    </div>
+    <div style="display:flex;gap:8px 26px;font-size:14.5px;color:#4a3f2d;padding-bottom:14px;flex-wrap:wrap;">
+      <span>Squares: <strong>{{ eqSquares }}</strong> (cut {{ cutText }}″)</span>
+      <span>Blocks: <strong>{{ printBlocks }}</strong></span>
+      <span>Border: <strong>{{ eqBorder }}</strong></span>
+    </div>
+    <div style="display:flex;gap:26px;align-items:flex-start;">
+      <svg width="{{ prSvgW }}" height="{{ prSvgH }}" style="display:block;flex:none;">
+        <rect x="0" y="0" width="{{ prSvgW }}" height="27" fill="#f6f1e4"></rect>
+        <rect x="0" y="0" width="41" height="{{ prSvgH }}" fill="#f6f1e4"></rect>
+        <path d="{{ prBandEdgeD }}" style="stroke:#c9bda2;stroke-width:1;fill:none;"></path>
+        <text x="19" y="18" style="font:italic 12px 'Bookman Old Style','URW Bookman',Bookman,Palatino,serif;fill:#8f7d5f;text-anchor:middle;">in</text>
+        <path d="{{ prTopMinorD }}" style="stroke:#8d7c60;stroke-width:1;fill:none;"></path>
+        <path d="{{ prTopMajorD }}" style="stroke:#5f5038;stroke-width:1.6;fill:none;"></path>
+        <path d="{{ prLeftMinorD }}" style="stroke:#8d7c60;stroke-width:1;fill:none;"></path>
+        <path d="{{ prLeftMajorD }}" style="stroke:#5f5038;stroke-width:1.6;fill:none;"></path>
+        <sc-for list="{{ prTopLabels }}" as="lb" hint-placeholder-count="1">
+          <text x="{{ lb.x }}" y="12" style="font:11px Seravek,'Trebuchet MS',Verdana,sans-serif;fill:#6d5f49;text-anchor:middle;">{{ lb.t }}</text>
+        </sc-for>
+        <sc-for list="{{ prLeftLabels }}" as="lb" hint-placeholder-count="1">
+          <text x="27" y="{{ lb.y }}" style="font:11px Seravek,'Trebuchet MS',Verdana,sans-serif;fill:#6d5f49;text-anchor:end;">{{ lb.t }}</text>
+        </sc-for>
+        <text x="{{ prTopEndX }}" y="12" style="font:700 11.5px Seravek,'Trebuchet MS',Verdana,sans-serif;fill:#a5502f;text-anchor:middle;">{{ prTopEndT }}</text>
+        <text x="27" y="{{ prLeftEndY }}" style="font:700 11.5px Seravek,'Trebuchet MS',Verdana,sans-serif;fill:#a5502f;text-anchor:end;">{{ prLeftEndT }}</text>
+        <rect x="44" y="30" width="{{ prQw }}" height="{{ prQh }}" rx="2" fill="#f7f1e0" stroke="{{ bindColor }}" style="stroke-width:2;"></rect>
+        <path d="{{ prBlue1 }}" fill="{{ chain1 }}"></path>
+        <path d="{{ prBlue2 }}" fill="{{ chain2 }}"></path>
+        <path d="{{ prBlue3 }}" fill="{{ chain3 }}"></path>
+        <path d="{{ prSeamD }}" style="stroke:rgba(110,80,45,0.14);stroke-width:0.7;fill:none;"></path>
+      </svg>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:12.5px;letter-spacing:0.14em;text-transform:uppercase;color:#8a7a61;font-weight:700;padding-bottom:4px;border-bottom:1.5px solid #3b3020;">Shopping list</div>
+        <sc-for list="{{ fabrics }}" as="f" hint-placeholder-count="2">
+          <div style="display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid #ddd2ba;">
+            <svg width="26" height="26" style="flex:none;display:block;"><rect x="1" y="1" width="24" height="24" rx="5" fill="{{ f.color }}" stroke="#a99a78" style="stroke-width:1;"></rect></svg>
+            <div style="flex:1;min-width:0;">
+              <div style="font-weight:600;font-size:14.5px;">{{ f.name }}</div>
+              <div style="font-size:12.5px;color:#6d5f49;margin-top:1px;">{{ f.detail }}</div>
+            </div>
+            <div style="text-align:right;flex:none;">
+              <div style="font:700 15px 'Bookman Old Style','URW Bookman',Bookman,Palatino,serif;white-space:nowrap;">{{ f.yards }}</div>
+              <div style="font-size:11px;color:#8a7a61;font-style:italic;">{{ f.sub }}</div>
+            </div>
+          </div>
+        </sc-for>
+        <div style="font-size:12.5px;letter-spacing:0.14em;text-transform:uppercase;color:#8a7a61;font-weight:700;padding:14px 0 4px;border-bottom:1.5px solid #3b3020;">To finish</div>
+        <sc-for list="{{ finishing }}" as="f" hint-placeholder-count="3">
+          <div style="display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid #ddd2ba;">
+            <svg width="26" height="26" style="flex:none;display:block;"><rect x="1" y="1" width="24" height="24" rx="5" fill="{{ f.color }}" stroke="#a99a78" style="stroke-width:1;"></rect></svg>
+            <div style="flex:1;min-width:0;">
+              <div style="font-weight:600;font-size:14.5px;">{{ f.name }}</div>
+              <div style="font-size:12.5px;color:#6d5f49;margin-top:1px;">{{ f.detail }}</div>
+            </div>
+            <div style="text-align:right;flex:none;">
+              <div style="font:700 15px 'Bookman Old Style','URW Bookman',Bookman,Palatino,serif;white-space:nowrap;">{{ f.yards }}</div>
+              <div style="font-size:11px;color:#8a7a61;font-style:italic;">{{ f.sub }}</div>
+            </div>
+          </div>
+        </sc-for>
+        <p style="margin:12px 0 0;font-size:12px;color:#6d5f49;line-height:1.55;">Yardage rounds up to the next ¼ yard, assuming 40″ usable width. All measurements are finished sizes; square cutting numbers include ¼″ seam allowance. Buy a little extra for insurance.</p>
+      </div>
+    </div>
+  </div>
+
+  <sc-if value="{{ toastOn }}" hint-placeholder-val="{{ false }}">
+    <div data-noprint="true" style="position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#43372a;color:#fbf4e4;padding:13px 26px;border-radius:999px;font-size:16px;box-shadow:0 10px 26px rgba(60,40,15,0.35);animation:qsvToast .28s ease;z-index:50;white-space:nowrap;max-width:90vw;overflow:hidden;text-overflow:ellipsis;">{{ toastMsg }}</div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;chainColor&quot;: {&quot;editor&quot;: &quot;color&quot;, &quot;default&quot;: &quot;#a9c7dc&quot;, &quot;options&quot;: [&quot;#a9c7dc&quot;, &quot;#b9c9a8&quot;, &quot;#dcb8ae&quot;, &quot;#c9b6d6&quot;], &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Fabric&quot;},
+  &quot;showSeams&quot;: {&quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Preview&quot;},
+  &quot;showQuilting&quot;: {&quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Preview&quot;}
+}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = Object.assign(this._defaults(), { stageW: 880, stageH: 560 });
+    this.stageRef = React.createRef();
+    this._measure = this._measure.bind(this);
+    this.PRESETS = [
+      { k: 'crib', n: 'Crib', w: 36, h: 52 },
+      { k: 'throw', n: 'Throw', w: 50, h: 65 },
+      { k: 'twin', n: 'Twin', w: 70, h: 90 },
+      { k: 'full', n: 'Full', w: 84, h: 90 },
+      { k: 'queen', n: 'Queen', w: 90, h: 108 },
+      { k: 'king', n: 'King', w: 110, h: 108 }
+    ];
+    this._photo = this._buildQuilt(45, 55, 1.5, 3.75, 3.75, 75, 90, 3.6, 15, 15, { quilting: true });
+    this._thumb = this._buildQuilt(45, 55, 1.5, 3.75, 3.75, 75, 90, 1.15, 0, 0, {});
+  }
+
+  _defaults() {
+    return {
+      screen: 'photo', cols: 45, rows: 55, cell: 1.5, B: 3.75, locked: true,
+      presetK: null, reqW: null, reqH: null,
+      wDraft: '75', hDraft: '90', cellDraft: '1 1/2', bDraft: '3 3/4',
+      copied: false, toast: ''
+    };
+  }
+  _W(st) { const s = st || this.state; return s.cols * s.cell + 2 * s.B; }
+  _H(st) { const s = st || this.state; return s.rows * s.cell + 2 * s.B; }
+
+  componentDidMount() {
+    window.addEventListener('resize', this._measure);
+    this._measure();
+    setTimeout(this._measure, 60);
+  }
+  componentWillUnmount() {
+    window.removeEventListener('resize', this._measure);
+    clearTimeout(this._ct); clearTimeout(this._tt);
+  }
+  _measure() {
+    const el = this.stageRef && this.stageRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const w = Math.round(r.width), h = Math.round(r.height);
+    if (w > 40 && h > 40 && (Math.abs(w - this.state.stageW) > 1 || Math.abs(h - this.state.stageH) > 1)) {
+      this.setState({ stageW: w, stageH: h });
+    }
+  }
+
+  // ---------- fractions ----------
+  _fmt(v) {
+    const G = { 1: '⅛', 2: '¼', 3: '⅜', 4: '½', 5: '⅝', 6: '¾', 7: '⅞' };
+    const n = Math.round(v * 8), w = Math.trunc(n / 8), r = n % 8;
+    if (!r) return '' + w;
+    if (!w) return G[r];
+    return w + G[r];
+  }
+  _fmtA(v) {
+    const G = { 1: '1/8', 2: '1/4', 3: '3/8', 4: '1/2', 5: '5/8', 6: '3/4', 7: '7/8' };
+    const n = Math.round(v * 8), w = Math.trunc(n / 8), r = n % 8;
+    if (!r) return '' + w;
+    if (!w) return G[r];
+    return w + ' ' + G[r];
+  }
+  _parse(s) {
+    if (s == null) return null;
+    s = String(s).trim().toLowerCase();
+    s = s.replace(/[″"]/g, '').replace(/\s*in(ch(es)?)?\.?\s*$/, '').trim();
+    const uni = { '⅛': ' 1/8', '¼': ' 1/4', '⅜': ' 3/8', '½': ' 1/2', '⅝': ' 5/8', '¾': ' 3/4', '⅞': ' 7/8' };
+    s = s.replace(/[⅛¼⅜½⅝¾⅞]/g, function (ch) { return uni[ch]; }).replace(/\s+/g, ' ').trim();
+    if (!s) return null;
+    let m = s.match(/^(\d+)[ -](\d+)\s*\/\s*(\d+)$/);
+    if (m) { const d = +m[3]; if (!d) return null; return +m[1] + (+m[2]) / d; }
+    m = s.match(/^(\d+)\s*\/\s*(\d+)$/);
+    if (m) { const d = +m[2]; if (!d) return null; return (+m[1]) / d; }
+    if (/^\d+(\.\d+)?$/.test(s)) return parseFloat(s);
+    return null;
+  }
+  _r8(v) { return Math.round(v * 8) / 8; }
+  _clampCell(v) { return Math.max(0.75, Math.min(3, this._r8(v))); }
+  _clampB(v) { return Math.max(0, Math.min(12, this._r8(v))); }
+
+  // ---------- pattern ----------
+  _isBlue(r, c) {
+    const R = Math.floor(r / 5), C = Math.floor(c / 5), i = r % 5, j = c % 5;
+    if (((R + C) % 2) === 0) {
+      return !((i === 0 && j === 2) || (i === 2 && (j === 0 || j === 4)) || (i === 4 && j === 2));
+    }
+    return (i === 0 || i === 4) && (j === 0 || j === 4);
+  }
+
+  _derive() {
+    const s = this.state;
+    const key = [s.cols, s.rows, s.cell, s.B].join('|');
+    if (this._dk === key) return this._dv;
+    const W = this._W(), H = this._H();
+    let blue = 0;
+    for (let r = 0; r < s.rows; r++) for (let c = 0; c < s.cols; c++) if (this._isBlue(r, c)) blue++;
+    const cream = s.cols * s.rows - blue;
+    const cut = s.cell + 0.5;
+    const perStrip = Math.max(1, Math.floor(40 / cut));
+    const inBlue = Math.ceil(blue / perStrip) * cut;
+    const inCreamSq = Math.ceil(cream / perStrip) * cut;
+    const inBorder = (Math.ceil((2 * H) / 40) + Math.ceil((2 * W) / 40)) * (s.B + 0.5);
+    const up = function (v) { return Math.ceil((v / 36) / 0.25) * 0.25; };
+    const yBlue = up(inBlue), yCream = up(inCreamSq + inBorder);
+    // finishing: backing, batting, binding
+    const needW = W + 8, needH = H + 8;
+    const vertPanels = Math.ceil(needW / 40), horzPanels = Math.ceil(needH / 40);
+    const useVert = vertPanels * needH <= horzPanels * needW;
+    const backPanels = useVert ? vertPanels : horzPanels;
+    const yBack = up(useVert ? vertPanels * needH : horzPanels * needW);
+    const perim = 2 * (W + H) + 10;
+    const bindStrips = Math.ceil(perim / 40);
+    const yBind = up(bindStrips * 2.5);
+    const packs = [['Crib', 45, 60], ['Twin', 72, 90], ['Full', 81, 96], ['Queen', 90, 108], ['King', 120, 120]];
+    let pack = null;
+    for (let i = 0; i < packs.length; i++) {
+      const p = packs[i];
+      if ((p[1] >= needW && p[2] >= needH) || (p[1] >= needH && p[2] >= needW)) { pack = p; break; }
+    }
+    this._dk = key;
+    this._dv = { W: W, H: H, blue: blue, cream: cream, cut: cut, yBlue: yBlue, yCream: yCream, needW: needW, needH: needH, backPanels: backPanels, yBack: yBack, perim: perim, bindStrips: bindStrips, yBind: yBind, pack: pack };
+    return this._dv;
+  }
+
+  // ---------- drawing ----------
+  _buildQuilt(cols, rows, cell, bx, by, W, H, ppi, x0, y0, opt) {
+    opt = opt || {};
+    const r2 = function (v) { return Math.round(v * 100) / 100; };
+    const cp = cell * ppi, ix = x0 + bx * ppi, iy = y0 + by * ppi;
+    const blue = ['', '', ''];
+    const w = r2(cp + 0.3);
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        if (!this._isBlue(r, c)) continue;
+        const i = (r * 7 + c * 13) % 3;
+        blue[i] += 'M' + r2(ix + c * cp) + ' ' + r2(iy + r * cp) + 'h' + w + 'v' + w + 'h-' + w + 'z';
+      }
+    }
+    let seams = '';
+    if (opt.seams && cp >= 2.6) {
+      for (let c = 0; c <= cols; c++) seams += 'M' + r2(ix + c * cp) + ' ' + r2(iy) + 'v' + r2(rows * cp);
+      for (let r = 0; r <= rows; r++) seams += 'M' + r2(ix) + ' ' + r2(iy + r * cp) + 'h' + r2(cols * cp);
+    }
+    let quilting = '';
+    if (opt.quilting && ppi >= 1.8) {
+      for (let k = -H; k <= W; k += 5) {
+        const x1 = Math.max(0, k), y1 = Math.max(0, -k), x2 = Math.min(W, H + k), y2 = Math.min(H, W - k);
+        if (x2 > x1) quilting += 'M' + r2(x0 + x1 * ppi) + ' ' + r2(y0 + y1 * ppi) + 'L' + r2(x0 + x2 * ppi) + ' ' + r2(y0 + y2 * ppi);
+      }
+      for (let k = 0; k <= W + H; k += 5) {
+        const x1 = Math.max(0, k - H), y1 = Math.min(H, k), x2 = Math.min(W, k), y2 = Math.max(0, k - W);
+        if (x2 > x1) quilting += 'M' + r2(x0 + x1 * ppi) + ' ' + r2(y0 + y1 * ppi) + 'L' + r2(x0 + x2 * ppi) + ' ' + r2(y0 + y2 * ppi);
+      }
+    }
+    return { qx: r2(x0), qy: r2(y0), qw: r2(W * ppi), qh: r2(H * ppi), w: r2(W * ppi + 2 * x0), h: r2(H * ppi + 2 * y0), blue: blue, seams: seams, quilting: quilting };
+  }
+
+  _rulers(W, H, ppi) {
+    const r2 = function (v) { return Math.round(v * 100) / 100; };
+    const svgW = Math.ceil(44 + W * ppi + 4), svgH = Math.ceil(30 + H * ppi + 4);
+    let tMin = '', tMaj = '', lMin = '', lMaj = '';
+    const topLabels = [], leftLabels = [];
+    for (let i = 0; i <= Math.floor(W); i++) {
+      const x = r2(44 + i * ppi);
+      if (i % 5) { tMin += 'M' + x + ' 27v-6'; }
+      else {
+        tMaj += 'M' + x + ' 27v-11';
+        if (i === 0 || (W - i) * ppi >= 26) topLabels.push({ x: x, t: '' + i });
+      }
+    }
+    tMaj += 'M' + r2(44 + W * ppi) + ' 27v-11';
+    for (let i = 0; i <= Math.floor(H); i++) {
+      const y = r2(30 + i * ppi);
+      if (i % 5) { lMin += 'M41 ' + y + 'h-6'; }
+      else {
+        lMaj += 'M41 ' + y + 'h-11';
+        if (i === 0 || (H - i) * ppi >= 20) leftLabels.push({ y: r2(y + 4), t: '' + i });
+      }
+    }
+    lMaj += 'M41 ' + r2(30 + H * ppi) + 'h-11';
+    return {
+      svgW: svgW, svgH: svgH,
+      bandEdgeD: 'M0 27.5H' + svgW + 'M41.5 0V' + svgH,
+      tMin: tMin, tMaj: tMaj, lMin: lMin, lMaj: lMaj,
+      topLabels: topLabels, leftLabels: leftLabels,
+      topEndX: r2(44 + W * ppi), topEndT: this._fmt(W),
+      leftEndY: r2(30 + H * ppi + 4), leftEndT: this._fmt(H)
+    };
+  }
+
+  _shade(hex, f) {
+    const n = parseInt(hex.slice(1), 16);
+    let r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+    r = Math.max(0, Math.min(255, Math.round(r * f)));
+    g = Math.max(0, Math.min(255, Math.round(g * f)));
+    b = Math.max(0, Math.min(255, Math.round(b * f)));
+    return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+  }
+
+  // ---------- actions ----------
+  _toast(msg) {
+    this.setState({ toast: msg });
+    clearTimeout(this._tt);
+    this._tt = setTimeout(() => this.setState({ toast: '' }), 3600);
+  }
+  _apply(patch, req) {
+    const n = Object.assign({}, this.state, patch);
+    const W = n.cols * n.cell + 2 * n.B, H = n.rows * n.cell + 2 * n.B;
+    this.setState(Object.assign({}, patch, {
+      presetK: (req && req.presetK) || null,
+      reqW: req && req.w != null ? req.w : null,
+      reqH: req && req.h != null ? req.h : null,
+      wDraft: this._fmtA(req && req.w != null ? req.w : W),
+      hDraft: this._fmtA(req && req.h != null ? req.h : H),
+      cellDraft: this._fmtA(n.cell),
+      bDraft: this._fmtA(n.B)
+    }));
+  }
+  _commitW(v) {
+    const s = this.state;
+    if (s.locked) {
+      const bc = s.B / s.cell;
+      const cellN = this._clampCell(v / (s.cols + 2 * bc));
+      this._apply({ cell: cellN, B: this._clampB(bc * cellN) }, { w: v });
+    } else {
+      const K = Math.max(1, Math.round((v - 2 * s.B) / (s.cell * 5)));
+      this._apply({ cols: K * 5 }, { w: v });
+    }
+  }
+  _commitH(v) {
+    const s = this.state;
+    if (s.locked) {
+      const bc = s.B / s.cell;
+      const cellN = this._clampCell(v / (s.rows + 2 * bc));
+      this._apply({ cell: cellN, B: this._clampB(bc * cellN) }, { h: v });
+    } else {
+      const K = Math.max(1, Math.round((v - 2 * s.B) / (s.cell * 5)));
+      this._apply({ rows: K * 5 }, { h: v });
+    }
+  }
+
+  _copyText(d) {
+    const s = this.state, A = this._fmtA.bind(this);
+    const p = this.PRESETS.find(p => p.k === s.presetK) || this.PRESETS.find(p => Math.abs(p.w - d.W) < 0.01 && Math.abs(p.h - d.H) < 0.01);
+    return [
+      'MY QUILT — Double Irish Chain',
+      'Finished size: ' + A(d.W) + ' x ' + A(d.H) + ' in' + (p ? ' (' + p.n + ')' : ''),
+      'Squares: ' + A(s.cell) + ' in finished (' + A(d.cut) + ' in cut) — ' + s.cols + ' x ' + s.rows + ' grid',
+      'Blocks: ' + (s.cols / 5) + ' x ' + (s.rows / 5) + ' (5 x 5 squares each)',
+      'Border: ' + A(s.B) + ' in all around',
+      '',
+      'Fabric (estimate, 40 in usable width):',
+      '- Light Blue Chain: ' + d.blue.toLocaleString('en-US') + ' squares — about ' + A(d.yBlue) + ' yd',
+      '- Cream Background: ' + d.cream.toLocaleString('en-US') + ' squares + border — about ' + A(d.yCream) + ' yd',
+      '- Backing: about ' + A(d.yBack) + ' yd (' + d.backPanels + ' panels, seamed)',
+      '- Batting: ' + A(d.needW) + ' x ' + A(d.needH) + ' in' + (d.pack ? ' (a ' + d.pack[0] + ' pack fits)' : ' (buy by the yard)'),
+      '- Binding: about ' + A(d.yBind) + ' yd (' + d.bindStrips + ' strips cut 2 1/2 in)',
+      'All yardage rounded up to the next 1/4 yd, assuming 40 in usable width.',
+      '',
+      '— Quilt Sizing Viewer'
+    ].join('\n');
+  }
+
+  renderVals() {
+    const s = this.state;
+    const chain = this.props.chainColor || '#a9c7dc';
+    const showSeams = this.props.showSeams !== false;
+    const showQuilting = this.props.showQuilting !== false;
+    const d = this._derive();
+    const fmt = this._fmt.bind(this);
+    const W = d.W, H = d.H;
+
+    // main preview
+    const aw = Math.max(360, s.stageW), ah = Math.max(300, s.stageH);
+    const ppi = Math.max(1.1, Math.min((aw - 52) / W, (ah - 38) / H));
+    const q = this._buildQuilt(s.cols, s.rows, s.cell, s.B, s.B, W, H, ppi, 44, 30, { seams: showSeams, quilting: showQuilting });
+    const ru = this._rulers(W, H, ppi);
+
+    // print sheet
+    const pPpi = Math.max(1, Math.min(315 / W, 430 / H));
+    const pq = this._buildQuilt(s.cols, s.rows, s.cell, s.B, s.B, W, H, pPpi, 44, 30, { seams: true });
+    const pru = this._rulers(W, H, pPpi);
+
+    const fabrics = [
+      { color: chain, name: 'Light Blue Chain', detail: d.blue.toLocaleString('en-US') + ' squares · cut ' + fmt(d.cut) + '″ each', yards: fmt(d.yBlue) + ' yd', sub: 'estimate' },
+      { color: '#f7f1e0', name: 'Cream Background', detail: d.cream.toLocaleString('en-US') + ' squares + border strips', yards: fmt(d.yCream) + ' yd', sub: 'estimate' }
+    ];
+    const finishing = [
+      { color: '#ded1b4', name: 'Backing', detail: d.backPanels + ' panels of 40″ fabric, seamed together', yards: fmt(d.yBack) + ' yd', sub: 'estimate' },
+      { color: '#f6f2e6', name: 'Batting', detail: 'quilt plus 4″ on every side' + (d.pack ? ' — a ' + d.pack[0] + ' pack (' + d.pack[1] + ' × ' + d.pack[2] + '″) covers it' : ' — wider than standard packs'), yards: fmt(d.needW) + '″ × ' + fmt(d.needH) + '″', sub: 'size needed' },
+      { color: this._shade(chain, 0.72), name: 'Binding', detail: d.bindStrips + ' strips cut 2½″ wide — wraps ' + fmt(d.perim - 10) + '″ around', yards: fmt(d.yBind) + ' yd', sub: 'estimate' }
+    ];
+
+    const preset = this.PRESETS.find(p => p.k === s.presetK) || this.PRESETS.find(p => Math.abs(p.w - W) < 0.01 && Math.abs(p.h - H) < 0.01);
+    const oddBlocks = ((s.cols / 5) % 2 === 1) && ((s.rows / 5) % 2 === 1);
+
+    // requested vs achieved
+    const missW = s.reqW != null && Math.abs(s.reqW - W) > 0.065;
+    const missH = s.reqH != null && Math.abs(s.reqH - H) > 0.065;
+    let reqNote = '';
+    if (missW || missH) {
+      const reqTxt = fmt(s.reqW != null ? s.reqW : W) + '″ × ' + fmt(s.reqH != null ? s.reqH : H) + '″';
+      const achTxt = fmt(W) + '″ × ' + fmt(H) + '″';
+      reqNote = s.locked
+        ? 'Keeping the pattern in proportion, ' + reqTxt + ' lands at ' + achTxt + ' — the squares come out at ' + fmt(s.cell) + '″.'
+        : 'You can’t sew part of a block, so the closest to ' + reqTxt + ' is ' + achTxt + '. Nudge the border to fine-tune.';
+    }
+
+    return {
+      showPhoto: s.screen === 'photo',
+      showTool: s.screen === 'tool',
+      stageRef: this.stageRef,
+
+      photoW: this._photo.w, photoH: this._photo.h,
+      pQx: this._photo.qx, pQy: this._photo.qy, pQw: this._photo.qw, pQh: this._photo.qh,
+      pBlue1: this._photo.blue[0], pBlue2: this._photo.blue[1], pBlue3: this._photo.blue[2],
+      pQuilting: this._photo.quilting,
+      thumbW: this._thumb.w, thumbH: this._thumb.h,
+      tBlue1: this._thumb.blue[0], tBlue2: this._thumb.blue[1], tBlue3: this._thumb.blue[2],
+
+      chain1: chain, chain2: this._shade(chain, 0.955), chain3: this._shade(chain, 1.045),
+      bindColor: this._shade(chain, 0.72),
+
+      svgW: ru.svgW, svgH: ru.svgH, bandEdgeD: ru.bandEdgeD,
+      topMinorD: ru.tMin, topMajorD: ru.tMaj, leftMinorD: ru.lMin, leftMajorD: ru.lMaj,
+      topLabels: ru.topLabels, leftLabels: ru.leftLabels,
+      topEndX: ru.topEndX, topEndT: ru.topEndT, leftEndY: ru.leftEndY, leftEndT: ru.leftEndT,
+      qw: q.qw, qh: q.qh,
+      blueD1: q.blue[0], blueD2: q.blue[1], blueD3: q.blue[2],
+      seamD: q.seams, quiltingD: q.quilting,
+      scaleDen: Math.max(2, Math.round(96 / ppi)),
+
+      prSvgW: pru.svgW, prSvgH: pru.svgH, prBandEdgeD: pru.bandEdgeD,
+      prTopMinorD: pru.tMin, prTopMajorD: pru.tMaj, prLeftMinorD: pru.lMin, prLeftMajorD: pru.lMaj,
+      prTopLabels: pru.topLabels, prLeftLabels: pru.leftLabels,
+      prTopEndX: pru.topEndX, prTopEndT: pru.topEndT, prLeftEndY: pru.leftEndY, prLeftEndT: pru.leftEndT,
+      prQw: pq.qw, prQh: pq.qh,
+      prBlue1: pq.blue[0], prBlue2: pq.blue[1], prBlue3: pq.blue[2],
+      prSeamD: pq.seams,
+      todayStr: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+      printPresetLine: preset ? 'a standard ' + preset.n : 'a custom size',
+      printBlocks: (s.cols / 5) + ' × ' + (s.rows / 5),
+
+      prettyW: fmt(W), prettyH: fmt(H),
+      cutText: fmt(d.cut),
+      eqSquares: s.cols + ' × ' + s.rows + ' at ' + fmt(s.cell) + '″ each',
+      eqBorder: fmt(s.B) + '″ all around',
+      eqTotal: fmt(W) + '″ × ' + fmt(H) + '″',
+      blocksLine: (s.cols / 5) + ' × ' + (s.rows / 5) + ' blocks — ' + (oddBlocks ? 'a chain block lands in every corner, nice and symmetric.' : 'an even block count, so the chain won’t reach every corner.'),
+      wDraft: s.wDraft, hDraft: s.hDraft, cellDraft: s.cellDraft, bDraft: s.bDraft,
+      presetVal: preset ? preset.k : 'custom',
+      fabrics: fabrics,
+      finishing: finishing,
+
+      locked: s.locked, unlocked: !s.locked,
+      lockTitle: s.locked ? 'Locked — click to size width and height on their own' : 'Unlocked — click to keep width and height in proportion',
+      lockModeLine: s.locked ? 'Locked: width and height scale together — the pattern stays, the squares resize.' : 'Unlocked: each side grows or shrinks by whole blocks (5 squares at a time).',
+      wStepTitle: s.locked ? 'Scales the whole quilt — ⅛″ per square' : 'One block (5 squares) at a time',
+      hStepTitle: s.locked ? 'Scales the whole quilt — ⅛″ per square' : 'One block (5 squares) at a time',
+      showReqNote: !!reqNote, reqNote: reqNote,
+
+      copied: s.copied, notCopied: !s.copied,
+      toastOn: !!s.toast, toastMsg: s.toast,
+
+      openTool: () => { this.setState({ screen: 'tool' }); setTimeout(this._measure, 40); setTimeout(this._measure, 240); },
+      backToPhoto: () => this.setState({ screen: 'photo' }),
+      newPlan: () => {
+        this.setState(this._defaults());
+        this._toast('Fresh start — back to the photo’s measurements.');
+      },
+      nudgeUpload: () => this._toast('This demo uses the sample photo — yours would go right here.'),
+      printPage: () => window.print(),
+      toggleLock: () => {
+        const to = !s.locked;
+        this.setState({ locked: to });
+        this._toast(to ? 'Locked — width and height scale together.' : 'Unlocked — each side moves by whole blocks.');
+      },
+      onPreset: (e) => {
+        const p = this.PRESETS.find(x => x.k === e.target.value);
+        if (!p) return;
+        if (s.locked) {
+          const bc = s.B / s.cell;
+          const cellN = this._clampCell(Math.min(p.w / (s.cols + 2 * bc), p.h / (s.rows + 2 * bc)));
+          this._apply({ cell: cellN, B: this._clampB(bc * cellN) }, { w: p.w, h: p.h, presetK: p.k });
+        } else {
+          const Kw = Math.max(1, Math.round((p.w - 2 * s.B) / (s.cell * 5)));
+          const Kh = Math.max(1, Math.round((p.h - 2 * s.B) / (s.cell * 5)));
+          this._apply({ cols: Kw * 5, rows: Kh * 5 }, { w: p.w, h: p.h, presetK: p.k });
+        }
+      },
+      typeW: (e) => this.setState({ wDraft: e.target.value }),
+      typeH: (e) => this.setState({ hDraft: e.target.value }),
+      typeCell: (e) => this.setState({ cellDraft: e.target.value }),
+      typeB: (e) => this.setState({ bDraft: e.target.value }),
+      commitW: (e) => {
+        const v = this._parse(e.target.value);
+        if (v == null) { this.setState({ wDraft: this._fmtA(W) }); this._toast('Try inches like 75 or 75 1/2'); return; }
+        this._commitW(Math.max(20, Math.min(140, Math.round(v * 4) / 4)));
+      },
+      commitH: (e) => {
+        const v = this._parse(e.target.value);
+        if (v == null) { this.setState({ hDraft: this._fmtA(H) }); this._toast('Try inches like 90 or 90 1/2'); return; }
+        this._commitH(Math.max(20, Math.min(140, Math.round(v * 4) / 4)));
+      },
+      commitCell: (e) => {
+        const v = this._parse(e.target.value);
+        if (v == null) { this.setState({ cellDraft: this._fmtA(s.cell) }); this._toast('Try a size like 1 1/2 or 2'); return; }
+        const cellN = this._clampCell(v);
+        const patch = { cell: cellN };
+        if (s.locked) patch.B = this._clampB((s.B / s.cell) * cellN);
+        this._apply(patch, null);
+      },
+      commitB: (e) => {
+        const v = this._parse(e.target.value);
+        if (v == null) { this.setState({ bDraft: this._fmtA(s.B) }); this._toast('Try a width like 3 3/4'); return; }
+        this._apply({ B: this._clampB(v) }, null);
+      },
+      enterKey: (e) => { if (e.key === 'Enter') e.target.blur(); },
+      incW: () => { if (s.locked) { this._scaleStep(1); } else { this._apply({ cols: s.cols + 5 }, null); } },
+      decW: () => { if (s.locked) { this._scaleStep(-1); } else { this._apply({ cols: Math.max(5, s.cols - 5) }, null); } },
+      incH: () => { if (s.locked) { this._scaleStep(1); } else { this._apply({ rows: s.rows + 5 }, null); } },
+      decH: () => { if (s.locked) { this._scaleStep(-1); } else { this._apply({ rows: Math.max(5, s.rows - 5) }, null); } },
+      incCell: () => {
+        const cellN = this._clampCell(s.cell + 0.25);
+        const patch = { cell: cellN };
+        if (s.locked) patch.B = this._clampB((s.B / s.cell) * cellN);
+        this._apply(patch, null);
+      },
+      decCell: () => {
+        const cellN = this._clampCell(s.cell - 0.25);
+        const patch = { cell: cellN };
+        if (s.locked) patch.B = this._clampB((s.B / s.cell) * cellN);
+        this._apply(patch, null);
+      },
+      incB: () => this._apply({ B: this._clampB(s.B + 0.25) }, null),
+      decB: () => this._apply({ B: this._clampB(s.B - 0.25) }, null),
+      copySettings: () => {
+        const t = this._copyText(d);
+        const done = () => {
+          this.setState({ copied: true });
+          this._toast('Copied! Paste it into notes, email, anywhere.');
+          clearTimeout(this._ct);
+          this._ct = setTimeout(() => this.setState({ copied: false }), 2600);
+        };
+        const fb = () => {
+          try {
+            const ta = document.createElement('textarea');
+            ta.value = t; ta.style.position = 'fixed'; ta.style.opacity = '0';
+            document.body.appendChild(ta); ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            done();
+          } catch (err) { this._toast('Could not copy — sorry!'); }
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(t).then(done, fb);
+        } else fb();
+      }
+    };
+  }
+
+  _scaleStep(dir) {
+    const s = this.state;
+    const bc = s.B / s.cell;
+    const cellN = this._clampCell(s.cell + 0.125 * dir);
+    this._apply({ cell: cellN, B: this._clampB(bc * cellN) }, null);
+  }
+}
+</script>
+</body>
+</html>
