@@ -29,9 +29,14 @@ def detect_borders(
     rows, cols = grid.shape
 
     def uniformity(values: np.ndarray) -> tuple[float, int]:
+        # trimmed modal fraction: up to 15 percent of a strip may be occluded
+        # or noisy (an L3 corner occluder) without hiding a real border strip;
+        # interior rows/cols stay far below the bar (fixture worst case 0.71
+        # trimmed vs the 0.93 threshold)
         counts = np.bincount(values)
         modal = int(np.argmax(counts))
-        return float(counts[modal] / len(values)), modal
+        keep = max(1, len(values) - int(0.15 * len(values)))
+        return min(1.0, float(counts[modal] / keep)), modal
 
     strips = {"left": 0, "right": 0, "top": 0, "bottom": 0}
     fabrics: list[int] = []
