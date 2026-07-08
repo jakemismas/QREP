@@ -75,7 +75,10 @@ LANDING PROCEDURE (per slice):
    Fixes #<issue>"`. Then `gh pr merge --merge --delete-branch`, then
    `git checkout main && git pull`, then confirm the issue auto-closed
    (`gh issue view <n>`); if not, close it with a comment pointing at the
-   merge commit.
+   merge commit. Confirm the slice branch is gone locally and remotely
+   (`git branch`, `git fetch --prune`); delete any stray with
+   `git branch -d` / `git push origin --delete`. Branch hygiene invariant:
+   between slices, `main` is the ONLY branch, local and remote.
 4. Post the closing comment: `CLOSING: criteria verified.` plus the pytest
    summary line and key outputs.
 5. Direct pushes to main are blocked by a hook. If `gh pr merge` itself is
@@ -112,8 +115,12 @@ and continue next iteration.
 
 COMPLETION: when S0-S9 are all closed, verify the parent #2 checklist (CI
 green on main — wait for it; REPORT.md present with fresh numbers), tick its
-boxes, post a final summary comment on #2, close #2, output the line
-`SPRINT COMPLETE` and stop the loop. On an environmental hard block (gh auth
+boxes, and verify branch hygiene: `gh api repos/jakemismas/QREP/branches
+--jq '.[].name'` must return exactly `main`; delete any leftover merged
+branch (`gh api -X DELETE repos/jakemismas/QREP/git/refs/heads/<b>` only
+after confirming its commit is contained in main via `git branch -r
+--contains`). Then post a final summary comment on #2, close #2, output the
+line `SPRINT COMPLETE` and stop the loop. On an environmental hard block (gh auth
 dead, disk full, a mandatory dep unresolvable after 3 distinct install
 strategies), comment `BLOCKED:` on #2 with diagnosis and suggested human
 action, output `SPRINT BLOCKED: <one line>` and stop the loop. Never stop
