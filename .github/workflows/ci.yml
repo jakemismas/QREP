@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -24,3 +28,119 @@ jobs:
         run: ruff check .
       - name: Test
         run: pytest -q
+
+  web-spike:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install python deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      - name: Install web deps
+        run: npm ci
+        working-directory: web
+      - name: Cache vendored wheels
+        uses: actions/cache@v4
+        with:
+          path: web/.vendor-cache
+          key: vendor-${{ hashFiles('web/vendor.lock.json') }}
+      - name: Vendor pinned Pyodide runtime and wheels
+        run: node scripts/vendor.mjs
+        working-directory: web
+      - name: Build qrep wheel into the site
+        run: node scripts/wheel.mjs
+        working-directory: web
+        env:
+          QREP_PYTHON: python
+      - name: Build site
+        run: npm run build
+        working-directory: web
+      - name: Unit tests (vitest)
+        run: npm test -- --run
+        working-directory: web
+      - name: Install Playwright chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: web
+      - name: Spike e2e against the built site
+        run: npx playwright test
+        working-directory: web
+      - name: Native pypdf checks on the browser-produced booklet
+        run: pytest tests/test_wasm_artifacts.py -q
+        env:
+          QREP_WASM_PDF: web/test-results/spike/booklet.pdf
+      - name: Upload spike artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spike-artifacts
+          path: web/test-results/spike/
+          if-no-files-found: ignore
+      - name: Compose Pages artifact (docs site at root, app under /app/)
+        run: |
+          mkdir -p _site/app
+          cp -r docs/* _site/
+          cp -r web/dist/* _site/app/
+          touch _site/.nojekyll
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy-pages:
+    if: github.ref == 'refs/heads/main'
+    needs: [test, web-spike]
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
+
+  live-spike:
+    if: github.ref == 'refs/heads/main'
+    needs: deploy-pages
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install python deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      - name: Install web deps
+        run: npm ci
+        working-directory: web
+      - name: Install Playwright chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: web
+      - name: Spike e2e against the deployed Pages site
+        run: npx playwright test
+        working-directory: web
+        env:
+          SPIKE_BASE_URL: https://jakemismas.github.io/QREP/app/
+      - name: Native pypdf checks on the live-site booklet
+        run: pytest tests/test_wasm_artifacts.py -q
+        env:
+          QREP_WASM_PDF: web/test-results/spike/booklet.pdf
