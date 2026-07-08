@@ -12,7 +12,10 @@ working dir `C:\Users\Jake Mismas\QREP`, Git Bash on Windows 11, Python 3.13.
 No human is available until morning. Before any work, read from disk:
 CLAUDE.md, qrep-design-doc.md, qrep-claude-code-prompt.md. They are binding.
 The sprint is GitHub issue #2 with ordered slice sub-issues titled `S0:` to
-`S9:`; each slice issue body is that slice's contract.
+`S10:`; each slice issue body is that slice's contract. The sprint ends by
+publishing GitHub release v0.1.0 (slice S10) so Jake can download and test it
+in the morning. Jake's viewer design mock is committed at
+docs/viewer-mock.html — S5 uses it as the look-and-layout reference.
 
 IRON RULE. Chat history is untrusted and may be compacted at any time. The
 only durable state is: git log on main, GitHub issue open/closed state, issue
@@ -28,7 +31,7 @@ WAKEUP PROCEDURE — run this checklist first, every single iteration:
 2. `gh issue list --state open --json number,title --limit 50` and the same
    with `--state closed`. Slice issues are titled `S<n>:`. If none exist in
    either state, comment nothing, output `SPRINT BLOCKED: no slice issues`
-   and stop the loop. If all S0-S9 are closed, go to COMPLETION.
+   and stop the loop. If all S0-S10 are closed, go to COMPLETION.
 3. Current slice = the open slice issue with the LOWEST S-number. Never touch
    a higher slice while a lower one is open.
 4. `git status -sb` and `gh pr list --state open`:
@@ -90,6 +93,15 @@ NO-THRASH RULE:
   tweak) demonstrably cannot meet a criterion — or when one approach has
   consumed an entire wakeup with no measured improvement. On abandoning:
   `APPROACH FAILED: <name> — what/why/best numbers` comment.
+- COUNCIL ESCALATION: after the 2nd `APPROACH FAILED:` on the same criterion,
+  before spending the 3rd attempt, load the adversarial-review skill and
+  convene a council on the problem: independent reviewer agents prompted to
+  REFUTE the current diagnosis and propose the failure mode you are missing
+  (correctness, algorithm choice, test-harness bug, spec misread). Post the
+  council's verdict as a `PROGRESS:` comment, then spend the 3rd attempt on
+  its best recommendation. Also convene a council before landing S7 if any
+  threshold passed by less than 2 percent margin — a near-miss pass is where
+  gamed tests hide.
 - On the 3rd for the same criterion: write the KNOWN_ISSUES.md entry (all
   three attempts, actual numbers), mark ONLY the unmeetable test
   `xfail(reason="KNOWN_ISSUES: <entry>", strict=False)`, keep every other
@@ -113,9 +125,10 @@ their own CI run on main; poll with `gh run list` on a short wakeup (~270s).
 Otherwise end a wakeup at a natural checkpoint (after a `PROGRESS:` comment)
 and continue next iteration.
 
-COMPLETION: when S0-S9 are all closed, verify the parent #2 checklist (CI
-green on main — wait for it; REPORT.md present with fresh numbers), tick its
-boxes, and verify branch hygiene: `gh api repos/jakemismas/QREP/branches
+COMPLETION: when S0-S10 are all closed, verify the parent #2 checklist (CI
+green on main — wait for it; REPORT.md present with fresh numbers; release
+v0.1.0 exists with assets via `gh release view v0.1.0`), tick its boxes, and
+verify branch hygiene: `gh api repos/jakemismas/QREP/branches
 --jq '.[].name'` must return exactly `main`; delete any leftover merged
 branch (`gh api -X DELETE repos/jakemismas/QREP/git/refs/heads/<b>` only
 after confirming its commit is contained in main via `git branch -r

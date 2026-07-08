@@ -26,7 +26,7 @@ All lengths are stored internally and in JSON as integer eighths of an inch. 1.5
 ## Interfaces in v1
 
 - CLI and JSON editing are the primary interfaces. No manual editing tools.
-- One bounded exception to the no-GUI rule: the sizing viewer, a single static HTML file (vanilla JS, no framework, no server, no build step) that loads a quilt JSON, renders the quilt top with inch rulers on the x and y axes, and re-renders live when the user changes finished width, height, or cell size inputs. View plus sizing only: no cell editing, no fabric picking, no persistence beyond copying adjusted values back into the JSON. Anything beyond that is future UI and out of scope.
+- One bounded exception to the no-GUI rule: the sizing viewer, a single static HTML file (vanilla JS, no framework, no server, no build step) that loads a quilt JSON, renders the quilt top with inch rulers on the x and y axes, and re-renders live when the user changes finished width, height, cell size, or border band width inputs. A proportion lock (default locked) scales cell size so the pattern is preserved exactly; unlocked resizing adds or removes whole blocks and reports achieved-vs-requested dimensions. The committed docs/viewer-mock.html is the look-and-layout reference. View plus sizing only: no cell editing, no fabric picking, no persistence beyond copying adjusted values back into the JSON. Anything beyond that is future UI and out of scope.
 
 ### CLI signatures (pinned; the README walkthrough is written against these)
 
@@ -36,6 +36,7 @@ qrep plan quilt.json --strategy historical|strip|modern -o plan.json
 qrep export quilt.json --strategy strip --out dist/ [--formats cutlist,yardage,svg,pdf]   # default all
 qrep render quilt.json --level 0..3 --seed 42 --scale 10 -o out.png
 qrep reverse img.png -o recovered.json [--corners x1,y1,...,x4,y4] [--fabrics N]
+qrep compare truth.json recovered.json
 qrep view quilt.json -o viewer.html
 ```
 
@@ -169,6 +170,7 @@ Explicitly out of scope for v1: multi-image fusion, folded or partial quilts, st
 - S7 CV pipeline validated against synthetic images, L0 through L2
 - S8 stretch: real photos if reference/ has any, otherwise L3 robustness (report-only, no gating thresholds, timeboxed)
 - S9 docs: README walkthrough, REPORT.md, KNOWN_ISSUES sweep, packaging honesty check
+- S10 release: version 0.1.0, sdist + wheel, GitHub release with demo artifacts (PDF, cut list, SVG, viewer.html, renders, recovered model + compare output)
 
 Each slice gates on green tests (pytest and ruff locally, CI green on main for the previous slice). A gate is satisfied when all tests pass OR each failing test is marked xfail(reason="KNOWN_ISSUES: <entry>", strict=False) with a matching KNOWN_ISSUES.md entry recording actual numbers, permitted only after 3 documented distinct attempts. Never delete or weaken an assertion. Each slice lands as a branch plus PR with Fixes #N; direct pushes to main are blocked by policy.
 
