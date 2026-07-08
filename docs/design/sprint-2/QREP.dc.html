@@ -1,0 +1,2000 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body{--serif:'Bookman Old Style','URW Bookman',Bookman,'Iowan Old Style',Palatino,serif;--sans:Seravek,'Gill Sans','Trebuchet MS',Verdana,sans-serif;--bg:#f2ebdc;--card:#fffdf7;--card2:#faf5e8;--card3:#f8f1df;--ink:#453a2a;--ink2:#5d4f39;--mut:#8a7a61;--faint:#a3937a;--line:#e7dcc4;--line2:#d9c8a8;--accent:#a5502f;--accentB:#8c3f22;--accentInk:#fdf6e9;--sage:#4c7a5a;--sageBg:#eef2e2;--sageLn:#d4dcba;--denim:#53718b;--amber:#a8781f;--stage:#e9dfc9;--pill:#fbf7ec;--pillLn:#ddcfb2;--shadow:rgba(96,66,28,.12);margin:0;background:var(--bg);-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    body[data-theme="dark"]{--bg:#211a10;--card:#2e2517;--card2:#382e1d;--card3:#3f3421;--ink:#f0e6d0;--ink2:#ddcfb0;--mut:#b3a184;--faint:#93826a;--line:#453a26;--line2:#5b4b2e;--accent:#d98a5e;--accentB:#e3a077;--accentInk:#2a1305;--sage:#9cc2a1;--sageBg:#2b3722;--sageLn:#48593a;--denim:#93b3cf;--amber:#d9ae55;--stage:#181208;--pill:#382e1d;--pillLn:#5b4b2e;--shadow:rgba(0,0,0,.45);}
+    a{color:var(--accent);}a:hover{color:var(--accentB);}
+    ::selection{background:#ecd9b8;}
+    @keyframes qFade{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+    @keyframes qToast{from{opacity:0;transform:translate(-50%,10px);}to{opacity:1;transform:translate(-50%,0);}}
+    @keyframes qSpin{to{transform:rotate(360deg);}}
+    @keyframes qPulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+    @page{size:letter;margin:0.45in;}
+    @media print{body{background:#fff;}[data-app]{display:none !important;}[data-printsheet]{display:block !important;}}
+  </style>
+</helmet>
+<div style="min-height:100vh;font-family:var(--sans);color:var(--ink);font-size:17px;">
+<div data-app="true">
+
+  <header data-noprint="true" style="position:sticky;top:0;z-index:30;background:var(--card);border-bottom:1px solid var(--line);padding:9px 16px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 10px var(--shadow);">
+    <button onClick="{{ goHome }}" data-tip="Back to the start screen" onMouseEnter="{{ tipOn }}" onMouseLeave="{{ tipOff }}" style="display:flex;align-items:center;gap:9px;background:none;border:none;cursor:pointer;padding:4px 2px;flex:none;">
+      <svg width="26" height="26" style="display:block;"><rect x="1" y="1" width="11" height="11" rx="2" fill="#a9c7dc"></rect><rect x="14" y="1" width="11" height="11" rx="2" fill="var(--accent)"></rect><rect x="1" y="14" width="11" height="11" rx="2" fill="var(--accent)"></rect><rect x="14" y="14" width="11" height="11" rx="2" fill="#a9c7dc"></rect></svg>
+      <span style="font:700 20px var(--serif);color:var(--ink);letter-spacing:.05em;">QREP</span>
+      <sc-if value="{{ isDesk }}" hint-placeholder-val="{{ true }}"><span style="font:italic 13px var(--serif);color:var(--mut);">quilt reverse-engineering</span></sc-if>
+    </button>
+    <sc-if value="{{ isDesk }}" hint-placeholder-val="{{ true }}">
+      <input value="{{ projName }}" onChange="{{ typeName }}" data-tip="Project name — click to rename" onMouseEnter="{{ tipOn }}" onMouseLeave="{{ tipOff }}" style="flex:0 1 240px;min-width:120px;background:none;border:1.5px solid transparent;border-radius:9px;padding:8px 10px;font:600 15.5px var(--sans);color:var(--ink2);" style-hover="border-color:var(--line2);" style-focus="border-color:var(--accent);outline:none;background:var(--card2);">
+    </sc-if>
+    <span style="flex:1;"></span>
+    <span data-tip="Changes save to this device automatically" onMouseEnter="{{ tipOn }}" onMouseLeave="{{ tipOff }}" style="display:flex;align-items:center;gap:7px;font-size:13.5px;color:var(--mut);flex:none;">
+      <span style="{{ saveDotStyle }}"></span>
+      <sc-if value="{{ isDesk }}" hint-placeholder-val="{{ true }}"><span>{{ saveText }}</span></sc-if>
+    </span>
+    <button onClick="{{ openJsonModal }}" style="flex:none;background:var(--card);border:1.5px solid var(--line2);border-radius:9px;padding:9px 14px;font:500 14.5px var(--sans);color:var(--ink2);cursor:pointer;" style-hover="background:var(--card2);">Open</button>
+    <button onClick="{{ saveJson }}" style="flex:none;background:var(--card);border:1.5px solid var(--line2);border-radius:9px;padding:9px 14px;font:500 14.5px var(--sans);color:var(--ink2);cursor:pointer;" style-hover="background:var(--card2);">Save</button>
+    <span data-tip="{{ engineTip }}" onMouseEnter="{{ tipOn }}" onMouseLeave="{{ tipOff }}" style="display:flex;align-items:center;gap:8px;padding:8px 13px;border:1px solid var(--pillLn);border-radius:999px;background:var(--pill);font-size:13px;color:var(--ink2);flex:none;">
+      <sc-if value="{{ engineBoot }}" hint-placeholder-val="{{ true }}"><svg width="13" height="13" style="display:block;animation:qSpin 0.9s linear infinite;"><circle cx="6.5" cy="6.5" r="5" style="fill:none;stroke:var(--denim);stroke-width:2.4;stroke-dasharray:22 10;"></circle></svg></sc-if>
+      <sc-if value="{{ engineReady }}" hint-placeholder-val="{{ false }}"><span style="width:9px;height:9px;border-radius:50%;background:var(--sage);"></span></sc-if>
+      <sc-if value="{{ engineBusy }}" hint-placeholder-val="{{ false }}"><span style="width:9px;height:9px;border-radius:50%;background:var(--amber);animation:qPulse 1s ease infinite;"></span></sc-if>
+      <sc-if value="{{ isDesk }}" hint-placeholder-val="{{ true }}"><span>{{ engineText }}</span></sc-if>
+    </span>
+    <button onClick="{{ toggleTheme }}" data-tip="{{ themeTip }}" onMouseEnter="{{ tipOn }}" onMouseLeave="{{ tipOff }}" style="flex:none;width:40px;height:40px;background:var(--card);border:1.5px solid var(--line2);border-radius:9px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--ink2);" style-hover="background:var(--card2);">
+      <sc-if value="{{ themeLight }}" hint-placeholder-val="{{ true }}"><svg width="18" height="18" style="display:block;"><circle cx="9" cy="9" r="4" fill="currentColor"></circle><path d="M9 0v3M9 15v3M0 9h3M15 9h3M2.6 2.6l2.1 2.1M13.3 13.3l2.1 2.1M15.4 2.6l-2.1 2.1M4.7 13.3l-2.1 2.1" style="stroke:currentColor;stroke-width:1.6;"></path></svg></sc-if>
+      <sc-if value="{{ themeDark }}" hint-placeholder-val="{{ false }}"><svg width="18" height="18" style="display:block;"><path d="M15 11.5A7 7 0 0 1 6.5 3 7 7 0 1 0 15 11.5z" fill="currentColor"></path></svg></sc-if>
+    </button>
+  </header>
+
+  <main style="{{ mainStyle }}">
+
+    <sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
+      <div data-screen-label="Start" style="animation:qFade .4s ease;max-width:880px;margin:30px auto 0;">
+        <div style="font-size:12.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--denim);font-weight:700;">QREP · quilt reverse-engineering</div>
+        <h1 style="margin:10px 0 8px;font:700 40px var(--serif);color:var(--denim);line-height:1.12;">Turn a quilt photo into a pattern.</h1>
+        <p style="margin:0 0 22px;font-size:17.5px;line-height:1.55;color:var(--mut);max-width:56ch;">QREP finds the grid, matches the fabrics, and does the sizing and yardage math. Everything runs right here in your browser.</p>
+        <sc-if value="{{ hasResume }}" hint-placeholder-val="{{ false }}">
+          <button onClick="{{ resumeSession }}" style="display:flex;align-items:center;gap:10px;background:var(--sageBg);border:1.5px solid var(--sageLn);border-radius:12px;padding:13px 18px;font:600 15.5px var(--sans);color:var(--sage);cursor:pointer;margin-bottom:20px;" style-hover="border-color:var(--sage);">
+            <svg width="15" height="15" style="display:block;"><path d="M2 8a6 6 0 1 1 1.7 4.2M2 12.5V8h4.5" style="fill:none;stroke:currentColor;stroke-width:2;"></path></svg>
+            Continue where you left off — {{ resumeName }}
+          </button>
+        </sc-if>
+        <div style="display:flex;flex-wrap:wrap;gap:44px;align-items:center;margin-top:4px;">
+          <button onClick="{{ startPhoto }}" style="flex:none;transform:rotate(-2deg);background:#fffdf7;border:1px solid #e7dcc4;border-radius:4px;padding:13px 13px 9px;box-shadow:0 18px 38px var(--shadow);cursor:pointer;text-align:left;" style-hover="transform:rotate(0deg) scale(1.02);">
+            <svg width="{{ th.w }}" height="{{ th.h }}" style="display:block;">
+              <sc-for list="{{ th.bands }}" as="b" hint-placeholder-count="1"><rect x="{{ b.x }}" y="{{ b.y }}" width="{{ b.w }}" height="{{ b.h }}" fill="{{ b.c }}"></rect></sc-for>
+              <rect x="{{ th.ix }}" y="{{ th.iy }}" width="{{ th.iw }}" height="{{ th.ih }}" fill="{{ th.bg }}"></rect>
+              <sc-for list="{{ th.paths }}" as="p" hint-placeholder-count="1"><path d="{{ p.d }}" fill="{{ p.c }}"></path></sc-for>
+              <path d="{{ th.quiltD }}" style="stroke:rgba(70,45,15,0.08);stroke-width:1;fill:none;"></path>
+              <rect x="0" y="0" width="{{ th.w }}" height="{{ th.h }}" fill="#d99a4e" opacity="0.1"></rect>
+            </svg>
+            <span style="display:flex;justify-content:space-between;gap:14px;padding-top:7px;">
+              <span style="font:italic 14px var(--serif);color:#8a7a61;">IMG_2847.jpeg</span>
+              <span style="font-size:12.5px;color:#b3a488;">sample photo</span>
+            </span>
+          </button>
+          <div style="flex:1 1 300px;max-width:430px;display:flex;flex-direction:column;gap:13px;align-items:flex-start;">
+            <p style="margin:0;font-size:16.5px;line-height:1.6;color:var(--ink2);">Lay the quilt flat, take one straight-on shot, and drop it in. You get back a quilt you can repaint, resize and re-plan — with the fabric math done for you.</p>
+            <button onClick="{{ startPhoto }}" style="background:var(--accent);color:var(--accentInk);border:none;border-radius:12px;padding:16px 26px;font:600 18px var(--sans);cursor:pointer;box-shadow:0 4px 12px var(--shadow);" style-hover="background:var(--accentB);">Start from a photo</button>
+            <button onClick="{{ startDemo }}" style="background:var(--card);border:1.5px solid var(--line2);border-radius:11px;padding:12px 18px;font:600 15.5px var(--sans);color:var(--ink2);cursor:pointer;" style-hover="background:var(--card2);">Open the demo quilt instead</button>
+            <button onClick="{{ startBlank }}" style="background:none;border:none;padding:6px 0 0;font-size:14.5px;font-family:inherit;color:var(--denim);cursor:pointer;text-decoration:underline;text-underline-offset:3px;">No photo handy? Start from a blank grid</button>
+            <span style="font-size:12.5px;color:var(--faint);">Vision engine downloads once (~60 MB) and runs in your browser.</span>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isDrop }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="Photo dropzone" style="animation:qFade .35s ease;max-width:620px;margin:26px auto 0;">
+        <button onClick="{{ goHome }}" style="background:none;border:none;padding:2px 0;font:500 15px var(--sans);color:var(--accent);cursor:pointer;">← Home</button>
+        <h1 style="margin:12px 0 6px;font:700 30px var(--serif);color:var(--denim);">Start from a photo</h1>
+        <p style="margin:0 0 18px;font-size:16.5px;line-height:1.55;color:var(--mut);">Flat, straight-on shots in daylight work best. QREP straightens small angles for you.</p>
+        <div onClick="{{ usePhoto }}" onDragOver="{{ dzOver }}" onDrop="{{ dzDrop }}" style="border:2.5px dashed var(--line2);border-radius:18px;background:var(--card2);padding:44px 26px;text-align:center;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:12px;" style-hover="border-color:var(--accent);background:var(--card);">
+          <svg width="52" height="44" style="display:block;color:var(--mut);"><rect x="1.25" y="7.25" width="49.5" height="35.5" rx="5" style="fill:none;stroke:currentColor;stroke-width:2.5;"></rect><path d="M17 7l4-5.75h10L35 7" style="fill:none;stroke:currentColor;stroke-width:2.5;"></path><circle cx="26" cy="24.5" r="9" style="fill:none;stroke:currentColor;stroke-width:2.5;"></circle></svg>
+          <span style="font:700 22px var(--serif);color:var(--ink);">Drop your quilt photo here</span>
+          <span style="font-size:15px;color:var(--mut);">JPG or PNG — or tap to browse</span>
+          <span style="font-size:14px;color:var(--faint);margin-top:2px;">— or —</span>
+          <button onClick="{{ usePhoto }}" style="background:var(--accent);color:var(--accentInk);border:none;border-radius:11px;padding:13px 22px;font:600 16px var(--sans);cursor:pointer;box-shadow:0 4px 12px var(--shadow);" style-hover="background:var(--accentB);">Use the sample photo</button>
+          <span style="font-size:13.5px;color:var(--faint);">This mock always analyzes IMG_2847 — the Double Irish Chain.</span>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isProg }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="Analysis progress" style="animation:qFade .35s ease;max-width:600px;margin:26px auto 0;">
+        <div style="background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:0 2px 10px var(--shadow);padding:26px;">
+          <h1 style="margin:0 0 4px;font:700 27px var(--serif);color:var(--denim);">Reading your quilt…</h1>
+          <p style="margin:0 0 18px;font-size:15px;color:var(--mut);">IMG_2847.jpeg · the demo runs much quicker than real life</p>
+          <sc-if value="{{ dlShow }}" hint-placeholder-val="{{ false }}">
+            <div style="background:var(--card3);border:1px dashed var(--line2);border-radius:12px;padding:14px 16px;margin-bottom:16px;">
+              <div style="display:flex;justify-content:space-between;gap:12px;font-size:14.5px;color:var(--ink2);margin-bottom:9px;"><span>Downloading vision engine — <strong>about 60 MB, first time only</strong></span><span style="font-weight:700;">{{ dlPctText }}</span></div>
+              <div style="height:12px;background:var(--card);border:1px solid var(--line);border-radius:999px;overflow:hidden;"><div style="{{ dlBarStyle }}"></div></div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ dlCached }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;align-items:center;gap:9px;font-size:14px;color:var(--sage);margin-bottom:14px;"><svg width="14" height="14" style="display:block;"><path d="M2 7.5l3.5 3.5L12 3.5" style="fill:none;stroke:currentColor;stroke-width:2.5;"></path></svg>Vision engine ready — cached from last time.</div>
+          </sc-if>
+          <div style="display:flex;flex-direction:column;">
+            <sc-for list="{{ stages }}" as="st" hint-placeholder-count="6">
+              <div style="display:flex;align-items:center;gap:13px;padding:11px 2px;border-bottom:1px dashed var(--line);">
+                <span style="width:22px;height:22px;flex:none;display:flex;align-items:center;justify-content:center;">
+                  <sc-if value="{{ st.pend }}" hint-placeholder-val="{{ true }}"><span style="width:10px;height:10px;border-radius:50%;border:2px solid var(--line2);"></span></sc-if>
+                  <sc-if value="{{ st.run }}" hint-placeholder-val="{{ false }}"><svg width="17" height="17" style="display:block;animation:qSpin .8s linear infinite;"><circle cx="8.5" cy="8.5" r="6.5" style="fill:none;stroke:var(--accent);stroke-width:2.6;stroke-dasharray:28 14;"></circle></svg></sc-if>
+                  <sc-if value="{{ st.done }}" hint-placeholder-val="{{ false }}"><svg width="17" height="17" style="display:block;color:var(--sage);"><path d="M2.5 9l4 4L14.5 4" style="fill:none;stroke:currentColor;stroke-width:2.8;"></path></svg></sc-if>
+                </span>
+                <span style="flex:1;font-size:16px;color:var(--ink2);">{{ st.label }}</span>
+                <sc-if value="{{ st.done }}" hint-placeholder-val="{{ false }}">
+                  <span style="width:86px;height:9px;background:var(--card3);border:1px solid var(--line);border-radius:999px;overflow:hidden;flex:none;"><span style="{{ st.msty }}"></span></span>
+                  <span style="width:44px;text-align:right;font-size:13.5px;font-weight:600;color:var(--mut);flex:none;">{{ st.pctText }}</span>
+                </sc-if>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display:flex;align-items:center;gap:16px;margin-top:18px;">
+            <sc-if value="{{ progRunning }}" hint-placeholder-val="{{ true }}">
+              <button onClick="{{ skipProg }}" style="background:var(--card);border:1.5px solid var(--line2);border-radius:10px;padding:11px 18px;font:600 15px var(--sans);color:var(--ink2);cursor:pointer;" style-hover="background:var(--card2);">Skip ahead</button>
+            </sc-if>
+            <button onClick="{{ cancelProg }}" style="background:none;border:none;padding:4px 0;font-size:15px;color:var(--accent);cursor:pointer;text-decoration:underline;text-underline-offset:3px;">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isResults }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="Photo results" style="animation:qFade .35s ease;max-width:1180px;margin:14px auto 0;">
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:16px;">
+          <h1 style="margin:0;font:700 30px var(--serif);color:var(--denim);flex:1 1 auto;">Here’s what we found</h1>
+          <span style="{{ ovStyle }}">{{ ovText }}</span>
+        </div>
+        <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start;">
+          <div style="flex:0 1 auto;background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:0 2px 10px var(--shadow);padding:14px;">
+            <div style="font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);font-weight:700;margin-bottom:10px;">Your photo</div>
+            <button onClick="{{ openLbPhoto }}" data-tip="Tap to enlarge" onMouseEnter="{{ tipOn }}" onMouseLeave="{{ tipOff }}" style="display:block;background:#fffdf7;border:1px solid #e7dcc4;border-radius:3px;padding:8px 8px 6px;cursor:zoom-in;box-shadow:0 8px 18px var(--shadow);transform:rotate(-1.2deg);" style-hover="transform:rotate(0deg) scale(1.015);">
+              <svg width="{{ rp.w }}" height="{{ rp.h }}" style="display:block;">
+                <sc-for list="{{ rp.bands }}" as="b" hint-placeholder-count="1"><rect x="{{ b.x }}" y="{{ b.y }}" width="{{ b.w }}" height="{{ b.h }}" fill="{{ b.c }}"></rect></sc-for>
+                <rect x="{{ rp.ix }}" y="{{ rp.iy }}" width="{{ rp.iw }}" height="{{ rp.ih }}" fill="{{ rp.bg }}"></rect>
+                <sc-for list="{{ rp.paths }}" as="p" hint-placeholder-count="1"><path d="{{ p.d }}" fill="{{ p.c }}"></path></sc-for>
+                <path d="{{ rp.quiltD }}" style="stroke:rgba(70,45,15,0.08);stroke-width:1;fill:none;"></path>
+                <rect x="0" y="0" width="{{ rp.w }}" height="{{ rp.h }}" fill="#d99a4e" opacity="0.09"></rect>
+              </svg>
+              <span style="display:flex;justify-content:space-between;gap:10px;font:italic 12.5px var(--serif);color:#8a7a61;padding-top:5px;"><span>IMG_2847.jpeg</span><span>tap to enlarge</span></span>
+            </button>
+          </div>
+          <div style="flex:0 1 auto;background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:0 2px 10px var(--shadow);padding:14px;">
+            <div style="font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);font-weight:700;margin-bottom:10px;">Recovered quilt</div>
+            <button onClick="{{ openLbQuilt }}" style="display:block;background:var(--stage);border:none;border-radius:10px;padding:12px;cursor:zoom-in;" style-hover="box-shadow:inset 0 0 0 2px var(--line2);">
+              <svg width="{{ rq.w }}" height="{{ rq.h }}" style="display:block;filter:drop-shadow(0 4px 10px var(--shadow));">
+                <sc-for list="{{ rq.bands }}" as="b" hint-placeholder-count="1"><rect x="{{ b.x }}" y="{{ b.y }}" width="{{ b.w }}" height="{{ b.h }}" fill="{{ b.c }}"></rect></sc-for>
+                <rect x="{{ rq.ix }}" y="{{ rq.iy }}" width="{{ rq.iw }}" height="{{ rq.ih }}" fill="{{ rq.bg }}"></rect>
+                <sc-for list="{{ rq.paths }}" as="p" hint-placeholder-count="1"><path d="{{ p.d }}" fill="{{ p.c }}"></path></sc-for>
+                <path d="{{ rq.hatchD }}" fill="rgba(196,90,40,0.32)" style="stroke:#d06a35;stroke-width:1;"></path>
+                <rect x="{{ rq.ox }}" y="{{ rq.oy }}" width="{{ rq.ow }}" height="{{ rq.oh }}" fill="none" stroke="{{ rq.bind }}" style="stroke-width:2;"></rect>
+              </svg>
+            </button>
+            <div style="display:flex;justify-content:space-between;gap:10px;font-size:13.5px;color:var(--mut);padding-top:8px;"><span>{{ resSizeText }}</span><span>45 × 55 squares</span></div>
+          </div>
+          <div style="flex:1 1 300px;min-width:280px;display:flex;flex-direction:column;gap:16px;">
+            <div style="background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:0 2px 10px var(--shadow);padding:20px;">
+              <h2 style="margin:0 0 4px;font:700 21px var(--serif);color:var(--denim);">How sure are we?</h2>
+              <p style="margin:0 0 10px;font-size:14px;color:var(--faint);line-height:1.5;">Computer vision guesses; it doesn’t know. Anything you fix by hand in the editor becomes 100%.</p>
+              <sc-for list="{{ confRows }}" as="c" hint-placeholder-count="6">
+                <div style="display:flex;align-items:center;gap:11px;padding:8px 0;border-bottom:1px dashed var(--line);">
+                  <span style="flex:1;font-size:15px;color:var(--ink2);">{{ c.label }}</span>
+                  <span style="width:96px;height:10px;background:var(--card3);border:1px solid var(--line);border-radius:999px;overflow:hidden;flex:none;"><span style="{{ c.msty }}"></span></span>
+                  <span style="width:38px;text-align:right;font-size:13.5px;font-weight:700;color:var(--ink2);flex:none;">{{ c.pctText }}</span>
+                  <span style="{{ c.wsty }}">{{ c.word }}</span>
+                </div>
+              </sc-for>
+              <button onClick="{{ toggleUnc }}" style="display:flex;align-items:center;gap:12px;background:none;border:none;padding:14px 0 4px;cursor:pointer;text-align:left;width:100%;">
+                <span style="{{ uncTrackStyle }}"><span style="{{ uncKnobStyle }}"></span></span>
+                <span style="flex:1;font-size:15px;color:var(--ink2);line-height:1.4;">Highlight the <strong>{{ uncCount }}</strong> squares to double-check</span>
+              </button>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:10px;">
+              <button onClick="{{ openEditor }}" style="width:100%;padding:16px;font:600 17.5px var(--sans);background:var(--accent);color:var(--accentInk);border:none;border-radius:12px;cursor:pointer;box-shadow:0 4px 12px var(--shadow);" style-hover="background:var(--accentB);">Open in the editor</button>
+              <button onClick="{{ tryCorners }}" style="width:100%;padding:14px;font:600 16px var(--sans);background:var(--card);border:1.5px solid var(--line2);border-radius:12px;color:var(--ink2);cursor:pointer;" style-hover="background:var(--card2);">Try again with corner pins</button>
+              <button onClick="{{ openLbSide }}" style="background:none;border:none;padding:6px 0;font-size:15px;color:var(--accent);cursor:pointer;text-decoration:underline;text-underline-offset:3px;">Compare side by side, full size</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isCorners }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="Corner pins" style="animation:qFade .35s ease;max-width:760px;margin:18px auto 0;">
+        <div style="background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:0 2px 10px var(--shadow);padding:24px;">
+          <h1 style="margin:0 0 6px;font:700 27px var(--serif);color:var(--denim);">Line up the corners</h1>
+          <p style="margin:0 0 16px;font-size:15.5px;line-height:1.55;color:var(--mut);max-width:60ch;">Drag each pin onto a corner of the quilt in your photo. It gives the straighten and grid stages a head start — confidence usually jumps.</p>
+          <div style="display:flex;justify-content:center;">
+            <div onPointerMove="{{ pinMove }}" onPointerUp="{{ pinUp }}" style="position:relative;display:inline-block;background:#e3d8bf;padding:14px;border-radius:6px;touch-action:none;">
+              <svg width="{{ cp.w }}" height="{{ cp.h }}" style="display:block;">
+                <sc-for list="{{ cp.bands }}" as="b" hint-placeholder-count="1"><rect x="{{ b.x }}" y="{{ b.y }}" width="{{ b.w }}" height="{{ b.h }}" fill="{{ b.c }}"></rect></sc-for>
+                <rect x="{{ cp.ix }}" y="{{ cp.iy }}" width="{{ cp.iw }}" height="{{ cp.ih }}" fill="{{ cp.bg }}"></rect>
+                <sc-for list="{{ cp.paths }}" as="p" hint-placeholder-count="1"><path d="{{ p.d }}" fill="{{ p.c }}"></path></sc-for>
+                <rect x="0" y="0" width="{{ cp.w }}" height="{{ cp.h }}" fill="#d99a4e" opacity="0.09"></rect>
+              </svg>
+              <svg width="{{ cpOverW }}" height="{{ cpOverH }}" style="position:absolute;left:0;top:0;pointer-events:none;">
+                <path d="{{ quadD }}" fill="rgba(165,80,47,0.07)" style="stroke:var(--accent);stroke-width:2;stroke-dasharray:7 5;"></path>
+              </svg>
+              <sc-for list="{{ pins }}" as="pn" hint-placeholder-count="4">
+                <button onPointerDown="{{ pinDown }}" data-pi="{{ pn.i }}" style="{{ pn.style }}"></button>
+              </sc-for>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:18px;">
+            <button onClick="{{ rerunPins }}" style="padding:14px 22px;font:600 16.5px var(--sans);background:var(--accent);color:var(--accentInk);border:none;border-radius:12px;cursor:pointer;box-shadow:0 4px 12px var(--shadow);" style-hover="background:var(--accentB);">Re-run the analysis</button>
+            <button onClick="{{ resetPins }}" style="padding:12px 18px;font:600 15px var(--sans);background:var(--card);border:1.5px solid var(--line2);border-radius:11px;color:var(--ink2);cursor:pointer;" style-hover="background:var(--card2);">Reset pins</button>
+            <button onClick="{{ backResults }}" style="background:none;border:none;padding:6px 0;font-size:15px;color:var(--accent);cursor:pointer;text-decoration:underline;text-underline-offset:3px;">Back to results</button>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isEditor }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="Editor" style="{{ edLayoutStyle }}">
+        <sc-if value="{{ showCanvas }}" hint-placeholder-val="{{ true }}">
+          <section style="flex:1 1 560px;min-width:0;background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:0 2px 10px var(--shadow);padding:12px;display:flex;flex-direction:column;gap:10px;">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <span style="display:flex;background:var(--card2);border:1px solid var(--line);border-radius:11px;padding:4px;gap:4px;flex:none;">
+                <button onClick="{{ setPaint }}" data-tip="Paint squares with the selected fabric" onMouseEnter="{{ tipOn }}" onMouseLeave="{{ tipOff }}" style="{{ modePaintStyle }}"><svg width="16" height="16" style="display:block;"><path d="M10.5 1.5l4 4L6 14H2v-4z" style="fill:none;stroke:currentColor;stroke-width:2;"></path></svg><sc-if value="{{ isDesk }}" hint-placeholder-val="{{ true }}"><span>Paint</span></sc-if></button>
+                <button onClick="{{ setPan }}" data-tip="Drag to move around the quilt" onMouseEnter="{{ tipOn }}" onMouseLeave="{{ tipOff }}" style="{{ modePanStyle }}"><svg width="16" height="16" style="display:block;"><path d="M8 1v14M1 8h14M8 1L5.5 3.5M8 1l2.5 2.5M8 15l-2.5-2.5M8 15l2.5-2.5M1 8l2.5-2.5M1 8l2.5 2.5M15 8l-2.5-2.5M15 8l-2.5 2.5" style="fill:none;stroke:currentColor;stroke-width:1.7;"></path></svg><sc-if value="{{ isDesk }}" hint-placeholder-val="{{ true }}"><span>Move</span></sc-if></button>
+                <button onClick="{{ setSeam }}" data-tip="Drag to sew squares into one piece · tap a piece to split it" onMouseEnter="{{ tipOn }}" onMouseLeave="{{ tipOff }}" style="{{ modeSeamStyle }}"><svg width="16" height="16" style="display:block;"><path d="M1.5 5.5h13M2 10.5h2.6M6.2 10.5h2.6M10.4 10.5h2.6" style="stroke:currentColor;stroke-width:2;fill:none;"></path></svg><sc-if value="{{ isDesk }}" hint-placeholder-val="{{ true }}"><span>Seams</span></sc-if></button>
+              </span>
+              <span style="width:1px;height:26px;background:var(--line);flex:none;"></span>
+              <sc-for list="{{ toolFabs }}" as="f" hint-placeholder-count="2">
+                <button onClick="{{ pickFab }}" data-fid="{{ f.id }}" data-tip="{{ f.name }}" onMouseEnter="{{ tipOn }}" onMouseLeave="{{ tipOff }}" style="{{ f.st }}"></button>
+              </sc-for>
+              <span style="width:1px;height:26px;background:var(--line);flex:none;"></span>
+              <button onClick="{{ undoClick }}" data-tip="Undo" onMouseEnter="{{ tipOn }}" onMouseLeave="{{ tipOff }}" style="{{ undoStyle }}"><svg width="17" height="15" style="display:block;"><path d="M6.5 1.5L2 6l4.5 4.5M2 6h8a5 5 0 0 1 0 10H7" style="fill:none;stroke:currentColor;stroke-width:2;"></path></svg></button>
+              <button onClick="{{ redoClick }}" data-tip="Redo" onMouseEnter="{{ tipOn }}" onMouseLeave="{{ tipOff }}" style="{{ redoStyle }}"><svg width="17" height="15" style="display:block;"><path d="M10.5 1.5L15 6l-4.5 4.5M15 6H7a5 5 0 0 0 0 10h3" style="fill:none;stroke:currentColor;stroke-width:2;"></path></svg></button>
+              <span style="width:1px;height:26px;background:var(--line);flex:none;"></span>
+              <button onClick="{{ zoomOut }}" data-tip="Zoom out" onMouseEnter="{{ tipOn }}" onMouseLeave="{{ tipOff }}" style="width:38px;height:38px;flex:none;font-size:20px;color:var(--ink2);background:var(--card);border:1.5px solid var(--line2);border-radius:9px;cursor:pointer;line-height:1;" style-hover="background:var(--card2);">−</button>
+              <span style="min-width:46px;text-align:center;font-size:14px;font-weight:600;color:var(--mut);flex:none;">{{ zoomLabel }}</span>
+              <button onClick="{{ zoomIn }}" data-tip="Zoom in" onMouseEnter="{{ tipOn }}" onMouseLeave="{{ tipOff }}" style="width:38px;height:38px;flex:none;font-size:20px;color:var(--ink2);background:var(--card);border:1.5px solid var(--line2);border-radius:9px;cursor:pointer;line-height:1;" style-hover="background:var(--card2);">+</button>
+              <button onClick="{{ zoomFit }}" style="height:38px;padding:0 12px;flex:none;font:600 13.5px var(--sans);color:var(--ink2);background:var(--card);border:1.5px solid var(--line2);border-radius:9px;cursor:pointer;" style-hover="background:var(--card2);">Fit</button>
+              <span style="flex:1;"></span>
+              <sc-if value="{{ showUncBtn }}" hint-placeholder-val="{{ false }}">
+                <button onClick="{{ toggleUnc }}" data-tip="Squares the photo analysis wasn’t sure about — painting one clears it" onMouseEnter="{{ tipOn }}" onMouseLeave="{{ tipOff }}" style="{{ uncBtnStyle }}">▨ {{ uncCount }} uncertain</button>
+              </sc-if>
+              <sc-if value="{{ showPhotoBtn }}" hint-placeholder-val="{{ false }}">
+                <button onClick="{{ openLbSide }}" data-tip="Compare with your photo" onMouseEnter="{{ tipOn }}" onMouseLeave="{{ tipOff }}" style="flex:none;background:#fffdf7;border:1px solid #e0d2b4;border-radius:3px;padding:3px 3px 1px;cursor:pointer;transform:rotate(2deg);box-shadow:0 3px 8px var(--shadow);" style-hover="transform:rotate(0deg) scale(1.06);">
+                  <svg width="30" height="37" style="display:block;"><rect x="0" y="0" width="30" height="37" fill="#f7f1e0"></rect><rect x="3" y="4" width="24" height="29" fill="#a9c7dc"></rect><rect x="8" y="10" width="14" height="17" fill="#f7f1e0"></rect><rect x="12" y="15" width="6" height="7" fill="#a9c7dc"></rect></svg>
+                </button>
+              </sc-if>
+            </div>
+            <div style="position:relative;background:var(--stage);border-radius:12px;box-shadow:inset 0 1px 8px var(--shadow);overflow:hidden;height:{{ stageH }};">
+              <div style="position:absolute;left:0;top:0;width:41px;height:27px;background:var(--card2);border-right:1px solid var(--line);border-bottom:1px solid var(--line);z-index:2;display:flex;align-items:center;justify-content:center;font:italic 12px var(--serif);color:var(--mut);">in</div>
+              <div style="position:absolute;left:41px;right:0;top:0;height:27px;background:var(--card2);border-bottom:1px solid var(--line);overflow:hidden;z-index:1;">
+                <svg ref="{{ topRulRef }}" width="{{ rulW }}" height="27" style="display:block;">
+                  <path d="{{ rtMin }}" style="stroke:var(--mut);stroke-width:1;fill:none;"></path>
+                  <path d="{{ rtMaj }}" style="stroke:var(--ink2);stroke-width:1.6;fill:none;"></path>
+                  <sc-for list="{{ rtLabels }}" as="lb" hint-placeholder-count="1"><text x="{{ lb.x }}" y="12" style="font:11.5px var(--sans);fill:var(--mut);text-anchor:middle;">{{ lb.t }}</text></sc-for>
+                  <text x="{{ rtEndX }}" y="12" style="font:700 12px var(--sans);fill:var(--accent);text-anchor:middle;">{{ rtEndT }}</text>
+                </svg>
+              </div>
+              <div style="position:absolute;left:0;top:27px;bottom:0;width:41px;background:var(--card2);border-right:1px solid var(--line);overflow:hidden;z-index:1;">
+                <svg ref="{{ leftRulRef }}" width="41" height="{{ rulH }}" style="display:block;">
+                  <path d="{{ rlMin }}" style="stroke:var(--mut);stroke-width:1;fill:none;"></path>
+                  <path d="{{ rlMaj }}" style="stroke:var(--ink2);stroke-width:1.6;fill:none;"></path>
+                  <sc-for list="{{ rlLabels }}" as="lb" hint-placeholder-count="1"><text x="27" y="{{ lb.y }}" style="font:11.5px var(--sans);fill:var(--mut);text-anchor:end;">{{ lb.t }}</text></sc-for>
+                  <text x="27" y="{{ rlEndY }}" style="font:700 12px var(--sans);fill:var(--accent);text-anchor:end;">{{ rlEndT }}</text>
+                </svg>
+              </div>
+              <div ref="{{ scrollRef }}" onScroll="{{ syncScroll }}" style="position:absolute;left:41px;top:27px;right:0;bottom:0;overflow:auto;">
+                <div ref="{{ contentRef }}" style="{{ contentStyle }}">
+                  <svg ref="{{ quiltRef }}" width="{{ mq.w }}" height="{{ mq.h }}" onPointerDown="{{ qDown }}" onPointerMove="{{ qMove }}" onPointerUp="{{ qUp }}" onPointerCancel="{{ qUp }}" style="display:block;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;cursor:{{ stageCursor }};">
+                    <g style="filter:drop-shadow(0 4px 12px var(--shadow));">
+                      <sc-for list="{{ mq.bands }}" as="b" hint-placeholder-count="1"><rect x="{{ b.x }}" y="{{ b.y }}" width="{{ b.w }}" height="{{ b.h }}" fill="{{ b.c }}"></rect></sc-for>
+                      <rect x="{{ mq.ix }}" y="{{ mq.iy }}" width="{{ mq.iw }}" height="{{ mq.ih }}" fill="{{ mq.bg }}"></rect>
+                      <sc-for list="{{ mq.paths }}" as="p" hint-placeholder-count="1"><path d="{{ p.d }}" fill="{{ p.c }}"></path></sc-for>
+                      <path d="{{ mq.seamD }}" style="{{ seamStyle }}"></path>
+                      <path d="{{ mq.hatchD }}" fill="rgba(196,90,40,0.32)" style="stroke:#d06a35;stroke-width:1;"></path>
+                      <rect x="{{ mq.ox }}" y="{{ mq.oy }}" width="{{ mq.ow }}" height="{{ mq.oh }}" fill="none" stroke="{{ mq.bind }}" style="stroke-width:2.5;"></rect>
+                    </g>
+                  </svg>
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:0 4px;">
+              <span style="font-size:13.5px;color:var(--faint);">{{ scaleText }}</span>
+              <span style="font:600 19px var(--serif);color:var(--ink);">{{ sizeText }} <span style="font:400 13.5px var(--sans);color:var(--faint);">finished</span></span>
+            </div>
+          </section>
+        </sc-if>
+        <sc-if value="{{ showSide }}" hint-placeholder-val="{{ false }}">
+          <div style="{{ sideStyle }}">
+            <sc-if value="{{ deskTabs }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;gap:5px;background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:5px;">
+                <button onClick="{{ setTabF }}" style="{{ tabStyleF }}">Fabrics</button>
+                <button onClick="{{ setTabS }}" style="{{ tabStyleS }}">Sizing</button>
+                <button onClick="{{ setTabP }}" style="{{ tabStyleP }}">Pattern</button>
+              </div>
+            </sc-if>
+            <sc-if value="{{ panelF }}" hint-placeholder-val="{{ false }}">
+              <section style="background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:0 2px 10px var(--shadow);padding:18px;">
+                <div style="display:flex;align-items:center;gap:12px;">
+                  <h2 style="margin:0;font:700 21px var(--serif);color:var(--denim);">Fabrics</h2>
+                  <span style="flex:1;border-top:2px dashed var(--line2);"></span>
+                  <span style="font-size:12.5px;color:var(--mut);border:1px solid var(--pillLn);border-radius:999px;padding:4px 11px;background:var(--pill);">tap a swatch to recolor</span>
+                </div>
+                <sc-for list="{{ fabRows }}" as="f" hint-placeholder-count="2">
+                  <div style="display:flex;align-items:center;gap:13px;padding:12px 2px;border-bottom:1px dashed var(--line);">
+                    <label data-tip="Tap to recolor" onMouseEnter="{{ tipOn }}" onMouseLeave="{{ tipOff }}" style="width:46px;height:46px;flex:none;border-radius:10px;background:{{ f.color }};border:1px solid var(--line2);cursor:pointer;position:relative;overflow:hidden;display:block;box-shadow:inset 0 -2px 5px rgba(0,0,0,0.07);">
+                      <input type="color" value="{{ f.color }}" onChange="{{ recolorFab }}" data-fid="{{ f.id }}" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;border:none;padding:0;">
+                    </label>
+                    <div style="flex:1;min-width:0;">
+                      <sc-if value="{{ f.editing }}" hint-placeholder-val="{{ false }}">
+                        <input value="{{ renameVal }}" onChange="{{ typeRename }}" onBlur="{{ commitRename }}" onKeyDown="{{ enterKey }}" data-fid="{{ f.id }}" style="width:100%;font:600 16px var(--sans);color:var(--ink);background:var(--card2);border:1.5px solid var(--accent);border-radius:8px;padding:7px 9px;" style-focus="outline:none;box-shadow:0 0 0 3px rgba(165,80,47,0.16);">
+                      </sc-if>
+                      <sc-if value="{{ f.notEditing }}" hint-placeholder-val="{{ true }}">
+                        <button onClick="{{ startRename }}" data-fid="{{ f.id }}" data-tip="Click to rename" onMouseEnter="{{ tipOn }}" onMouseLeave="{{ tipOff }}" style="background:none;border:none;padding:0;font:600 16.5px var(--sans);color:var(--ink);cursor:text;text-align:left;" style-hover="color:var(--accent);">{{ f.name }} ✎</button>
+                      </sc-if>
+                      <div style="font-size:14px;color:var(--mut);margin-top:3px;">{{ f.hex }} · {{ f.countText }}</div>
+                    </div>
+                  </div>
+                </sc-for>
+                <button onClick="{{ addFab }}" style="width:100%;margin-top:12px;padding:12px;font:600 15.5px var(--sans);color:var(--ink2);background:none;border:2px dashed var(--line2);border-radius:11px;cursor:pointer;" style-hover="border-color:var(--accent);color:var(--accent);">＋ Add a fabric</button>
+                <p style="margin:12px 2px 0;font-size:13.5px;color:var(--faint);line-height:1.5;">Recoloring updates the quilt, yardage and pattern instantly. Pick a fabric here, then paint squares on the quilt.</p>
+              </section>
+            </sc-if>
+            <sc-if value="{{ panelS }}" hint-placeholder-val="{{ false }}">
+              <section style="background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:0 2px 10px var(--shadow);padding:18px;display:flex;flex-direction:column;gap:15px;">
+                <div style="display:flex;align-items:center;gap:12px;">
+                  <h2 style="margin:0;font:700 21px var(--serif);color:var(--denim);">Sizing</h2>
+                  <span style="flex:1;border-top:2px dashed var(--line2);"></span>
+                  <span style="font-size:12.5px;color:var(--mut);border:1px solid var(--pillLn);border-radius:999px;padding:4px 11px;background:var(--pill);">finished sizes</span>
+                </div>
+                <label style="display:block;">
+                  <span style="display:block;font-size:14.5px;color:var(--mut);margin-bottom:6px;">Standard size</span>
+                  <select value="{{ presetVal }}" onChange="{{ onPreset }}" style="width:100%;padding:12px 13px;font-size:16.5px;font-family:var(--sans);color:var(--ink);background:var(--card);border:1.5px solid var(--line2);border-radius:10px;cursor:pointer;">
+                    <option value="custom">Custom size</option>
+                    <option value="crib">Crib — 36 × 52</option>
+                    <option value="throw">Throw — 50 × 65</option>
+                    <option value="twin">Twin — 70 × 90</option>
+                    <option value="full">Full — 84 × 90</option>
+                    <option value="queen">Queen — 90 × 108</option>
+                    <option value="king">King — 110 × 108</option>
+                  </select>
+                </label>
+                <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:end;">
+                  <div>
+                    <span style="display:block;font-size:14.5px;color:var(--mut);margin-bottom:6px;">Width <span style="color:var(--faint);">· in</span></span>
+                    <div style="display:flex;gap:5px;">
+                      <button onClick="{{ decW }}" title="{{ stepTitle }}" style="width:36px;height:50px;flex:none;font-size:21px;color:var(--ink2);background:var(--card2);border:1.5px solid var(--line2);border-radius:10px;cursor:pointer;line-height:1;" style-hover="background:var(--card3);">−</button>
+                      <input value="{{ wDraft }}" onChange="{{ typeW }}" onBlur="{{ commitW }}" onKeyDown="{{ enterKey }}" style="width:100%;min-width:0;text-align:center;font:600 17.5px var(--serif);color:var(--ink);background:var(--card);border:1.5px solid var(--line2);border-radius:10px;padding:6px 2px;" style-focus="border-color:var(--accent);box-shadow:0 0 0 3px rgba(165,80,47,0.16);outline:none;">
+                      <button onClick="{{ incW }}" title="{{ stepTitle }}" style="width:36px;height:50px;flex:none;font-size:21px;color:var(--ink2);background:var(--card2);border:1.5px solid var(--line2);border-radius:10px;cursor:pointer;line-height:1;" style-hover="background:var(--card3);">+</button>
+                    </div>
+                  </div>
+                  <button onClick="{{ toggleLock }}" data-tip="{{ lockTitle }}" onMouseEnter="{{ tipOn }}" onMouseLeave="{{ tipOff }}" style="{{ lockBtnStyle }}">
+                    <sc-if value="{{ locked }}" hint-placeholder-val="{{ true }}"><svg width="21" height="23" style="display:block;"><path d="M6 10.5V7a4.5 4.5 0 0 1 9 0v3.5" style="fill:none;stroke:currentColor;stroke-width:2.4;"></path><rect x="3" y="10.5" width="15" height="10.5" rx="2.5" fill="currentColor"></rect></svg></sc-if>
+                    <sc-if value="{{ unlocked }}" hint-placeholder-val="{{ false }}"><svg width="23" height="23" style="display:block;"><path d="M9 10.5V6a4.5 4.5 0 0 1 9 0v1.5" style="fill:none;stroke:currentColor;stroke-width:2.4;"></path><rect x="3" y="10.5" width="15" height="10.5" rx="2.5" fill="currentColor"></rect></svg></sc-if>
+                  </button>
+                  <div>
+                    <span style="display:block;font-size:14.5px;color:var(--mut);margin-bottom:6px;">Height <span style="color:var(--faint);">· in</span></span>
+                    <div style="display:flex;gap:5px;">
+                      <button onClick="{{ decH }}" title="{{ stepTitle }}" style="width:36px;height:50px;flex:none;font-size:21px;color:var(--ink2);background:var(--card2);border:1.5px solid var(--line2);border-radius:10px;cursor:pointer;line-height:1;" style-hover="background:var(--card3);">−</button>
+                      <input value="{{ hDraft }}" onChange="{{ typeH }}" onBlur="{{ commitH }}" onKeyDown="{{ enterKey }}" style="width:100%;min-width:0;text-align:center;font:600 17.5px var(--serif);color:var(--ink);background:var(--card);border:1.5px solid var(--line2);border-radius:10px;padding:6px 2px;" style-focus="border-color:var(--accent);box-shadow:0 0 0 3px rgba(165,80,47,0.16);outline:none;">
+                      <button onClick="{{ incH }}" title="{{ stepTitle }}" style="width:36px;height:50px;flex:none;font-size:21px;color:var(--ink2);background:var(--card2);border:1.5px solid var(--line2);border-radius:10px;cursor:pointer;line-height:1;" style-hover="background:var(--card3);">+</button>
+                    </div>
+                  </div>
+                </div>
+                <div style="font-size:13.5px;color:var(--faint);line-height:1.5;margin-top:-5px;">{{ lockModeLine }}</div>
+                <sc-if value="{{ showReq }}" hint-placeholder-val="{{ false }}">
+                  <div style="background:var(--sageBg);border:1px solid var(--sageLn);border-radius:12px;padding:12px 14px;">
+                    <div style="display:flex;gap:10px;align-items:stretch;">
+                      <div style="flex:1;text-align:center;"><div style="font-size:12.5px;color:var(--mut);margin-bottom:2px;">You asked for</div><div style="font:600 17px var(--serif);color:var(--ink2);">{{ reqText }}</div></div>
+                      <span style="display:flex;align-items:center;color:var(--sage);font-size:17px;">→</span>
+                      <div style="flex:1;text-align:center;"><div style="font-size:12.5px;color:var(--mut);margin-bottom:2px;">You’ll get</div><div style="font:700 17px var(--serif);color:var(--sage);">{{ achText }}</div></div>
+                    </div>
+                    <div style="font-size:13.5px;color:var(--ink2);line-height:1.5;margin-top:8px;">{{ reqLine }}</div>
+                  </div>
+                </sc-if>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:13px;align-items:end;">
+                  <div>
+                    <span style="display:block;font-size:14.5px;color:var(--mut);margin-bottom:6px;">Square size <span style="color:var(--faint);">· in</span></span>
+                    <div style="display:flex;gap:5px;">
+                      <button onClick="{{ decCell }}" title="A quarter inch smaller" style="width:36px;height:50px;flex:none;font-size:21px;color:var(--ink2);background:var(--card2);border:1.5px solid var(--line2);border-radius:10px;cursor:pointer;line-height:1;" style-hover="background:var(--card3);">−</button>
+                      <input value="{{ cellDraft }}" onChange="{{ typeCell }}" onBlur="{{ commitCell }}" onKeyDown="{{ enterKey }}" style="width:100%;min-width:0;text-align:center;font:600 17.5px var(--serif);color:var(--ink);background:var(--card);border:1.5px solid var(--line2);border-radius:10px;padding:6px 2px;" style-focus="border-color:var(--accent);box-shadow:0 0 0 3px rgba(165,80,47,0.16);outline:none;">
+                      <button onClick="{{ incCell }}" title="A quarter inch bigger" style="width:36px;height:50px;flex:none;font-size:21px;color:var(--ink2);background:var(--card2);border:1.5px solid var(--line2);border-radius:10px;cursor:pointer;line-height:1;" style-hover="background:var(--card3);">+</button>
+                    </div>
+                  </div>
+                  <div style="font-size:14px;color:var(--mut);line-height:1.5;padding-bottom:5px;">Cut squares at <strong style="color:var(--ink2);">{{ cutText }}″</strong> — ¼″ seams included.</div>
+                </div>
+                <div>
+                  <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:6px;">
+                    <span style="font-size:14.5px;color:var(--mut);">Borders <span style="color:var(--faint);">· in, outermost first</span></span>
+                    <button onClick="{{ addBand }}" style="background:none;border:none;padding:2px 0;font:600 14px var(--sans);color:var(--accent);cursor:pointer;">＋ add a border</button>
+                  </div>
+                  <sc-for list="{{ bandRows }}" as="b" hint-placeholder-count="1">
+                    <div style="display:flex;gap:5px;align-items:center;margin-bottom:8px;">
+                      <span style="width:34px;height:50px;flex:none;border-radius:9px;background:{{ b.color }};border:1px solid var(--line2);box-shadow:inset 0 -2px 5px rgba(0,0,0,0.07);"></span>
+                      <select value="{{ b.fidStr }}" onChange="{{ bandFab }}" data-bi="{{ b.bi }}" style="flex:1;min-width:0;padding:12px 8px;font-size:14.5px;font-family:var(--sans);color:var(--ink);background:var(--card);border:1.5px solid var(--line2);border-radius:10px;cursor:pointer;">
+                        <sc-for list="{{ fabOpts }}" as="o" hint-placeholder-count="2"><option value="{{ o.idStr }}">{{ o.name }}</option></sc-for>
+                      </select>
+                      <button onClick="{{ decBand }}" data-bi="{{ b.bi }}" title="A quarter inch narrower" style="width:36px;height:50px;flex:none;font-size:21px;color:var(--ink2);background:var(--card2);border:1.5px solid var(--line2);border-radius:10px;cursor:pointer;line-height:1;" style-hover="background:var(--card3);">−</button>
+                      <input value="{{ b.draft }}" onChange="{{ typeBand }}" onBlur="{{ commitBand }}" onKeyDown="{{ enterKey }}" data-bi="{{ b.bi }}" style="width:64px;flex:none;text-align:center;font:600 17px var(--serif);color:var(--ink);background:var(--card);border:1.5px solid var(--line2);border-radius:10px;padding:12px 2px;" style-focus="border-color:var(--accent);box-shadow:0 0 0 3px rgba(165,80,47,0.16);outline:none;">
+                      <button onClick="{{ incBand }}" data-bi="{{ b.bi }}" title="A quarter inch wider" style="width:36px;height:50px;flex:none;font-size:21px;color:var(--ink2);background:var(--card2);border:1.5px solid var(--line2);border-radius:10px;cursor:pointer;line-height:1;" style-hover="background:var(--card3);">+</button>
+                      <sc-if value="{{ b.removable }}" hint-placeholder-val="{{ false }}">
+                        <button onClick="{{ removeBand }}" data-bi="{{ b.bi }}" title="Remove this border" style="width:30px;height:50px;flex:none;font-size:17px;color:var(--faint);background:none;border:none;cursor:pointer;" style-hover="color:var(--accent);">✕</button>
+                      </sc-if>
+                    </div>
+                  </sc-for>
+                </div>
+                <div style="background:var(--card3);border:1px dashed var(--line2);border-radius:12px;padding:13px 15px;display:flex;flex-direction:column;gap:6px;">
+                  <div style="display:flex;justify-content:space-between;gap:12px;font-size:15.5px;color:var(--ink2);"><span>Squares</span><strong style="font-weight:600;">{{ eqSquares }}</strong></div>
+                  <div style="display:flex;justify-content:space-between;gap:12px;font-size:15.5px;color:var(--ink2);"><span>Borders</span><strong style="font-weight:600;">{{ eqBorder }}</strong></div>
+                  <div style="border-top:1px dashed var(--line2);margin-top:2px;padding-top:8px;display:flex;justify-content:space-between;align-items:baseline;gap:12px;"><span style="font-size:14px;color:var(--mut);">Finished quilt</span><strong style="font:700 19px var(--serif);color:var(--accent);">{{ eqTotal }}</strong></div>
+                  <div style="font-size:13.5px;color:var(--faint);line-height:1.5;">{{ blocksLine }}</div>
+                </div>
+              </section>
+            </sc-if>
+            <sc-if value="{{ panelP }}" hint-placeholder-val="{{ false }}">
+              <section style="background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:0 2px 10px var(--shadow);padding:18px;">
+                <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+                  <h2 style="margin:0;font:700 21px var(--serif);color:var(--denim);">Pattern</h2>
+                  <span style="flex:1;border-top:2px dashed var(--line2);"></span>
+                  <span style="font-size:12.5px;color:var(--mut);border:1px solid var(--pillLn);border-radius:999px;padding:4px 11px;background:var(--pill);">how to sew it</span>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:9px;">
+                  <sc-for list="{{ strats }}" as="st" hint-placeholder-count="3">
+                    <button onClick="{{ pickStrat }}" data-k="{{ st.k }}" style="{{ st.style }}">
+                      <span style="display:flex;align-items:center;gap:9px;">
+                        <span style="{{ st.dot }}"></span>
+                        <span style="font:700 16.5px var(--sans);color:var(--ink);">{{ st.title }}</span>
+                      </span>
+                      <span style="display:block;font-size:13.5px;color:var(--mut);line-height:1.45;margin:5px 0 9px;">{{ st.blurb }}</span>
+                      <span style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;">
+                        <span><span style="display:block;font-size:11.5px;color:var(--faint);text-transform:uppercase;letter-spacing:.08em;">Pieces</span><span style="font:700 16px var(--serif);color:var(--ink2);">{{ st.pieces }}</span></span>
+                        <span><span style="display:block;font-size:11.5px;color:var(--faint);text-transform:uppercase;letter-spacing:.08em;">Cuts</span><span style="font:700 16px var(--serif);color:var(--ink2);">{{ st.cuts }}</span></span>
+                        <span><span style="display:block;font-size:11.5px;color:var(--faint);text-transform:uppercase;letter-spacing:.08em;">Sewing ⓘ</span><span style="font:700 16px var(--serif);color:var(--ink2);">{{ st.time }}</span></span>
+                      </span>
+                    </button>
+                  </sc-for>
+                </div>
+                <div style="font-size:12.5px;color:var(--faint);margin-top:7px;line-height:1.5;">ⓘ Sewing times are a rough estimate — every quilter’s pace is different.</div>
+                <div style="background:var(--sageBg);border:1px solid var(--sageLn);border-radius:10px;padding:10px 13px;font-size:13.5px;color:var(--ink2);line-height:1.5;margin-top:9px;">The quilt preview draws the seams for the plan you pick. Want it your way? Use the <strong>Seams</strong> tool on the canvas — drag to sew squares into one piece, tap a piece to split it.</div>
+                <div style="display:flex;align-items:center;gap:12px;margin:18px 0 4px;">
+                  <h3 style="margin:0;font:700 17.5px var(--serif);color:var(--denim);">Yardage</h3>
+                  <span style="flex:1;border-top:2px dashed var(--line2);"></span>
+                  <span style="font-size:12.5px;color:var(--mut);border:1px solid var(--pillLn);border-radius:999px;padding:3px 10px;background:var(--pill);">estimates</span>
+                </div>
+                <table style="width:100%;border-collapse:collapse;">
+                  <tbody>
+                    <sc-for list="{{ yardRows }}" as="y" hint-placeholder-count="5">
+                      <tr style="border-bottom:1px dashed var(--line);">
+                        <td style="padding:10px 6px 10px 0;vertical-align:top;"><span style="display:flex;align-items:center;gap:9px;"><span style="width:24px;height:24px;border-radius:6px;background:{{ y.sw }};border:1px solid var(--line2);flex:none;"></span><span style="font-weight:600;font-size:15px;color:var(--ink);white-space:nowrap;">{{ y.name }}</span></span></td>
+                        <td style="padding:10px 6px;font-size:13.5px;color:var(--mut);line-height:1.45;vertical-align:top;">{{ y.forText }}</td>
+                        <td style="padding:10px 0 10px 6px;text-align:right;vertical-align:top;"><span style="font:700 15.5px var(--serif);color:var(--ink);white-space:nowrap;">{{ y.buy }}</span><br><span style="font-size:11.5px;color:var(--faint);font-style:italic;">{{ y.sub }}</span></td>
+                      </tr>
+                    </sc-for>
+                  </tbody>
+                </table>
+                <p style="margin:10px 0 0;font-size:13px;color:var(--faint);line-height:1.5;">Rounded up to the next ¼ yard, assuming 40″ usable width. Buy a little extra for insurance.</p>
+                <div style="display:flex;align-items:center;gap:12px;margin:18px 0 10px;">
+                  <h3 style="margin:0;font:700 17.5px var(--serif);color:var(--denim);">Take it with you</h3>
+                  <span style="flex:1;border-top:2px dashed var(--line2);"></span>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;">
+                  <sc-for list="{{ dlBtns }}" as="d" hint-placeholder-count="5">
+                    <button onClick="{{ startDl }}" data-k="{{ d.k }}" style="{{ d.style }}">
+                      <sc-if value="{{ d.busy }}" hint-placeholder-val="{{ false }}">
+                        <span style="display:flex;align-items:center;gap:8px;justify-content:center;"><svg width="14" height="14" style="display:block;animation:qSpin .8s linear infinite;"><circle cx="7" cy="7" r="5.5" style="fill:none;stroke:currentColor;stroke-width:2.4;stroke-dasharray:24 12;"></circle></svg>Making it…</span>
+                      </sc-if>
+                      <sc-if value="{{ d.idle }}" hint-placeholder-val="{{ true }}">
+                        <span style="display:block;font-weight:600;font-size:14.5px;">{{ d.label }}</span>
+                        <span style="display:block;font-size:12px;color:var(--faint);margin-top:2px;">{{ d.sub }}</span>
+                      </sc-if>
+                    </button>
+                  </sc-for>
+                </div>
+                <button onClick="{{ copySettings }}" style="width:100%;margin-top:12px;padding:15px;font:600 16.5px var(--sans);background:{{ copyBg }};color:{{ copyFg }};border:none;border-radius:12px;cursor:pointer;box-shadow:0 4px 12px var(--shadow);">{{ copyLabel }}</button>
+              </section>
+            </sc-if>
+          </div>
+        </sc-if>
+      </div>
+    </sc-if>
+  </main>
+  <sc-if value="{{ phoneBar }}" hint-placeholder-val="{{ false }}">
+    <nav data-noprint="true" style="position:fixed;left:0;right:0;bottom:0;z-index:35;background:var(--card);border-top:1px solid var(--line);display:flex;padding:6px 6px calc(6px + env(safe-area-inset-bottom));box-shadow:0 -4px 14px var(--shadow);">
+      <sc-for list="{{ phTabs }}" as="pt" hint-placeholder-count="4">
+        <button onClick="{{ setPhTab }}" data-k="{{ pt.k }}" style="{{ pt.style }}">
+          <svg width="22" height="22" style="display:block;"><path d="{{ pt.icon }}" style="stroke:currentColor;stroke-width:1.8;fill:none;"></path></svg>
+          <span style="font-size:11.5px;font-weight:600;">{{ pt.label }}</span>
+        </button>
+      </sc-for>
+    </nav>
+  </sc-if>
+</div>
+<div data-printsheet="true" style="display:none;font-family:var(--sans);color:#3b3020;">
+  <div style="display:flex;justify-content:space-between;align-items:baseline;gap:16px;border-bottom:2.5px solid #3b3020;padding-bottom:10px;">
+    <div style="font:700 24px var(--serif);">{{ printName }} — quilt plan</div>
+    <div style="font-size:13px;color:#6d5f49;white-space:nowrap;">{{ todayStr }} · QREP</div>
+  </div>
+  <div style="display:flex;gap:18px;align-items:baseline;flex-wrap:wrap;padding:13px 0 4px;">
+    <span style="font:700 29px var(--serif);">{{ eqTotal }}</span>
+    <span style="font-size:15px;color:#6d5f49;">finished · {{ printPresetLine }}</span>
+  </div>
+  <div style="display:flex;gap:8px 24px;font-size:14px;color:#4a3f2d;padding-bottom:13px;flex-wrap:wrap;">
+    <span>Squares: <strong>{{ eqSquares }}</strong> (cut {{ cutText }}″)</span>
+    <span>Borders: <strong>{{ eqBorder }}</strong></span>
+    <span>Plan: <strong>{{ printStrat }}</strong></span>
+  </div>
+  <div style="display:flex;gap:24px;align-items:flex-start;">
+    <svg width="{{ pr.svgW }}" height="{{ pr.svgH }}" style="display:block;flex:none;">
+      <rect x="0" y="0" width="{{ pr.svgW }}" height="27" fill="#f6f1e4"></rect>
+      <rect x="0" y="0" width="41" height="{{ pr.svgH }}" fill="#f6f1e4"></rect>
+      <path d="{{ pr.edgeD }}" style="stroke:#c9bda2;stroke-width:1;fill:none;"></path>
+      <text x="19" y="18" style="font:italic 12px var(--serif);fill:#8f7d5f;text-anchor:middle;">in</text>
+      <path d="{{ pr.tMin }}" style="stroke:#8d7c60;stroke-width:1;fill:none;"></path>
+      <path d="{{ pr.tMaj }}" style="stroke:#5f5038;stroke-width:1.6;fill:none;"></path>
+      <path d="{{ pr.lMin }}" style="stroke:#8d7c60;stroke-width:1;fill:none;"></path>
+      <path d="{{ pr.lMaj }}" style="stroke:#5f5038;stroke-width:1.6;fill:none;"></path>
+      <sc-for list="{{ pr.tLabels }}" as="lb" hint-placeholder-count="1"><text x="{{ lb.x }}" y="12" style="font:11px var(--sans);fill:#6d5f49;text-anchor:middle;">{{ lb.t }}</text></sc-for>
+      <sc-for list="{{ pr.lLabels }}" as="lb" hint-placeholder-count="1"><text x="27" y="{{ lb.y }}" style="font:11px var(--sans);fill:#6d5f49;text-anchor:end;">{{ lb.t }}</text></sc-for>
+      <text x="{{ pr.tEndX }}" y="12" style="font:700 11.5px var(--sans);fill:#a5502f;text-anchor:middle;">{{ pr.tEndT }}</text>
+      <text x="27" y="{{ pr.lEndY }}" style="font:700 11.5px var(--sans);fill:#a5502f;text-anchor:end;">{{ pr.lEndY2T }}</text>
+      <sc-for list="{{ pr.bands }}" as="b" hint-placeholder-count="1"><rect x="{{ b.x }}" y="{{ b.y }}" width="{{ b.w }}" height="{{ b.h }}" fill="{{ b.c }}"></rect></sc-for>
+      <rect x="{{ pr.ix }}" y="{{ pr.iy }}" width="{{ pr.iw }}" height="{{ pr.ih }}" fill="{{ pr.bg }}"></rect>
+      <sc-for list="{{ pr.paths }}" as="p" hint-placeholder-count="1"><path d="{{ p.d }}" fill="{{ p.c }}"></path></sc-for>
+      <path d="{{ pr.seamD }}" style="stroke:rgba(110,80,45,0.14);stroke-width:0.7;fill:none;"></path>
+      <rect x="{{ pr.ox }}" y="{{ pr.oy }}" width="{{ pr.ow }}" height="{{ pr.oh }}" fill="none" stroke="{{ pr.bind }}" style="stroke-width:2;"></rect>
+    </svg>
+    <div style="flex:1;min-width:0;">
+      <div style="font-size:12.5px;letter-spacing:.14em;text-transform:uppercase;color:#8a7a61;font-weight:700;padding-bottom:4px;border-bottom:1.5px solid #3b3020;">Shopping list</div>
+      <sc-for list="{{ yardRows }}" as="y" hint-placeholder-count="5">
+        <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #ddd2ba;">
+          <span style="width:24px;height:24px;border-radius:5px;background:{{ y.sw }};border:1px solid #a99a78;flex:none;"></span>
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:600;font-size:14px;">{{ y.name }}</div>
+            <div style="font-size:12.5px;color:#6d5f49;margin-top:1px;">{{ y.forText }}</div>
+          </div>
+          <div style="text-align:right;flex:none;">
+            <div style="font:700 14.5px var(--serif);white-space:nowrap;">{{ y.buy }}</div>
+            <div style="font-size:11px;color:#8a7a61;font-style:italic;">{{ y.sub }}</div>
+          </div>
+        </div>
+      </sc-for>
+      <p style="margin:12px 0 0;font-size:12px;color:#6d5f49;line-height:1.55;">Yardage rounds up to the next ¼ yard, assuming 40″ usable width. All measurements are finished sizes; square cutting numbers include ¼″ seam allowance. Buy a little extra for insurance.</p>
+    </div>
+  </div>
+</div>
+
+<sc-if value="{{ lbOpen }}" hint-placeholder-val="{{ false }}">
+  <div data-noprint="true" style="position:fixed;inset:0;z-index:60;">
+    <div onClick="{{ lbClose }}" style="position:absolute;inset:0;background:rgba(18,12,6,0.84);"></div>
+    <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:18px;pointer-events:none;">
+      <div style="display:flex;align-items:center;gap:10px;pointer-events:auto;">
+        <span style="display:flex;background:rgba(255,253,247,0.12);border:1px solid rgba(255,253,247,0.25);border-radius:11px;padding:4px;gap:4px;">
+          <button onClick="{{ setLbPhoto }}" style="{{ lbTabPhoto }}">Photo</button>
+          <button onClick="{{ setLbSide }}" style="{{ lbTabSide }}">Side by side</button>
+          <button onClick="{{ setLbQuilt }}" style="{{ lbTabQuilt }}">Quilt</button>
+        </span>
+        <button onClick="{{ lbClose }}" style="width:42px;height:42px;background:rgba(255,253,247,0.12);border:1px solid rgba(255,253,247,0.25);border-radius:11px;color:#f6ecd9;font-size:19px;cursor:pointer;">✕</button>
+      </div>
+      <sc-if value="{{ lbShowPhoto }}" hint-placeholder-val="{{ true }}">
+        <div style="pointer-events:auto;background:#fffdf7;padding:12px 12px 8px;border-radius:4px;box-shadow:0 24px 60px rgba(0,0,0,0.5);">
+          <svg width="{{ lp.w }}" height="{{ lp.h }}" style="display:block;">
+            <sc-for list="{{ lp.bands }}" as="b" hint-placeholder-count="1"><rect x="{{ b.x }}" y="{{ b.y }}" width="{{ b.w }}" height="{{ b.h }}" fill="{{ b.c }}"></rect></sc-for>
+            <rect x="{{ lp.ix }}" y="{{ lp.iy }}" width="{{ lp.iw }}" height="{{ lp.ih }}" fill="{{ lp.bg }}"></rect>
+            <sc-for list="{{ lp.paths }}" as="p" hint-placeholder-count="1"><path d="{{ p.d }}" fill="{{ p.c }}"></path></sc-for>
+            <path d="{{ lp.quiltD }}" style="stroke:rgba(70,45,15,0.08);stroke-width:1;fill:none;"></path>
+            <rect x="0" y="0" width="{{ lp.w }}" height="{{ lp.h }}" fill="#d99a4e" opacity="0.09"></rect>
+          </svg>
+          <div style="font:italic 13px var(--serif);color:#8a7a61;padding-top:6px;text-align:center;">IMG_2847.jpeg — your photo</div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ lbShowQuilt }}" hint-placeholder-val="{{ false }}">
+        <div style="pointer-events:auto;background:#241c10;padding:16px;border-radius:10px;box-shadow:0 24px 60px rgba(0,0,0,0.5);">
+          <svg width="{{ lq.w }}" height="{{ lq.h }}" style="display:block;">
+            <sc-for list="{{ lq.bands }}" as="b" hint-placeholder-count="1"><rect x="{{ b.x }}" y="{{ b.y }}" width="{{ b.w }}" height="{{ b.h }}" fill="{{ b.c }}"></rect></sc-for>
+            <rect x="{{ lq.ix }}" y="{{ lq.iy }}" width="{{ lq.iw }}" height="{{ lq.ih }}" fill="{{ lq.bg }}"></rect>
+            <sc-for list="{{ lq.paths }}" as="p" hint-placeholder-count="1"><path d="{{ p.d }}" fill="{{ p.c }}"></path></sc-for>
+            <path d="{{ lq.hatchD }}" fill="rgba(196,90,40,0.32)" style="stroke:#d06a35;stroke-width:1;"></path>
+            <rect x="{{ lq.ox }}" y="{{ lq.oy }}" width="{{ lq.ow }}" height="{{ lq.oh }}" fill="none" stroke="{{ lq.bind }}" style="stroke-width:2;"></rect>
+          </svg>
+          <div style="font-size:13px;color:#cbbc9e;padding-top:8px;text-align:center;">{{ lbQuiltCap }}</div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ lbShowSide }}" hint-placeholder-val="{{ false }}">
+        <div style="pointer-events:auto;display:flex;gap:22px;flex-wrap:wrap;justify-content:center;align-items:flex-start;">
+          <div style="background:#fffdf7;padding:10px 10px 6px;border-radius:4px;box-shadow:0 24px 60px rgba(0,0,0,0.5);">
+            <svg width="{{ lsp.w }}" height="{{ lsp.h }}" style="display:block;">
+              <sc-for list="{{ lsp.bands }}" as="b" hint-placeholder-count="1"><rect x="{{ b.x }}" y="{{ b.y }}" width="{{ b.w }}" height="{{ b.h }}" fill="{{ b.c }}"></rect></sc-for>
+              <rect x="{{ lsp.ix }}" y="{{ lsp.iy }}" width="{{ lsp.iw }}" height="{{ lsp.ih }}" fill="{{ lsp.bg }}"></rect>
+              <sc-for list="{{ lsp.paths }}" as="p" hint-placeholder-count="1"><path d="{{ p.d }}" fill="{{ p.c }}"></path></sc-for>
+              <path d="{{ lsp.quiltD }}" style="stroke:rgba(70,45,15,0.08);stroke-width:1;fill:none;"></path>
+              <rect x="0" y="0" width="{{ lsp.w }}" height="{{ lsp.h }}" fill="#d99a4e" opacity="0.09"></rect>
+            </svg>
+            <div style="font:italic 12.5px var(--serif);color:#8a7a61;padding-top:5px;text-align:center;">your photo</div>
+          </div>
+          <div style="background:#241c10;padding:12px;border-radius:10px;box-shadow:0 24px 60px rgba(0,0,0,0.5);">
+            <svg width="{{ lsq.w }}" height="{{ lsq.h }}" style="display:block;">
+              <sc-for list="{{ lsq.bands }}" as="b" hint-placeholder-count="1"><rect x="{{ b.x }}" y="{{ b.y }}" width="{{ b.w }}" height="{{ b.h }}" fill="{{ b.c }}"></rect></sc-for>
+              <rect x="{{ lsq.ix }}" y="{{ lsq.iy }}" width="{{ lsq.iw }}" height="{{ lsq.ih }}" fill="{{ lsq.bg }}"></rect>
+              <sc-for list="{{ lsq.paths }}" as="p" hint-placeholder-count="1"><path d="{{ p.d }}" fill="{{ p.c }}"></path></sc-for>
+              <path d="{{ lsq.hatchD }}" fill="rgba(196,90,40,0.32)" style="stroke:#d06a35;stroke-width:1;"></path>
+              <rect x="{{ lsq.ox }}" y="{{ lsq.oy }}" width="{{ lsq.ow }}" height="{{ lsq.oh }}" fill="none" stroke="{{ lsq.bind }}" style="stroke-width:2;"></rect>
+            </svg>
+            <div style="font-size:12.5px;color:#cbbc9e;padding-top:6px;text-align:center;">recovered quilt</div>
+          </div>
+        </div>
+      </sc-if>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ jsonOpen }}" hint-placeholder-val="{{ false }}">
+  <div data-noprint="true" style="position:fixed;inset:0;z-index:60;">
+    <div onClick="{{ jsonClose }}" style="position:absolute;inset:0;background:rgba(18,12,6,0.6);"></div>
+    <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(460px,calc(100vw - 32px));background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:0 24px 60px rgba(0,0,0,0.35);padding:24px;">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
+        <h2 style="margin:0;font:700 23px var(--serif);color:var(--denim);flex:1;">Open a project</h2>
+        <button onClick="{{ jsonClose }}" style="width:38px;height:38px;background:var(--card2);border:1px solid var(--line);border-radius:9px;color:var(--ink2);font-size:16px;cursor:pointer;">✕</button>
+      </div>
+      <p style="margin:0 0 14px;font-size:14.5px;color:var(--mut);line-height:1.5;">QREP projects are plain .json files — easy to email, back up, or share with a friend.</p>
+      <label style="display:flex;flex-direction:column;align-items:center;gap:8px;border:2.5px dashed var(--line2);border-radius:14px;background:var(--card2);padding:26px 16px;cursor:pointer;position:relative;" style-hover="border-color:var(--accent);">
+        <svg width="34" height="30" style="display:block;color:var(--mut);"><path d="M17 20V2M17 2l-6 6M17 2l6 6M3 20v6a2 2 0 0 0 2 2h24a2 2 0 0 0 2-2v-6" style="fill:none;stroke:currentColor;stroke-width:2.4;"></path></svg>
+        <span style="font:600 16.5px var(--sans);color:var(--ink2);">Drop a .json project here</span>
+        <span style="font-size:13.5px;color:var(--faint);">or tap to browse</span>
+        <input type="file" accept=".json,application/json" onChange="{{ fileOpen }}" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;">
+      </label>
+      <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;">
+        <button onClick="{{ loadSample }}" style="flex:1;padding:12px;font:600 15px var(--sans);background:var(--card);border:1.5px solid var(--line2);border-radius:10px;color:var(--ink2);cursor:pointer;" style-hover="background:var(--card2);">Load the sample project</button>
+        <button onClick="{{ brokenDemo }}" data-tip="Shows the error toast" onMouseEnter="{{ tipOn }}" onMouseLeave="{{ tipOff }}" style="flex:1;padding:12px;font:600 15px var(--sans);background:none;border:1.5px dashed var(--line2);border-radius:10px;color:var(--mut);cursor:pointer;" style-hover="color:var(--accent);border-color:var(--accent);">Try a broken file</button>
+      </div>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ toastOn }}" hint-placeholder-val="{{ false }}">
+  <div data-noprint="true" style="{{ toastStyle }}">
+    <span style="flex:none;display:flex;">{{ toastGlyph }}</span>
+    <span>{{ toastMsg }}</span>
+  </div>
+</sc-if>
+
+<sc-if value="{{ tipShow }}" hint-placeholder-val="{{ false }}">
+  <div style="{{ tipStyle }}">{{ tipText }}</div>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.PRESETS = [
+      { k: 'crib', n: 'Crib', w: 36, h: 52 }, { k: 'throw', n: 'Throw', w: 50, h: 65 },
+      { k: 'twin', n: 'Twin', w: 70, h: 90 }, { k: 'full', n: 'Full', w: 84, h: 90 },
+      { k: 'queen', n: 'Queen', w: 90, h: 108 }, { k: 'king', n: 'King', w: 110, h: 108 }
+    ];
+    this.stageDefs = [
+      ['straighten', 'Straightening the photo'], ['colors', 'Matching fabric colors'],
+      ['grid', 'Finding the grid'], ['cells', 'Reading every square'],
+      ['repeats', 'Spotting the repeats'], ['borders', 'Measuring the borders']
+    ];
+    this.confBase = { straighten: 0.98, colors: 0.93, grid: 0.9, cells: 0.85, repeats: 0.77, borders: 0.94 };
+    this.confEnh = { straighten: 0.99, colors: 0.95, grid: 0.96, cells: 0.93, repeats: 0.9, borders: 0.97 };
+    let theme = 'light', resume = null;
+    try { if (localStorage.getItem('qrep-theme') === 'dark') theme = 'dark'; } catch (e) { }
+    try {
+      const r = JSON.parse(localStorage.getItem('qrep-autosave'));
+      if (r && r.model && r.model.cols && r.model.cells && r.model.fabrics) resume = r;
+    } catch (e) { }
+    this._resume = resume;
+    this._photoM = this._mkChain(false);
+    this.state = {
+      screen: 'home', theme: theme, vw: window.innerWidth || 1200, vh: window.innerHeight || 800,
+      projName: resume && resume.name ? resume.name : 'My quilt project',
+      model: resume ? resume.model : this._mkChain(false),
+      tab: 'sizing', mode: 'paint', activeFab: 1, zoom: 'fit', showUnc: false,
+      renameId: null, renameVal: '',
+      locked: true, presetK: null, reqW: null, reqH: null,
+      wDraft: '', hDraft: '', cellDraft: '', bandDrafts: [],
+      strategy: 'strip',
+      engine: 'boot', visionDL: false,
+      dlPct: 0, dlActive: false, progRun: false, enhanced: false,
+      stages: this.stageDefs.map(function (d) { return { k: d[0], label: d[1], st: 0, conf: 0 }; }),
+      pins: [{ x: 7, y: 6 }, { x: 93, y: 5 }, { x: 95, y: 94 }, { x: 5, y: 95 }],
+      lb: null, jsonOpen: false, busyDl: null,
+      toast: null, tip: null, copied: false, saveState: 'saved',
+      cvW: 900, cvH: 560
+    };
+    this.scrollRef = React.createRef(); this.quiltRef = React.createRef(); this.contentRef = React.createRef();
+    this.topRulRef = React.createRef(); this.leftRulRef = React.createRef();
+    this._measure = this._measure.bind(this);
+    this._onKey = this._onKey.bind(this);
+    this._undoS = []; this._redoS = []; this._tm = []; this._ver = 0; this._svgCache = {};
+    if (!this.state.model.seamFix) this.state.model.seamFix = { h: {}, v: {} };
+    this._refreshDrafts(true);
+  }
+
+  componentDidMount() {
+    document.body.setAttribute('data-theme', this.state.theme);
+    window.addEventListener('resize', this._measure);
+    window.addEventListener('keydown', this._onKey);
+    this._bootT = setTimeout(() => this.setState({ engine: 'ready' }), 1500);
+    this._measure(); setTimeout(this._measure, 80);
+  }
+  componentWillUnmount() {
+    window.removeEventListener('resize', this._measure);
+    window.removeEventListener('keydown', this._onKey);
+    clearTimeout(this._bootT); clearTimeout(this._tt); clearTimeout(this._saveT); clearTimeout(this._ct);
+    this._clearTimers();
+  }
+  _clearTimers() { this._tm.forEach(clearTimeout); this._tm = []; clearInterval(this._dlI); }
+  _measure() {
+    const p = { vw: window.innerWidth, vh: window.innerHeight };
+    const el = this.scrollRef.current;
+    if (el) {
+      const r = el.getBoundingClientRect();
+      if (r.width > 60 && r.height > 60) { p.cvW = Math.round(r.width); p.cvH = Math.round(r.height); }
+    }
+    const s = this.state;
+    if (p.vw !== s.vw || p.vh !== s.vh || (p.cvW && (p.cvW !== s.cvW || p.cvH !== s.cvH))) this.setState(p);
+  }
+  _onKey(e) {
+    if (e.key === 'Escape') { if (this.state.lb) this.setState({ lb: null }); if (this.state.jsonOpen) this.setState({ jsonOpen: false }); return; }
+    if ((e.ctrlKey || e.metaKey) && this.state.screen === 'editor') {
+      const k = e.key.toLowerCase();
+      if (k === 'z' && !e.shiftKey) { e.preventDefault(); this._undo(); }
+      else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); this._redo(); }
+    }
+  }
+
+  // ---------- fractions & format ----------
+  _fmt(v) { const G = { 1: '⅛', 2: '¼', 3: '⅜', 4: '½', 5: '⅝', 6: '¾', 7: '⅞' }; const n = Math.round(v * 8), w = Math.trunc(n / 8), r = n % 8; if (!r) return '' + w; if (!w) return G[r]; return w + G[r]; }
+  _fmtA(v) { const G = { 1: '1/8', 2: '1/4', 3: '3/8', 4: '1/2', 5: '5/8', 6: '3/4', 7: '7/8' }; const n = Math.round(v * 8), w = Math.trunc(n / 8), r = n % 8; if (!r) return '' + w; if (!w) return G[r]; return w + ' ' + G[r]; }
+  _parse(s) {
+    if (s == null) return null;
+    s = String(s).trim().toLowerCase().replace(/[″"]/g, '').replace(/\s*in(ch(es)?)?\.?\s*$/, '').trim();
+    const uni = { '⅛': ' 1/8', '¼': ' 1/4', '⅜': ' 3/8', '½': ' 1/2', '⅝': ' 5/8', '¾': ' 3/4', '⅞': ' 7/8' };
+    s = s.replace(/[⅛¼⅜½⅝¾⅞]/g, function (ch) { return uni[ch]; }).replace(/\s+/g, ' ').trim();
+    if (!s) return null;
+    let m = s.match(/^(\d+)[ -](\d+)\s*\/\s*(\d+)$/);
+    if (m) { const d = +m[3]; return d ? +m[1] + (+m[2]) / d : null; }
+    m = s.match(/^(\d+)\s*\/\s*(\d+)$/);
+    if (m) { const d = +m[2]; return d ? (+m[1]) / d : null; }
+    if (/^\d+(\.\d+)?$/.test(s)) return parseFloat(s);
+    return null;
+  }
+  _r8(v) { return Math.round(v * 8) / 8; }
+  _num(n) { return n.toLocaleString('en-US'); }
+  _hrs(mins) { if (mins < 95) return '~' + Math.round(mins / 5) * 5 + ' min'; return '~' + this._fmt(Math.round(mins / 30) / 2) + ' h'; }
+  _shade(hex, f) {
+    const n = parseInt(hex.slice(1), 16);
+    const r = Math.max(0, Math.min(255, Math.round(((n >> 16) & 255) * f)));
+    const g = Math.max(0, Math.min(255, Math.round(((n >> 8) & 255) * f)));
+    const b = Math.max(0, Math.min(255, Math.round((n & 255) * f)));
+    return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+  }
+
+  // ---------- model ----------
+  _isBlue(r, c) {
+    const R = Math.floor(r / 5), C = Math.floor(c / 5), i = r % 5, j = c % 5;
+    if (((R + C) % 2) === 0) return !((i === 0 && j === 2) || (i === 2 && (j === 0 || j === 4)) || (i === 4 && j === 2));
+    return (i === 0 || i === 4) && (j === 0 || j === 4);
+  }
+  _mkChain(fromPhoto) {
+    const cells = [];
+    for (let r = 0; r < 55; r++) for (let c = 0; c < 45; c++) cells.push(this._isBlue(r, c) ? 1 : 0);
+    return {
+      name: 'Double Irish Chain', source: fromPhoto ? 'photo' : 'demo', photo: true,
+      cols: 45, rows: 55, cell: 1.5, block: 5, bg: 0,
+      bands: [{ w: 3.75, fid: 0 }],
+      fabrics: [{ name: 'Cream Background', color: '#f7f1e0' }, { name: 'Light Blue Chain', color: '#a9c7dc' }],
+      cells: cells, unc: {}, seamFix: { h: {}, v: {} }
+    };
+  }
+  _mkBlank() {
+    const cells = [];
+    for (let i = 0; i < 18 * 24; i++) cells.push(0);
+    return {
+      name: 'My new quilt', source: 'blank', photo: false,
+      cols: 18, rows: 24, cell: 2.5, block: 1, bg: 0,
+      bands: [{ w: 2.5, fid: 0 }],
+      fabrics: [{ name: 'Cream Background', color: '#f7f1e0' }, { name: 'Denim Blue', color: '#8ba8bf' }],
+      cells: cells, unc: {}, seamFix: { h: {}, v: {} }
+    };
+  }
+  _mkUnc(m, enhanced) {
+    m.unc = {};
+    const step = enhanced ? 89 : 26;
+    for (let r = 0; r < m.rows; r++) for (let c = 0; c < m.cols; c++) {
+      if (((r * 31 + c * 17 + 5) % step) === 0) m.unc[r * m.cols + c] = 1;
+    }
+  }
+  _boff(m) { let t = 0; for (let i = 0; i < m.bands.length; i++) t += m.bands[i].w; return t; }
+  _W(m) { return m.cols * m.cell + 2 * this._boff(m); }
+  _H(m) { return m.rows * m.cell + 2 * this._boff(m); }
+
+  // ---------- derived numbers ----------
+  _derive() {
+    const m = this.state.model;
+    const key = this._ver + '|' + m.source;
+    if (this._dk === key) return this._dv;
+    const W = this._W(m), H = this._H(m), n = m.cols * m.rows;
+    const counts = m.fabrics.map(function () { return 0; });
+    for (let i = 0; i < n; i++) counts[m.cells[i]] = (counts[m.cells[i]] || 0) + 1;
+    const cut = m.cell + 0.5;
+    const perStrip = Math.max(1, Math.floor(40 / cut));
+    const inches = m.fabrics.map((f, i) => Math.ceil((counts[i] || 0) / perStrip) * cut);
+    const bandUse = m.fabrics.map(function () { return false; });
+    m.bands.forEach((b) => {
+      inches[b.fid] += (Math.ceil((2 * H) / 40) + Math.ceil((2 * W) / 40)) * (b.w + 0.5);
+      bandUse[b.fid] = true;
+    });
+    const up = function (v) { return Math.ceil((v / 36) / 0.25) * 0.25; };
+    const yards = inches.map(up);
+    const needW = W + 8, needH = H + 8;
+    const vp = Math.ceil(needW / 40), hp = Math.ceil(needH / 40);
+    const useV = vp * needH <= hp * needW;
+    const backPanels = useV ? vp : hp;
+    const yBack = up(useV ? vp * needH : hp * needW);
+    const perim = 2 * (W + H) + 10;
+    const bindStrips = Math.ceil(perim / 40);
+    const yBind = up(bindStrips * 2.5);
+    // strategy math
+    let runs = 0, rects = 0;
+    const sigs = {};
+    let prev = null;
+    for (let r = 0; r < m.rows; r++) {
+      const segs = [];
+      let st = 0;
+      for (let c = 1; c <= m.cols; c++) {
+        if (c === m.cols || m.cells[r * m.cols + c] !== m.cells[r * m.cols + st]) {
+          segs.push(st + ':' + c + ':' + m.cells[r * m.cols + st]);
+          st = c;
+        }
+      }
+      runs += segs.length;
+      sigs[segs.join('|')] = 1;
+      if (prev) { segs.forEach(function (sg) { if (prev.indexOf(sg) === -1) rects++; }); }
+      else rects += segs.length;
+      prev = segs;
+    }
+    const uniq = Object.keys(sigs).length;
+    const bandPieces = m.bands.length * 4;
+    const strat = {
+      hist: { pieces: n + bandPieces, cuts: n + m.fabrics.reduce((a, f, i) => a + Math.ceil((counts[i] || 0) / perStrip), 0), mins: n * 1.05 + 90 },
+      strip: { pieces: runs + bandPieces, cuts: uniq * m.fabrics.length * 2 + m.rows, mins: m.rows * 2.4 + uniq * 16 + 60 },
+      opt: { pieces: rects + bandPieces, cuts: rects + m.fabrics.length * 2, mins: rects * 1.15 + 120 }
+    };
+    this._dk = key;
+    this._dv = { W: W, H: H, n: n, counts: counts, cut: cut, perStrip: perStrip, yards: yards, bandUse: bandUse, needW: needW, needH: needH, backPanels: backPanels, yBack: yBack, perim: perim, bindStrips: bindStrips, yBind: yBind, strat: strat, uniq: uniq, rects: rects };
+    return this._dv;
+  }
+
+  // ---------- drawing ----------
+  _svgOut(m, ppi, x0, y0, opt) {
+    opt = opt || {};
+    const key = (m === this.state.model ? 'M' + this._ver : 'P') + '|' + ppi.toFixed(3) + '|' + x0 + '|' + y0 + '|' + (opt.seamMode || (opt.seams ? 'grid' : '')) + '|' + (opt.quilting ? 1 : 0) + (opt.hatch ? 1 : 0);
+    if (this._svgCache[key]) return this._svgCache[key];
+    const r2 = function (v) { return Math.round(v * 100) / 100; };
+    const W = this._W(m), H = this._H(m);
+    const bands = [];
+    let off = 0;
+    for (let i = 0; i < m.bands.length; i++) {
+      const b = m.bands[i];
+      bands.push({ x: r2(x0 + off * ppi), y: r2(y0 + off * ppi), w: r2((W - 2 * off) * ppi), h: r2((H - 2 * off) * ppi), c: m.fabrics[b.fid] ? m.fabrics[b.fid].color : '#ccc' });
+      off += b.w;
+    }
+    const ix = x0 + off * ppi, iy = y0 + off * ppi, cp = m.cell * ppi;
+    const counts = m.fabrics.map(function () { return 0; });
+    const n = m.cols * m.rows;
+    for (let i = 0; i < n; i++) counts[m.cells[i]]++;
+    let maj = 0;
+    counts.forEach(function (c, i) { if (c > counts[maj]) maj = i; });
+    const ds = m.fabrics.map(function () { return ''; });
+    const w = r2(cp + 0.3);
+    for (let r = 0; r < m.rows; r++) for (let c = 0; c < m.cols; c++) {
+      const f = m.cells[r * m.cols + c];
+      if (f === maj) continue;
+      ds[f] += 'M' + r2(ix + c * cp) + ' ' + r2(iy + r * cp) + 'h' + w + 'v' + w + 'h-' + w + 'z';
+    }
+    const paths = [];
+    ds.forEach((d, i) => { if (d) paths.push({ d: d, c: m.fabrics[i].color }); });
+    let seamD = '';
+    const sMode = opt.seamMode || (opt.seams ? 'grid' : '');
+    if (sMode && cp >= 4.5) {
+      const own = m === this.state.model;
+      const mode = own ? sMode : 'grid';
+      const fix = (own && m.seamFix) ? m.seamFix : { h: {}, v: {} };
+      const mm = own ? this._mergeMaps(mode) : { h: {}, v: {} };
+      const plain = mode === 'grid' && !Object.keys(fix.h).length && !Object.keys(fix.v).length;
+      for (let cb = 1; cb < m.cols; cb++) {
+        let run = -1;
+        for (let r = 0; r <= m.rows; r++) {
+          const cut = r < m.rows && (plain || !this._edgeOn(fix, mm, 'h', r * m.cols + cb - 1));
+          if (cut && run < 0) run = r;
+          if (!cut && run >= 0) { seamD += 'M' + r2(ix + cb * cp) + ' ' + r2(iy + run * cp) + 'v' + r2((r - run) * cp); run = -1; }
+        }
+      }
+      for (let rb = 1; rb < m.rows; rb++) {
+        let run = -1;
+        for (let c = 0; c <= m.cols; c++) {
+          const cut = c < m.cols && (plain || !this._edgeOn(fix, mm, 'v', (rb - 1) * m.cols + c));
+          if (cut && run < 0) run = c;
+          if (!cut && run >= 0) { seamD += 'M' + r2(ix + run * cp) + ' ' + r2(iy + rb * cp) + 'h' + r2((c - run) * cp); run = -1; }
+        }
+      }
+      seamD += 'M' + r2(ix) + ' ' + r2(iy) + 'h' + r2(m.cols * cp) + 'v' + r2(m.rows * cp) + 'h-' + r2(m.cols * cp) + 'z';
+    }
+    let hatchD = '';
+    if (opt.hatch) {
+      for (const k in m.unc) {
+        const idx = +k, r = Math.floor(idx / m.cols), c = idx % m.cols;
+        hatchD += 'M' + r2(ix + c * cp) + ' ' + r2(iy + r * cp) + 'h' + w + 'v' + w + 'h-' + w + 'z';
+      }
+    }
+    let quiltD = '';
+    if (opt.quilting && ppi >= 1.6) {
+      for (let k = -H; k <= W; k += 5) {
+        const a = Math.max(0, k), b = Math.max(0, -k), a2 = Math.min(W, H + k), b2 = Math.min(H, W - k);
+        if (a2 > a) quiltD += 'M' + r2(x0 + a * ppi) + ' ' + r2(y0 + b * ppi) + 'L' + r2(x0 + a2 * ppi) + ' ' + r2(y0 + b2 * ppi);
+      }
+      for (let k = 0; k <= W + H; k += 5) {
+        const a = Math.max(0, k - H), b = Math.min(H, k), a2 = Math.min(W, k), b2 = Math.max(0, k - W);
+        if (a2 > a) quiltD += 'M' + r2(x0 + a * ppi) + ' ' + r2(y0 + b * ppi) + 'L' + r2(x0 + a2 * ppi) + ' ' + r2(y0 + b2 * ppi);
+      }
+    }
+    const out = {
+      w: Math.ceil(W * ppi + 2 * x0), h: Math.ceil(H * ppi + 2 * y0),
+      bands: bands, ix: r2(ix), iy: r2(iy), iw: r2(m.cols * cp), ih: r2(m.rows * cp),
+      bg: m.fabrics[maj].color, paths: paths, seamD: seamD, hatchD: hatchD, quiltD: quiltD,
+      ox: r2(x0 + 1), oy: r2(y0 + 1), ow: r2(W * ppi - 2), oh: r2(H * ppi - 2),
+      bind: m.fabrics[1] ? this._shade(m.fabrics[1].color, 0.72) : '#8c6f4e',
+      qx: r2(x0), qy: r2(y0), qw: r2(W * ppi), qh: r2(H * ppi), ppi: ppi
+    };
+    const ck = Object.keys(this._svgCache);
+    if (ck.length > 24) this._svgCache = {};
+    this._svgCache[key] = out;
+    return out;
+  }
+  _ticks(len, ppi, off, gap) {
+    const r2 = function (v) { return Math.round(v * 100) / 100; };
+    let min = '', maj = '';
+    const labels = [];
+    for (let i = 0; i <= Math.floor(len); i++) {
+      const p = r2(off + i * ppi);
+      if (i % 5) min += gap === 'x' ? ('M' + p + ' 27v-6') : ('M41 ' + p + 'h-6');
+      else {
+        maj += gap === 'x' ? ('M' + p + ' 27v-11') : ('M41 ' + p + 'h-11');
+        if (i === 0 || (len - i) * ppi >= (gap === 'x' ? 26 : 20)) labels.push({ p: p, t: '' + i });
+      }
+    }
+    const end = r2(off + len * ppi);
+    maj += gap === 'x' ? ('M' + end + ' 27v-11') : ('M41 ' + end + 'h-11');
+    return { min: min, maj: maj, labels: labels, end: end };
+  }
+
+  // ---------- undo / autosave ----------
+  _snap() { const m = this.state.model; return JSON.parse(JSON.stringify(m)); }
+  _pushUndo(tag) {
+    const now = Date.now();
+    if (tag && this._lastTag === tag && now - (this._lastTagT || 0) < 1200) { this._lastTagT = now; return; }
+    this._lastTag = tag || null; this._lastTagT = now;
+    this._undoS.push(this._snap());
+    if (this._undoS.length > 60) this._undoS.shift();
+    this._redoS = [];
+  }
+  _undo() { if (!this._undoS.length) return; this._redoS.push(this._snap()); this._applySnap(this._undoS.pop()); }
+  _redo() { if (!this._redoS.length) return; this._undoS.push(this._snap()); this._applySnap(this._redoS.pop()); }
+  _applySnap(sn) { this.setState({ model: sn }); this._ver++; this._refreshDrafts(); this._touch(); }
+  _mut(fn, tag) {
+    this._pushUndo(tag);
+    fn(this.state.model);
+    this._ver++;
+    this._refreshDrafts();
+    this._touch();
+    this.forceUpdate();
+  }
+  _refreshDrafts(init) {
+    const m = init ? this.state.model : this.state.model;
+    const p = {
+      wDraft: this._fmtA(this._W(m)), hDraft: this._fmtA(this._H(m)),
+      cellDraft: this._fmtA(m.cell), bandDrafts: m.bands.map((b) => this._fmtA(b.w))
+    };
+    if (init) Object.assign(this.state, p); else this.setState(p);
+  }
+  _touch() {
+    this.setState({ saveState: 'saving' });
+    clearTimeout(this._saveT);
+    this._saveT = setTimeout(() => {
+      this._resume = { name: this.state.projName, model: this.state.model };
+      try { localStorage.setItem('qrep-autosave', JSON.stringify(this._resume)); } catch (e) { }
+      this.setState({ saveState: 'saved' });
+    }, 700);
+  }
+
+  // ---------- analysis flow ----------
+  _startAnalysis() {
+    this._clearTimers();
+    this.setState({
+      screen: 'progress', engine: 'busy', progRun: true, dlPct: 0, dlActive: !this.state.visionDL, dlAtStart: this.state.visionDL,
+      stages: this.stageDefs.map(function (d) { return { k: d[0], label: d[1], st: 0, conf: 0 }; })
+    });
+    if (!this.state.visionDL) {
+      this._dlI = setInterval(() => {
+        const p = Math.min(100, this.state.dlPct + 9);
+        this.setState({ dlPct: p });
+        if (p >= 100) { clearInterval(this._dlI); this.setState({ dlActive: false, visionDL: true }); this._runStages(); }
+      }, 65);
+    } else this._runStages();
+  }
+  _runStages() {
+    const confs = this.state.enhanced ? this.confEnh : this.confBase;
+    const D = 250;
+    this.stageDefs.forEach((d, i) => {
+      this._tm.push(setTimeout(() => {
+        const st = this.state.stages.map(function (x) { return Object.assign({}, x); });
+        st[i].st = 1; this.setState({ stages: st });
+      }, i * D + 10));
+      this._tm.push(setTimeout(() => {
+        const st = this.state.stages.map(function (x) { return Object.assign({}, x); });
+        st[i].st = 2; st[i].conf = confs[d[0]]; this.setState({ stages: st });
+      }, i * D + D - 20));
+    });
+    this._tm.push(setTimeout(() => this._finishAnalysis(), this.stageDefs.length * D + 320));
+  }
+  _finishAnalysis() {
+    this._clearTimers();
+    const confs = this.state.enhanced ? this.confEnh : this.confBase;
+    const m = this._mkChain(true);
+    this._mkUnc(m, this.state.enhanced);
+    this._undoS = []; this._redoS = []; this._ver++;
+    const st = this.stageDefs.map(function (d) { return { k: d[0], label: d[1], st: 2, conf: confs[d[0]] }; });
+    this.setState({ model: m, stages: st, screen: 'results', engine: 'ready', progRun: false, showUnc: false, projName: 'Double Irish Chain' });
+    this._refreshDrafts(); this._touch();
+  }
+
+  // ---------- painting & panning ----------
+  _cellAt(e) {
+    const g = this._geom, m = this.state.model;
+    if (!g || !this.quiltRef.current) return -1;
+    const rect = this.quiltRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left - (g.x0 + g.boff * g.ppi);
+    const y = e.clientY - rect.top - (g.y0 + g.boff * g.ppi);
+    const c = Math.floor(x / (m.cell * g.ppi)), r = Math.floor(y / (m.cell * g.ppi));
+    if (c < 0 || r < 0 || c >= m.cols || r >= m.rows) return -1;
+    return r * m.cols + c;
+  }
+  _paintCell(idx) {
+    const m = this.state.model;
+    if (m.cells[idx] === this.state.activeFab && !m.unc[idx]) return;
+    m.cells[idx] = this.state.activeFab;
+    delete m.unc[idx];
+    this._ver++; this._painted = true;
+  }
+  _walk(a, b, cols) {
+    const out = [];
+    let r = Math.floor(a / cols), c = a % cols;
+    const r2 = Math.floor(b / cols), c2 = b % cols;
+    let guard = 0;
+    while ((r !== r2 || c !== c2) && guard++ < 600) {
+      const remR = Math.abs(r2 - r), remC = Math.abs(c2 - c);
+      if (remR >= remC && remR > 0) r += (r2 > r ? 1 : -1);
+      else c += (c2 > c ? 1 : -1);
+      out.push(r * cols + c);
+    }
+    return out;
+  }
+  _zoomTo(e) {
+    const m = this.state.model, q = this.quiltRef.current;
+    if (!q) return;
+    const rect = q.getBoundingClientRect();
+    const fx = (e.clientX - rect.left) / rect.width, fy = (e.clientY - rect.top) / rect.height;
+    const z = Math.min(1, Math.max(0.1, 22 / (96 * m.cell)));
+    this.setState({ zoom: Math.round(z * 100) / 100 });
+    this._toast('Zoomed in — the squares were too small to touch. Tap again to edit; pan with two fingers.');
+    setTimeout(() => {
+      const sc = this.scrollRef.current, q2 = this.quiltRef.current;
+      if (!sc || !q2) return;
+      const r2 = q2.getBoundingClientRect();
+      sc.scrollLeft = fx * r2.width - sc.clientWidth / 2;
+      sc.scrollTop = fy * r2.height - sc.clientHeight / 2;
+    }, 60);
+  }
+  _paintAt(e) {
+    const m = this.state.model, idx = this._cellAt(e);
+    if (idx < 0) { this._lastPaint = -1; return; }
+    if (this._lastPaint != null && this._lastPaint >= 0 && this._lastPaint !== idx) {
+      const steps = this._walk(this._lastPaint, idx, m.cols);
+      for (let k = 0; k < steps.length; k++) this._paintCell(steps[k]);
+    } else this._paintCell(idx);
+    this._lastPaint = idx;
+    if (!this._raf) this._raf = requestAnimationFrame(() => { this._raf = 0; this.forceUpdate(); });
+  }
+  _seamStep(e) {
+    const m = this.state.model, i = this._cellAt(e), sm = this._seam;
+    if (!sm) return;
+    const dist = Math.abs(e.clientX - sm.dx) + Math.abs(e.clientY - sm.dy);
+    if (i < 0) { sm.last = -1; return; }
+    const last = sm.last;
+    sm.last = i;
+    if (last < 0 || i === last || dist < 8) return;
+    sm.moved = true;
+    const fix = m.seamFix || (m.seamFix = { h: {}, v: {} });
+    const mm = this._mergeMaps(this._seamMode || 'grid');
+    const steps = this._walk(last, i, m.cols);
+    let prev = last, did = false;
+    for (let k = 0; k < steps.length; k++) {
+      const cur = steps[k];
+      if (m.cells[prev] === m.cells[cur]) {
+        const kind = Math.abs(cur - prev) === 1 ? 'h' : 'v';
+        const key = Math.min(prev, cur);
+        if (!this._edgeOn(fix, mm, kind, key)) { fix[kind][key] = 1; sm.changed = true; did = true; }
+      }
+      prev = cur;
+    }
+    if (did) { this._ver++; }
+    if (!this._raf) this._raf = requestAnimationFrame(() => { this._raf = 0; this.forceUpdate(); });
+  }
+  _seamSplit(i) {
+    const m = this.state.model;
+    const patch = this._patchCells(m, this._seamMode || 'grid', i);
+    if (patch.length < 2) return false;
+    const inP = {};
+    patch.forEach(function (x) { inP[x] = 1; });
+    const fix = m.seamFix || (m.seamFix = { h: {}, v: {} });
+    patch.forEach((x) => {
+      if ((x % m.cols) < m.cols - 1 && inP[x + 1]) fix.h[x] = 0;
+      if (inP[x + m.cols]) fix.v[x] = 0;
+    });
+    this._ver++;
+    return true;
+  }
+  _midpoint() {
+    let mx = 0, my = 0;
+    this._pts.forEach(function (p) { mx += p.x; my += p.y; });
+    return { x: mx / this._pts.size, y: my / this._pts.size };
+  }
+  _cancelStroke() {
+    if (this._stroke && this._painted) { this._touch(); this.setState({}); }
+    else if (this._stroke && this._undoS.length) this._undoS.pop();
+    if (this._seam) {
+      if (this._seam.changed) { this._touch(); this.setState({}); }
+      else if (this._undoS.length) this._undoS.pop();
+    }
+    this._stroke = false; this._seam = null; this._pan = null; this._lastPaint = -1; this._lastTag = null;
+  }
+  _qDown(e) {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    this._pts = this._pts || new Map();
+    this._pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (this._pts.size >= 2) {
+      // second finger: stop editing, start two-finger pan / pinch zoom
+      this._cancelStroke();
+      const sc = this.scrollRef.current, mid = this._midpoint();
+      const box = sc ? sc.getBoundingClientRect() : { left: 0, top: 0 };
+      const pts = Array.from(this._pts.values());
+      const d0 = Math.max(20, Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y));
+      const ppi0 = this._geom ? this._geom.ppi : 96;
+      this._pinch = {
+        d0: d0, zoom0: ppi0 / 96, f: 1, boxL: box.left, boxT: box.top,
+        cx: (sc ? sc.scrollLeft : 0) + mid.x - box.left,
+        cy: (sc ? sc.scrollTop : 0) + mid.y - box.top,
+        w0: 0, h0: 0
+      };
+      const ce = this.contentRef.current;
+      if (ce) { this._pinch.w0 = ce.offsetWidth; this._pinch.h0 = ce.offsetHeight; ce.style.transformOrigin = '0 0'; }
+      return;
+    }
+    const md = this.state.mode;
+    if ((md === 'paint' || md === 'seam') && this._geom && this._geom.ppi * this.state.model.cell < 14) { this._zoomTo(e); return; }
+    if (md === 'paint') { this._stroke = true; this._painted = false; this._lastPaint = -1; this._pushUndo(); this._paintAt(e); }
+    else if (md === 'seam') { this._pushUndo(); this._seam = { last: this._cellAt(e), moved: false, changed: false, dx: e.clientX, dy: e.clientY }; }
+    else {
+      const sc = this.scrollRef.current;
+      this._pan = { x: e.clientX, y: e.clientY, sl: sc ? sc.scrollLeft : 0, st: sc ? sc.scrollTop : 0 };
+    }
+  }
+  _qMove(e) {
+    if (this._pts && this._pts.has(e.pointerId)) this._pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (this._pinch && this._pts && this._pts.size >= 2) {
+      const pz = this._pinch, sc = this.scrollRef.current, mid = this._midpoint();
+      const pts = Array.from(this._pts.values());
+      const d = Math.max(20, Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y));
+      let f = d / pz.d0;
+      f = Math.max(0.03 / pz.zoom0, Math.min(2.2 / pz.zoom0, f));
+      pz.f = f;
+      const ce = this.contentRef.current;
+      if (ce) {
+        ce.style.transform = 'scale(' + f + ')';
+        ce.style.width = (pz.w0 * f) + 'px';
+        ce.style.height = (pz.h0 * f) + 'px';
+      }
+      if (sc) {
+        sc.scrollLeft = pz.cx * f - (mid.x - pz.boxL);
+        sc.scrollTop = pz.cy * f - (mid.y - pz.boxT);
+      }
+      return;
+    }
+    if (this._stroke) this._paintAt(e);
+    else if (this._seam) this._seamStep(e);
+    else if (this._pan) {
+      const sc = this.scrollRef.current;
+      if (sc) { sc.scrollLeft = this._pan.sl - (e.clientX - this._pan.x); sc.scrollTop = this._pan.st - (e.clientY - this._pan.y); }
+    }
+  }
+  _qUp(e) {
+    if (this._pts && e) this._pts.delete(e.pointerId);
+    if (this._pinch) {
+      if (!this._pts || this._pts.size < 2) {
+        const pz = this._pinch;
+        this._pinch = null;
+        const ce = this.contentRef.current, sc = this.scrollRef.current;
+        const sl = sc ? sc.scrollLeft : 0, st = sc ? sc.scrollTop : 0;
+        if (ce) { ce.style.transform = ''; ce.style.width = ''; ce.style.height = ''; }
+        if (Math.abs(pz.f - 1) > 0.02) {
+          const nz = Math.max(0.03, Math.min(2.2, pz.zoom0 * pz.f));
+          this.setState({ zoom: Math.round(nz * 1000) / 1000 });
+        } else this.forceUpdate();
+        setTimeout(() => {
+          const sc2 = this.scrollRef.current;
+          if (sc2) { sc2.scrollLeft = sl; sc2.scrollTop = st; }
+        }, 60);
+      }
+      return; // fingers from a pan/pinch never paint, seam or split
+    }
+    if (this._stroke && this._painted) { this._touch(); this.setState({}); }
+    else if (this._stroke && this._undoS.length) this._undoS.pop();
+    if (this._seam) {
+      let changed = this._seam.changed;
+      if (!this._seam.moved && this._seam.last >= 0) changed = this._seamSplit(this._seam.last) || changed;
+      if (changed) { this._touch(); this.setState({}); }
+      else if (this._undoS.length) this._undoS.pop();
+    }
+    this._stroke = false; this._pan = null; this._seam = null; this._lastTag = null; this._lastPaint = -1;
+  }
+  // ---------- seam merge maps ----------
+  _mergeMaps(mode) {
+    const m = this.state.model;
+    const key = this._ver + '|' + mode;
+    if (this._mmK === key) return this._mmV;
+    const h = {}, v = {};
+    if (mode !== 'grid') {
+      for (let r = 0; r < m.rows; r++) for (let c = 0; c < m.cols - 1; c++) {
+        const i = r * m.cols + c;
+        if (m.cells[i] === m.cells[i + 1]) h[i] = 1;
+      }
+    }
+    if (mode === 'rect') {
+      for (let r = 1; r < m.rows; r++) {
+        let st = 0;
+        for (let c = 1; c <= m.cols; c++) {
+          if (c === m.cols || m.cells[r * m.cols + c] !== m.cells[r * m.cols + st]) {
+            const color = m.cells[r * m.cols + st];
+            let same = true;
+            for (let k = st; k < c && same; k++) if (m.cells[(r - 1) * m.cols + k] !== color) same = false;
+            if (same && st > 0 && m.cells[(r - 1) * m.cols + st - 1] === color) same = false;
+            if (same && c < m.cols && m.cells[(r - 1) * m.cols + c] === color) same = false;
+            if (same) for (let k = st; k < c; k++) v[(r - 1) * m.cols + k] = 1;
+            st = c;
+          }
+        }
+      }
+    }
+    this._mmK = key; this._mmV = { h: h, v: v };
+    return this._mmV;
+  }
+  _edgeOn(fix, mm, kind, i) {
+    const o = fix[kind][i];
+    if (o != null) return o === 1;
+    return !!mm[kind][i];
+  }
+  _patchCells(m, mode, start) {
+    const fix = m.seamFix || { h: {}, v: {} };
+    const mm = this._mergeMaps(mode);
+    const seen = {}; const stack = [start]; const out = [start];
+    seen[start] = 1;
+    while (stack.length) {
+      const i = stack.pop(), r = Math.floor(i / m.cols), c = i % m.cols;
+      const nb = [];
+      if (c < m.cols - 1 && this._edgeOn(fix, mm, 'h', i)) nb.push(i + 1);
+      if (c > 0 && this._edgeOn(fix, mm, 'h', i - 1)) nb.push(i - 1);
+      if (r < m.rows - 1 && this._edgeOn(fix, mm, 'v', i)) nb.push(i + m.cols);
+      if (r > 0 && this._edgeOn(fix, mm, 'v', i - m.cols)) nb.push(i - m.cols);
+      for (let k = 0; k < nb.length; k++) { const j = nb[k]; if (!seen[j]) { seen[j] = 1; stack.push(j); out.push(j); } }
+    }
+    return out;
+  }
+  _pieceCount(mode) {
+    const m = this.state.model;
+    const key = this._ver + '|' + mode;
+    if (this._pcK === key) return this._pcV;
+    const fix = m.seamFix || { h: {}, v: {} };
+    const mm = this._mergeMaps(mode);
+    const n = m.cols * m.rows, seen = new Uint8Array(n);
+    let count = 0;
+    for (let s0 = 0; s0 < n; s0++) {
+      if (seen[s0]) continue;
+      count++; seen[s0] = 1;
+      const stack = [s0];
+      while (stack.length) {
+        const i = stack.pop(), r = Math.floor(i / m.cols), c = i % m.cols;
+        if (c < m.cols - 1 && !seen[i + 1] && this._edgeOn(fix, mm, 'h', i)) { seen[i + 1] = 1; stack.push(i + 1); }
+        if (c > 0 && !seen[i - 1] && this._edgeOn(fix, mm, 'h', i - 1)) { seen[i - 1] = 1; stack.push(i - 1); }
+        if (r < m.rows - 1 && !seen[i + m.cols] && this._edgeOn(fix, mm, 'v', i)) { seen[i + m.cols] = 1; stack.push(i + m.cols); }
+        if (r > 0 && !seen[i - m.cols] && this._edgeOn(fix, mm, 'v', i - m.cols)) { seen[i - m.cols] = 1; stack.push(i - m.cols); }
+      }
+    }
+    this._pcK = key; this._pcV = count;
+    return count;
+  }
+
+  // ---------- toast, tips ----------
+  _toast(msg, kind) {
+    this.setState({ toast: { msg: msg, kind: kind || 'ok' } });
+    clearTimeout(this._tt);
+    this._tt = setTimeout(() => this.setState({ toast: null }), 3600);
+  }
+
+  // ---------- exports ----------
+  _download(name, content, mime) {
+    try {
+      const blob = new Blob([content], { type: mime || 'text/plain' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = name;
+      document.body.appendChild(a); a.click();
+      setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 400);
+      return true;
+    } catch (e) { return false; }
+  }
+  _cutRows() {
+    const m = this.state.model, d = this._derive(), A = this._fmtA.bind(this);
+    const rows = [];
+    m.fabrics.forEach((f, i) => {
+      if (d.counts[i]) rows.push([f.name, 'squares', d.counts[i], A(d.cut), A(d.cut)]);
+    });
+    m.bands.forEach((b, i) => {
+      rows.push([m.fabrics[b.fid].name, 'border ' + (i + 1) + ' strips', Math.ceil((2 * d.W) / 40) + Math.ceil((2 * d.H) / 40), '40', A(b.w + 0.5)]);
+    });
+    rows.push([m.fabrics[1] ? m.fabrics[1].name : 'Binding fabric', 'binding strips', d.bindStrips, '40', '2 1/2']);
+    return rows;
+  }
+  _csv() {
+    let out = 'fabric,piece,count,cut_width_in,cut_height_in\n';
+    this._cutRows().forEach(function (r) { out += '"' + r[0] + '",' + r[1] + ',' + r[2] + ',"' + r[3] + '","' + r[4] + '"\n'; });
+    return out;
+  }
+  _md() {
+    const s = this.state, d = this._derive(), A = this._fmtA.bind(this);
+    const names = { hist: 'Historical (square by square)', strip: 'Strip piecing', opt: 'Modern optimized' };
+    let out = '# ' + s.model.name + ' — cut list\n\n' + A(d.W) + ' x ' + A(d.H) + ' in finished · ' + s.model.cols + ' x ' + s.model.rows + ' squares at ' + A(s.model.cell) + ' in · plan: ' + names[s.strategy] + '\n\n| Fabric | Piece | Count | Cut (in) |\n|---|---|---:|---|\n';
+    this._cutRows().forEach(function (r) { out += '| ' + r[0] + ' | ' + r[1] + ' | ' + r[2] + ' | ' + r[3] + ' x ' + r[4] + ' |\n'; });
+    out += '\nCut sizes include 1/4 in seam allowance. Made with QREP.\n';
+    return out;
+  }
+  _yardTxt() {
+    const d = this._derive(), A = this._fmtA.bind(this), m = this.state.model;
+    let out = this.state.model.name.toUpperCase() + ' — YARDAGE (estimate)\nFinished size: ' + A(d.W) + ' x ' + A(d.H) + ' in\n\n';
+    m.fabrics.forEach((f, i) => {
+      out += '- ' + f.name + ': about ' + A(d.yards[i]) + ' yd (' + this._num(d.counts[i] || 0) + ' squares' + (d.bandUse[i] ? ' + borders' : '') + ')\n';
+    });
+    out += '- Binding: about ' + A(d.yBind) + ' yd (' + d.bindStrips + ' strips cut 2 1/2 in)\n- Backing: about ' + A(d.yBack) + ' yd (' + d.backPanels + ' panels of 40 in, seamed)\n- Batting: ' + A(d.needW) + ' x ' + A(d.needH) + ' in\n\nRounded up to the next 1/4 yd, assuming 40 in usable width. Buy a little extra for insurance.\n';
+    return out;
+  }
+  _svgStr() {
+    const q = this._svgOut(this.state.model, 8, 10, 10, { seams: true });
+    let s = '<svg xmlns="http://www.w3.org/2000/svg" width="' + q.w + '" height="' + q.h + '" viewBox="0 0 ' + q.w + ' ' + q.h + '">';
+    q.bands.forEach(function (b) { s += '<rect x="' + b.x + '" y="' + b.y + '" width="' + b.w + '" height="' + b.h + '" fill="' + b.c + '"/>'; });
+    s += '<rect x="' + q.ix + '" y="' + q.iy + '" width="' + q.iw + '" height="' + q.ih + '" fill="' + q.bg + '"/>';
+    q.paths.forEach(function (p) { s += '<path d="' + p.d + '" fill="' + p.c + '"/>'; });
+    if (q.seamD) s += '<path d="' + q.seamD + '" stroke="rgba(110,80,45,0.18)" stroke-width="0.7" fill="none"/>';
+    s += '<rect x="' + q.qx + '" y="' + q.qy + '" width="' + q.qw + '" height="' + q.qh + '" fill="none" stroke="' + q.bind + '" stroke-width="2"/></svg>';
+    return s;
+  }
+  _copyText() {
+    const s = this.state, d = this._derive(), A = this._fmtA.bind(this), m = s.model;
+    const p = this.PRESETS.find((p) => Math.abs(p.w - d.W) < 0.07 && Math.abs(p.h - d.H) < 0.07);
+    const borders = m.bands.map((b) => A(b.w) + ' in ' + m.fabrics[b.fid].name).join(', ');
+    const lines = [
+      'MY QUILT — ' + m.name + ' (QREP)',
+      'Finished size: ' + A(d.W) + ' x ' + A(d.H) + ' in' + (p ? ' (' + p.n + ')' : ''),
+      'Squares: ' + A(m.cell) + ' in finished (' + A(d.cut) + ' in cut) — ' + m.cols + ' x ' + m.rows + ' grid',
+      'Borders: ' + borders,
+      '',
+      'Fabric (estimate, 40 in usable width):'
+    ];
+    m.fabrics.forEach((f, i) => {
+      lines.push('- ' + f.name + ' (' + f.color + '): ' + this._num(d.counts[i] || 0) + ' squares' + (d.bandUse[i] ? ' + borders' : '') + ' — about ' + A(d.yards[i]) + ' yd');
+    });
+    lines.push('- Binding: about ' + A(d.yBind) + ' yd (' + d.bindStrips + ' strips cut 2 1/2 in)');
+    lines.push('- Backing: about ' + A(d.yBack) + ' yd (' + d.backPanels + ' panels, seamed)');
+    lines.push('- Batting: ' + A(d.needW) + ' x ' + A(d.needH) + ' in');
+    lines.push('Rounded up to the next 1/4 yd.');
+    return lines.join('\n');
+  }
+  _doCopy() {
+    const t = this._copyText();
+    const done = () => {
+      this.setState({ copied: true });
+      this._toast('Copied! Paste it into notes, email, anywhere.');
+      clearTimeout(this._ct);
+      this._ct = setTimeout(() => this.setState({ copied: false }), 2600);
+    };
+    const fb = () => {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = t; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        document.execCommand('copy'); document.body.removeChild(ta);
+        done();
+      } catch (err) { this._toast('Could not copy — sorry!', 'err'); }
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(done, fb);
+    else fb();
+  }
+  _startDl(k) {
+    if (this.state.busyDl) return;
+    this.setState({ busyDl: k, engine: 'busy' });
+    setTimeout(() => {
+      const m = this.state.model;
+      const base = (m.name || 'quilt').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      let ok = true;
+      if (k === 'pdf') { window.print(); this._toast('Print dialog opened — choose “Save as PDF”.'); }
+      else if (k === 'csv') { ok = this._download(base + '-cut-list.csv', this._csv(), 'text/csv'); }
+      else if (k === 'md') { ok = this._download(base + '-cut-list.md', this._md(), 'text/markdown'); }
+      else if (k === 'yard') { ok = this._download(base + '-yardage.txt', this._yardTxt(), 'text/plain'); }
+      else if (k === 'svg') { ok = this._download(base + '-diagram.svg', this._svgStr(), 'image/svg+xml'); }
+      if (k !== 'pdf') {
+        if (ok) this._toast('Saved — check your downloads folder.');
+        else this._toast('That export didn’t work — try again?', 'err');
+      }
+      this.setState({ busyDl: null, engine: 'ready' });
+    }, 620);
+  }
+
+  // ---------- sizing commits ----------
+  _commitDim(axis, v) {
+    const s = this.state, m = s.model;
+    v = Math.max(20, Math.min(140, Math.round(v * 4) / 4));
+    if (s.locked) {
+      const cur = axis === 'w' ? this._W(m) : this._H(m);
+      const ratio = v / cur;
+      const cellN = Math.max(0.75, Math.min(4, this._r8(m.cell * ratio)));
+      const f = cellN / m.cell;
+      this._mut(function (mm) {
+        mm.cell = cellN;
+        mm.bands.forEach(function (b) { b.w = Math.max(0.25, Math.round(b.w * f * 8) / 8); });
+      }, 'dim');
+    } else {
+      const step = m.cell * m.block;
+      this._mut((mm) => {
+        if (axis === 'w') mm.cols = Math.max(m.block, Math.round((v - 2 * this._boff(mm)) / step) * m.block);
+        else mm.rows = Math.max(m.block, Math.round((v - 2 * this._boff(mm)) / step) * m.block);
+        const n = mm.cols * mm.rows;
+        while (mm.cells.length < n) mm.cells.push(mm.bg);
+        if (axis === 'w') this._regrid(mm);
+        mm.cells.length = n;
+      }, 'dim');
+    }
+    this.setState(axis === 'w' ? { reqW: v, presetK: null } : { reqH: v, presetK: null });
+  }
+  _regrid(mm) {
+    // cols changed: rebuild cells row by row so existing art keeps its left-top alignment
+    const old = this._undoS.length ? this._undoS[this._undoS.length - 1] : null;
+    if (!old) return;
+    const oc = old.cols, cells = [];
+    for (let r = 0; r < mm.rows; r++) for (let c = 0; c < mm.cols; c++) {
+      cells.push(c < oc && r < old.rows ? (old.cells[r * oc + c] != null ? old.cells[r * oc + c] : mm.bg) : mm.bg);
+    }
+    mm.cells = cells;
+    mm.unc = {};
+  }
+
+  // ---------- view models ----------
+  _openEditor(m, name) {
+    if (m) { if (!m.seamFix) m.seamFix = { h: {}, v: {} }; this.setState({ model: m }); this._ver++; this._undoS = []; this._redoS = []; }
+    if (name) this.setState({ projName: name });
+    this.setState({ screen: 'editor', tab: this.state.vw < 720 ? 'canvas' : 'fabrics', zoom: 'fit' });
+    this._refreshDrafts(); this._touch();
+    setTimeout(this._measure, 40); setTimeout(this._measure, 260);
+  }
+  _rvShell() {
+    const s = this.state, isDesk = s.vw >= 720;
+    const edPhone = s.screen === 'editor' && !isDesk;
+    return {
+      isDesk: isDesk,
+      isHome: s.screen === 'home', isDrop: s.screen === 'drop', isProg: s.screen === 'progress',
+      isResults: s.screen === 'results', isCorners: s.screen === 'corners', isEditor: s.screen === 'editor',
+      mainStyle: 'max-width:1420px;margin:0 auto;padding:' + (edPhone ? '12px 12px 96px' : (isDesk ? '20px 22px 44px' : '16px 14px 44px')) + ';',
+      projName: s.projName,
+      typeName: (e) => { this.setState({ projName: e.target.value }); this._touch(); },
+      saveDotStyle: 'width:9px;height:9px;border-radius:50%;background:var(--' + (s.saveState === 'saved' ? 'sage' : 'amber') + ');' + (s.saveState === 'saving' ? 'animation:qPulse 1s ease infinite;' : ''),
+      saveText: s.saveState === 'saved' ? 'Autosaved' : 'Saving…',
+      openJsonModal: () => this.setState({ jsonOpen: true }),
+      jsonClose: () => this.setState({ jsonOpen: false }),
+      saveJson: () => {
+        const base = (s.projName || 'quilt').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        const ok = this._download(base + '.qrep.json', JSON.stringify({ app: 'QREP', version: 1, name: s.projName, model: s.model }, null, 1), 'application/json');
+        this._toast(ok ? 'Project saved as ' + base + '.qrep.json' : 'Save didn’t work — try again?', ok ? 'ok' : 'err');
+      },
+      engineBoot: s.engine === 'boot', engineReady: s.engine === 'ready', engineBusy: s.engine === 'busy',
+      engineText: s.engine === 'boot' ? 'engine warming up' : (s.engine === 'ready' ? 'engine ready' : 'engine busy'),
+      engineTip: 'The Python engine runs in your browser — it boots in a few seconds on first load.',
+      themeLight: s.theme === 'light', themeDark: s.theme === 'dark',
+      themeTip: s.theme === 'light' ? 'Switch to evening mode' : 'Switch to daylight mode',
+      toggleTheme: () => {
+        const t = s.theme === 'light' ? 'dark' : 'light';
+        this.setState({ theme: t });
+        document.body.setAttribute('data-theme', t);
+        try { localStorage.setItem('qrep-theme', t); } catch (e) { }
+      },
+      goHome: () => this.setState({ screen: 'home' }),
+      tipOn: (e) => {
+        if (this.state.vw < 720) return;
+        const el = e.currentTarget, r = el.getBoundingClientRect();
+        this.setState({ tip: { t: el.dataset.tip, x: Math.round(r.left + r.width / 2), y: Math.round(r.top - 9) } });
+      },
+      tipOff: () => this.setState({ tip: null }),
+      enterKey: (e) => { if (e.key === 'Enter') e.target.blur(); }
+    };
+  }
+  _rvHome() {
+    const s = this.state;
+    return {
+      t: this._svgOut(this._photoM, 1.15, 0, 0, {}),
+      th: this._svgOut(this._photoM, 2.7, 0, 0, { quilting: true }),
+      hasResume: !!this._resume && s.screen === 'home',
+      resumeName: this._resume ? (this._resume.name || 'your quilt') : '',
+      resumeSession: () => this._openEditor(null, null),
+      startPhoto: () => this.setState({ screen: 'drop' }),
+      startBlank: () => this._openEditor(this._mkBlank(), 'My new quilt'),
+      startDemo: () => this._openEditor(this._mkChain(false), 'Double Irish Chain'),
+      usePhoto: () => this._startAnalysis(),
+      dzOver: (e) => e.preventDefault(),
+      dzDrop: (e) => { e.preventDefault(); this._startAnalysis(); }
+    };
+  }
+  _rvFlow() {
+    const s = this.state, fmt = this._fmt.bind(this);
+    const o = {
+      dlShow: s.dlActive, dlPctText: Math.round(s.dlPct) + '%',
+      dlBarStyle: 'display:block;height:100%;width:' + s.dlPct + '%;background:var(--denim);border-radius:999px;transition:width .12s;',
+      dlCached: s.progRun && !s.dlActive && !!s.dlAtStart,
+      progRunning: s.progRun,
+      uncCount: Object.keys(s.model.unc).length,
+      toggleUnc: () => this.setState({ showUnc: !s.showUnc }),
+      openLbPhoto: () => this.setState({ lb: 'photo' }),
+      openLbQuilt: () => this.setState({ lb: 'quilt' }),
+      openLbSide: () => this.setState({ lb: 'side' }),
+      skipProg: () => { this._clearTimers(); this._finishAnalysis(); },
+      cancelProg: () => { this._clearTimers(); this.setState({ screen: 'drop', progRun: false, engine: 'ready' }); },
+      stages: s.stages.map((st) => {
+        const p = Math.round(st.conf * 100);
+        return {
+          label: st.label, pend: st.st === 0, run: st.st === 1, done: st.st === 2, pctText: p + '%',
+          msty: 'display:block;height:100%;width:' + p + '%;background:var(--' + (st.conf >= 0.9 ? 'sage' : (st.conf >= 0.82 ? 'amber' : 'accent')) + ');border-radius:999px;'
+        };
+      })
+    };
+    if (s.screen !== 'results' && s.screen !== 'corners' && !s.lb) {
+      return Object.assign(o, { rp: this._zeroSvg(), rq: this._zeroSvg(), cp: this._zeroSvg(), confRows: [], pins: [], ovText: '', ovStyle: '', resSizeText: '', quadD: '', cpOverW: 0, cpOverH: 0, uncTrackStyle: '', uncKnobStyle: '', openEditor: null, tryCorners: null, pinDown: null, pinMove: null, pinUp: null, rerunPins: null, resetPins: null, backResults: null });
+    }
+    const m = s.model;
+    const rpPpi = Math.min(4.1, Math.max(2.2, (s.vw - 110) / 75), (s.vw - 110) / 75);
+    const rqPpi = Math.min(310 / this._W(m), 375 / this._H(m), rpPpi);
+    const avg = s.stages.reduce(function (a, x) { return a + x.conf; }, 0) / s.stages.length;
+    const ap = Math.round(avg * 100);
+    const aw = ap >= 92 ? ['very sure', 'sage'] : (ap >= 84 ? ['solid', 'sage'] : (ap >= 78 ? ['good — check the flags', 'amber'] : ['needs your eye', 'accent']));
+    const cpPpi = Math.min(4.6, Math.max(2.6, (s.vw - 120) / 75));
+    const cp = this._svgOut(this._photoM, cpPpi, 0, 0, { quilting: true });
+    this._cpDim = { w: cp.w, h: cp.h };
+    const px = s.pins.map(function (p) { return { x: 14 + p.x / 100 * cp.w, y: 14 + p.y / 100 * cp.h }; });
+    return Object.assign(o, {
+      rp: this._svgOut(this._photoM, Math.min(rpPpi, 4.1), 0, 0, { quilting: true }),
+      rq: this._svgOut(m, rqPpi, 0, 0, { hatch: s.showUnc }),
+      resSizeText: fmt(this._W(m)) + '″ × ' + fmt(this._H(m)) + '″ finished',
+      ovText: 'Overall confidence ' + ap + '% — ' + aw[0],
+      ovStyle: 'font-size:14px;font-weight:700;color:var(--' + aw[1] + ');border:1.5px solid var(--' + (aw[1] === 'sage' ? 'sageLn' : 'line2') + ');background:var(--' + (aw[1] === 'sage' ? 'sageBg' : 'pill') + ');border-radius:999px;padding:8px 15px;',
+      confRows: s.stages.map((st) => {
+        const p = Math.round(st.conf * 100);
+        const w = st.conf >= 0.95 ? ['Very sure', 'sage'] : (st.conf >= 0.85 ? ['Solid', 'sage'] : (st.conf >= 0.8 ? ['Good', 'amber'] : ['Check it', 'accent']));
+        return {
+          label: st.label.replace('Straightening the photo', 'Straighten').replace('Matching fabric colors', 'Fabric colors').replace('Finding the grid', 'Grid').replace('Reading every square', 'Squares').replace('Spotting the repeats', 'Repeats').replace('Measuring the borders', 'Borders'),
+          pctText: p + '%', word: w[0],
+          msty: 'display:block;height:100%;width:' + p + '%;background:var(--' + w[1] + ');border-radius:999px;',
+          wsty: 'width:64px;text-align:right;font-size:12px;font-weight:700;flex:none;color:var(--' + w[1] + ');'
+        };
+      }),
+      uncTrackStyle: 'width:46px;height:27px;flex:none;border-radius:999px;position:relative;transition:background .15s;background:' + (s.showUnc ? 'var(--accent)' : 'var(--card3)') + ';border:1.5px solid ' + (s.showUnc ? 'var(--accent)' : 'var(--line2)') + ';',
+      uncKnobStyle: 'position:absolute;top:2px;width:20px;height:20px;border-radius:50%;background:#fffdf7;box-shadow:0 1px 4px rgba(0,0,0,0.3);transition:left .15s;left:' + (s.showUnc ? '22px' : '3px') + ';',
+      openEditor: () => this._openEditor(null, 'Double Irish Chain'),
+      tryCorners: () => this.setState({ screen: 'corners' }),
+      cp: cp, cpOverW: cp.w + 28, cpOverH: cp.h + 28,
+      quadD: 'M' + px[0].x + ' ' + px[0].y + 'L' + px[1].x + ' ' + px[1].y + 'L' + px[2].x + ' ' + px[2].y + 'L' + px[3].x + ' ' + px[3].y + 'Z',
+      pins: s.pins.map(function (p, i) {
+        return { i: '' + i, style: 'position:absolute;width:30px;height:30px;border-radius:50%;background:var(--accent);border:3px solid #fffdf7;box-shadow:0 3px 8px rgba(0,0,0,0.35);cursor:grab;padding:0;touch-action:none;left:' + Math.round(px[i].x - 15) + 'px;top:' + Math.round(px[i].y - 15) + 'px;' };
+      }),
+      pinDown: (e) => {
+        this._pin = +e.currentTarget.dataset.pi;
+        const par = e.currentTarget.parentElement;
+        try { par.setPointerCapture(e.pointerId); } catch (err) { }
+        this._pinBox = par.getBoundingClientRect();
+      },
+      pinMove: (e) => {
+        if (this._pin == null || this._pin < 0 || !this._pinBox) return;
+        const d = this._cpDim;
+        const x = Math.max(0, Math.min(100, (e.clientX - this._pinBox.left - 14) / d.w * 100));
+        const y = Math.max(0, Math.min(100, (e.clientY - this._pinBox.top - 14) / d.h * 100));
+        const pins = s.pins.map(function (p) { return { x: p.x, y: p.y }; });
+        pins[this._pin] = { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 };
+        this.setState({ pins: pins });
+      },
+      pinUp: () => { this._pin = -1; },
+      rerunPins: () => { this.setState({ enhanced: true }); this._startAnalysis(); },
+      resetPins: () => this.setState({ pins: [{ x: 7, y: 6 }, { x: 93, y: 5 }, { x: 95, y: 94 }, { x: 5, y: 95 }] }),
+      backResults: () => this.setState({ screen: 'results' })
+    });
+  }
+  _zeroSvg() { return { w: 0, h: 0, bands: [], paths: [], ix: 0, iy: 0, iw: 0, ih: 0, bg: '', seamD: '', hatchD: '', quiltD: '', ox: 0, oy: 0, ow: 0, oh: 0, bind: '', qx: 0, qy: 0, qw: 0, qh: 0 } }
+
+  _rvEditor() {
+    const s = this.state, isPhone = s.vw < 720, fmt = this._fmt.bind(this);
+    if (s.screen !== 'editor') return { showCanvas: false, showSide: false, phoneBar: false, deskTabs: false, panelF: false, panelS: false, panelP: false, mq: this._zeroSvg(), edLayoutStyle: '', sideStyle: '', stageH: '0px', rulW: 0, rulH: 0, rtLabels: [], rlLabels: [], toolFabs: [], phTabs: [] };
+    const m = s.model, d = this._derive(), W = d.W, H = d.H, pad = 16;
+    let ppi;
+    if (s.zoom === 'fit') ppi = Math.max(0.7, Math.min((s.cvW - 2 * pad - 8) / W, (s.cvH - 2 * pad - 8) / H));
+    else ppi = 96 * s.zoom;
+    this._geom = { ppi: ppi, x0: pad, y0: pad, boff: this._boff(m) };
+    const sm = ({ hist: 'grid', strip: 'strip', opt: 'rect' })[s.strategy] || 'grid';
+    this._seamMode = sm;
+    const mq = this._svgOut(m, ppi, pad, pad, { seamMode: sm, hatch: s.showUnc });
+    const tt = this._ticks(W, ppi, pad, 'x'), lt = this._ticks(H, ppi, pad, 'y');
+    const effTab = (!isPhone && s.tab === 'canvas') ? 'fabrics' : s.tab;
+    const showSide = !isPhone || s.tab !== 'canvas';
+    const tabSt = (on) => 'flex:1;padding:10px 8px;font:600 15px var(--sans);border-radius:9px;cursor:pointer;' + (on ? 'background:var(--card);border:1px solid var(--line2);color:var(--accent);box-shadow:0 2px 6px var(--shadow);' : 'background:none;border:1px solid transparent;color:var(--mut);');
+    const modeSt = (on) => 'display:flex;align-items:center;gap:7px;padding:9px 12px;border-radius:8px;font:600 14px var(--sans);cursor:pointer;' + (on ? 'background:var(--card);border:1px solid var(--line2);color:var(--accent);box-shadow:0 2px 6px var(--shadow);' : 'background:none;border:1px solid transparent;color:var(--mut);');
+    const iconSt = (dis) => 'width:38px;height:38px;flex:none;display:flex;align-items:center;justify-content:center;color:var(--ink2);background:var(--card);border:1.5px solid var(--line2);border-radius:9px;' + (dis ? 'opacity:0.35;cursor:default;' : 'cursor:pointer;');
+    const steps = [0.08, 0.12, 0.18, 0.25, 0.35, 0.5, 0.75, 1];
+    const cur = ppi / 96;
+    const uncN = Object.keys(m.unc).length;
+    const setTab = (k) => { this.setState({ tab: k }); setTimeout(this._measure, 30); setTimeout(this._measure, 200); };
+    const icons = {
+      canvas: 'M3.5 3.5h15v15h-15zM3.5 9h15M3.5 14h15M9 3.5v15M14 3.5v15',
+      fabrics: 'M3.5 3.5h9v9h-9zM9.5 9.5h9v9h-9z',
+      sizing: 'M2.5 7.5h17v7h-17zM6 7.5v3.5M9.5 7.5v3.5M13 7.5v3.5M16.5 7.5v3.5',
+      pattern: 'M4.5 3h10l4 4v12h-14zM8 9.5h7M8 13h7M8 16.5h5'
+    };
+    return {
+      edLayoutStyle: (isPhone ? 'display:block;' : 'display:flex;gap:20px;align-items:flex-start;') + 'animation:qFade .3s ease;',
+      showCanvas: !isPhone || s.tab === 'canvas',
+      showSide: showSide, deskTabs: !isPhone,
+      sideStyle: isPhone ? 'display:flex;flex-direction:column;gap:14px;' : 'flex:0 0 376px;max-width:376px;display:flex;flex-direction:column;gap:14px;',
+      panelF: showSide && effTab === 'fabrics', panelS: showSide && effTab === 'sizing', panelP: showSide && effTab === 'pattern',
+      tabStyleF: tabSt(effTab === 'fabrics'), tabStyleS: tabSt(effTab === 'sizing'), tabStyleP: tabSt(effTab === 'pattern'),
+      setTabF: () => setTab('fabrics'), setTabS: () => setTab('sizing'), setTabP: () => setTab('pattern'),
+      stageH: isPhone ? 'max(360px,calc(100dvh - 340px))' : 'clamp(430px,calc(100vh - 330px),860px)',
+      stageCursor: s.mode === 'paint' ? 'crosshair' : (s.mode === 'seam' ? 'cell' : 'grab'),
+      modePaintStyle: modeSt(s.mode === 'paint'), modePanStyle: modeSt(s.mode === 'pan'), modeSeamStyle: modeSt(s.mode === 'seam'),
+      setPaint: () => this.setState({ mode: 'paint' }), setPan: () => this.setState({ mode: 'pan' }),
+      setSeam: () => { this.setState({ mode: 'seam' }); this._toast('Seams: drag to sew squares together, tap a piece to split it.'); },
+      toolFabs: m.fabrics.map((f, i) => ({
+        id: '' + i, name: f.name + ' — paint with this', color: f.color,
+        st: 'width:34px;height:34px;flex:none;border-radius:9px;cursor:pointer;background:' + f.color + ';border:1px solid var(--line2);box-shadow:inset 0 -2px 4px rgba(0,0,0,0.08)' + (s.activeFab === i ? ',0 0 0 2.5px var(--card),0 0 0 5px var(--accent);' : ';')
+      })),
+      pickFab: (e) => this.setState({ activeFab: +e.currentTarget.dataset.fid, mode: 'paint' }),
+      undoStyle: iconSt(!this._undoS.length), redoStyle: iconSt(!this._redoS.length),
+      undoClick: () => this._undo(), redoClick: () => this._redo(),
+      zoomLabel: s.zoom === 'fit' ? 'Fit' : Math.round(s.zoom * 100) + '%',
+      zoomIn: () => { const n = steps.find((x) => x > cur * 1.01); this.setState({ zoom: n || steps[steps.length - 1] }); },
+      zoomOut: () => { const below = steps.filter((x) => x < cur * 0.99); this.setState({ zoom: below.length ? below[below.length - 1] : 'fit' }); },
+      zoomFit: () => this.setState({ zoom: 'fit' }),
+      showUncBtn: m.photo && uncN > 0,
+      uncBtnStyle: 'flex:none;padding:9px 13px;border-radius:999px;font:600 13.5px var(--sans);cursor:pointer;' + (s.showUnc ? 'background:var(--accent);color:var(--accentInk);border:1.5px solid var(--accent);' : 'background:var(--pill);color:var(--ink2);border:1.5px solid var(--pillLn);'),
+      showPhotoBtn: !!m.photo,
+      rulW: mq.w, rulH: mq.h,
+      rtMin: tt.min, rtMaj: tt.maj, rtLabels: tt.labels.map(function (l) { return { x: l.p, t: l.t }; }), rtEndX: tt.end, rtEndT: fmt(W),
+      rlMin: lt.min, rlMaj: lt.maj, rlLabels: lt.labels.map(function (l) { return { y: l.p + 4, t: l.t }; }), rlEndY: lt.end + 4, rlEndT: fmt(H),
+      scrollRef: this.scrollRef, quiltRef: this.quiltRef, topRulRef: this.topRulRef, leftRulRef: this.leftRulRef, contentRef: this.contentRef,
+      syncScroll: (e) => {
+        const t = e.target;
+        if (this.topRulRef.current) this.topRulRef.current.style.transform = 'translateX(' + (-t.scrollLeft) + 'px)';
+        if (this.leftRulRef.current) this.leftRulRef.current.style.transform = 'translateY(' + (-t.scrollTop) + 'px)';
+      },
+      qDown: (e) => this._qDown(e), qMove: (e) => this._qMove(e), qUp: (e) => this._qUp(e),
+      seamStyle: s.mode === 'seam' ? 'stroke:rgba(110,80,45,0.4);stroke-width:1.5;fill:none;' : 'stroke:rgba(110,80,45,0.13);stroke-width:1;fill:none;',
+      contentStyle: 'width:' + mq.w + 'px;height:' + mq.h + 'px;',
+      mq: mq,
+      scaleText: s.mode === 'seam' ? 'Seams: drag to sew squares into one piece · tap a piece to split it · two fingers to pan' : (s.zoom === 'fit' ? ('Fit — about 1:' + Math.max(1, Math.round(96 / ppi)) + ' of real size') : (s.zoom === 1 ? '100% — actual size on most screens' : Math.round(s.zoom * 100) + '% — about 1:' + Math.max(1, Math.round(96 / ppi)) + ' of real size')),
+      sizeText: fmt(W) + '″ × ' + fmt(H) + '″',
+      phoneBar: isPhone,
+      phTabs: ['canvas', 'fabrics', 'sizing', 'pattern'].map((k) => ({
+        k: k, label: k === 'canvas' ? 'Quilt' : k.charAt(0).toUpperCase() + k.slice(1), icon: icons[k],
+        style: 'flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 4px;border:none;border-radius:11px;cursor:pointer;background:' + (s.tab === k ? 'var(--card3)' : 'none') + ';color:' + (s.tab === k ? 'var(--accent)' : 'var(--mut)') + ';'
+      })),
+      setPhTab: (e) => setTab(e.currentTarget.dataset.k)
+    };
+  }
+
+  _rvPanels() {
+    const s = this.state, m = s.model, d = this._derive();
+    const fmt = this._fmt.bind(this), A = this._fmtA.bind(this), num = this._num.bind(this);
+    const stepDim = (axis, dir) => {
+      if (s.locked) {
+        const cellN = Math.max(0.75, Math.min(4, this._r8(m.cell + 0.125 * dir)));
+        if (cellN === m.cell) return;
+        const f = cellN / m.cell;
+        this._mut(function (mm) { mm.cell = cellN; mm.bands.forEach(function (b) { b.w = Math.max(0.25, Math.round(b.w * f * 8) / 8); }); }, 'stepc');
+      } else {
+        this._mut((mm) => {
+          if (axis === 'w') mm.cols = Math.max(mm.block, mm.cols + dir * mm.block);
+          else mm.rows = Math.max(mm.block, mm.rows + dir * mm.block);
+          this._regrid(mm);
+        }, 'step' + axis);
+      }
+      this.setState({ presetK: null, reqW: null, reqH: null });
+    };
+    const preset = this.PRESETS.find((p) => Math.abs(p.w - d.W) < 0.07 && Math.abs(p.h - d.H) < 0.07);
+    const missW = s.reqW != null && Math.abs(s.reqW - d.W) > 0.065;
+    const missH = s.reqH != null && Math.abs(s.reqH - d.H) > 0.065;
+    const stratNames = { hist: 'Historical', strip: 'Strip piecing', opt: 'Modern optimized' };
+    const yardRows = m.fabrics.map(function (f, i) {
+      return { sw: f.color, name: f.name, forText: num(d.counts[i] || 0) + ' squares · cut ' + fmt(d.cut) + '″' + (d.bandUse[i] ? ' + border strips' : ''), buy: fmt(d.yards[i]) + ' yd', sub: 'estimate' };
+    });
+    yardRows.push({ sw: m.fabrics[1] ? this._shade(m.fabrics[1].color, 0.72) : '#8c6f4e', name: 'Binding', forText: d.bindStrips + ' strips cut 2½″ — wraps ' + fmt(d.perim - 10) + '″', buy: fmt(d.yBind) + ' yd', sub: 'estimate' });
+    yardRows.push({ sw: '#e0d4b8', name: 'Backing', forText: d.backPanels + ' panels of 40″ fabric, seamed', buy: fmt(d.yBack) + ' yd', sub: 'estimate' });
+    yardRows.push({ sw: '#f4efe3', name: 'Batting', forText: 'quilt plus 4″ on every side', buy: fmt(d.needW) + '″ × ' + fmt(d.needH) + '″', sub: 'size needed' });
+    return {
+      fabRows: m.fabrics.map(function (f, i) {
+        return { id: '' + i, color: f.color, name: f.name, hex: f.color.toUpperCase(), countText: num(d.counts[i] || 0) + ' squares' + (d.bandUse[i] ? ' + borders' : ''), editing: s.renameId === i, notEditing: s.renameId !== i };
+      }),
+      recolorFab: (e) => {
+        const fid = +e.target.dataset.fid, v = e.target.value;
+        this._mut(function (mm) { mm.fabrics[fid].color = v; }, 'col' + fid);
+      },
+      startRename: (e) => {
+        const fid = +e.currentTarget.dataset.fid;
+        this.setState({ renameId: fid, renameVal: m.fabrics[fid].name });
+      },
+      renameVal: s.renameVal,
+      typeRename: (e) => this.setState({ renameVal: e.target.value }),
+      commitRename: (e) => {
+        const fid = +e.target.dataset.fid, v = (s.renameVal || '').trim();
+        if (v && v !== m.fabrics[fid].name) this._mut(function (mm) { mm.fabrics[fid].name = v; });
+        this.setState({ renameId: null });
+      },
+      addFab: () => {
+        const pal = ['#c9b6d6', '#b9c9a8', '#dcb8ae', '#d9b05e', '#b98f7a', '#8ba8bf'];
+        this._mut(function (mm) { mm.fabrics.push({ name: 'New fabric ' + (mm.fabrics.length + 1), color: pal[(mm.fabrics.length - 2 + pal.length) % pal.length] }); });
+        this.setState({ activeFab: m.fabrics.length - 1, mode: 'paint' });
+        this._toast('New fabric added — it’s now your paintbrush.');
+      },
+      presetVal: preset ? preset.k : 'custom',
+      onPreset: (e) => {
+        const p = this.PRESETS.find((x) => x.k === e.target.value);
+        if (!p) return;
+        if (s.locked) {
+          const sc = Math.min(p.w / d.W, p.h / d.H);
+          const cellN = Math.max(0.75, Math.min(4, this._r8(m.cell * sc)));
+          const f = cellN / m.cell;
+          this._mut(function (mm) { mm.cell = cellN; mm.bands.forEach(function (b) { b.w = Math.max(0.25, Math.round(b.w * f * 8) / 8); }); });
+        } else {
+          this._mut((mm) => {
+            const step = mm.cell * mm.block, off = 2 * this._boff(mm);
+            mm.cols = Math.max(mm.block, Math.round((p.w - off) / step) * mm.block);
+            mm.rows = Math.max(mm.block, Math.round((p.h - off) / step) * mm.block);
+            this._regrid(mm);
+          });
+        }
+        this.setState({ reqW: p.w, reqH: p.h, presetK: p.k });
+      },
+      wDraft: s.wDraft, hDraft: s.hDraft, cellDraft: s.cellDraft,
+      typeW: (e) => this.setState({ wDraft: e.target.value }),
+      typeH: (e) => this.setState({ hDraft: e.target.value }),
+      typeCell: (e) => this.setState({ cellDraft: e.target.value }),
+      commitW: (e) => {
+        const v = this._parse(e.target.value);
+        if (v == null) { this.setState({ wDraft: A(d.W) }); this._toast('Try inches like 75 or 75 1/2', 'err'); return; }
+        this._commitDim('w', v);
+      },
+      commitH: (e) => {
+        const v = this._parse(e.target.value);
+        if (v == null) { this.setState({ hDraft: A(d.H) }); this._toast('Try inches like 90 or 90 1/2', 'err'); return; }
+        this._commitDim('h', v);
+      },
+      commitCell: (e) => {
+        const v = this._parse(e.target.value);
+        if (v == null) { this.setState({ cellDraft: A(m.cell) }); this._toast('Try a size like 1 1/2 or 2', 'err'); return; }
+        const cellN = Math.max(0.75, Math.min(4, this._r8(v)));
+        const f = cellN / m.cell;
+        this._mut(function (mm) {
+          mm.cell = cellN;
+          if (s.locked) mm.bands.forEach(function (b) { b.w = Math.max(0.25, Math.round(b.w * f * 8) / 8); });
+        });
+        this.setState({ presetK: null, reqW: null, reqH: null });
+      },
+      incW: () => stepDim('w', 1), decW: () => stepDim('w', -1),
+      incH: () => stepDim('h', 1), decH: () => stepDim('h', -1),
+      incCell: () => { const c = Math.min(4, this._r8(m.cell + 0.25)); this._mut(function (mm) { mm.cell = c; }, 'cell'); },
+      decCell: () => { const c = Math.max(0.75, this._r8(m.cell - 0.25)); this._mut(function (mm) { mm.cell = c; }, 'cell'); },
+      stepTitle: s.locked ? 'Scales the whole quilt' : 'One block at a time',
+      locked: s.locked, unlocked: !s.locked,
+      toggleLock: () => {
+        this.setState({ locked: !s.locked, reqW: null, reqH: null });
+        this._toast(!s.locked ? 'Locked — width and height scale together.' : 'Unlocked — each side moves by whole blocks.');
+      },
+      lockTitle: s.locked ? 'Locked: sizes scale together, pattern stays put. Tap to unlock.' : 'Unlocked: each side grows by whole blocks. Tap to lock.',
+      lockBtnStyle: 'width:44px;height:50px;flex:none;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;' + (s.locked ? 'background:#f6e7da;border:1.5px solid #cf9a7f;color:var(--accent);' : 'background:var(--card2);border:1.5px solid var(--line2);color:var(--mut);'),
+      lockModeLine: s.locked ? 'Locked: the pattern stays identical — the squares themselves resize.' : (m.block > 1 ? 'Unlocked: each side grows or shrinks by whole blocks (5 squares at a time).' : 'Unlocked: each side grows or shrinks a row or column of squares at a time.'),
+      showReq: !s.locked && (missW || missH),
+      reqText: fmt(s.reqW != null ? s.reqW : d.W) + '″ × ' + fmt(s.reqH != null ? s.reqH : d.H) + '″',
+      achText: fmt(d.W) + '″ × ' + fmt(d.H) + '″',
+      reqLine: 'You can’t sew part of a block, so QREP picked the closest whole-block size. Nudge a border to land exactly.',
+      cutText: fmt(d.cut),
+      bandRows: m.bands.map(function (b, i) {
+        return { bi: '' + i, draft: s.bandDrafts[i] != null ? s.bandDrafts[i] : A(b.w), fidStr: '' + b.fid, color: m.fabrics[b.fid] ? m.fabrics[b.fid].color : '#ccc', removable: m.bands.length > 1 };
+      }),
+      fabOpts: m.fabrics.map(function (f, i) { return { idStr: '' + i, name: f.name }; }),
+      bandFab: (e) => {
+        const bi = +e.target.dataset.bi, v = +e.target.value;
+        this._mut(function (mm) { mm.bands[bi].fid = v; });
+      },
+      typeBand: (e) => {
+        const bi = +e.target.dataset.bi;
+        const bd = s.bandDrafts.slice(); bd[bi] = e.target.value;
+        this.setState({ bandDrafts: bd });
+      },
+      commitBand: (e) => {
+        const bi = +e.target.dataset.bi;
+        const v = this._parse(e.target.value);
+        if (v == null) { this._refreshDrafts(); this._toast('Try a width like 3 3/4', 'err'); return; }
+        const w = Math.max(0.25, Math.min(14, this._r8(v)));
+        this._mut(function (mm) { mm.bands[bi].w = w; });
+      },
+      incBand: (e) => { const bi = +e.currentTarget.dataset.bi; this._mut(function (mm) { mm.bands[bi].w = Math.min(14, mm.bands[bi].w + 0.25); }, 'band' + bi); },
+      decBand: (e) => { const bi = +e.currentTarget.dataset.bi; this._mut(function (mm) { mm.bands[bi].w = Math.max(0.25, mm.bands[bi].w - 0.25); }, 'band' + bi); },
+      addBand: () => { this._mut(function (mm) { mm.bands.push({ w: 2, fid: 0 }); }); this._toast('New border added inside the others.'); },
+      removeBand: (e) => { const bi = +e.currentTarget.dataset.bi; this._mut(function (mm) { if (mm.bands.length > 1) mm.bands.splice(bi, 1); }); },
+      eqSquares: m.cols + ' × ' + m.rows + ' at ' + fmt(m.cell) + '″ each',
+      eqBorder: m.bands.map(function (b) { return fmt(b.w) + '″'; }).join(' + ') + (m.bands.length > 1 ? ' bands' : ' all around'),
+      eqTotal: fmt(d.W) + '″ × ' + fmt(d.H) + '″',
+      blocksLine: m.block === 5 ? ((m.cols / 5) + ' × ' + (m.rows / 5) + ' blocks of 5 × 5 squares — ' + (((m.cols / 5) % 2 && (m.rows / 5) % 2) ? 'a chain block lands in every corner.' : 'even block count; the chain won’t reach every corner.')) : num(m.cols * m.rows) + ' squares to play with — paint away.',
+      strats: ['hist', 'strip', 'opt'].map((k) => {
+        const t = d.strat[k], sel = s.strategy === k;
+        let pieces = t.pieces, cuts = t.cuts, mins = t.mins;
+        if (sel) {
+          const live = this._pieceCount(({ hist: 'grid', strip: 'strip', opt: 'rect' })[k]) + m.bands.length * 4;
+          if (Math.round(live) !== Math.round(t.pieces)) {
+            const ratio = live / Math.max(1, t.pieces);
+            cuts = Math.max(m.fabrics.length, t.cuts * ratio);
+            mins = Math.max(30, t.mins * ratio);
+          }
+          pieces = live;
+        }
+        const tweaked = sel && m.seamFix && (Object.keys(m.seamFix.h).length + Object.keys(m.seamFix.v).length) > 0;
+        return {
+          k: k, title: stratNames[k] + (tweaked ? ' · hand-tweaked' : ''),
+          blurb: k === 'hist' ? 'Every square cut and sewn one at a time, the way the original was likely made. Most control.' : (k === 'strip' ? 'Sew long strips first, then crosscut whole rows at once. The classic shortcut for repeating patterns.' : 'Merges same-color neighbors into bigger patches. Fewest seams for painted, irregular quilts.'),
+          pieces: num(Math.round(pieces)), cuts: num(Math.round(cuts)), time: this._hrs(mins),
+          style: 'text-align:left;width:100%;padding:13px 14px;border-radius:13px;cursor:pointer;' + (sel ? 'background:var(--card3);border:2px solid var(--accent);' : 'background:var(--card);border:2px solid var(--line);'),
+          dot: 'width:14px;height:14px;border-radius:50%;flex:none;' + (sel ? 'background:var(--accent);box-shadow:inset 0 0 0 3px var(--card);border:1px solid var(--accent);' : 'border:2px solid var(--line2);background:var(--card);')
+        };
+      }),
+      pickStrat: (e) => {
+        const k = e.currentTarget.dataset.k;
+        const hasFix = m.seamFix && (Object.keys(m.seamFix.h).length + Object.keys(m.seamFix.v).length) > 0;
+        if (hasFix && k !== s.strategy) {
+          this._mut(function (mm) { mm.seamFix = { h: {}, v: {} }; });
+          this._toast('Seam tweaks reset for the new plan.');
+        }
+        this.setState({ strategy: k });
+      },
+      yardRows: yardRows,
+      dlBtns: [
+        { k: 'pdf', label: 'PDF booklet', sub: 'one-page plan to print' },
+        { k: 'csv', label: 'Cut list · CSV', sub: 'for spreadsheets' },
+        { k: 'md', label: 'Cut list · Markdown', sub: 'plain text' },
+        { k: 'yard', label: 'Yardage report', sub: 'shopping list' },
+        { k: 'svg', label: 'SVG diagram', sub: 'vector of the quilt' }
+      ].map(function (x) {
+        return { k: x.k, label: x.label, sub: x.sub, busy: s.busyDl === x.k, idle: s.busyDl !== x.k, style: 'text-align:left;padding:11px 13px;border-radius:11px;cursor:pointer;background:var(--card);border:1.5px solid var(--line2);color:var(--ink2);' + (s.busyDl === x.k ? 'opacity:0.75;' : '') };
+      }),
+      startDl: (e) => this._startDl(e.currentTarget.dataset.k),
+      copySettings: () => this._doCopy(),
+      copyBg: s.copied ? 'var(--sage)' : 'var(--accent)',
+      copyFg: s.copied ? '#f2f7ee' : 'var(--accentInk)',
+      copyLabel: s.copied ? 'Copied ✓' : 'Copy my settings',
+      printPresetLine: preset ? 'a standard ' + preset.n : 'a custom size',
+      printStrat: stratNames[s.strategy] + ' piecing plan',
+      printName: m.name
+    };
+  }
+
+  _rvOverlays() {
+    const s = this.state, m = s.model, fmt = this._fmt.bind(this);
+    const W = this._W(m), H = this._H(m);
+    // print sheet (always in DOM, shown by @media print)
+    const pPpi = Math.max(0.8, Math.min(315 / W, 425 / H));
+    const pq = this._svgOut(m, pPpi, 44, 30, { seamMode: ({ hist: 'grid', strip: 'strip', opt: 'rect' })[s.strategy] || 'grid' });
+    const tt = this._ticks(W, pPpi, 44, 'x'), lt = this._ticks(H, pPpi, 30, 'y');
+    const pr = {
+      svgW: pq.w, svgH: pq.h, edgeD: 'M0 27.5H' + pq.w + 'M41.5 0V' + pq.h,
+      tMin: tt.min, tMaj: tt.maj, lMin: lt.min, lMaj: lt.maj,
+      tLabels: tt.labels.map(function (l) { return { x: l.p, t: l.t }; }),
+      lLabels: lt.labels.map(function (l) { return { y: l.p + 4, t: l.t }; }),
+      tEndX: tt.end, tEndT: fmt(W), lEndY: lt.end + 4, lEndY2T: fmt(H),
+      bands: pq.bands, ix: pq.ix, iy: pq.iy, iw: pq.iw, ih: pq.ih, bg: pq.bg,
+      paths: pq.paths, seamD: pq.seamD, ox: pq.qx, oy: pq.qy, ow: pq.qw, oh: pq.qh, bind: pq.bind
+    };
+    // lightbox
+    const lb = s.lb;
+    const lbTab = (on) => 'padding:10px 16px;border-radius:8px;font:600 14.5px var(--sans);cursor:pointer;border:none;' + (on ? 'background:#f6ecd9;color:#43372a;' : 'background:none;color:#f6ecd9;');
+    let lp = this._zeroSvg(), lq = this._zeroSvg(), lsp = this._zeroSvg(), lsq = this._zeroSvg();
+    if (lb) {
+      const vw = s.vw, vh = s.vh;
+      if (lb === 'photo') lp = this._svgOut(this._photoM, Math.max(1.5, Math.min((vw - 90) / 75, (vh - 230) / 90)), 0, 0, { quilting: true });
+      if (lb === 'quilt') lq = this._svgOut(m, Math.max(1, Math.min((vw - 90) / W, (vh - 230) / H)), 0, 0, { hatch: s.showUnc, seamMode: ({ hist: 'grid', strip: 'strip', opt: 'rect' })[s.strategy] || 'grid' });
+      if (lb === 'side') {
+        const half = vw < 760 ? (vw - 80) : (vw - 170) / 2;
+        lsp = this._svgOut(this._photoM, Math.max(1, Math.min(half / 75, (vh - 260) / 90, 4.4)), 0, 0, { quilting: true });
+        lsq = this._svgOut(m, Math.max(0.8, Math.min(half / W, (vh - 260) / H, 4.4)), 0, 0, { hatch: s.showUnc });
+      }
+    }
+    const uncN = Object.keys(m.unc).length;
+    // toast + tip
+    const tk = s.toast ? s.toast.kind : 'ok';
+    return {
+      pr: pr, todayStr: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+      lbOpen: !!lb,
+      lbClose: () => this.setState({ lb: null }),
+      setLbPhoto: () => this.setState({ lb: 'photo' }),
+      setLbSide: () => this.setState({ lb: 'side' }),
+      setLbQuilt: () => this.setState({ lb: 'quilt' }),
+      lbTabPhoto: lbTab(lb === 'photo'), lbTabSide: lbTab(lb === 'side'), lbTabQuilt: lbTab(lb === 'quilt'),
+      lbShowPhoto: lb === 'photo', lbShowSide: lb === 'side', lbShowQuilt: lb === 'quilt',
+      lp: lp, lq: lq, lsp: lsp, lsq: lsq,
+      lbQuiltCap: fmt(W) + '″ × ' + fmt(H) + '″ finished' + (s.showUnc && uncN ? ' — ' + uncN + ' uncertain squares hatched' : ''),
+      jsonOpen: s.jsonOpen,
+      fileOpen: (e) => {
+        const f = e.target.files && e.target.files[0];
+        if (!f) return;
+        const rd = new FileReader();
+        rd.onload = () => {
+          try {
+            const obj = JSON.parse(rd.result);
+            const mm = obj.model;
+            if (!mm || !mm.cols || !mm.rows || !mm.cells || !mm.fabrics || !mm.bands) throw new Error('bad');
+            this.setState({ jsonOpen: false });
+            this._openEditor(mm, obj.name || 'Opened project');
+            this._toast('Project opened — welcome back.');
+          } catch (err) {
+            this._toast('That file isn’t a QREP project — try the sample instead.', 'err');
+          }
+        };
+        rd.onerror = () => this._toast('Couldn’t read that file.', 'err');
+        rd.readAsText(f);
+        e.target.value = '';
+      },
+      loadSample: () => {
+        this.setState({ jsonOpen: false });
+        this._openEditor(this._mkChain(false), 'Sample project');
+        this._toast('Sample project loaded.');
+      },
+      brokenDemo: () => this._toast('That file isn’t a QREP project — it’s missing its grid. Nothing was changed.', 'err'),
+      toastOn: !!s.toast, toastMsg: s.toast ? s.toast.msg : '',
+      toastGlyph: tk === 'err' ? '⚠' : '✓',
+      toastStyle: 'position:fixed;left:50%;bottom:26px;transform:translateX(-50%);display:flex;align-items:center;gap:10px;padding:13px 24px;border-radius:999px;font-size:15.5px;z-index:80;white-space:nowrap;max-width:92vw;overflow:hidden;text-overflow:ellipsis;box-shadow:0 10px 26px rgba(30,18,6,0.4);animation:qToast .28s ease;' + (tk === 'err' ? 'background:#8c3f22;color:#fdf6e9;' : 'background:#43372a;color:#fbf4e4;'),
+      tipShow: !!s.tip && !!s.tip.t,
+      tipText: s.tip ? s.tip.t : '',
+      tipStyle: s.tip ? 'position:fixed;left:' + s.tip.x + 'px;top:' + s.tip.y + 'px;transform:translate(-50%,-100%);background:#2b2115;color:#f6ecd9;padding:7px 12px;border-radius:8px;font:13px var(--sans);z-index:90;pointer-events:none;white-space:nowrap;max-width:320px;box-shadow:0 6px 18px rgba(0,0,0,0.3);' : ''
+    };
+  }
+  renderVals() {
+    const o = {};
+    Object.assign(o, this._rvShell(), this._rvHome(), this._rvFlow(), this._rvEditor(), this._rvPanels(), this._rvOverlays());
+    return o;
+  }
+}
+</script>
+</body>
+</html>

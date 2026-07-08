@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body{--serif:'Bookman Old Style','URW Bookman',Bookman,'Iowan Old Style',Palatino,serif;--sans:Seravek,'Gill Sans','Trebuchet MS',Verdana,sans-serif;margin:0;background:#efe8d8;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    a{color:#a5502f;}a:hover{color:#8c3f22;}
+    [data-skin="light"]{--bg:#f2ebdc;--card:#fffdf7;--card2:#faf5e8;--card3:#f8f1df;--ink:#453a2a;--ink2:#5d4f39;--mut:#8a7a61;--faint:#a3937a;--line:#e7dcc4;--line2:#d9c8a8;--accent:#a5502f;--accentB:#8c3f22;--accentInk:#fdf6e9;--sage:#4c7a5a;--sageBg:#eef2e2;--sageLn:#d4dcba;--denim:#53718b;--amber:#a8781f;--stage:#e9dfc9;--pill:#fbf7ec;--pillLn:#ddcfb2;--shadow:rgba(96,66,28,.12);}
+    [data-skin="dark"]{--bg:#211a10;--card:#2e2517;--card2:#382e1d;--card3:#3f3421;--ink:#f0e6d0;--ink2:#ddcfb0;--mut:#b3a184;--faint:#93826a;--line:#453a26;--line2:#5b4b2e;--accent:#d98a5e;--accentB:#e3a077;--accentInk:#2a1305;--sage:#9cc2a1;--sageBg:#2b3722;--sageLn:#48593a;--denim:#93b3cf;--amber:#d9ae55;--stage:#181208;--pill:#382e1d;--pillLn:#5b4b2e;--shadow:rgba(0,0,0,.45);}
+    @keyframes qSpin{to{transform:rotate(360deg);}}
+    @keyframes qPulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+    @keyframes qToast{from{opacity:0;transform:translate(-50%,10px);}to{opacity:1;transform:translate(-50%,0);}}
+  </style>
+</helmet>
+<div style="min-height:100vh;font-family:var(--sans);color:#453a2a;font-size:16.5px;padding-bottom:80px;">
+
+  <header style="max-width:1060px;margin:0 auto;padding:44px 26px 8px;">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <svg width="34" height="34" style="display:block;"><rect x="1" y="1" width="15" height="15" rx="2.5" fill="#a9c7dc"></rect><rect x="18" y="1" width="15" height="15" rx="2.5" fill="#a5502f"></rect><rect x="1" y="18" width="15" height="15" rx="2.5" fill="#a5502f"></rect><rect x="18" y="18" width="15" height="15" rx="2.5" fill="#a9c7dc"></rect></svg>
+      <span style="font:700 30px var(--serif);letter-spacing:.05em;color:#3f3423;">QREP</span>
+      <span style="font:italic 16px var(--serif);color:#8a7a61;padding-top:6px;">design system · v1</span>
+    </div>
+    <p style="margin:16px 0 0;font-size:18px;line-height:1.6;color:#6d5f49;max-width:64ch;">The visual language for QREP, the quilt reverse-engineering platform. Warm craft-room materials, generous readable type, and honest uncertainty. Desktop-first, works down to an iPhone; every theme token ships in <strong>daylight</strong> and <strong>evening</strong>.</p>
+    <div style="display:flex;gap:22px;flex-wrap:wrap;margin-top:20px;">
+      <div style="flex:1 1 240px;background:#fffdf7;border:1px solid #e7dcc4;border-radius:14px;padding:16px 18px;">
+        <div style="font:700 16px var(--serif);color:#3f3423;margin-bottom:5px;">Sewing room, not software</div>
+        <div style="font-size:14.5px;line-height:1.55;color:#8a7a61;">Cream paper, stitched dividers, fabric swatches. No dashboards, no data slop.</div>
+      </div>
+      <div style="flex:1 1 240px;background:#fffdf7;border:1px solid #e7dcc4;border-radius:14px;padding:16px 18px;">
+        <div style="font:700 16px var(--serif);color:#3f3423;margin-bottom:5px;">Quilters’ arithmetic</div>
+        <div style="font-size:14.5px;line-height:1.55;color:#8a7a61;">Mixed fractions everywhere — 2½″, never 2.5. Finished sizes labeled as such; seam allowances spelled out.</div>
+      </div>
+      <div style="flex:1 1 240px;background:#fffdf7;border:1px solid #e7dcc4;border-radius:14px;padding:16px 18px;">
+        <div style="font:700 16px var(--serif);color:#3f3423;margin-bottom:5px;">Uncertainty is honest</div>
+        <div style="font-size:14.5px;line-height:1.55;color:#8a7a61;">Vision results show their confidence, always. Hand edits are certain — painting a square clears its doubt.</div>
+      </div>
+    </div>
+  </header>
+
+  <section style="max-width:1060px;margin:0 auto;padding:34px 26px 0;">
+    <h2 style="margin:0 0 4px;font:700 26px var(--serif);color:#53718b;">Color tokens</h2>
+    <p style="margin:0 0 14px;font-size:15px;color:#8a7a61;">Fabric colors are the user’s and never theme; everything else swaps between daylight and evening.</p>
+    <div style="background:#fffdf7;border:1px solid #e7dcc4;border-radius:14px;padding:6px 18px;">
+      <sc-for list="{{ colorRows }}" as="c" hint-placeholder-count="8">
+        <div style="display:flex;align-items:center;gap:14px;padding:10px 0;border-bottom:1px dashed #ecdfc4;">
+          <span style="width:44px;height:32px;border-radius:8px;background:{{ c.l }};border:1px solid #d9c8a8;flex:none;"></span>
+          <span style="width:44px;height:32px;border-radius:8px;background:{{ c.d }};border:1px solid #57482f;flex:none;"></span>
+          <span style="flex:1;min-width:0;"><span style="font-weight:600;font-size:15.5px;color:#3f3423;">{{ c.name }}</span><span style="font-size:13px;color:#a3937a;"> · {{ c.use }}</span></span>
+          <code style="font-size:12.5px;color:#8a7a61;flex:none;">{{ c.v }}</code>
+          <span style="width:150px;text-align:right;font-size:12.5px;color:#a3937a;flex:none;">{{ c.l }} / {{ c.d }}</span>
+        </div>
+      </sc-for>
+    </div>
+  </section>
+
+  <section style="max-width:1060px;margin:0 auto;padding:34px 26px 0;">
+    <h2 style="margin:0 0 4px;font:700 26px var(--serif);color:#53718b;">Type</h2>
+    <p style="margin:0 0 14px;font-size:15px;color:#8a7a61;">Bookman-family serif for headings and measurements; Seravek/Gill Sans for everything else. Body is 17px — quilters read glasses-off. Minimum 13px, and only for footnotes.</p>
+    <div style="background:#fffdf7;border:1px solid #e7dcc4;border-radius:14px;padding:8px 20px;">
+      <sc-for list="{{ typeRows }}" as="t" hint-placeholder-count="6">
+        <div style="display:flex;align-items:baseline;gap:18px;padding:13px 0;border-bottom:1px dashed #ecdfc4;flex-wrap:wrap;">
+          <span style="width:210px;flex:none;font-size:13px;color:#a3937a;">{{ t.label }}</span>
+          <span style="{{ t.style }}">{{ t.sample }}</span>
+        </div>
+      </sc-for>
+    </div>
+  </section>
+
+  <section style="max-width:1060px;margin:0 auto;padding:34px 26px 0;">
+    <h2 style="margin:0 0 4px;font:700 26px var(--serif);color:#53718b;">Shape &amp; spacing</h2>
+    <div style="display:flex;gap:22px;flex-wrap:wrap;margin-top:12px;">
+      <div style="flex:1 1 300px;background:#fffdf7;border:1px solid #e7dcc4;border-radius:14px;padding:16px 18px;font-size:14.5px;line-height:1.6;color:#6d5f49;">
+        <strong style="color:#3f3423;">Radii.</strong> Cards 16 · panels &amp; inputs 10 · segmented controls 11 outside, 8 inside · pills 999. Nothing sharp — everything slightly rounded like a well-washed quilt.
+      </div>
+      <div style="flex:1 1 300px;background:#fffdf7;border:1px solid #e7dcc4;border-radius:14px;padding:16px 18px;font-size:14.5px;line-height:1.6;color:#6d5f49;">
+        <strong style="color:#3f3423;">Spacing.</strong> Base 4px scale; cards pad 18–20; rows 12; section gaps 14–16. Hit targets ≥ 44px on touch, steppers 36–44px wide. Dashed dividers (<span style="border-top:2px dashed #d9c8a8;display:inline-block;width:48px;vertical-align:middle;"></span>) mark section seams, like basting stitches.
+      </div>
+      <div style="flex:1 1 300px;background:#fffdf7;border:1px solid #e7dcc4;border-radius:14px;padding:16px 18px;font-size:14.5px;line-height:1.6;color:#6d5f49;">
+        <strong style="color:#3f3423;">Layout.</strong> Desktop: canvas + one 376px side panel with tabs. Tablet: same, panel narrows. iPhone: bottom tab bar (Quilt · Fabrics · Sizing · Pattern); panels become full-width pages.
+      </div>
+    </div>
+  </section>
+
+  <section style="max-width:1060px;margin:0 auto;padding:38px 26px 0;">
+    <h2 style="margin:0 0 4px;font:700 26px var(--serif);color:#53718b;">Components</h2>
+    <p style="margin:0 0 6px;font-size:15px;color:#8a7a61;">Every component ships in daylight and evening. The demos below are live — poke them.</p>
+
+    <h3 style="font:700 19px var(--serif);color:#53718b;margin:22px 0 10px;">Buttons · engine chip · autosave</h3>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;">
+      <sc-for list="{{ skins }}" as="sk" hint-placeholder-count="2">
+        <div data-skin="{{ sk.k }}" style="flex:1 1 340px;min-width:300px;background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:18px;color:var(--ink);font-family:var(--sans);position:relative;">
+          <span style="position:absolute;top:10px;right:14px;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);">{{ sk.label }}</span>
+          <div style="display:flex;flex-direction:column;gap:12px;margin-top:8px;">
+            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+              <button style="background:var(--accent);color:var(--accentInk);border:none;border-radius:11px;padding:13px 20px;font:600 15.5px var(--sans);cursor:pointer;box-shadow:0 4px 12px var(--shadow);" style-hover="background:var(--accentB);">Start from a photo</button>
+              <button style="background:var(--card);border:1.5px solid var(--line2);border-radius:10px;padding:11px 16px;font:500 14.5px var(--sans);color:var(--ink2);cursor:pointer;" style-hover="background:var(--card2);">Open</button>
+              <button style="background:none;border:none;padding:4px 0;font-size:14.5px;font-family:inherit;color:var(--accent);cursor:pointer;text-decoration:underline;text-underline-offset:3px;">Compare full size</button>
+            </div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+              <button style="background:var(--card);border:1.5px solid var(--line2);border-radius:10px;padding:11px 16px;font:500 14.5px var(--sans);color:var(--ink2);opacity:0.45;cursor:not-allowed;">Disabled</button>
+              <sc-if value="{{ notBusyBtn }}" hint-placeholder-val="{{ true }}">
+                <button onClick="{{ goBusy }}" style="background:var(--card);border:1.5px solid var(--line2);border-radius:10px;padding:11px 16px;font:600 14.5px var(--sans);color:var(--ink2);cursor:pointer;" style-hover="background:var(--card2);">Export — tap me</button>
+              </sc-if>
+              <sc-if value="{{ busyBtn }}" hint-placeholder-val="{{ false }}">
+                <button style="background:var(--card);border:1.5px solid var(--line2);border-radius:10px;padding:11px 16px;font:600 14.5px var(--sans);color:var(--ink2);opacity:0.75;cursor:wait;display:flex;align-items:center;gap:8px;"><svg width="14" height="14" style="display:block;animation:qSpin .8s linear infinite;"><circle cx="7" cy="7" r="5.5" style="fill:none;stroke:currentColor;stroke-width:2.4;stroke-dasharray:24 12;"></circle></svg>Making it…</button>
+              </sc-if>
+            </div>
+            <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;">
+              <span style="display:flex;align-items:center;gap:8px;padding:8px 13px;border:1px solid var(--pillLn);border-radius:999px;background:var(--pill);font-size:13px;color:var(--ink2);"><span style="width:9px;height:9px;border-radius:50%;background:var(--sage);"></span>engine ready</span>
+              <span style="display:flex;align-items:center;gap:8px;padding:8px 13px;border:1px solid var(--pillLn);border-radius:999px;background:var(--pill);font-size:13px;color:var(--ink2);"><svg width="13" height="13" style="display:block;animation:qSpin .9s linear infinite;"><circle cx="6.5" cy="6.5" r="5" style="fill:none;stroke:var(--denim);stroke-width:2.4;stroke-dasharray:22 10;"></circle></svg>engine warming up</span>
+              <span style="display:flex;align-items:center;gap:7px;font-size:13px;color:var(--mut);"><span style="width:9px;height:9px;border-radius:50%;background:var(--sage);"></span>Autosaved</span>
+            </div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+
+    <h3 style="font:700 19px var(--serif);color:#53718b;margin:26px 0 10px;">Fraction input · dropdown · toggle · proportion lock</h3>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;">
+      <sc-for list="{{ skins }}" as="sk" hint-placeholder-count="2">
+        <div data-skin="{{ sk.k }}" style="flex:1 1 340px;min-width:300px;background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:18px;color:var(--ink);font-family:var(--sans);position:relative;">
+          <span style="position:absolute;top:10px;right:14px;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);">{{ sk.label }}</span>
+          <div style="display:flex;flex-direction:column;gap:13px;margin-top:8px;">
+            <div>
+              <span style="display:block;font-size:14px;color:var(--mut);margin-bottom:6px;">Square size <span style="color:var(--faint);">· in</span></span>
+              <div style="display:flex;gap:5px;max-width:220px;">
+                <button onClick="{{ decFrac }}" style="width:38px;height:48px;flex:none;font-size:20px;color:var(--ink2);background:var(--card2);border:1.5px solid var(--line2);border-radius:10px;cursor:pointer;line-height:1;" style-hover="background:var(--card3);">−</button>
+                <input value="{{ fracDraft }}" onChange="{{ typeFrac }}" onBlur="{{ commitFrac }}" onKeyDown="{{ enterKey }}" style="width:100%;min-width:0;text-align:center;font:600 17px var(--serif);color:var(--ink);background:var(--card);border:1.5px solid var(--line2);border-radius:10px;padding:6px 2px;" style-focus="border-color:var(--accent);box-shadow:0 0 0 3px rgba(165,80,47,0.16);outline:none;">
+                <button onClick="{{ incFrac }}" style="width:38px;height:48px;flex:none;font-size:20px;color:var(--ink2);background:var(--card2);border:1.5px solid var(--line2);border-radius:10px;cursor:pointer;line-height:1;" style-hover="background:var(--card3);">+</button>
+              </div>
+              <span style="display:block;font-size:12.5px;color:var(--faint);margin-top:5px;">Accepts “2 1/2”, “2½” or “2.5” — always shows mixed fractions.</span>
+            </div>
+            <label style="display:block;max-width:280px;">
+              <span style="display:block;font-size:14px;color:var(--mut);margin-bottom:6px;">Standard size</span>
+              <select value="{{ sel }}" onChange="{{ onSel }}" style="width:100%;padding:11px 12px;font-size:15.5px;font-family:var(--sans);color:var(--ink);background:var(--card);border:1.5px solid var(--line2);border-radius:10px;cursor:pointer;">
+                <option value="crib">Crib — 36 × 52</option>
+                <option value="throw">Throw — 50 × 65</option>
+                <option value="twin">Twin — 70 × 90</option>
+                <option value="queen">Queen — 90 × 108</option>
+              </select>
+            </label>
+            <button onClick="{{ toggle }}" style="display:flex;align-items:center;gap:11px;background:none;border:none;padding:0;cursor:pointer;text-align:left;">
+              <span style="{{ togTrack }}"><span style="{{ togKnob }}"></span></span>
+              <span style="font-size:14.5px;color:var(--ink2);">Highlight uncertain squares</span>
+            </button>
+            <div style="display:flex;align-items:center;gap:11px;">
+              <button onClick="{{ toggleLock }}" style="{{ lockStyle }}">
+                <sc-if value="{{ locked }}" hint-placeholder-val="{{ true }}"><svg width="19" height="21" style="display:block;"><path d="M5 9.5V6.5a4 4 0 0 1 8 0v3" style="fill:none;stroke:currentColor;stroke-width:2.2;"></path><rect x="2.5" y="9.5" width="13" height="9.5" rx="2.5" fill="currentColor"></rect></svg></sc-if>
+                <sc-if value="{{ unlockedB }}" hint-placeholder-val="{{ false }}"><svg width="21" height="21" style="display:block;"><path d="M8 9.5V5.5a4 4 0 0 1 8 0V7" style="fill:none;stroke:currentColor;stroke-width:2.2;"></path><rect x="2.5" y="9.5" width="13" height="9.5" rx="2.5" fill="currentColor"></rect></svg></sc-if>
+              </button>
+              <span style="font-size:14.5px;color:var(--ink2);">{{ lockWord }}</span>
+            </div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+
+    <h3 style="font:700 19px var(--serif);color:#53718b;margin:26px 0 10px;">Confidence · progress with stages · low-confidence cells</h3>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;">
+      <sc-for list="{{ skins }}" as="sk" hint-placeholder-count="2">
+        <div data-skin="{{ sk.k }}" style="flex:1 1 340px;min-width:300px;background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:18px;color:var(--ink);font-family:var(--sans);position:relative;">
+          <span style="position:absolute;top:10px;right:14px;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);">{{ sk.label }}</span>
+          <div style="display:flex;flex-direction:column;gap:14px;margin-top:8px;">
+            <div style="background:var(--card3);border:1px dashed var(--line2);border-radius:11px;padding:12px 14px;">
+              <div style="display:flex;justify-content:space-between;gap:10px;font-size:13.5px;color:var(--ink2);margin-bottom:8px;"><span>{{ progText }}</span><span style="font-weight:700;">{{ progPct }}%</span></div>
+              <div style="height:11px;background:var(--card);border:1px solid var(--line);border-radius:999px;overflow:hidden;"><span style="{{ progBar }}"></span></div>
+              <div style="display:flex;justify-content:space-between;gap:6px;font-size:11.5px;color:var(--faint);margin-top:7px;flex-wrap:wrap;"><span>straighten</span><span>colors</span><span>grid</span><span>cells</span><span>repeats</span><span>borders</span></div>
+              <button onClick="{{ replayProg }}" style="margin-top:9px;background:none;border:none;padding:0;font:600 13px var(--sans);color:var(--accent);cursor:pointer;text-decoration:underline;text-underline-offset:3px;">Replay download</button>
+            </div>
+            <div>
+              <sc-for list="{{ confRows }}" as="c" hint-placeholder-count="3">
+                <div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px dashed var(--line);">
+                  <span style="flex:1;font-size:14.5px;color:var(--ink2);">{{ c.label }}</span>
+                  <span style="width:92px;height:10px;background:var(--card3);border:1px solid var(--line);border-radius:999px;overflow:hidden;flex:none;"><span style="{{ c.msty }}"></span></span>
+                  <span style="width:38px;text-align:right;font-size:13px;font-weight:700;color:var(--ink2);flex:none;">{{ c.pctText }}</span>
+                  <span style="{{ c.wsty }}">{{ c.word }}</span>
+                </div>
+              </sc-for>
+            </div>
+            <div style="display:flex;gap:13px;align-items:center;">
+              <svg width="119" height="70" style="display:block;flex:none;">
+                <rect x="1" y="1" width="117" height="68" fill="#f7f1e0" stroke="#cbb894" style="stroke-width:1;"></rect>
+                <rect x="18" y="18" width="17" height="17" fill="#a9c7dc"></rect><rect x="52" y="18" width="17" height="17" fill="#a9c7dc"></rect><rect x="86" y="18" width="17" height="17" fill="#a9c7dc"></rect>
+                <rect x="35" y="35" width="17" height="17" fill="#a9c7dc"></rect><rect x="69" y="35" width="17" height="17" fill="#a9c7dc"></rect>
+                <rect x="52" y="18" width="17" height="17" fill="rgba(196,90,40,0.32)" style="stroke:#d06a35;stroke-width:1.2;"></rect>
+                <rect x="35" y="35" width="17" height="17" fill="rgba(196,90,40,0.32)" style="stroke:#d06a35;stroke-width:1.2;"></rect>
+              </svg>
+              <span style="font-size:13px;line-height:1.5;color:var(--mut);">Squares the vision engine isn’t sure about hatch in terracotta. Painting one by hand clears the doubt — hand edits are certain.</span>
+            </div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+
+    <h3 style="font:700 19px var(--serif);color:#53718b;margin:26px 0 10px;">Cards · table · fabric swatches</h3>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;">
+      <sc-for list="{{ skins }}" as="sk" hint-placeholder-count="2">
+        <div data-skin="{{ sk.k }}" style="flex:1 1 340px;min-width:300px;background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:18px;color:var(--ink);font-family:var(--sans);position:relative;">
+          <span style="position:absolute;top:10px;right:14px;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);">{{ sk.label }}</span>
+          <div style="display:flex;flex-direction:column;gap:13px;margin-top:8px;">
+            <div style="background:var(--card3);border:2px solid var(--accent);border-radius:13px;padding:12px 14px;">
+              <span style="display:flex;align-items:center;gap:9px;"><span style="width:14px;height:14px;border-radius:50%;background:var(--accent);box-shadow:inset 0 0 0 3px var(--card);border:1px solid var(--accent);flex:none;"></span><span style="font:700 15.5px var(--sans);color:var(--ink);">Strip piecing</span></span>
+              <span style="display:block;font-size:13px;color:var(--mut);margin:4px 0 8px;">Sew long strips first, then crosscut whole rows at once.</span>
+              <span style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;">
+                <span><span style="display:block;font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.08em;">Pieces</span><span style="font:700 15px var(--serif);color:var(--ink2);">1,331</span></span>
+                <span><span style="display:block;font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.08em;">Cuts</span><span style="font:700 15px var(--serif);color:var(--ink2);">95</span></span>
+                <span><span style="display:block;font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.08em;">Sewing ⓘ</span><span style="font:700 15px var(--serif);color:var(--ink2);">~5½ h</span></span>
+              </span>
+            </div>
+            <table style="width:100%;border-collapse:collapse;">
+              <tbody>
+                <tr style="border-bottom:1px dashed var(--line);">
+                  <td style="padding:9px 6px 9px 0;"><span style="display:flex;align-items:center;gap:8px;"><span style="width:22px;height:22px;border-radius:6px;background:#a9c7dc;border:1px solid var(--line2);flex:none;"></span><span style="font-weight:600;font-size:14px;color:var(--ink);white-space:nowrap;">Light Blue Chain</span></span></td>
+                  <td style="padding:9px 6px;font-size:12.5px;color:var(--mut);">1,313 squares · cut 2″</td>
+                  <td style="padding:9px 0 9px 6px;text-align:right;"><span style="font:700 14.5px var(--serif);color:var(--ink);">4¼ yd</span><br><span style="font-size:11px;color:var(--faint);font-style:italic;">estimate</span></td>
+                </tr>
+                <tr>
+                  <td style="padding:9px 6px 9px 0;"><span style="display:flex;align-items:center;gap:8px;"><span style="width:22px;height:22px;border-radius:6px;background:#f7f1e0;border:1px solid var(--line2);flex:none;"></span><span style="font-weight:600;font-size:14px;color:var(--ink);white-space:nowrap;">Cream Background</span></span></td>
+                  <td style="padding:9px 6px;font-size:12.5px;color:var(--mut);">1,162 squares + borders</td>
+                  <td style="padding:9px 0 9px 6px;text-align:right;"><span style="font:700 14.5px var(--serif);color:var(--ink);">5½ yd</span><br><span style="font-size:11px;color:var(--faint);font-style:italic;">estimate</span></td>
+                </tr>
+              </tbody>
+            </table>
+            <div style="display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;">
+              <span style="width:40px;height:40px;flex:none;border-radius:9px;background:#a9c7dc;border:1px solid var(--line2);box-shadow:inset 0 -2px 5px rgba(0,0,0,0.07);"></span>
+              <span style="flex:1;min-width:0;"><span style="font:600 15px var(--sans);color:var(--ink);">Light Blue Chain ✎</span><br><span style="font-size:13px;color:var(--mut);">#A9C7DC · 1,313 squares</span></span>
+              <span style="font-size:11.5px;color:var(--faint);border:1px solid var(--pillLn);background:var(--pill);border-radius:999px;padding:3px 9px;flex:none;">tap swatch to recolor</span>
+            </div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+
+    <h3 style="font:700 19px var(--serif);color:#53718b;margin:26px 0 10px;">Dropzone · toast · modal · tooltip</h3>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;">
+      <sc-for list="{{ skins }}" as="sk" hint-placeholder-count="2">
+        <div data-skin="{{ sk.k }}" style="flex:1 1 340px;min-width:300px;background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:18px;color:var(--ink);font-family:var(--sans);position:relative;">
+          <span style="position:absolute;top:10px;right:14px;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);">{{ sk.label }}</span>
+          <div style="display:flex;flex-direction:column;gap:13px;margin-top:8px;">
+            <div style="border:2.5px dashed var(--line2);border-radius:14px;background:var(--card2);padding:22px 16px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:7px;cursor:pointer;" style-hover="border-color:var(--accent);background:var(--card);">
+              <svg width="40" height="34" style="display:block;color:var(--mut);"><rect x="1.25" y="5.25" width="37.5" height="27.5" rx="4" style="fill:none;stroke:currentColor;stroke-width:2.2;"></rect><path d="M13 5l3-4.25h8L27 5" style="fill:none;stroke:currentColor;stroke-width:2.2;"></path><circle cx="20" cy="18.5" r="6.5" style="fill:none;stroke:currentColor;stroke-width:2.2;"></circle></svg>
+              <span style="font:700 17px var(--serif);color:var(--ink);">Drop your quilt photo here</span>
+              <span style="font-size:13px;color:var(--mut);">JPG or PNG — or tap to browse</span>
+            </div>
+            <div style="display:flex;gap:9px;flex-wrap:wrap;">
+              <button onClick="{{ toastOk }}" style="background:var(--card);border:1.5px solid var(--line2);border-radius:10px;padding:10px 14px;font:600 13.5px var(--sans);color:var(--ink2);cursor:pointer;" style-hover="background:var(--card2);">Show success toast</button>
+              <button onClick="{{ toastErr }}" style="background:var(--card);border:1.5px solid var(--line2);border-radius:10px;padding:10px 14px;font:600 13.5px var(--sans);color:var(--ink2);cursor:pointer;" style-hover="background:var(--card2);">Show error toast</button>
+              <button onClick="{{ openModal }}" style="background:var(--card);border:1.5px solid var(--line2);border-radius:10px;padding:10px 14px;font:600 13.5px var(--sans);color:var(--ink2);cursor:pointer;" style-hover="background:var(--card2);">Open modal</button>
+              <button data-tip="Tooltips are one short sentence, dark in both themes" onMouseEnter="{{ tipOn }}" onMouseLeave="{{ tipOff }}" style="background:var(--card);border:1.5px dashed var(--line2);border-radius:10px;padding:10px 14px;font:600 13.5px var(--sans);color:var(--mut);cursor:help;">Hover for tooltip</button>
+            </div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+
+    <p style="margin:26px 0 0;font-size:14px;color:#a3937a;line-height:1.6;max-width:70ch;">Confidence words map to fills: <strong style="color:#4c7a5a;">sage ≥ 85%</strong>, <strong style="color:#a8781f;">goldenrod 80–84%</strong>, <strong style="color:#a5502f;">terracotta below 80%</strong>. Toasts sit bottom-center and never stack; errors are terracotta and always say what <em>didn’t</em> happen. Tooltips appear on hover only — never hide required information in them.</p>
+  </section>
+
+  <sc-if value="{{ modalOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;inset:0;z-index:60;">
+      <div onClick="{{ closeModal }}" style="position:absolute;inset:0;background:rgba(18,12,6,0.6);"></div>
+      <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(420px,calc(100vw - 32px));background:#fffdf7;border:1px solid #e7dcc4;border-radius:18px;box-shadow:0 24px 60px rgba(0,0,0,0.35);padding:24px;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
+          <h2 style="margin:0;font:700 22px var(--serif);color:#53718b;flex:1;">Modal</h2>
+          <button onClick="{{ closeModal }}" style="width:38px;height:38px;background:#faf5e8;border:1px solid #e7dcc4;border-radius:9px;color:#5d4f39;font-size:16px;cursor:pointer;">✕</button>
+        </div>
+        <p style="margin:0 0 16px;font-size:14.5px;color:#8a7a61;line-height:1.55;">One card, centered, warm backdrop at 60%. Escape, ✕, and the backdrop all close it. Primary action sits left.</p>
+        <div style="display:flex;gap:10px;">
+          <button onClick="{{ closeModal }}" style="background:#a5502f;color:#fdf6e9;border:none;border-radius:10px;padding:12px 18px;font:600 15px var(--sans);cursor:pointer;">Got it</button>
+          <button onClick="{{ closeModal }}" style="background:#fffdf7;border:1.5px solid #d9c8a8;border-radius:10px;padding:12px 18px;font:600 15px var(--sans);color:#5d4f39;cursor:pointer;">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+  <sc-if value="{{ toastOn }}" hint-placeholder-val="{{ false }}">
+    <div style="{{ toastStyle }}"><span style="flex:none;">{{ toastGlyph }}</span><span>{{ toastMsg }}</span></div>
+  </sc-if>
+  <sc-if value="{{ tipShow }}" hint-placeholder-val="{{ false }}">
+    <div style="{{ tipStyle }}">{{ tipText }}</div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = {
+      frac: '2 1/2', fracV: 2.5, locked: true, toggleOn: true, sel: 'twin',
+      prog: 100, toast: null, modal: false, tip: null, busyBtn: false
+    };
+    this.skins = [{ k: 'light', label: 'Daylight' }, { k: 'dark', label: 'Evening' }];
+  }
+  componentWillUnmount() { clearTimeout(this._tt); clearInterval(this._pi); clearTimeout(this._bt); }
+  _fmtA(v) {
+    const G = { 1: '1/8', 2: '1/4', 3: '3/8', 4: '1/2', 5: '5/8', 6: '3/4', 7: '7/8' };
+    const n = Math.round(v * 8), w = Math.trunc(n / 8), r = n % 8;
+    if (!r) return '' + w; if (!w) return G[r]; return w + ' ' + G[r];
+  }
+  _parse(s) {
+    s = String(s || '').trim().replace(/[″"]/g, '');
+    let m = s.match(/^(\d+)[ -](\d+)\s*\/\s*(\d+)$/);
+    if (m) { const d = +m[3]; return d ? +m[1] + (+m[2]) / d : null; }
+    m = s.match(/^(\d+)\s*\/\s*(\d+)$/);
+    if (m) { const d = +m[2]; return d ? (+m[1]) / d : null; }
+    if (/^\d+(\.\d+)?$/.test(s)) return parseFloat(s);
+    return null;
+  }
+  _toast(msg, kind) {
+    this.setState({ toast: { msg: msg, kind: kind || 'ok' } });
+    clearTimeout(this._tt);
+    this._tt = setTimeout(() => this.setState({ toast: null }), 3200);
+  }
+  renderVals() {
+    const s = this.state;
+    const conf = [
+      { label: 'Straighten', pct: 98, word: 'Very sure', color: 'sage' },
+      { label: 'Repeats', pct: 84, word: 'Good', color: 'amber' },
+      { label: 'Squares', pct: 71, word: 'Check it', color: 'accent' }
+    ].map(function (c) {
+      return {
+        label: c.label, pctText: c.pct + '%', word: c.word,
+        msty: 'display:block;height:100%;width:' + c.pct + '%;background:var(--' + c.color + ');border-radius:999px;',
+        wsty: 'width:70px;text-align:right;font-size:12.5px;font-weight:700;flex:none;color:var(--' + c.color + ');'
+      };
+    });
+    return {
+      skins: this.skins,
+      colorRows: [
+        { name: 'Desk', use: 'app background', v: '--bg', l: '#f2ebdc', d: '#211a10' },
+        { name: 'Card', use: 'panels, sheets', v: '--card', l: '#fffdf7', d: '#2e2517' },
+        { name: 'Card sunken', use: 'wells, toolbars', v: '--card2', l: '#faf5e8', d: '#382e1d' },
+        { name: 'Ink', use: 'primary text', v: '--ink', l: '#453a2a', d: '#f0e6d0' },
+        { name: 'Muted ink', use: 'labels, captions', v: '--mut', l: '#8a7a61', d: '#b3a184' },
+        { name: 'Seam line', use: 'borders, dividers', v: '--line', l: '#e7dcc4', d: '#453a26' },
+        { name: 'Terracotta', use: 'primary action, low confidence', v: '--accent', l: '#a5502f', d: '#d98a5e' },
+        { name: 'Sage', use: 'success, high confidence', v: '--sage', l: '#4c7a5a', d: '#9cc2a1' },
+        { name: 'Goldenrod', use: 'busy, mid confidence', v: '--amber', l: '#a8781f', d: '#d9ae55' },
+        { name: 'Denim', use: 'engine, downloads', v: '--denim', l: '#53718b', d: '#93b3cf' },
+        { name: 'Cutting mat', use: 'canvas stage', v: '--stage', l: '#e9dfc9', d: '#181208' }
+      ],
+      typeRows: [
+        { label: 'Display · 38/700 serif', style: 'font:700 38px var(--serif);color:#3f3423;', sample: 'What are we making today?' },
+        { label: 'Screen title · 27–30/700 serif', style: 'font:700 28px var(--serif);color:#3f3423;', sample: 'Here’s what we found' },
+        { label: 'Panel title · 21/700 serif', style: 'font:700 21px var(--serif);color:#3f3423;', sample: 'Sizing' },
+        { label: 'Measurement · serif, fractions', style: 'font:700 22px var(--serif);color:#a5502f;', sample: '82½″ × 90″ finished' },
+        { label: 'Body · 16–17 sans', style: 'font:16.5px/1.55 var(--sans);color:#5d4f39;', sample: 'Cut squares at 2″ — ¼″ seams included.' },
+        { label: 'Caption · 13–14 sans', style: 'font:13.5px var(--sans);color:#a3937a;', sample: 'Rounded up to the next ¼ yard · estimate' }
+      ],
+      // interactive demos
+      fracDraft: s.frac,
+      typeFrac: (e) => this.setState({ frac: e.target.value }),
+      commitFrac: (e) => {
+        const v = this._parse(e.target.value);
+        if (v == null) { this.setState({ frac: this._fmtA(s.fracV) }); this._toast('Mixed fractions like 2 1/2', 'err'); return; }
+        const c = Math.max(0.25, Math.min(20, Math.round(v * 8) / 8));
+        this.setState({ fracV: c, frac: this._fmtA(c) });
+      },
+      incFrac: () => { const c = s.fracV + 0.25; this.setState({ fracV: c, frac: this._fmtA(c) }); },
+      decFrac: () => { const c = Math.max(0.25, s.fracV - 0.25); this.setState({ fracV: c, frac: this._fmtA(c) }); },
+      enterKey: (e) => { if (e.key === 'Enter') e.target.blur(); },
+      sel: s.sel, onSel: (e) => this.setState({ sel: e.target.value }),
+      togOn: s.toggleOn,
+      togTrack: 'width:46px;height:27px;flex:none;border-radius:999px;position:relative;transition:background .15s;background:' + (s.toggleOn ? 'var(--sage)' : 'var(--card3)') + ';border:1.5px solid ' + (s.toggleOn ? 'var(--sage)' : 'var(--line2)') + ';cursor:pointer;',
+      togKnob: 'position:absolute;top:2px;width:20px;height:20px;border-radius:50%;background:#fffdf7;box-shadow:0 1px 4px rgba(0,0,0,0.3);transition:left .15s;left:' + (s.toggleOn ? '22px' : '3px') + ';',
+      toggle: () => this.setState({ toggleOn: !s.toggleOn }),
+      locked: s.locked, unlockedB: !s.locked,
+      lockStyle: 'width:44px;height:44px;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;' + (s.locked ? 'background:#f6e7da;border:1.5px solid #cf9a7f;color:var(--accent);' : 'background:var(--card2);border:1.5px solid var(--line2);color:var(--mut);'),
+      toggleLock: () => this.setState({ locked: !s.locked }),
+      lockWord: s.locked ? 'Locked — scale together' : 'Unlocked — whole blocks',
+      progPct: s.prog,
+      progBar: 'display:block;height:100%;width:' + s.prog + '%;background:var(--denim);border-radius:999px;transition:width .12s;',
+      progText: s.prog >= 100 ? 'Vision engine ready' : 'Downloading vision engine — about 60 MB, first time only',
+      progDone: s.prog >= 100,
+      replayProg: () => {
+        clearInterval(this._pi);
+        this.setState({ prog: 0 });
+        this._pi = setInterval(() => {
+          const p = Math.min(100, this.state.prog + 7);
+          this.setState({ prog: p });
+          if (p >= 100) clearInterval(this._pi);
+        }, 80);
+      },
+      confRows: conf,
+      busyBtn: s.busyBtn, notBusyBtn: !s.busyBtn,
+      goBusy: () => {
+        this.setState({ busyBtn: true });
+        clearTimeout(this._bt);
+        this._bt = setTimeout(() => this.setState({ busyBtn: false }), 1600);
+      },
+      toastOk: () => this._toast('Saved — check your downloads folder.'),
+      toastErr: () => this._toast('That file isn’t a QREP project — nothing was changed.', 'err'),
+      modalOpen: s.modal,
+      openModal: () => this.setState({ modal: true }),
+      closeModal: () => this.setState({ modal: false }),
+      tipOn: (e) => {
+        const r = e.currentTarget.getBoundingClientRect();
+        this.setState({ tip: { t: e.currentTarget.dataset.tip, x: Math.round(r.left + r.width / 2), y: Math.round(r.top - 9) } });
+      },
+      tipOff: () => this.setState({ tip: null }),
+      tipShow: !!s.tip, tipText: s.tip ? s.tip.t : '',
+      tipStyle: s.tip ? 'position:fixed;left:' + s.tip.x + 'px;top:' + s.tip.y + 'px;transform:translate(-50%,-100%);background:#2b2115;color:#f6ecd9;padding:7px 12px;border-radius:8px;font:13px var(--sans);z-index:90;pointer-events:none;white-space:nowrap;box-shadow:0 6px 18px rgba(0,0,0,0.3);' : '',
+      toastOn: !!s.toast, toastMsg: s.toast ? s.toast.msg : '', toastGlyph: s.toast && s.toast.kind === 'err' ? '⚠' : '✓',
+      toastStyle: 'position:fixed;left:50%;bottom:26px;transform:translateX(-50%);display:flex;align-items:center;gap:10px;padding:13px 24px;border-radius:999px;font-size:15.5px;z-index:80;box-shadow:0 10px 26px rgba(30,18,6,0.4);animation:qToast .28s ease;' + (s.toast && s.toast.kind === 'err' ? 'background:#8c3f22;color:#fdf6e9;' : 'background:#43372a;color:#fbf4e4;')
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -112,14 +112,45 @@ storage is structurally untrustworthy here:
 - Photos and designs never leave the device; that privacy line is part of
   the product's identity and appears in the README and UI copy.
 
+## UI reference (binding)
+
+The Claude Design mockups are committed at docs/design/sprint-2/
+(QREP.dc.html for screens and behavior, QREP Design System.dc.html for
+tokens and components). They are the look-and-behavior reference for every
+UI slice. docs/design/sprint-2/PARITY.md is the binding annex mapping each
+mock screen to its slice and recording every deliberate deviation; the two
+load-bearing ones: all numbers come from the engine even where the mock
+computes them in JS, and the Seams tool is a preview layer whose overrides
+live in the project-file wrapper, never in the engine model, and never
+change exports in this sprint. The project file is a wrapper
+(`{app, version, name, model, ui}`) around the canonical engine model JSON;
+Open also accepts a bare engine model. The mock's phone layout (<720px,
+bottom tabs) is in scope for layout; phone CV performance stays best-effort.
+
+## Test-driven protocol (binding)
+
+Every slice works red-first: for each acceptance criterion, the test exists
+and fails before the implementing code lands, and both land in the same PR.
+Expected values flow one way, hand computation (in comments or fixtures) to
+assertion, per the repo non-negotiables; never observed output to assertion.
+Layers: pytest for bridge and engine behavior (including the new resize
+semantics with hand-computed literals); vitest for UI logic (fraction
+parsing/formatting parity fixtures shared with Python, undo history, dirty
+tracking, RPC correlation, seam-override edge maps); Playwright for user
+flows against the built site. UI parity items test the behavior contract in
+PARITY.md, not pixel styling. PRs state which tests were written first; a
+criterion without a test is not done.
+
 ## Sizing math ownership
 
 Sprint 1 already documented a Python-vs-JS divergence in the sizing math
 (round-half-to-even vs Math.round, see qrep/viewer/sizing.py). The rule for
 sprint 2: Python is authoritative. The bridge exposes resize_locked and
-resize_unlocked (wrapping the existing sizing helper, which remains the
-single Python implementation); every UI commit adopts the bridge's returned
-model. A JS preview mirror for live slider feedback is permitted only with a
+resize_unlocked; every UI commit adopts the bridge's returned model. Per the
+mock (PARITY.md item 4), locked resize also scales border-band widths by
+the cell factor (eighth-rounded, quarter-inch floor) with the mock's clamps;
+these are NEW bridge functions with fresh hand-computed tests, and sprint
+1's sizing helper and its tests stay untouched. A JS preview mirror for live slider feedback is permitted only with a
 parity test asserting the exact literals of the Python sizing unit tests; if
 parity cannot be held, the mirror is dropped in favor of a debounced Python
 call.
