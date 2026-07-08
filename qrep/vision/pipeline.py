@@ -51,8 +51,8 @@ def reverse(
         raise ValueError(f"could not read image: {image_path}")
 
     rect = rectify(image, corners)
-    palette = extract_palette(rect.image, fabrics)
-    grid = estimate_grid(rect.image)
+    palette = extract_palette(rect.image, fabrics, mask=rect.mask)
+    grid = estimate_grid(rect.image, mask=rect.mask)
     cells = assign_cells(rect.image, grid.x.boundaries, grid.y.boundaries, palette.centers_lab)
     borders = detect_borders(cells.assignments, grid.x.boundaries, grid.y.boundaries)
 

@@ -1,8 +1,12 @@
 """Repeat detection: axis-aligned autocorrelation on the fabric-id grid.
 
-The Double Irish Chain also repeats along the (5, 5) diagonal by block
-parity; the contract asks for the axis-aligned periods (10, 10), so shifts
-are evaluated along one axis at a time.
+mean(a == b) over the overlap of a grid and its shifted self IS the
+normalized 2D autocorrelation of the one-hot fabric encoding (the per-cell
+dot product of one-hot vectors is 1 exactly when the labels match), so this
+implements the pinned method directly on labels without materializing the
+one-hot tensor. The Double Irish Chain also repeats along the (5, 5)
+diagonal by block parity; the contract asks for the axis-aligned periods
+(10, 10), so shifts are evaluated along one axis at a time.
 """
 
 import numpy as np

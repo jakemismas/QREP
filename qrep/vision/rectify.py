@@ -18,6 +18,7 @@ class RectifyResult(BaseModel):
     model_config = {"arbitrary_types_allowed": True}
 
     image: np.ndarray  # rectified BGR quilt-only image
+    mask: np.ndarray  # uint8, 255 inside the quilt quad (output coordinates)
     corners: list[tuple[float, float]]  # detected quad in source px, TL TR BR BL
     identity: bool
     confidence: float
@@ -89,9 +90,17 @@ def rectify(image: np.ndarray, corners: list[tuple[float, float]] | None = None)
     deviation = float(np.abs(quad - rect).max()) / max_dim
 
     if deviation < IDENTITY_THRESHOLD:
-        cropped = image[int(round(y0)) : int(round(y1)), int(round(x0)) : int(round(x1))]
+        cx0, cy0 = int(round(x0)), int(round(y0))
+        cropped = image[cy0 : int(round(y1)), cx0 : int(round(x1))]
+        # the crop is the quad's bounding box; pixels between the quad and
+        # the box are background wedges, and the design doc pins palette
+        # extraction to pixels inside the QUAD only, so mask them out
+        mask = np.zeros(cropped.shape[:2], dtype=np.uint8)
+        local_quad = (quad - np.array([cx0, cy0])).astype(np.int32)
+        cv2.fillConvexPoly(mask, local_quad, 255)
         return RectifyResult(
             image=cropped,
+            mask=mask,
             corners=[tuple(p) for p in rect],
             identity=True,
             confidence=1.0,
@@ -110,6 +119,8 @@ def rectify(image: np.ndarray, corners: list[tuple[float, float]] | None = None)
     confidence = max(0.0, (1.0 - min(residual_norm * 10, 1.0)) * (1.0 - warp_magnitude))
     return RectifyResult(
         image=warped,
+        # the whole warp target IS the quad interior
+        mask=np.full((height, width), 255, dtype=np.uint8),
         corners=[tuple(p) for p in quad],
         identity=False,
         confidence=min(confidence, 0.999),

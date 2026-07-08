@@ -34,12 +34,17 @@ def _simplified_silhouette(points: np.ndarray, centers: np.ndarray, labels: np.n
     return float(np.mean((nearest_other - own) / denom))
 
 
-def extract_palette(image_bgr: np.ndarray, fabrics: int | None = None) -> PaletteResult:
-    """K-means over quilt pixels only (callers pass the rectified quilt image).
+def extract_palette(
+    image_bgr: np.ndarray, fabrics: int | None = None, mask: np.ndarray | None = None
+) -> PaletteResult:
+    """K-means over quilt pixels only: with a mask, background wedges between
+    the quad and its bounding box are excluded per the design doc.
 
     fabrics forces k (the CLI escape hatch); otherwise k maximizes silhouette.
     """
     lab = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2Lab).reshape(-1, 3).astype(np.float32)
+    if mask is not None:
+        lab = lab[mask.reshape(-1) > 0]
     rng = np.random.default_rng(42)
     if lab.shape[0] > SUBSAMPLE:
         idx = rng.choice(lab.shape[0], SUBSAMPLE, replace=False)

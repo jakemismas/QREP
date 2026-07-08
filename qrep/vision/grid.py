@@ -50,8 +50,10 @@ def _binarize(profile: np.ndarray) -> np.ndarray:
     for i in range(1, len(profile) - 1):
         if profile[i] > threshold and profile[i] >= profile[i - 1] and profile[i] >= profile[i + 1]:
             spikes[i] = 1.0
-    # dilate by one pixel so half-pixel edge jitter cannot halve the
-    # correlation at the fundamental lag
+    # dilate by one pixel to absorb RANDOM half-pixel edge jitter; a
+    # SYSTEMATIC alternation (cells alternating 14/16 px) is a genuine
+    # 2-cell period this cannot and should not erase -- see the vision
+    # robustness follow-up issue
     return np.minimum(spikes + np.roll(spikes, 1) + np.roll(spikes, -1), 1.0)
 
 
@@ -81,6 +83,10 @@ def _find_pitch(profile: np.ndarray, max_pitch: int) -> tuple[float, float]:
         if abs(denom) > 1e-9:
             shift = 0.5 * (corr[i - 1] - corr[i + 1]) / denom
             pitch += float(np.clip(shift, -0.5, 0.5))
+    # "prominence": the lag-0-normalized autocorrelation height at the
+    # fundamental, not the topographic saddle-relative kind; already in
+    # [0, 1] and monotone in periodicity strength, which is what the
+    # confidence contract needs
     prominence = float(max(0.0, min(1.0, corr[i])))
     return pitch, prominence
 
@@ -131,10 +137,18 @@ def _boundaries(extent: int, pitch: float, offset: float, profile: np.ndarray) -
     return cleaned
 
 
-def estimate_grid(image_bgr: np.ndarray) -> GridResult:
+def estimate_grid(image_bgr: np.ndarray, mask: np.ndarray | None = None) -> GridResult:
     gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY).astype(np.float32)
-    grad_x = np.abs(cv2.Sobel(gray, cv2.CV_32F, 1, 0, ksize=3)).sum(axis=0)
-    grad_y = np.abs(cv2.Sobel(gray, cv2.CV_32F, 0, 1, ksize=3)).sum(axis=1)
+    grad = np.abs(cv2.Sobel(gray, cv2.CV_32F, 1, 0, ksize=3))
+    grad_v = np.abs(cv2.Sobel(gray, cv2.CV_32F, 0, 1, ksize=3))
+    if mask is not None:
+        # quilt-quad pixels only: background wedges at the crop edges would
+        # otherwise inject strong spurious edges into the projections
+        eroded = cv2.erode(mask, np.ones((5, 5), np.uint8))
+        grad = grad * (eroded > 0)
+        grad_v = grad_v * (eroded > 0)
+    grad_x = grad.sum(axis=0)
+    grad_y = grad_v.sum(axis=1)
     height, width = gray.shape
 
     pitch_x, prom_x = _find_pitch(grad_x, max_pitch=width // 4)

@@ -1,5 +1,10 @@
 """Cell fabric assignment: median cell color in Lab to the nearest palette
-entry, with a per-cell margin confidence."""
+entry, with a per-cell margin confidence.
+
+The margin is the RELATIVE margin (d2 - d1) / d2 rather than the raw Lab
+distance difference the design doc sketches: the schema requires cell
+confidence in [0, 1], and the relative form is scale-free in Lab. Same
+ordering, bounded range."""
 
 import cv2
 import numpy as np
