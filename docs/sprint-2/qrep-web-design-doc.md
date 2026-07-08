@@ -30,6 +30,31 @@ accounts and no server-side storage, a server would have nothing to do.
   dropped from and re-added to the Pyodide distribution before, and a
   self-hosted pin is immune to that. S0 records the exact Pyodide version and
   every wheel filename in this section when it lands.
+
+  S0 record (2026-07-08, issue #40; machine-readable copy with sha256 digests
+  in web/vendor.lock.json, enforced by web/scripts/vendor.mjs at build time):
+  - Pyodide 0.28.3 (Python 3.13.2, abi_version 2025_0, platform
+    emscripten_4_0_9). Core files from npm pyodide@0.28.3: pyodide.mjs,
+    pyodide.js, pyodide.asm.js, pyodide.asm.wasm, python_stdlib.zip,
+    pyodide-lock.json.
+  - Distribution wheels (Pyodide 0.28.3 CDN, vendored next to
+    pyodide-lock.json): numpy-2.2.5-cp313-cp313-pyodide_2025_0_wasm32.whl,
+    opencv_python-4.11.0.86-cp313-cp313-pyodide_2025_0_wasm32.whl,
+    pillow-11.3.0-cp313-cp313-pyodide_2025_0_wasm32.whl,
+    pydantic-2.10.6-py3-none-any.whl,
+    pydantic_core-2.27.2-cp313-cp313-pyodide_2025_0_wasm32.whl,
+    typing_extensions-4.14.1-py3-none-any.whl,
+    annotated_types-0.7.0-py3-none-any.whl,
+    charset_normalizer-3.4.2-py3-none-any.whl (reportlab 5.x dependency),
+    micropip-0.10.1-py3-none-any.whl.
+  - PyPI pure-Python wheels (vendored under wheels/):
+    reportlab-5.0.0-py3-none-any.whl, svgwrite-1.4.3-py3-none-any.whl.
+  - qrep-0.1.0-py3-none-any.whl built from the repo at site build time,
+    installed with micropip deps=False.
+  - Versioning note: Pyodide moved to CPython-tracking version numbers after
+    0.29.x (0.28.3 -> 0.29.4 -> 314.x). 0.28.3 is the last release of the
+    measured 0.28 line and matches the native 3.13 CI matrix; upgrades stay
+    deliberate, tested acts per the risk register.
 - Pyodide runs in a Web Worker. A typed RPC layer (request id, method, JSON
   payload, transferables for bytes) is the only path between UI and engine.
   The worker is disposable: every bridge call is stateless (the model JSON

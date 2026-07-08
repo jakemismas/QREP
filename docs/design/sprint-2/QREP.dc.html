@@ -85,7 +85,7 @@
             <button onClick="{{ startPhoto }}" style="background:var(--accent);color:var(--accentInk);border:none;border-radius:12px;padding:16px 26px;font:600 18px var(--sans);cursor:pointer;box-shadow:0 4px 12px var(--shadow);" style-hover="background:var(--accentB);">Start from a photo</button>
             <button onClick="{{ startDemo }}" style="background:var(--card);border:1.5px solid var(--line2);border-radius:11px;padding:12px 18px;font:600 15.5px var(--sans);color:var(--ink2);cursor:pointer;" style-hover="background:var(--card2);">Open the demo quilt instead</button>
             <button onClick="{{ startBlank }}" style="background:none;border:none;padding:6px 0 0;font-size:14.5px;font-family:inherit;color:var(--denim);cursor:pointer;text-decoration:underline;text-underline-offset:3px;">No photo handy? Start from a blank grid</button>
-            <span style="font-size:12.5px;color:var(--faint);">Vision engine downloads once (~60 MB) and runs in your browser.</span>
+            <span style="font-size:12.5px;color:var(--faint);">Everything runs in your browser — the vision engine loads itself the first time, about 12 MB.</span>
           </div>
         </div>
       </div>
@@ -114,12 +114,12 @@
           <p style="margin:0 0 18px;font-size:15px;color:var(--mut);">IMG_2847.jpeg · the demo runs much quicker than real life</p>
           <sc-if value="{{ dlShow }}" hint-placeholder-val="{{ false }}">
             <div style="background:var(--card3);border:1px dashed var(--line2);border-radius:12px;padding:14px 16px;margin-bottom:16px;">
-              <div style="display:flex;justify-content:space-between;gap:12px;font-size:14.5px;color:var(--ink2);margin-bottom:9px;"><span>Downloading vision engine — <strong>about 60 MB, first time only</strong></span><span style="font-weight:700;">{{ dlPctText }}</span></div>
+              <div style="display:flex;justify-content:space-between;gap:12px;font-size:14.5px;color:var(--ink2);margin-bottom:9px;"><span>Loading the vision engine — <strong>first time only</strong></span><span style="font-weight:700;">{{ dlPctText }}</span></div>
               <div style="height:12px;background:var(--card);border:1px solid var(--line);border-radius:999px;overflow:hidden;"><div style="{{ dlBarStyle }}"></div></div>
             </div>
           </sc-if>
           <sc-if value="{{ dlCached }}" hint-placeholder-val="{{ false }}">
-            <div style="display:flex;align-items:center;gap:9px;font-size:14px;color:var(--sage);margin-bottom:14px;"><svg width="14" height="14" style="display:block;"><path d="M2 7.5l3.5 3.5L12 3.5" style="fill:none;stroke:currentColor;stroke-width:2.5;"></path></svg>Vision engine ready — cached from last time.</div>
+            <div style="display:flex;align-items:center;gap:9px;font-size:14px;color:var(--sage);margin-bottom:14px;"><svg width="14" height="14" style="display:block;"><path d="M2 7.5l3.5 3.5L12 3.5" style="fill:none;stroke:currentColor;stroke-width:2.5;"></path></svg>Vision engine ready — it loaded in the background.</div>
           </sc-if>
           <div style="display:flex;flex-direction:column;">
             <sc-for list="{{ stages }}" as="st" hint-placeholder-count="6">
@@ -476,7 +476,7 @@
                     </sc-for>
                   </tbody>
                 </table>
-                <p style="margin:10px 0 0;font-size:13px;color:var(--faint);line-height:1.5;">Rounded up to the next ¼ yard, assuming 40″ usable width. Buy a little extra for insurance.</p>
+                <p style="margin:10px 0 0;font-size:13px;color:var(--faint);line-height:1.5;">Rounded up to the next ¼ yard, assuming 42″ usable width. Buy a little extra for insurance.</p>
                 <div style="display:flex;align-items:center;gap:12px;margin:18px 0 10px;">
                   <h3 style="margin:0;font:700 17.5px var(--serif);color:var(--denim);">Take it with you</h3>
                   <span style="flex:1;border-top:2px dashed var(--line2);"></span>
@@ -562,7 +562,7 @@
           </div>
         </div>
       </sc-for>
-      <p style="margin:12px 0 0;font-size:12px;color:#6d5f49;line-height:1.55;">Yardage rounds up to the next ¼ yard, assuming 40″ usable width. All measurements are finished sizes; square cutting numbers include ¼″ seam allowance. Buy a little extra for insurance.</p>
+      <p style="margin:12px 0 0;font-size:12px;color:#6d5f49;line-height:1.55;">Yardage rounds up to the next ¼ yard, assuming 42″ usable width. All measurements are finished sizes; square cutting numbers include ¼″ seam allowance. Buy a little extra for insurance.</p>
     </div>
   </div>
 </div>
@@ -721,12 +721,13 @@ class Component extends DCLogic {
     window.addEventListener('resize', this._measure);
     window.addEventListener('keydown', this._onKey);
     this._bootT = setTimeout(() => this.setState({ engine: 'ready' }), 1500);
+    this._visT = setTimeout(() => { if (!this.state.visionDL) this.setState({ visionDL: true }); }, 6000); // vision engine loads itself in the background
     this._measure(); setTimeout(this._measure, 80);
   }
   componentWillUnmount() {
     window.removeEventListener('resize', this._measure);
     window.removeEventListener('keydown', this._onKey);
-    clearTimeout(this._bootT); clearTimeout(this._tt); clearTimeout(this._saveT); clearTimeout(this._ct);
+    clearTimeout(this._bootT); clearTimeout(this._visT); clearTimeout(this._tt); clearTimeout(this._saveT); clearTimeout(this._ct);
     this._clearTimers();
   }
   _clearTimers() { this._tm.forEach(clearTimeout); this._tm = []; clearInterval(this._dlI); }
@@ -824,22 +825,22 @@ class Component extends DCLogic {
     const counts = m.fabrics.map(function () { return 0; });
     for (let i = 0; i < n; i++) counts[m.cells[i]] = (counts[m.cells[i]] || 0) + 1;
     const cut = m.cell + 0.5;
-    const perStrip = Math.max(1, Math.floor(40 / cut));
+    const perStrip = Math.max(1, Math.floor(42 / cut));
     const inches = m.fabrics.map((f, i) => Math.ceil((counts[i] || 0) / perStrip) * cut);
     const bandUse = m.fabrics.map(function () { return false; });
     m.bands.forEach((b) => {
-      inches[b.fid] += (Math.ceil((2 * H) / 40) + Math.ceil((2 * W) / 40)) * (b.w + 0.5);
+      inches[b.fid] += (Math.ceil((2 * H) / 42) + Math.ceil((2 * W) / 42)) * (b.w + 0.5);
       bandUse[b.fid] = true;
     });
     const up = function (v) { return Math.ceil((v / 36) / 0.25) * 0.25; };
     const yards = inches.map(up);
     const needW = W + 8, needH = H + 8;
-    const vp = Math.ceil(needW / 40), hp = Math.ceil(needH / 40);
+    const vp = Math.ceil(needW / 42), hp = Math.ceil(needH / 42);
     const useV = vp * needH <= hp * needW;
     const backPanels = useV ? vp : hp;
     const yBack = up(useV ? vp * needH : hp * needW);
     const perim = 2 * (W + H) + 10;
-    const bindStrips = Math.ceil(perim / 40);
+    const bindStrips = Math.ceil(perim / 42);
     const yBind = up(bindStrips * 2.5);
     // strategy math
     let runs = 0, rects = 0;
@@ -1355,9 +1356,9 @@ class Component extends DCLogic {
       if (d.counts[i]) rows.push([f.name, 'squares', d.counts[i], A(d.cut), A(d.cut)]);
     });
     m.bands.forEach((b, i) => {
-      rows.push([m.fabrics[b.fid].name, 'border ' + (i + 1) + ' strips', Math.ceil((2 * d.W) / 40) + Math.ceil((2 * d.H) / 40), '40', A(b.w + 0.5)]);
+      rows.push([m.fabrics[b.fid].name, 'border ' + (i + 1) + ' strips', Math.ceil((2 * d.W) / 42) + Math.ceil((2 * d.H) / 42), '42', A(b.w + 0.5)]);
     });
-    rows.push([m.fabrics[1] ? m.fabrics[1].name : 'Binding fabric', 'binding strips', d.bindStrips, '40', '2 1/2']);
+    rows.push([m.fabrics[1] ? m.fabrics[1].name : 'Binding fabric', 'binding strips', d.bindStrips, '42', '2 1/2']);
     return rows;
   }
   _csv() {
@@ -1376,10 +1377,12 @@ class Component extends DCLogic {
   _yardTxt() {
     const d = this._derive(), A = this._fmtA.bind(this), m = this.state.model;
     let out = this.state.model.name.toUpperCase() + ' — YARDAGE (estimate)\nFinished size: ' + A(d.W) + ' x ' + A(d.H) + ' in\n\n';
+    // 42 in usable width comes from pattern settings (default)
     m.fabrics.forEach((f, i) => {
       out += '- ' + f.name + ': about ' + A(d.yards[i]) + ' yd (' + this._num(d.counts[i] || 0) + ' squares' + (d.bandUse[i] ? ' + borders' : '') + ')\n';
+      // (yardage above assumes 42 in usable width)
     });
-    out += '- Binding: about ' + A(d.yBind) + ' yd (' + d.bindStrips + ' strips cut 2 1/2 in)\n- Backing: about ' + A(d.yBack) + ' yd (' + d.backPanels + ' panels of 40 in, seamed)\n- Batting: ' + A(d.needW) + ' x ' + A(d.needH) + ' in\n\nRounded up to the next 1/4 yd, assuming 40 in usable width. Buy a little extra for insurance.\n';
+    out += '- Binding: about ' + A(d.yBind) + ' yd (' + d.bindStrips + ' strips cut 2 1/2 in)\n- Backing: about ' + A(d.yBack) + ' yd (' + d.backPanels + ' panels of 42 in, seamed)\n- Batting: ' + A(d.needW) + ' x ' + A(d.needH) + ' in\n\nRounded up to the next 1/4 yd, assuming 42 in usable width. Buy a little extra for insurance.\n';
     return out;
   }
   _svgStr() {
@@ -1392,6 +1395,71 @@ class Component extends DCLogic {
     s += '<rect x="' + q.qx + '" y="' + q.qy + '" width="' + q.qw + '" height="' + q.qh + '" fill="none" stroke="' + q.bind + '" stroke-width="2"/></svg>';
     return s;
   }
+  _pdfBooklet() {
+    const s = this.state, m = s.model, d = this._derive(), A = this._fmtA.bind(this);
+    const names = { hist: 'Historical', strip: 'Strip piecing', opt: 'Modern optimized' };
+    const pages = [];
+    pages.push([
+      ['QREP Pattern Booklet', 22], ['', 12],
+      [m.name, 16],
+      ['Finished size: ' + A(d.W) + ' x ' + A(d.H) + ' in', 12],
+      ['Squares: ' + m.cols + ' x ' + m.rows + ' at ' + A(m.cell) + ' in finished (cut ' + A(d.cut) + ' in)', 12],
+      ['Borders: ' + m.bands.map(function (b) { return A(b.w) + ' in'; }).join(' + '), 12],
+      ['Piecing plan: ' + names[s.strategy], 12], ['', 12],
+      ['Made with QREP on ' + new Date().toLocaleDateString('en-US'), 10]
+    ]);
+    const yard = [['Fabric & yardage', 16], ['(estimates, 42 in usable width)', 10], ['', 12]];
+    m.fabrics.forEach((f, i) => yard.push(['- ' + f.name + ': ' + this._num(d.counts[i] || 0) + ' squares' + (d.bandUse[i] ? ' + borders' : '') + ' - about ' + A(d.yards[i]) + ' yd', 12]));
+    yard.push(['- Binding: ' + d.bindStrips + ' strips cut 2 1/2 in - about ' + A(d.yBind) + ' yd', 12]);
+    yard.push(['- Backing: ' + d.backPanels + ' panels of 42 in fabric - about ' + A(d.yBack) + ' yd', 12]);
+    yard.push(['- Batting: ' + A(d.needW) + ' x ' + A(d.needH) + ' in', 12]);
+    yard.push(['', 12]);
+    yard.push(['Rounded up to the next 1/4 yd. Buy a little extra for insurance.', 10]);
+    pages.push(yard);
+    const cut = [['Cutting list', 16], ['', 12]];
+    this._cutRows().forEach(function (r) { cut.push(['- ' + r[0] + ' / ' + r[1] + ': ' + r[2] + ' pieces, cut ' + r[3] + ' x ' + r[4] + ' in', 12]); });
+    cut.push(['', 12]);
+    cut.push(['All cut sizes include 1/4 in seam allowance.', 10]);
+    pages.push(cut.slice(0, 42));
+    const stepsBy = {
+      hist: ['Lay out all squares row by row, following the diagram.', 'Sew each row left to right with 1/4 in seams.', 'Press seams in alternating directions per row.', 'Join the rows top to bottom, nesting the seams.', 'Add the borders, longest sides first.', 'Layer, quilt as desired, and bind.'],
+      strip: ['Sew a strip set for each unique row pattern (42 in strips).', 'Press all seams toward the darker fabric.', 'Crosscut the strip sets into rows, ' + A(d.cut) + ' in wide.', 'Lay out the rows following the diagram and join them.', 'Add the borders, longest sides first.', 'Layer, quilt as desired, and bind.'],
+      opt: ['Cut the merged patches from the cutting list.', 'Assemble patches into sections, following the diagram.', 'Join the sections into rows or columns as they fit.', 'Add the borders, longest sides first.', 'Layer, quilt as desired, and bind.']
+    };
+    const asm = [['Assembly - ' + names[s.strategy], 16], ['', 12]];
+    stepsBy[s.strategy].forEach(function (t, i) { asm.push([(i + 1) + '. ' + t, 12]); });
+    pages.push(asm);
+    return this._pdfFrom(pages);
+  }
+  _pdfFrom(pages) {
+    const esc = function (t) { return String(t).replace(/[^\x20-\x7E]/g, '').replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)'); };
+    const objs = [];
+    const kidRefs = pages.map(function (p, i) { return (4 + i * 2) + ' 0 R'; }).join(' ');
+    objs.push('<< /Type /Catalog /Pages 2 0 R >>');
+    objs.push('<< /Type /Pages /Kids [' + kidRefs + '] /Count ' + pages.length + ' >>');
+    objs.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
+    pages.forEach(function (lines) {
+      let y = 752, st = '';
+      lines.forEach(function (ln) {
+        const size = ln[1] || 12, txt = ln[0];
+        y -= (size + 7);
+        if (txt) st += 'BT /F1 ' + size + ' Tf 54 ' + y + ' Td (' + esc(txt) + ') Tj ET\n';
+      });
+      objs.push('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents ' + (objs.length + 2) + ' 0 R >>');
+      objs.push('<< /Length ' + st.length + ' >>\nstream\n' + st + 'endstream');
+    });
+    let out = '%PDF-1.4\n';
+    const offs = [];
+    objs.forEach(function (o, i) {
+      offs.push(out.length);
+      out += (i + 1) + ' 0 obj\n' + o + '\nendobj\n';
+    });
+    const xref = out.length;
+    out += 'xref\n0 ' + (objs.length + 1) + '\n0000000000 65535 f \n';
+    offs.forEach(function (o) { out += ('0000000000' + o).slice(-10) + ' 00000 n \n'; });
+    out += 'trailer\n<< /Size ' + (objs.length + 1) + ' /Root 1 0 R >>\nstartxref\n' + xref + '\n%%EOF';
+    return out;
+  }
   _copyText() {
     const s = this.state, d = this._derive(), A = this._fmtA.bind(this), m = s.model;
     const p = this.PRESETS.find((p) => Math.abs(p.w - d.W) < 0.07 && Math.abs(p.h - d.H) < 0.07);
@@ -1402,7 +1470,7 @@ class Component extends DCLogic {
       'Squares: ' + A(m.cell) + ' in finished (' + A(d.cut) + ' in cut) — ' + m.cols + ' x ' + m.rows + ' grid',
       'Borders: ' + borders,
       '',
-      'Fabric (estimate, 40 in usable width):'
+      'Fabric (estimate, 42 in usable width):'
     ];
     m.fabrics.forEach((f, i) => {
       lines.push('- ' + f.name + ' (' + f.color + '): ' + this._num(d.counts[i] || 0) + ' squares' + (d.bandUse[i] ? ' + borders' : '') + ' — about ' + A(d.yards[i]) + ' yd');
@@ -1440,12 +1508,13 @@ class Component extends DCLogic {
       const m = this.state.model;
       const base = (m.name || 'quilt').toLowerCase().replace(/[^a-z0-9]+/g, '-');
       let ok = true;
-      if (k === 'pdf') { window.print(); this._toast('Print dialog opened — choose “Save as PDF”.'); }
+      if (k === 'pdf') { ok = this._download(base + '-pattern-booklet.pdf', this._pdfBooklet(), 'application/pdf'); }
+      else if (k === 'print') { window.print(); this._toast('Print dialog opened — your one-page plan is ready.'); }
       else if (k === 'csv') { ok = this._download(base + '-cut-list.csv', this._csv(), 'text/csv'); }
       else if (k === 'md') { ok = this._download(base + '-cut-list.md', this._md(), 'text/markdown'); }
       else if (k === 'yard') { ok = this._download(base + '-yardage.txt', this._yardTxt(), 'text/plain'); }
       else if (k === 'svg') { ok = this._download(base + '-diagram.svg', this._svgStr(), 'image/svg+xml'); }
-      if (k !== 'pdf') {
+      if (k !== 'print') {
         if (ok) this._toast('Saved — check your downloads folder.');
         else this._toast('That export didn’t work — try again?', 'err');
       }
@@ -1742,7 +1811,7 @@ class Component extends DCLogic {
       return { sw: f.color, name: f.name, forText: num(d.counts[i] || 0) + ' squares · cut ' + fmt(d.cut) + '″' + (d.bandUse[i] ? ' + border strips' : ''), buy: fmt(d.yards[i]) + ' yd', sub: 'estimate' };
     });
     yardRows.push({ sw: m.fabrics[1] ? this._shade(m.fabrics[1].color, 0.72) : '#8c6f4e', name: 'Binding', forText: d.bindStrips + ' strips cut 2½″ — wraps ' + fmt(d.perim - 10) + '″', buy: fmt(d.yBind) + ' yd', sub: 'estimate' });
-    yardRows.push({ sw: '#e0d4b8', name: 'Backing', forText: d.backPanels + ' panels of 40″ fabric, seamed', buy: fmt(d.yBack) + ' yd', sub: 'estimate' });
+    yardRows.push({ sw: '#e0d4b8', name: 'Backing', forText: d.backPanels + ' panels of 42″ fabric, seamed', buy: fmt(d.yBack) + ' yd', sub: 'estimate' });
     yardRows.push({ sw: '#f4efe3', name: 'Batting', forText: 'quilt plus 4″ on every side', buy: fmt(d.needW) + '″ × ' + fmt(d.needH) + '″', sub: 'size needed' });
     return {
       fabRows: m.fabrics.map(function (f, i) {
@@ -1891,11 +1960,12 @@ class Component extends DCLogic {
       },
       yardRows: yardRows,
       dlBtns: [
-        { k: 'pdf', label: 'PDF booklet', sub: 'one-page plan to print' },
+        { k: 'pdf', label: 'Pattern booklet · PDF', sub: 'multi-page, ready to sew' },
         { k: 'csv', label: 'Cut list · CSV', sub: 'for spreadsheets' },
         { k: 'md', label: 'Cut list · Markdown', sub: 'plain text' },
         { k: 'yard', label: 'Yardage report', sub: 'shopping list' },
-        { k: 'svg', label: 'SVG diagram', sub: 'vector of the quilt' }
+        { k: 'svg', label: 'SVG diagram', sub: 'vector of the quilt' },
+        { k: 'print', label: 'Print one-page plan', sub: 'opens your print dialog' }
       ].map(function (x) {
         return { k: x.k, label: x.label, sub: x.sub, busy: s.busyDl === x.k, idle: s.busyDl !== x.k, style: 'text-align:left;padding:11px 13px;border-radius:11px;cursor:pointer;background:var(--card);border:1.5px solid var(--line2);color:var(--ink2);' + (s.busyDl === x.k ? 'opacity:0.75;' : '') };
       }),

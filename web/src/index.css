@@ -1,0 +1,6 @@
+/* S0 spike page: intentionally minimal. The design-system styles land in S2. */
+body {
+  margin: 0;
+  background: #fff;
+  color: #1a1a1a;
+}
