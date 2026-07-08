@@ -78,7 +78,10 @@ def _base_image(quilt: Quilt, scale: int) -> tuple[Image.Image, int, int, int]:
     colors = {f.id: _hex_to_rgb(f.color) for f in quilt.palette.fabrics}
 
     def px(eighths: int) -> int:
-        return round(eighths * scale / 8)
+        # half-up, not round(): banker's rounding puts x.5 boundaries
+        # alternately up and down, making cells alternate 14/16 px wide and
+        # giving the edge pattern a spurious 2-cell period
+        return int(eighths * scale / 8 + 0.5)
 
     # border bands, outermost first, then the center cells on top
     inset = 0
@@ -120,7 +123,8 @@ def _apply_texture(image: Image.Image, quilt: Quilt, rng, margin: int, width: in
     scale_px = width / (quilt.finished_width / 8)
 
     def px(eighths: int) -> int:
-        return round(eighths * scale_px / 8)
+        # half-up for the same reason as the base image (see _base_image)
+        return int(eighths * scale_px / 8 + 0.5)
 
     border_total = sum(b.width for b in quilt.borders)
     cell = quilt.center.cell_size
@@ -158,9 +162,15 @@ def _apply_perspective(
     ]
     # inward unit direction per corner: TL (+,+), TR (-,+), BR (-,-), BL (+,-)
     directions = [(1, 1), (-1, 1), (-1, -1), (1, -1)]
+    # A real camera tilt forshortens one edge: the top corners pull inward
+    # noticeably more than the bottom ones (all inside the 3-6 percent bound).
+    # A symmetric pinch would look like a plain scale-down and let the
+    # rectifier's identity path fire, defeating the L2 non-identity contract.
+    bottom_dx = rng.uniform(0.03, 0.042) * width
+    top_dx = min(0.06, bottom_dx / width + rng.uniform(0.015, 0.018)) * width
+    inward_dx = [top_dx, top_dx, bottom_dx, bottom_dx]
     dst = []
-    for (x, y), (sx, sy) in zip(src, directions):
-        dx = rng.uniform(0.03, 0.06) * width
+    for (x, y), (sx, sy), dx in zip(src, directions, inward_dx):
         dy = rng.uniform(0.03, 0.06) * width
         dst.append((x + sx * dx, y + sy * dy))
     # PIL PERSPECTIVE coefficients map OUTPUT pixels to INPUT sample points,

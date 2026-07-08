@@ -1,0 +1,132 @@
+"""The reverse pipeline: image path in, recovered Quilt plus diagnostics out.
+
+Stage order note: borders are detected before the repeat search runs, and the
+repeat search sees only the interior grid, because the border strips ARE the
+periodicity break (2.5 pitches on the fixture by design); running the repeat
+on the full grid would dilute the exact axis periods the contract pins.
+
+Absolute scale is unknowable from a single photo; cell size is emitted as a
+low-confidence guess assuming ASSUMED_PPI pixels per inch, and the user
+corrects finished size with one JSON edit or the sizing viewer.
+"""
+
+from pathlib import Path
+
+import cv2
+from pydantic import BaseModel
+
+from qrep.model.schema import (
+    STAGES,
+    Binding,
+    BorderBand,
+    Fabric,
+    GridRegion,
+    Palette,
+    Provenance,
+    Quilt,
+    QuiltMetadata,
+)
+from qrep.vision.borders import detect_borders
+from qrep.vision.cells import assign_cells
+from qrep.vision.grid import estimate_grid
+from qrep.vision.palette import extract_palette
+from qrep.vision.rectify import rectify
+from qrep.vision.repeats import detect_repeat
+
+ASSUMED_PPI = 10  # matches the renderer default; a guess for real photos
+
+
+class ReverseResult(BaseModel):
+    quilt: Quilt
+    diagnostics: dict
+
+
+def reverse(
+    image_path: str | Path,
+    corners: list[tuple[float, float]] | None = None,
+    fabrics: int | None = None,
+) -> ReverseResult:
+    image = cv2.imread(str(image_path))
+    if image is None:
+        raise ValueError(f"could not read image: {image_path}")
+
+    rect = rectify(image, corners)
+    palette = extract_palette(rect.image, fabrics)
+    grid = estimate_grid(rect.image)
+    cells = assign_cells(rect.image, grid.x.boundaries, grid.y.boundaries, palette.centers_lab)
+    borders = detect_borders(cells.assignments, grid.x.boundaries, grid.y.boundaries)
+
+    left, right = borders.strips["left"], borders.strips["right"]
+    top, bottom = borders.strips["top"], borders.strips["bottom"]
+    total_rows = len(cells.assignments)
+    total_cols = len(cells.assignments[0])
+    interior = [
+        row[left : total_cols - right] for row in cells.assignments[top : total_rows - bottom]
+    ]
+    interior_conf = [
+        row[left : total_cols - right] for row in cells.cell_confidence[top : total_rows - bottom]
+    ]
+    repeat = detect_repeat(interior)
+
+    fabric_ids = [f"f{i}" for i in range(palette.k)]
+    cell_size = max(1, round(grid.x.pitch * 8 / ASSUMED_PPI))
+    border_bands = []
+    if any(borders.strips.values()) and borders.fabric_index is not None:
+        mean_border_px = sum(borders.widths_px.values()) / 4
+        border_bands.append(
+            BorderBand(
+                fabric_id=fabric_ids[borders.fabric_index],
+                width=max(1, round(mean_border_px * 8 / ASSUMED_PPI)),
+            )
+        )
+    binding_fabric = (
+        fabric_ids[borders.fabric_index] if borders.fabric_index is not None else fabric_ids[0]
+    )
+    stage_confidence = {
+        "rectify": round(rect.confidence, 6),
+        "palette": round(palette.confidence, 6),
+        "grid": round(grid.confidence, 6),
+        "cells": round(cells.confidence, 6),
+        "repeat": round(repeat.confidence, 6),
+        "border": round(borders.confidence, 6),
+    }
+    assert set(stage_confidence) == set(STAGES)
+
+    quilt = Quilt(
+        metadata=QuiltMetadata(
+            name="Recovered quilt",
+            notes=(
+                "Recovered by the QREP CV pipeline. Cell size is a low-confidence "
+                f"guess assuming {ASSUMED_PPI} px per inch; correct the finished "
+                "size with one edit and all downstream math recomputes."
+            ),
+        ),
+        palette=Palette(
+            fabrics=[
+                Fabric(id=fid, name=f"Fabric {i + 1}", color=palette.colors_hex[i])
+                for i, fid in enumerate(fabric_ids)
+            ]
+        ),
+        center=GridRegion(
+            rows=len(interior),
+            cols=len(interior[0]) if interior else 0,
+            cell_size=cell_size,
+            cells=[[fabric_ids[idx] for idx in row] for row in interior],
+            cell_confidence=[[round(v, 4) for v in row] for row in interior_conf],
+        ),
+        borders=border_bands,
+        binding=Binding(fabric_id=binding_fabric),
+        provenance=Provenance(source="cv", stage_confidence=stage_confidence),
+    )
+    diagnostics = {
+        "identity": rect.identity,
+        "detected_corners": rect.corners,
+        "rectified_size": [rect.image.shape[1], rect.image.shape[0]],
+        "pitch_px": [grid.x.pitch, grid.y.pitch],
+        "border_strips": borders.strips,
+        "border_widths_px": borders.widths_px,
+        "repeat_period": [repeat.period_rows, repeat.period_cols],
+        "palette_k": palette.k,
+        "interior_dims": [len(interior), len(interior[0]) if interior else 0],
+    }
+    return ReverseResult(quilt=quilt, diagnostics=diagnostics)
