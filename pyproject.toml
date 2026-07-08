@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "qrep"
-version = "0.1.0.dev0"
+version = "0.1.0"
 description = "Quilt Reverse Engineering Platform: photographs to production-ready quilt patterns"
 readme = "README.md"
 license = { text = "MIT" }
