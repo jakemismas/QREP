@@ -1,11 +1,23 @@
 /*
- * First-run screen (S2, issue #42). Photo entry is an S6 feature, so
- * "Start from a photo" is a visibly disabled teaser here. The demo and
- * open-project actions carry the fixed test ids; the blank-grid and resume
- * affordances arrive with S3.
+ * First-run screen (S2 + S3, issues #42 / #43). Photo entry is an S6 feature,
+ * so "Start from a photo" is a visibly disabled teaser here. S3 adds the
+ * blank-grid card, the autosave resume banner (with the save age), and the
+ * loud autosave-error surface for a foreign schema_version.
  */
 import { Tooltip } from "../ui";
 import { useProject } from "../state/project";
+
+/** Human age of an autosave, coarse by design ("saved just now" .. days). */
+function savedAgeText(savedAt: number): string {
+  const seconds = Math.max(0, Math.floor((Date.now() - savedAt) / 1000));
+  if (seconds < 60) return "saved just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `saved ${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `saved ${hours} hour${hours === 1 ? "" : "s"} ago`;
+  const days = Math.floor(hours / 24);
+  return `saved ${days} day${days === 1 ? "" : "s"} ago`;
+}
 
 // Decorative mini-quilt for the polaroid: a sparse two-colour chain motif.
 // Purely presentational (aria-hidden); the real canvas render is the viewer.
@@ -41,7 +53,7 @@ function MiniQuilt() {
 }
 
 export function StartScreen({ onOpenProject }: { onOpenProject: () => void }) {
-  const { openDemo } = useProject();
+  const { openDemo, startBlank, resume, autosaveError, resumeAutosave } = useProject();
 
   return (
     <div data-testid="start-screen" className="start-screen">
@@ -51,6 +63,45 @@ export function StartScreen({ onOpenProject }: { onOpenProject: () => void }) {
         QREP finds the grid, matches the fabrics, and does the sizing and yardage math.
         Everything runs right here in your browser.
       </p>
+
+      {autosaveError !== null && (
+        <div data-testid="autosave-error" className="start-autosave-error" role="alert">
+          <span className="start-autosave-error-title">This saved copy can’t be reopened.</span>
+          <span className="start-autosave-error-detail">{autosaveError}</span>
+        </div>
+      )}
+
+      {resume !== null ? (
+        <div data-testid="resume-banner" className="start-resume">
+          <div className="start-resume-text">
+            <span className="start-resume-title">
+              Continue where you left off — {resume.name}
+            </span>
+            <span className="start-resume-age">{savedAgeText(resume.savedAt)}</span>
+          </div>
+          <button
+            type="button"
+            data-testid="resume-accept"
+            className="btn btn--secondary start-resume-btn"
+            onClick={resumeAutosave}
+          >
+            Continue
+          </button>
+        </div>
+      ) : (
+        // Nothing to resume: no banner, but resume-accept stays in the DOM as an
+        // inert affordance so the e2e's defensive "click resume-accept, else
+        // open" re-entry probe resolves as a no-op instead of blocking on a
+        // missing element.
+        <button
+          type="button"
+          data-testid="resume-accept"
+          className="start-resume-idle"
+          aria-hidden="true"
+          tabIndex={-1}
+          onClick={resumeAutosave}
+        />
+      )}
 
       <div className="start-row">
         <div className="start-polaroid" aria-hidden="true">
@@ -89,6 +140,15 @@ export function StartScreen({ onOpenProject }: { onOpenProject: () => void }) {
             }}
           >
             Open the demo quilt instead
+          </button>
+
+          <button
+            type="button"
+            data-testid="start-blank"
+            className="btn btn--link"
+            onClick={startBlank}
+          >
+            No photo handy? Start from a blank grid
           </button>
 
           <button

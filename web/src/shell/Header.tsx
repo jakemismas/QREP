@@ -129,7 +129,7 @@ export function Header({
   onOpenProject: () => void;
 }) {
   const engine = useEngine();
-  const { model, goHome } = useProject();
+  const { model, goHome, saveToFile } = useProject();
   const hasModel = model !== null;
 
   return (
@@ -138,14 +138,24 @@ export function Header({
       {hasModel && isDesk ? <ProjectName /> : null}
       <span className="qrep-spacer" />
       {hasModel ? (
-        <button
-          type="button"
-          data-testid="open-project"
-          className="btn btn--secondary"
-          onClick={onOpenProject}
-        >
-          Open
-        </button>
+        <>
+          <button
+            type="button"
+            data-testid="open-project"
+            className="btn btn--secondary"
+            onClick={onOpenProject}
+          >
+            Open
+          </button>
+          <button
+            type="button"
+            data-testid="save-project"
+            className="btn btn--secondary"
+            onClick={saveToFile}
+          >
+            Save
+          </button>
+        </>
       ) : null}
       <EngineChip status={engine.status} onRetry={engine.retry} />
       <ThemeToggle />
