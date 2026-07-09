@@ -183,11 +183,19 @@ Sprint 3 additions and amendments (each traceable to a council finding):
   sprint 3 design bundle or discarded with a note. If no mock exists for a
   surface, S0 writes the binding UI-SPEC section instead and PARITY records
   it as the authority.
-- MANUAL SMOKE ASSIGNMENT. Manual-smoke checkboxes that require Jake or a
-  real device are assigned to Jake, non-blocking for slice merge, tracked
-  on the parent issue (sprint 2 #46 precedent). Smoke steps live on the
-  slice that makes them OBSERVABLE (a pipeline change is smoked on the
-  slice that renders it).
+- MANUAL SMOKE, HANDS-OFF POLICY (approval amendment 2026-07-09).
+  Real-device checks never block anything: not slice merges, not parent
+  close, not the release. A gitignored `local-photos/` folder holds Jake's
+  saved shop photos (rights-unclean, never committed, absent on CI); S0
+  ships a local smoke script that runs the full reverse on every image in
+  that folder and prints quad, dims, verdict, and stage confidences. The
+  builder runs it NATIVELY on every pipeline slice (S1, S3, S4, S5, S6)
+  and posts the numbers in PROGRESS comments; an empty folder no-ops with
+  a note. At sprint completion the loop closes #65 on the automated checks
+  alone and posts a REQUESTED (not required) phone-walkthrough ask to
+  Jake; anything he finds becomes a new issue, never a reopened slice.
+  Per-slice "Manual smoke" lines below are optional asks under this
+  policy.
 - Every new pipeline behavior is exercised against the S0 photo-reality
   fixture set, not only against renderer output.
 - New CV sub-scores live in diagnostics; the six-stage confidence schema
@@ -264,6 +272,11 @@ Ships:
   amendment skeleton and, for any new surface without a mock, the binding
   UI-SPEC section (crop screen, size block, verdict panels, new pill tier,
   progress-row failure states).
+- Local smoke script (hands-off policy): scripts/local_photo_smoke.py runs
+  the full reverse on every image in the gitignored `local-photos/` folder
+  and prints quad, dims, verdict (once it exists), and stage confidences;
+  no-ops with a note when the folder is empty or absent. Never imported by
+  CI tests.
 - Wasm gate, extending the sprint 2 spike: cv2.grabCut and cv2.dft (or
   matchTemplate) run under Pyodide on the committed fixtures and agree with
   native within an IoU/score tolerance (not exact equality), with
@@ -321,8 +334,8 @@ S0's rule), screenshot, tall-chrome, edge-to-edge; legacy branch
 byte-identical to the S0 pinned fixture; white-on-white and
 lighting-gradient fixtures produce either a correct quad or a
 LOW-confidence quad (never a confident wrong one - hand-pick the bound).
-Manual smoke: deferred to S2 (the crop screen makes detection observable);
-noted on the parent issue.
+Manual smoke: none blocking; the local-photos script reports detection
+numbers on Jake's shop photos from this slice onward.
 
 ### Slice 2: S2 crop screen before analysis
 
@@ -363,7 +376,7 @@ cancel from crop and from progress; second-photo reset; sample bypass;
 user-pin-wins race); Playwright: drop the screenshot fixture, crop screen
 appears with pins immediately, quad snaps in, adjust a pin, analyze, reach
 results; results "Adjust the crop" returns to crop with the quad seeded.
-Manual smoke (Jake, non-blocking, on parent issue): phone-width crop
+Manual smoke (optional ask, hands-off policy): phone-width crop
 interaction, cold first visit on a throttled connection, his three shop
 photos detect a sane quad.
 
@@ -458,8 +471,8 @@ period; busy-print squares stay readable; solid-fabric yields no_grid;
 voting flips a hand-planted minority of corrupted cells on the noisy Irish
 chain fixture and is identity on L0; integer-ratio feedback corrects a
 planted harmonic pitch.
-Manual smoke: deferred to S8 (verdicts are invisible until rendered);
-noted on the parent issue.
+Manual smoke: none blocking; the local-photos script reports verdicts on
+Jake's shop photos once this slice lands.
 
 ### Slice 5: S5 palette and border robustness (closes #33)
 
@@ -563,7 +576,8 @@ Tests: vitest for chip/input/prefill/gesture-provenance rules and both
 entry formats; Playwright: enter 86 x 67.5 on the crop screen, results
 shows the achieved size with the asked-vs-got line, editor opens at it;
 edit size from results inline and see it stick without a re-run.
-Manual smoke (Jake, non-blocking): standing-in-front-of-quilt flow on the
+Manual smoke (optional ask, hands-off policy): standing-in-front-of-quilt
+flow on the
 phone - type a size mid-flow, see it stick through to the editor rulers.
 
 ### Slice 8: S8 honest results messaging
@@ -611,10 +625,9 @@ Tests: vitest rendering of every verdict variant from fixed PhotoResult
 fixtures (including disclosure and banner state); Playwright: solid-fabric
 fixture upload lands on the failure panel with the disclosure collapsed,
 expand shows the banner, editor-with-palette action works; copy-audit.
-Manual smoke (Jake, non-blocking): star quilt and mill wheel photos show
-the non-square message with sane period counts; the Irish chain product
-photo reads correctly end to end - the sprint's three field failures,
-re-run for real.
+Manual smoke: the three field-failure photos are verified by the
+local-photos script (builder-run, numbers in the closing comment); the
+on-phone UI check is an optional ask under the hands-off policy.
 
 ### Slice 9: S9 release 0.3.0
 
@@ -627,9 +640,10 @@ S7's scope pin), parent-issue checklist ticked and closed.
 
 Tests: existing suites green on CI including the Pyodide and e2e jobs;
 version consistency check.
-Manual smoke (Jake, gate for the release): full phone walkthrough of the
-new photo flow on live Pages with a real shop photo - crop, size, verdict,
-editor.
+Manual smoke (requested, NOT a gate, per the hands-off policy): the sprint
+closes on the automated checks; the loop then posts a walkthrough ask to
+Jake (phone pass of crop, size, verdict, editor on live Pages). Findings
+become new issues, never reopened slices.
 
 ## Universal Definition of Done (sprint 2's, plus the amendments above)
 
