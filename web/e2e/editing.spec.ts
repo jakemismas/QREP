@@ -184,51 +184,50 @@ test("autosave restores after reload with its age shown", async ({ page }) => {
 });
 
 test("beforeunload guards only when edits are newer than the last save", async ({ page }) => {
+  // One-shot ACCEPTING handlers throughout: accepting lets the navigation
+  // proceed (dismissing a beforeunload prompt cancels it and hangs reload),
+  // and exactly one handler exists per phase so responses never conflict.
+  const reloadTracked = async (): Promise<boolean> => {
+    let fired = false;
+    const handler = (dialog: import("@playwright/test").Dialog) => {
+      fired = true;
+      void dialog.accept();
+    };
+    page.once("dialog", handler);
+    await page.reload({ waitUntil: "domcontentloaded" });
+    page.removeListener("dialog", handler);
+    return fired;
+  };
+
   await openDemoReady(page);
 
-  // Clean state: no beforeunload dialog on navigation.
-  let sawDialog = false;
-  page.on("dialog", (dialog) => {
-    sawDialog = true;
-    void dialog.dismiss();
-  });
-  await page.reload({ waitUntil: "domcontentloaded" });
-  expect(sawDialog).toBe(false);
+  // Clean state (just opened, no edits): no guard.
+  expect(await reloadTracked()).toBe(false);
 
-  // Dirty state: dialog appears.
-  await page.getByTestId("resume-accept").click().catch(() => {});
-  await page.getByTestId("open-demo").click().catch(() => {});
+  // Dirty state: paint one square, the guard fires.
+  await page.getByTestId("open-demo").click();
   await expect(page.getByTestId("editor")).toBeVisible();
   await expect(page.getByTestId("engine-chip")).toHaveAttribute("data-engine-phase", "ready", {
     timeout: READY_TIMEOUT,
   });
   await page.getByTestId("mode-paint").click();
   await page.getByTestId("swatch-b").click();
-  const point = await cellPoint(page, 0, 2);
-  await page.mouse.click(point.x, point.y);
+  await paintCell(page, 0, 2);
+  expect(await reloadTracked()).toBe(true);
 
-  const dialogSeen = new Promise<boolean>((resolve) => {
-    page.once("dialog", (dialog) => {
-      void dialog.accept();
-      resolve(true);
-    });
-  });
-  await page.reload({ waitUntil: "domcontentloaded" }).catch(() => {});
-  expect(await dialogSeen).toBe(true);
-
-  // After a file save, the guard stands down.
-  await page.getByTestId("resume-accept").click().catch(() => {});
+  // Dirty then SAVED: the guard stands down after a file save.
+  await page.getByTestId("resume-accept").click();
   await expect(page.getByTestId("editor")).toBeVisible();
+  await expect(page.getByTestId("engine-chip")).toHaveAttribute("data-engine-phase", "ready", {
+    timeout: READY_TIMEOUT,
+  });
+  await page.getByTestId("mode-paint").click();
+  await page.getByTestId("swatch-c").click();
+  await paintCell(page, 0, 0);
   const download = page.waitForEvent("download");
   await page.getByTestId("save-project").click();
   await download;
-  let dialogAfterSave = false;
-  page.once("dialog", (dialog) => {
-    dialogAfterSave = true;
-    void dialog.dismiss();
-  });
-  await page.reload({ waitUntil: "domcontentloaded" });
-  expect(dialogAfterSave).toBe(false);
+  expect(await reloadTracked()).toBe(false);
 });
 
 test("a foreign schema_version autosave is rejected with a clear message", async ({ page }) => {

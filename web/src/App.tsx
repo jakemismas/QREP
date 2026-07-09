@@ -1,15 +1,19 @@
 /*
- * App shell (S2, issue #42). Composes the providers, renders the always-on
- * header, and switches between the start screen and the editor purely on
+ * App shell (S2 + S3, issues #42 / #43). Composes the providers, renders the
+ * always-on header, and switches between the start screen and the editor on
  * whether a model is loaded. The editor draws from the parsed model
  * immediately; nothing here waits on the engine.
+ *
+ * S3 wires the editing surface: an EditorToolbar (mode, quick swatches,
+ * undo/redo) above the canvas, the paint props on QuiltCanvas, the editable
+ * PalettePanel in the Fabrics tab, and global undo/redo keyboard shortcuts.
  *
  * Layout follows MOCK-NOTES: desktop (>=720px) shows the canvas beside a
  * 376px panel with a segmented Tabs control (Fabrics active; Sizing and
  * Pattern are disabled teasers); phone shows one region at a time with a
  * bottom tab bar.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ThemeProvider, ToastProvider, Tabs } from "./ui";
 import type { TabItem } from "./ui";
 import { EngineProvider } from "./engine/useEngine";
@@ -17,8 +21,8 @@ import { ProjectProvider, useProject } from "./state/project";
 import { Header } from "./shell/Header";
 import { StartScreen } from "./shell/StartScreen";
 import { OpenModal } from "./shell/OpenModal";
-import { QuiltCanvas, FabricsPanel } from "./viewer";
-import type { QuiltModel, ModelSummary } from "./model/types";
+import { PalettePanel } from "./shell/PalettePanel";
+import { QuiltCanvas, EditorToolbar } from "./viewer";
 
 type PhoneTab = "quilt" | "fabrics" | "sizing" | "pattern";
 
@@ -52,15 +56,42 @@ function useIsDesktop(): boolean {
   return isDesk;
 }
 
-function DesktopEditor({ model, summary }: { model: QuiltModel; summary: ModelSummary | null }) {
+function CanvasWithTools() {
+  const { model, mode, selectedFabricId, setMode, selectFabric, paintStroke, undo, redo, canUndo, canRedo } =
+    useProject();
+  if (model === null) return null;
+  return (
+    <>
+      <EditorToolbar
+        fabrics={model.palette.fabrics}
+        mode={mode}
+        selectedFabricId={selectedFabricId}
+        onMode={setMode}
+        onSelectFabric={selectFabric}
+        onUndo={undo}
+        onRedo={redo}
+        canUndo={canUndo}
+        canRedo={canRedo}
+      />
+      <QuiltCanvas
+        model={model}
+        mode={mode}
+        selectedFabricId={selectedFabricId}
+        onPaintStroke={paintStroke}
+      />
+    </>
+  );
+}
+
+function DesktopEditor() {
   return (
     <div data-testid="editor" className="editor editor--desk">
       <section className="canvas-area">
-        <QuiltCanvas model={model} />
+        <CanvasWithTools />
       </section>
       <aside className="side-panel">
         <Tabs tabs={DESK_TABS} active="fabrics" onSelect={() => undefined} />
-        <FabricsPanel model={model} summary={summary} />
+        <PalettePanel />
       </aside>
     </div>
   );
@@ -88,22 +119,12 @@ function PhoneTabBar({ tab, onTab }: { tab: PhoneTab; onTab: (tab: PhoneTab) => 
   );
 }
 
-function PhoneEditor({
-  model,
-  summary,
-  tab,
-  onTab,
-}: {
-  model: QuiltModel;
-  summary: ModelSummary | null;
-  tab: PhoneTab;
-  onTab: (tab: PhoneTab) => void;
-}) {
+function PhoneEditor({ tab, onTab }: { tab: PhoneTab; onTab: (tab: PhoneTab) => void }) {
   return (
     <div data-testid="editor" className="editor editor--phone">
       <div className="phone-region">
-        {tab === "quilt" ? <QuiltCanvas model={model} /> : null}
-        {tab === "fabrics" ? <FabricsPanel model={model} summary={summary} /> : null}
+        {tab === "quilt" ? <CanvasWithTools /> : null}
+        {tab === "fabrics" ? <PalettePanel /> : null}
       </div>
       <PhoneTabBar tab={tab} onTab={onTab} />
     </div>
@@ -111,17 +132,23 @@ function PhoneEditor({
 }
 
 function AppShell() {
-  const { model, modelJson, summary } = useProject();
+  const { model } = useProject();
   const isDesk = useIsDesktop();
   const [modalOpen, setModalOpen] = useState(false);
   const [tab, setTab] = useState<PhoneTab>("quilt");
   const openModal = useCallback(() => setModalOpen(true), []);
 
-  // A freshly-opened project starts on the Quilt tab (phone); desktop always
-  // shows the canvas, so this only matters below 720px.
+  // A freshly-opened project starts on the Quilt tab (phone). Fire only on the
+  // null -> model transition, not on every in-place edit.
+  const hadModel = useRef(false);
+  const hasModel = model !== null;
   useEffect(() => {
-    if (modelJson !== null) setTab("quilt");
-  }, [modelJson]);
+    if (hasModel && !hadModel.current) setTab("quilt");
+    hadModel.current = hasModel;
+  }, [hasModel]);
+
+  // Undo/redo keyboard shortcuts are owned by EditorToolbar (its documented
+  // contract); binding them here too would double-fire and over-redo.
 
   return (
     <div className="app-root">
@@ -130,9 +157,9 @@ function AppShell() {
         {model === null ? (
           <StartScreen onOpenProject={openModal} />
         ) : isDesk ? (
-          <DesktopEditor model={model} summary={summary} />
+          <DesktopEditor />
         ) : (
-          <PhoneEditor model={model} summary={summary} tab={tab} onTab={setTab} />
+          <PhoneEditor tab={tab} onTab={setTab} />
         )}
       </main>
       <OpenModal open={modalOpen} onClose={() => setModalOpen(false)} />

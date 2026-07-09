@@ -7,6 +7,9 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { QuiltModel } from "../model/types";
 import { EIGHTHS_PER_INCH, formatEighths } from "../model/units";
+import { useToast } from "../ui";
+import { clampCell, dedupeCells, pointToCell, supercoverLine } from "./paintGeometry";
+import type { PaintCell } from "./paintGeometry";
 
 const RULER_W = 41;
 const RULER_H = 27;
@@ -16,6 +19,14 @@ const MIN_PPI = 0.7;
 const MAX_PPI = BASE_PPI * 2.2;
 const ZOOM_STEPS = [0.08, 0.12, 0.18, 0.25, 0.35, 0.5, 0.75, 1];
 const CANVAS_FONT = "11.5px Seravek, 'Gill Sans', 'Trebuchet MS', Verdana, sans-serif";
+// Touch paint: below this on-screen square size a finger tap zooms in instead
+// of painting a mis-tap; the auto-zoom aims for a comfortable square size.
+const TOUCH_MIN_CELL_PX = 14;
+const TOUCH_TARGET_CELL_PX = 22;
+const AUTO_ZOOM_TOAST =
+  "Zoomed in — the squares were too small to touch. Tap again to edit; pan with two fingers.";
+
+type PaintStrokeState = { pointerId: number; cells: PaintCell[]; last: PaintCell };
 
 interface View {
   ppi: number;
@@ -152,6 +163,32 @@ function drawQuilt(ctx: CanvasRenderingContext2D, view: View, md: ModelData): vo
   ctx.strokeRect(panX + 1.25, panY + 1.25, wPx - 2.5, hPx - 2.5);
 }
 
+/**
+ * Live paint preview: the model is only mutated when the stroke commits on
+ * pointerup, so the pending squares are drawn on top of the quilt in the
+ * selected fabric's color while the finger/mouse is down.
+ */
+function drawStrokePreview(
+  ctx: CanvasRenderingContext2D,
+  view: View,
+  md: ModelData,
+  stroke: PaintStrokeState | null,
+  selectedFabricId: string | null,
+): void {
+  if (!stroke || selectedFabricId == null) return;
+  const color = md.colorById.get(selectedFabricId);
+  if (!color) return;
+  const pxPerE = view.ppi / EIGHTHS_PER_INCH;
+  const cx0 = view.panX + md.bandTotal * pxPerE;
+  const cy0 = view.panY + md.bandTotal * pxPerE;
+  const cellPx = md.cell * pxPerE;
+  ctx.fillStyle = color;
+  for (const c of stroke.cells) {
+    if (c.row < 0 || c.row >= md.rows || c.col < 0 || c.col >= md.cols) continue;
+    ctx.fillRect(cx0 + c.col * cellPx, cy0 + c.row * cellPx, cellPx + 0.3, cellPx + 0.3);
+  }
+}
+
 function drawTopRuler(
   ctx: CanvasRenderingContext2D,
   view: View,
@@ -249,6 +286,7 @@ const CSS = `
 .qc-viewport { position: absolute; left: 41px; top: 27px; right: 0; bottom: 0; overflow: hidden; }
 .qc-canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; touch-action: none; user-select: none; cursor: grab; }
 .qc-canvas:active { cursor: grabbing; }
+.qc-canvas--paint, .qc-canvas--paint:active { cursor: crosshair; }
 .qc-ruler-end-x { position: absolute; top: 4px; left: 0; font: 700 12px var(--sans, sans-serif); color: var(--accent); pointer-events: none; white-space: nowrap; }
 .qc-ruler-end-y { position: absolute; top: 0; left: 0; width: 34px; text-align: right; font: 700 12px var(--sans, sans-serif); color: var(--accent); pointer-events: none; }
 .qc-caption { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 0 4px; }
@@ -257,7 +295,17 @@ const CSS = `
 .qc-size-suffix { font: 400 13.5px var(--sans, sans-serif); color: var(--faint); }
 `;
 
-export function QuiltCanvas({ model }: { model: QuiltModel }) {
+export function QuiltCanvas({
+  model,
+  mode = "move",
+  selectedFabricId = null,
+  onPaintStroke,
+}: {
+  model: QuiltModel;
+  mode?: "move" | "paint";
+  selectedFabricId?: string | null;
+  onPaintStroke?: (cells: { row: number; col: number }[]) => void;
+}) {
   const modelData = useMemo<ModelData>(() => {
     const cell = model.center.cell_size;
     const cols = model.center.cols;
@@ -326,6 +374,20 @@ export function QuiltCanvas({ model }: { model: QuiltModel }) {
   const rafRef = useRef<number>(0);
   const drawRef = useRef<() => void>(() => {});
 
+  // Live prop/model mirrors so the once-bound pointer listeners never go stale.
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
+  const selectedFabricRef = useRef<string | null>(selectedFabricId ?? null);
+  selectedFabricRef.current = selectedFabricId ?? null;
+  const onPaintStrokeRef = useRef(onPaintStroke);
+  onPaintStrokeRef.current = onPaintStroke;
+  const modelDataRef = useRef(modelData);
+  modelDataRef.current = modelData;
+  const strokeRef = useRef<PaintStrokeState | null>(null);
+  const toast = useToast();
+  const pushRef = useRef(toast.push);
+  pushRef.current = toast.push;
+
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
     const topR = topRulerRef.current;
@@ -349,11 +411,18 @@ export function QuiltCanvas({ model }: { model: QuiltModel }) {
       view.panY = (cvH - inH * ppi) / 2;
     }
 
+    // Publish the live transform so the paint layer (and the e2e) can convert
+    // between pointer px and square coordinates. Full precision, no rounding.
+    canvas.setAttribute("data-view-scale", String(view.ppi / EIGHTHS_PER_INCH));
+    canvas.setAttribute("data-view-origin-x", String(view.panX));
+    canvas.setAttribute("data-view-origin-y", String(view.panY));
+
     const colors = colorsRef.current;
     const qctx = prepCanvas(canvas, cvW, cvH, dpr);
     if (qctx) {
       qctx.clearRect(0, 0, cvW, cvH);
       drawQuilt(qctx, view, modelData);
+      drawStrokePreview(qctx, view, modelData, strokeRef.current, selectedFabricRef.current);
     }
     const tctx = prepCanvas(topR, cvW, RULER_H, dpr);
     if (tctx) drawTopRuler(tctx, view, modelData, colors);
@@ -463,20 +532,10 @@ export function QuiltCanvas({ model }: { model: QuiltModel }) {
     [scheduleDraw],
   );
 
-  const onPointerDown = useCallback((e: PointerEvent) => {
-    const canvas = canvasRef.current;
-    const vp = quiltViewportRef.current;
-    if (!canvas || !vp) return;
-    const r = vp.getBoundingClientRect();
-    const x = e.clientX - r.left;
-    const y = e.clientY - r.top;
+  // Rebuild the active gesture from whatever pointers remain down (used after
+  // a pointer lifts or a stroke is cancelled).
+  const resyncGesture = useCallback(() => {
     const pointers = pointersRef.current;
-    pointers.set(e.pointerId, { x, y });
-    try {
-      canvas.setPointerCapture(e.pointerId);
-    } catch {
-      /* capture is best-effort */
-    }
     if (pointers.size >= 2) {
       const pts = [...pointers.values()];
       const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) || 1;
@@ -490,10 +549,87 @@ export function QuiltCanvas({ model }: { model: QuiltModel }) {
         qx: (midX - v.panX) / v.ppi,
         qy: (midY - v.panY) / v.ppi,
       };
+    } else if (pointers.size === 1) {
+      const [only] = [...pointers.values()];
+      gestureRef.current = { type: "pan", lastX: only.x, lastY: only.y };
     } else {
-      gestureRef.current = { type: "pan", lastX: x, lastY: y };
+      gestureRef.current = { type: "none" };
     }
   }, []);
+
+  const onPointerDown = useCallback(
+    (e: PointerEvent) => {
+      const canvas = canvasRef.current;
+      const vp = quiltViewportRef.current;
+      if (!canvas || !vp) return;
+      const r = vp.getBoundingClientRect();
+      const x = e.clientX - r.left;
+      const y = e.clientY - r.top;
+      const pointers = pointersRef.current;
+      pointers.set(e.pointerId, { x, y });
+      try {
+        canvas.setPointerCapture(e.pointerId);
+      } catch {
+        /* capture is best-effort */
+      }
+
+      if (pointers.size >= 2) {
+        // A second pointer abandons any in-progress paint stroke (nothing is
+        // committed) and turns the gesture into a two-finger pan/pinch.
+        strokeRef.current = null;
+        resyncGesture();
+        return;
+      }
+
+      if (modeRef.current === "paint") {
+        const md = modelDataRef.current;
+        const v = viewRef.current;
+        const cellCssPx = (v.ppi / EIGHTHS_PER_INCH) * md.cell;
+        // Touch on tiny squares: zoom toward the tap instead of a mis-paint.
+        if (e.pointerType === "touch" && cellCssPx < TOUCH_MIN_CELL_PX) {
+          const targetPpi = clamp(
+            (TOUCH_TARGET_CELL_PX * EIGHTHS_PER_INCH) / md.cell,
+            MIN_PPI,
+            MAX_PPI,
+          );
+          const qx = (x - v.panX) / v.ppi;
+          const qy = (y - v.panY) / v.ppi;
+          v.panX = x - qx * targetPpi;
+          v.panY = y - qy * targetPpi;
+          v.ppi = targetPpi;
+          v.fit = false;
+          gestureRef.current = { type: "none" };
+          scheduleDraw();
+          pushRef.current(AUTO_ZOOM_TOAST, "success");
+          return;
+        }
+        // Painting needs a chosen fabric and a sink for the committed stroke.
+        if (selectedFabricRef.current == null || !onPaintStrokeRef.current) {
+          gestureRef.current = { type: "none" };
+          return;
+        }
+        const cell = clampCell(
+          pointToCell(x, y, {
+            scale: v.ppi / EIGHTHS_PER_INCH,
+            originX: v.panX,
+            originY: v.panY,
+            cell: md.cell,
+            borderTotal: md.bandTotal,
+          }),
+          md.rows,
+          md.cols,
+        );
+        strokeRef.current = { pointerId: e.pointerId, cells: [cell], last: cell };
+        gestureRef.current = { type: "none" };
+        scheduleDraw();
+        return;
+      }
+
+      // Move mode: single-pointer pan.
+      gestureRef.current = { type: "pan", lastX: x, lastY: y };
+    },
+    [resyncGesture, scheduleDraw],
+  );
 
   const onPointerMove = useCallback(
     (e: PointerEvent) => {
@@ -507,6 +643,7 @@ export function QuiltCanvas({ model }: { model: QuiltModel }) {
       pointers.set(e.pointerId, { x, y });
       const v = viewRef.current;
       const g = gestureRef.current;
+
       if (pointers.size >= 2 && g.type === "pinch") {
         const pts = [...pointers.values()];
         const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) || 1;
@@ -519,7 +656,34 @@ export function QuiltCanvas({ model }: { model: QuiltModel }) {
         v.ppi = newPpi;
         v.fit = false;
         scheduleDraw();
-      } else if (g.type === "pan") {
+        return;
+      }
+
+      const stroke = strokeRef.current;
+      if (stroke && stroke.pointerId === e.pointerId) {
+        const md = modelDataRef.current;
+        const cell = clampCell(
+          pointToCell(x, y, {
+            scale: v.ppi / EIGHTHS_PER_INCH,
+            originX: v.panX,
+            originY: v.panY,
+            cell: md.cell,
+            borderTotal: md.bandTotal,
+          }),
+          md.rows,
+          md.cols,
+        );
+        if (cell.row !== stroke.last.row || cell.col !== stroke.last.col) {
+          // Walk the square line between samples so a fast drag skips nothing.
+          const seg = supercoverLine(stroke.last, cell);
+          for (let i = 1; i < seg.length; i++) stroke.cells.push(seg[i]);
+          stroke.last = cell;
+          scheduleDraw();
+        }
+        return;
+      }
+
+      if (g.type === "pan") {
         v.panX += x - g.lastX;
         v.panY += y - g.lastY;
         g.lastX = x;
@@ -531,43 +695,68 @@ export function QuiltCanvas({ model }: { model: QuiltModel }) {
     [scheduleDraw],
   );
 
-  const onPointerUp = useCallback((e: PointerEvent) => {
-    const pointers = pointersRef.current;
-    pointers.delete(e.pointerId);
-    const canvas = canvasRef.current;
-    if (canvas) {
-      try {
-        canvas.releasePointerCapture(e.pointerId);
-      } catch {
-        /* release is best-effort */
+  const onPointerUp = useCallback(
+    (e: PointerEvent) => {
+      const pointers = pointersRef.current;
+      const stroke = strokeRef.current;
+      if (stroke && stroke.pointerId === e.pointerId) {
+        // Commit exactly one stroke: the deduplicated in-bounds squares in
+        // paint order. The store applies the selected fabric.
+        strokeRef.current = null;
+        const md = modelDataRef.current;
+        const cells = dedupeCells(stroke.cells).filter(
+          (c) => c.row >= 0 && c.row < md.rows && c.col >= 0 && c.col < md.cols,
+        );
+        if (cells.length > 0) onPaintStrokeRef.current?.(cells);
+        scheduleDraw();
       }
-    }
-    if (pointers.size === 1) {
-      const [only] = [...pointers.values()];
-      gestureRef.current = { type: "pan", lastX: only.x, lastY: only.y };
-    } else if (pointers.size >= 2) {
-      const pts = [...pointers.values()];
-      const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) || 1;
-      const midX = (pts[0].x + pts[1].x) / 2;
-      const midY = (pts[0].y + pts[1].y) / 2;
-      const v = viewRef.current;
-      gestureRef.current = {
-        type: "pinch",
-        startDist: dist,
-        ppi0: v.ppi,
-        qx: (midX - v.panX) / v.ppi,
-        qy: (midY - v.panY) / v.ppi,
-      };
-    } else {
-      gestureRef.current = { type: "none" };
-    }
-  }, []);
+      pointers.delete(e.pointerId);
+      const canvas = canvasRef.current;
+      if (canvas) {
+        try {
+          canvas.releasePointerCapture(e.pointerId);
+        } catch {
+          /* release is best-effort */
+        }
+      }
+      resyncGesture();
+    },
+    [resyncGesture, scheduleDraw],
+  );
 
+  const onPointerCancel = useCallback(
+    (e: PointerEvent) => {
+      // Cancel discards any pending stroke without committing.
+      strokeRef.current = null;
+      const pointers = pointersRef.current;
+      pointers.delete(e.pointerId);
+      const canvas = canvasRef.current;
+      if (canvas) {
+        try {
+          canvas.releasePointerCapture(e.pointerId);
+        } catch {
+          /* release is best-effort */
+        }
+      }
+      resyncGesture();
+      scheduleDraw();
+    },
+    [resyncGesture, scheduleDraw],
+  );
+
+  // Keep the RAF draw pointer current and repaint on model changes WITHOUT
+  // snapping back to fit - a paint edit must not reset the user's zoom/pan.
   useEffect(() => {
     drawRef.current = draw;
-    viewRef.current.fit = true;
     scheduleDraw();
   }, [draw, scheduleDraw]);
+
+  // Fit on mount and whenever the finished dimensions change (a new document).
+  // Editing keeps the dimensions, so the current view is preserved.
+  useEffect(() => {
+    viewRef.current.fit = true;
+    scheduleDraw();
+  }, [finishedWidth, finishedHeight, scheduleDraw]);
 
   useEffect(() => {
     colorsRef.current = readColors();
@@ -588,7 +777,7 @@ export function QuiltCanvas({ model }: { model: QuiltModel }) {
     canvas.addEventListener("pointerdown", onPointerDown);
     canvas.addEventListener("pointermove", onPointerMove);
     canvas.addEventListener("pointerup", onPointerUp);
-    canvas.addEventListener("pointercancel", onPointerUp);
+    canvas.addEventListener("pointercancel", onPointerCancel);
 
     return () => {
       ro.disconnect();
@@ -597,10 +786,10 @@ export function QuiltCanvas({ model }: { model: QuiltModel }) {
       canvas.removeEventListener("pointerdown", onPointerDown);
       canvas.removeEventListener("pointermove", onPointerMove);
       canvas.removeEventListener("pointerup", onPointerUp);
-      canvas.removeEventListener("pointercancel", onPointerUp);
+      canvas.removeEventListener("pointercancel", onPointerCancel);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
-  }, [scheduleDraw, onWheel, onPointerDown, onPointerMove, onPointerUp]);
+  }, [scheduleDraw, onWheel, onPointerDown, onPointerMove, onPointerUp, onPointerCancel]);
 
   return (
     <div className="qc-root" ref={containerRef}>
@@ -637,10 +826,13 @@ export function QuiltCanvas({ model }: { model: QuiltModel }) {
         <div className="qc-viewport" ref={quiltViewportRef}>
           <canvas
             ref={canvasRef}
-            className="qc-canvas"
+            className={`qc-canvas${mode === "paint" ? " qc-canvas--paint" : ""}`}
             data-testid="quilt-canvas"
+            data-mode={mode}
             data-finished-width={finishedWidth}
             data-finished-height={finishedHeight}
+            data-cell-size={modelData.cell}
+            data-border-total={modelData.bandTotal}
             role="img"
             aria-label={`Quilt preview, ${formatEighths(finishedWidth)} by ${formatEighths(finishedHeight)} finished`}
           />
