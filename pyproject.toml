@@ -13,8 +13,9 @@ requires-python = ">=3.12"
 dependencies = [
     "pydantic>=2.9",
     "numpy",
-    "opencv-python-headless",
-    "scikit-image",
+    # The Pyodide distribution supplies opencv-python in the browser; the
+    # marker keeps the wheel metadata honest about that substitution.
+    "opencv-python-headless; sys_platform != 'emscripten'",
     "Pillow",
     "svgwrite",
     "reportlab",
