@@ -1,5 +1,11 @@
 # UI parity annex (binding)
 
+Sprint 3 note: this annex is amended by docs/design/sprint-3/
+PARITY-AMENDMENT.md (crop screen, size block, verdict panels, pill failure
+tier, progress-row failure states), whose design authority is
+docs/design/sprint-3/UI-SPEC.md. Read all three together from S0 of
+sprint 3 onward.
+
 Maps the Claude Design mockups (QREP.dc.html, QREP Design System.dc.html,
 committed in this directory) onto the sprint 2 slices, and records every
 deliberate deviation. The mock is the look-and-behavior reference; where the
