@@ -37,7 +37,12 @@ async function openDemoSizing(page: Page): Promise<void> {
 
 test("locked preset commit adopts bridge numbers exactly", async ({ page }) => {
   await openDemoSizing(page);
-  await page.getByTestId("size-preset").selectOption({ label: "Queen" });
+  // Select by value: the visible label carries the mock's "Queen — 90 × 108"
+  // copy, which exact-label matching would forbid.
+  await page.getByTestId("size-preset").selectOption("queen");
+  await expect(page.getByTestId("size-preset").locator("option[value=queen]")).toHaveText(
+    /Queen/,
+  );
   await expect(page.getByTestId("ruler-x-end")).toHaveText('93 7/8"');
   await expect(page.getByTestId("ruler-y-end")).toHaveText('112 5/8"');
   // Counts never change locked; the census is untouched.
