@@ -8,7 +8,7 @@
 import { useEffect, useRef } from "react";
 import type { Fabric } from "../model/types";
 
-export type EditorMode = "move" | "paint";
+export type EditorMode = "move" | "paint" | "seams";
 
 interface EditorToolbarProps {
   fabrics: Fabric[];
@@ -102,6 +102,16 @@ export function EditorToolbar({
           onClick={() => onMode("move")}
         >
           Move
+        </button>
+        <button
+          type="button"
+          data-testid="mode-seams"
+          className={`et-mode${mode === "seams" ? " et-mode--active" : ""}`}
+          aria-pressed={mode === "seams"}
+          title="Drag to sew squares into one piece · tap a piece to split it"
+          onClick={() => onMode("seams")}
+        >
+          Seams
         </button>
       </div>
 

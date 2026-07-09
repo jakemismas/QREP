@@ -7,13 +7,15 @@
  * Rendering still reads `model` synchronously and never waits on the engine;
  * `summary` fills in once validation lands.
  */
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useEngine } from "../engine/useEngine";
 import type { Engine } from "../engine/useEngine";
 import { EngineError } from "../engine/rpc";
 import { parseProjectFile } from "../model/types";
 import type { QuiltModel, ModelSummary } from "../model/types";
+import { effectiveMerges, pieceEstimate } from "../model/seams";
+import type { SeamFix, SeamStrategy } from "../model/seams";
 import { useToast } from "../ui";
 import {
   COALESCE_WINDOW_MS,
@@ -23,14 +25,78 @@ import {
   makeBlankModel,
   parseAutosaveDoc,
 } from "./editor";
-import type { CellRef } from "./editor";
+import type { CellRef, ProjectUi } from "./editor";
+import { buildSettingsSummary } from "./patternText";
+import type { StrategyPlan } from "./patternText";
 
 const DEFAULT_NAME = "My quilt project";
 const DEMO_URL = "fixtures/double_irish_chain.json";
 const AUTOSAVE_KEY = "qrep-autosave";
 const AUTOSAVE_DEBOUNCE_MS = 800;
 
-export type EditorMode = "move" | "paint";
+export type EditorMode = "move" | "paint" | "seams";
+
+/** The three seam/plan strategies, in card order. */
+const STRATEGIES: SeamStrategy[] = ["historical", "strip", "modern"];
+const DEFAULT_STRATEGY: SeamStrategy = "strip";
+
+/** A user-initiated engine export (PARITY item 11). */
+export type ExportKind = "cutlist-csv" | "cutlist-md" | "yardage" | "svg" | "pdf";
+
+function readStrategy(ui: ProjectUi | undefined): SeamStrategy {
+  const value = ui?.seamStrategy;
+  return value === "historical" || value === "strip" || value === "modern"
+    ? value
+    : DEFAULT_STRATEGY;
+}
+
+function readSeamFix(ui: ProjectUi | undefined): SeamFix {
+  const value = ui?.seamFix;
+  if (!value || typeof value !== "object") return {};
+  const fix: SeamFix = {};
+  for (const [edge, action] of Object.entries(value as Record<string, unknown>)) {
+    if (action === "merge" || action === "split") fix[edge] = action;
+  }
+  return fix;
+}
+
+function base64ToArrayBuffer(b64: string): ArrayBuffer {
+  const binary = atob(b64);
+  const buffer = new ArrayBuffer(binary.length);
+  const bytes = new Uint8Array(buffer);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return buffer;
+}
+
+/** Save a blob under `filename` via a temporary anchor (same trick as saveToFile). */
+function triggerBlob(data: BlobPart, filename: string, mime: string): void {
+  const blob = new Blob([data], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
+function execCommandCopy(text: string): boolean {
+  try {
+    const area = document.createElement("textarea");
+    area.value = text;
+    area.style.position = "fixed";
+    area.style.opacity = "0";
+    document.body.appendChild(area);
+    area.focus();
+    area.select();
+    const ok = document.execCommand("copy");
+    area.remove();
+    return ok;
+  } catch {
+    return false;
+  }
+}
 
 interface ResumeInfo {
   name: string;
@@ -96,6 +162,18 @@ interface ProjectApi {
   openFromText: (text: string, fallbackName: string) => boolean;
   rename: (name: string) => void;
   goHome: () => void;
+  // --- S5 pattern + seams ---
+  seamStrategy: SeamStrategy;
+  selectStrategy: (strategy: SeamStrategy) => void;
+  seamMerges: string[];
+  seamDrag: (edges: string[]) => void;
+  seamTap: (cell: { row: number; col: number }) => void;
+  handTweaked: boolean;
+  estimates: { pieces: number; seams: number };
+  plans: Record<SeamStrategy, StrategyPlan | null>;
+  setPatternActive: (active: boolean) => void;
+  exportDownload: (kind: ExportKind) => Promise<void>;
+  copySettings: () => Promise<boolean>;
 }
 
 const ProjectContext = createContext<ProjectApi | null>(null);
@@ -160,10 +238,31 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const [lastResize, setLastResize] = useState<ResizeInfo | null>(null);
   const [restore, setRestore] = useState<RestoreState>(readAutosave);
 
+  const [seamStrategy, setSeamStrategy] = useState<SeamStrategy>(DEFAULT_STRATEGY);
+  const [seamFix, setSeamFix] = useState<SeamFix>({});
+  const [plans, setPlans] = useState<Record<SeamStrategy, StrategyPlan | null>>({
+    historical: null,
+    strip: null,
+    modern: null,
+  });
+
   const nameRef = useRef(name);
   nameRef.current = name;
   const selectedFabricIdRef = useRef(selectedFabricId);
   selectedFabricIdRef.current = selectedFabricId;
+  const seamStrategyRef = useRef(seamStrategy);
+  seamStrategyRef.current = seamStrategy;
+  const seamFixRef = useRef(seamFix);
+  seamFixRef.current = seamFix;
+  const summaryRef = useRef(summary);
+  summaryRef.current = summary;
+  const plansRef = useRef(plans);
+  plansRef.current = plans;
+  // Pattern tab drives explicit plan requests; edits bump the model revision so
+  // a stale in-flight plan can be discarded and the three strategies recomputed.
+  const patternActiveRef = useRef(false);
+  const editRevRef = useRef(0);
+  const plansRevRef = useRef(-1);
 
   // ---- React snapshot of the mutable store -------------------------------
 
@@ -226,7 +325,13 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     const s = storeRef.current;
     if (!s) return;
     try {
-      localStorage.setItem(AUTOSAVE_KEY, buildAutosaveDoc(s.model, nameRef.current, Date.now()));
+      localStorage.setItem(
+        AUTOSAVE_KEY,
+        buildAutosaveDoc(s.model, nameRef.current, Date.now(), {
+          seamFix: seamFixRef.current,
+          seamStrategy: seamStrategyRef.current,
+        }),
+      );
     } catch {
       /* storage blocked or full: autosave is best-effort */
     }
@@ -240,16 +345,56 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     }, AUTOSAVE_DEBOUNCE_MS);
   }, [writeAutosave]);
 
+  // ---- plans (explicit, per model revision) ------------------------------
+  //
+  // PARITY item 1: card metrics and yardage are engine-authoritative. When the
+  // Pattern tab is open the three strategies are planned once per model
+  // revision; a plan whose revision was superseded by a later edit is dropped.
+
+  const requestPlans = useCallback(() => {
+    const s = storeRef.current;
+    if (!s) return;
+    const rev = editRevRef.current;
+    if (plansRevRef.current === rev) return; // already requested for this revision
+    plansRevRef.current = rev;
+    const json = JSON.stringify(s.model);
+    for (const strategy of STRATEGIES) {
+      engineRef.current.call<StrategyPlan>("plan", json, strategy).then(
+        (result) => {
+          if (plansRevRef.current === rev) {
+            setPlans((prev) => ({ ...prev, [strategy]: result }));
+          }
+        },
+        (err: unknown) => {
+          if (plansRevRef.current !== rev) return;
+          const message =
+            err instanceof EngineError ? err.message : "Couldn’t work out the plan — try again?";
+          toast.push(message, "error");
+        },
+      );
+    }
+  }, [toast]);
+
+  const setPatternActive = useCallback(
+    (active: boolean) => {
+      patternActiveRef.current = active;
+      if (active) requestPlans();
+    },
+    [requestPlans],
+  );
+
   const afterMutation = useCallback(() => {
+    editRevRef.current += 1;
     refresh();
     requestValidation();
     scheduleAutosave();
-  }, [refresh, requestValidation, scheduleAutosave]);
+    if (patternActiveRef.current) requestPlans();
+  }, [refresh, requestValidation, scheduleAutosave, requestPlans]);
 
   // ---- open / restore ----------------------------------------------------
 
   const installModel = useCallback(
-    (next: QuiltModel, displayName: string) => {
+    (next: QuiltModel, displayName: string, ui?: ProjectUi) => {
       const s = storeRef.current;
       if (s) s.reset(next);
       else storeRef.current = new EditorStore(next, clockObjRef.current);
@@ -258,10 +403,21 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       setSelectedFabricId(next.palette.fabrics[0]?.id ?? null);
       setSummary(null);
       setLastResize(null);
+      // Restore persisted seam UI (PARITY item 2/5); default strip, no fixes.
+      const restoredStrategy = readStrategy(ui);
+      const restoredFix = readSeamFix(ui);
+      setSeamStrategy(restoredStrategy);
+      seamStrategyRef.current = restoredStrategy;
+      setSeamFix(restoredFix);
+      seamFixRef.current = restoredFix;
+      setPlans({ historical: null, strip: null, modern: null });
+      plansRevRef.current = -1;
+      editRevRef.current += 1;
       refresh();
       requestValidation();
+      if (patternActiveRef.current) requestPlans();
     },
-    [refresh, requestValidation],
+    [refresh, requestValidation, requestPlans],
   );
 
   const openFromText = useCallback(
@@ -285,7 +441,18 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         return false;
       }
       const displayName = parsed.name && parsed.name !== "Untitled" ? parsed.name : fallbackName;
-      installModel(parsedModel, displayName || DEFAULT_NAME);
+      // parseProjectFile validates the wrapper already; recover ui.seamFix /
+      // ui.seamStrategy from it (the frozen parser returns only model + name).
+      let ui: ProjectUi | undefined;
+      try {
+        const doc = JSON.parse(text) as Record<string, unknown>;
+        if (doc && doc.app === "QREP" && doc.ui && typeof doc.ui === "object") {
+          ui = doc.ui as ProjectUi;
+        }
+      } catch {
+        /* text already parsed above; ignore */
+      }
+      installModel(parsedModel, displayName || DEFAULT_NAME, ui);
       return true;
     },
     [toast, installModel],
@@ -324,7 +491,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       setRestore({ resume: null, autosaveError: err instanceof Error ? err.message : String(err) });
       return;
     }
-    installModel(doc.model, doc.name);
+    installModel(doc.model, doc.name, doc.ui);
   }, [installModel]);
 
   // ---- editing actions ---------------------------------------------------
@@ -539,9 +706,15 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     if (!s) return;
     const filename = `${slugify(nameRef.current)}.qrep.json`;
     try {
-      const blob = new Blob([buildProjectFile(s.model, nameRef.current)], {
-        type: "application/json",
-      });
+      const blob = new Blob(
+        [
+          buildProjectFile(s.model, nameRef.current, {
+            seamFix: seamFixRef.current,
+            seamStrategy: seamStrategyRef.current,
+          }),
+        ],
+        { type: "application/json" },
+      );
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
@@ -572,6 +745,8 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     storeRef.current = null;
     pendingRef.current = null;
     versionRef.current++;
+    patternActiveRef.current = false;
+    plansRevRef.current = -1;
     setModel(null);
     setSummary(null);
     setName(DEFAULT_NAME);
@@ -581,7 +756,199 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     setCanRedo(false);
     setDirty(false);
     setLastResize(null);
+    setSeamStrategy(DEFAULT_STRATEGY);
+    seamStrategyRef.current = DEFAULT_STRATEGY;
+    setSeamFix({});
+    seamFixRef.current = {};
+    setPlans({ historical: null, strip: null, modern: null });
   }, []);
+
+  // ---- seams tool (PARITY item 2; preview layer over ui.seamFix) ----------
+
+  const handleSetMode = useCallback(
+    (next: EditorMode) => {
+      setMode(next);
+      if (next === "seams") {
+        toast.push("Seams: drag to sew squares together, tap a piece to split it.", "success");
+      }
+    },
+    [toast],
+  );
+
+  const selectStrategy = useCallback(
+    (strategy: SeamStrategy) => {
+      const hadFixes = Object.keys(seamFixRef.current).length > 0;
+      setSeamStrategy(strategy);
+      seamStrategyRef.current = strategy;
+      if (hadFixes) {
+        setSeamFix({});
+        seamFixRef.current = {};
+        toast.push("Seam tweaks reset for the new plan.", "success");
+      }
+      scheduleAutosave();
+    },
+    [toast, scheduleAutosave],
+  );
+
+  const seamDrag = useCallback(
+    (edges: string[]) => {
+      const s = storeRef.current;
+      if (!s || edges.length === 0) return;
+      const cells = s.model.center.cells;
+      const merged = effectiveMerges(cells, seamStrategyRef.current, seamFixRef.current);
+      let changed = false;
+      const next: SeamFix = { ...seamFixRef.current };
+      for (const edge of edges) {
+        if (!merged.has(edge)) {
+          next[edge] = "merge";
+          changed = true;
+        }
+      }
+      if (!changed) return;
+      setSeamFix(next);
+      seamFixRef.current = next;
+      scheduleAutosave();
+    },
+    [scheduleAutosave],
+  );
+
+  const seamTap = useCallback(
+    (cell: { row: number; col: number }) => {
+      const s = storeRef.current;
+      if (!s) return;
+      const cells = s.model.center.cells;
+      const rows = cells.length;
+      const cols = cells[0]?.length ?? 0;
+      if (cell.row < 0 || cell.row >= rows || cell.col < 0 || cell.col >= cols) return;
+      const merged = effectiveMerges(cells, seamStrategyRef.current, seamFixRef.current);
+      // Walk the piece under the tap, collecting every merged edge inside it, then
+      // split each one so the whole piece breaks back into single squares.
+      const start = cell.row * cols + cell.col;
+      const visited = new Set<number>([start]);
+      const inside = new Set<string>();
+      const stack = [start];
+      while (stack.length > 0) {
+        const index = stack.pop()!;
+        const r = Math.floor(index / cols);
+        const c = index % cols;
+        const step = (edge: string, neighbor: number) => {
+          if (!merged.has(edge)) return;
+          inside.add(edge);
+          if (!visited.has(neighbor)) {
+            visited.add(neighbor);
+            stack.push(neighbor);
+          }
+        };
+        if (c < cols - 1) step(`${r},${c}:v`, index + 1);
+        if (c > 0) step(`${r},${c - 1}:v`, index - 1);
+        if (r < rows - 1) step(`${r},${c}:h`, index + cols);
+        if (r > 0) step(`${r - 1},${c}:h`, index - cols);
+      }
+      if (inside.size === 0) return;
+      const next: SeamFix = { ...seamFixRef.current };
+      for (const edge of inside) next[edge] = "split";
+      setSeamFix(next);
+      seamFixRef.current = next;
+      scheduleAutosave();
+    },
+    [scheduleAutosave],
+  );
+
+  const seamMerges = useMemo<string[]>(() => {
+    if (!model) return [];
+    return [...effectiveMerges(model.center.cells, seamStrategy, seamFix)];
+  }, [model, seamStrategy, seamFix]);
+
+  const estimates = useMemo(() => {
+    if (!model) return { pieces: 0, seams: 0 };
+    return pieceEstimate(
+      model.center.cells,
+      effectiveMerges(model.center.cells, seamStrategy, seamFix),
+    );
+  }, [model, seamStrategy, seamFix]);
+
+  const handTweaked = Object.keys(seamFix).length > 0;
+
+  // ---- exports + copy (PARITY items 11/12) --------------------------------
+
+  const exportDownload = useCallback(
+    async (kind: ExportKind): Promise<void> => {
+      const s = storeRef.current;
+      if (!s) return;
+      const json = JSON.stringify(s.model);
+      const strategy = seamStrategyRef.current;
+      const slug = slugify(nameRef.current);
+      try {
+        let data: BlobPart;
+        let filename: string;
+        let mime: string;
+        if (kind === "svg") {
+          const r = await engineRef.current.call<{ text: string }>("export_svg", json);
+          data = r.text;
+          filename = `${slug}-diagram.svg`;
+          mime = "image/svg+xml";
+        } else if (kind === "cutlist-csv") {
+          const r = await engineRef.current.call<{ text: string }>(
+            "export_cutlist_csv",
+            json,
+            strategy,
+          );
+          data = r.text;
+          filename = `${slug}-cut-list.csv`;
+          mime = "text/csv";
+        } else if (kind === "cutlist-md") {
+          const r = await engineRef.current.call<{ text: string }>(
+            "export_cutlist_md",
+            json,
+            strategy,
+          );
+          data = r.text;
+          filename = `${slug}-cut-list.md`;
+          mime = "text/markdown";
+        } else if (kind === "yardage") {
+          const r = await engineRef.current.call<{ text: string }>("export_yardage", json, strategy);
+          data = r.text;
+          filename = `${slug}-yardage.txt`;
+          mime = "text/plain";
+        } else {
+          const r = await engineRef.current.call<{ pdf_b64: string }>("export_pdf", json, strategy);
+          data = base64ToArrayBuffer(r.pdf_b64);
+          filename = `${slug}-booklet.pdf`;
+          mime = "application/pdf";
+        }
+        triggerBlob(data, filename, mime);
+        toast.push("Saved — your pattern file is ready.", "success");
+      } catch (err) {
+        const message =
+          err instanceof EngineError ? err.message : "That export didn’t work — try again?";
+        toast.push(message, "error");
+      }
+    },
+    [toast],
+  );
+
+  const copySettings = useCallback(async (): Promise<boolean> => {
+    const s = storeRef.current;
+    if (!s) return false;
+    const text = buildSettingsSummary(
+      s.model,
+      nameRef.current,
+      summaryRef.current,
+      plansRef.current[seamStrategyRef.current],
+    );
+    let ok = false;
+    try {
+      await navigator.clipboard.writeText(text);
+      ok = true;
+    } catch {
+      ok = execCommandCopy(text);
+    }
+    toast.push(
+      ok ? "Copied! Paste it into notes, email, anywhere." : "Could not copy — sorry!",
+      ok ? "success" : "error",
+    );
+    return ok;
+  }, [toast]);
 
   // ---- beforeunload guard (registered only while file-dirty) -------------
 
@@ -609,7 +976,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     canRedo,
     resume: restore.resume,
     autosaveError: restore.autosaveError,
-    setMode,
+    setMode: handleSetMode,
     selectFabric,
     paintStroke,
     recolorFabric,
@@ -633,6 +1000,17 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     openFromText,
     rename,
     goHome,
+    seamStrategy,
+    selectStrategy,
+    seamMerges,
+    seamDrag,
+    seamTap,
+    handTweaked,
+    estimates,
+    plans,
+    setPatternActive,
+    exportDownload,
+    copySettings,
   };
 
   return <ProjectContext.Provider value={api}>{children}</ProjectContext.Provider>;

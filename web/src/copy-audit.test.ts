@@ -18,6 +18,11 @@ const BANNED = /download|install/i;
 // Exact string literals that may legitimately contain banned words.
 const ALLOWLIST: string[] = [
   "micropip.install", // python code run in the worker, not UI copy
+  "download-cutlist-csv", // S5 export button test id (not UI copy)
+  "download-cutlist-md", // S5 export button test id (not UI copy)
+  "download-yardage", // S5 export button test id (not UI copy)
+  "download-svg", // S5 export button test id (not UI copy)
+  "download-pdf", // S5 export button test id (not UI copy)
 ];
 
 function sourceFiles(dir: string): string[] {

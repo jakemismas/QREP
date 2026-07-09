@@ -10,6 +10,8 @@ import { describe, expect, it } from "vitest";
 import {
   clampCell,
   dedupeCells,
+  edgeBetween,
+  pathEdges,
   pointToCell,
   supercoverLine,
   type PaintCell,
@@ -108,6 +110,64 @@ describe("supercoverLine", () => {
       { row: 1, col: 2 },
       { row: 1, col: 3 },
     ]);
+  });
+});
+
+describe("edgeBetween", () => {
+  it("a downward step (0,0)->(1,0) crosses the horizontal edge 0,0:h", () => {
+    // Same col, rows differ by 1: lower row is 0 -> `0,0:h`.
+    expect(edgeBetween({ row: 0, col: 0 }, { row: 1, col: 0 })).toBe("0,0:h");
+  });
+
+  it("a rightward step (0,0)->(0,1) crosses the vertical edge 0,0:v", () => {
+    // Same row, cols differ by 1: lower col is 0 -> `0,0:v`.
+    expect(edgeBetween({ row: 0, col: 0 }, { row: 0, col: 1 })).toBe("0,0:v");
+  });
+
+  it("names the lower-index square regardless of travel direction", () => {
+    // (2,3)->(2,2) is the same boundary as (2,2)->(2,3): min col 2 -> `2,2:v`.
+    expect(edgeBetween({ row: 2, col: 3 }, { row: 2, col: 2 })).toBe("2,2:v");
+    // (3,1)->(2,1) is the same boundary as (2,1)->(3,1): min row 2 -> `2,1:h`.
+    expect(edgeBetween({ row: 3, col: 1 }, { row: 2, col: 1 })).toBe("2,1:h");
+  });
+
+  it("returns null for the same square or a non-adjacent pair", () => {
+    expect(edgeBetween({ row: 1, col: 1 }, { row: 1, col: 1 })).toBeNull();
+    // Diagonal neighbours share no edge.
+    expect(edgeBetween({ row: 0, col: 0 }, { row: 1, col: 1 })).toBeNull();
+    // Two apart along a row is not an edge.
+    expect(edgeBetween({ row: 0, col: 0 }, { row: 0, col: 2 })).toBeNull();
+  });
+});
+
+describe("pathEdges", () => {
+  it("a straight vertical drag (0,0)->(1,0) crosses exactly 0,0:h", () => {
+    // supercover walk is [(0,0),(1,0)]; its one edge is `0,0:h`.
+    const walk = supercoverLine({ row: 0, col: 0 }, { row: 1, col: 0 });
+    expect(pathEdges(walk)).toEqual(["0,0:h"]);
+  });
+
+  it("the diagonal (0,0)->(1,1) supercover crosses its two staircase edges", () => {
+    // nx=ny=1: one exact corner steps col first -> walk [(0,0),(0,1),(1,1)].
+    // Edges: (0,0)->(0,1) is `0,0:v`; (0,1)->(1,1) is `0,1:h`.
+    const walk = supercoverLine({ row: 0, col: 0 }, { row: 1, col: 1 });
+    expect(walk).toEqual([
+      { row: 0, col: 0 },
+      { row: 0, col: 1 },
+      { row: 1, col: 1 },
+    ]);
+    expect(pathEdges(walk)).toEqual(["0,0:v", "0,1:h"]);
+  });
+
+  it("emits a re-crossed edge only once within one gesture", () => {
+    // Right across 0,0:v then back left across the same boundary: one edge.
+    expect(
+      pathEdges([
+        { row: 0, col: 0 },
+        { row: 0, col: 1 },
+        { row: 0, col: 0 },
+      ]),
+    ).toEqual(["0,0:v"]);
   });
 });
 
