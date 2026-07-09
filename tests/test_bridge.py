@@ -109,6 +109,11 @@ def test_bridge_never_imports_typer():
             assert not name.startswith(("typer", "click")), f"bridge imports {name}"
 
 
+@pytest.mark.skipif(
+    __import__("sys").platform == "emscripten",
+    reason="subprocess is unavailable under wasm; the import graph is "
+    "platform-independent and verified on native CPython",
+)
 def test_bridge_import_does_not_load_cv2():
     # S6 (issue #46): the vision wheel lazy-loads in the browser on first
     # photo use, so importing the bridge must not pull cv2 - otherwise the
