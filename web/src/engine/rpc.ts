@@ -40,6 +40,9 @@ export type EngineStatus =
   | { phase: "busy"; method: string; queued: number }
   | { phase: "failed"; message: string };
 
+/** Vision wheel lifecycle (S6): lazy, prefetchable, retryable. */
+export type VisionState = "cold" | "loading" | "ready" | "failed";
+
 export interface WorkerLike {
   postMessage(message: unknown): void;
   terminate(): void;
@@ -68,10 +71,32 @@ export class EngineClient {
   private inFlight: QueuedCall | null = null;
   private status: EngineStatus = { phase: "booting", step: "Starting the engine" };
   private listeners = new Set<(status: EngineStatus) => void>();
+  private vision: VisionState = "cold";
+  private visionListeners = new Set<(state: VisionState) => void>();
   private readonly createWorker: () => WorkerLike;
 
   constructor(createWorker: () => WorkerLike) {
     this.createWorker = createWorker;
+  }
+
+  onVision(listener: (state: VisionState) => void): () => void {
+    this.visionListeners.add(listener);
+    listener(this.vision);
+    return () => this.visionListeners.delete(listener);
+  }
+
+  getVision(): VisionState {
+    return this.vision;
+  }
+
+  /** Ask the worker to load the vision wheel now (idle prefetch / retry). */
+  prefetchVision(): void {
+    this.worker?.postMessage({ type: "load-vision" });
+  }
+
+  private setVision(state: VisionState): void {
+    this.vision = state;
+    for (const listener of this.visionListeners) listener(state);
   }
 
   start(): void {
@@ -89,6 +114,7 @@ export class EngineClient {
     for (const call of outstanding) {
       call.reject(new EngineError("worker", "the engine was restarted"));
     }
+    this.setVision("cold");
     this.start();
   }
 
@@ -133,6 +159,15 @@ export class EngineClient {
       case "boot-failed":
         this.booted = false;
         this.setStatus({ phase: "failed", message: message.message ?? "engine failed to load" });
+        break;
+      case "vision-progress":
+        this.setVision("loading");
+        break;
+      case "vision-ready":
+        this.setVision("ready");
+        break;
+      case "vision-failed":
+        this.setVision("failed");
         break;
       case "result": {
         if (this.inFlight === null || message.id !== this.inFlight.id) return;

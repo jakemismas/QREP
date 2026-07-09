@@ -17,7 +17,7 @@
  * wheel filenames without hardcoding versions.
  */
 import { createHash } from "node:crypto";
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -105,6 +105,14 @@ writeFileSync(
       pyodideVersion: lock.pyodideVersion,
       distributionPackages: lock.distributionWheels.map((w) => w.name),
       pypiWheels: lock.pypiWheels.map((w) => w.file),
+      // Measured vision payload (S6): the UI's loading copy shows this
+      // real number, never a placeholder.
+      visionBytes: statSync(
+        path.join(
+          pyodideDir,
+          lock.distributionWheels.find((w) => w.name === "opencv-python").file,
+        ),
+      ).size,
     },
     null,
     2,

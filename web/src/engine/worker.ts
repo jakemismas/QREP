@@ -19,7 +19,11 @@ interface CallMessage {
   args: unknown[];
 }
 
-type InMessage = InitMessage | CallMessage;
+interface LoadVisionMessage {
+  type: "load-vision";
+}
+
+type InMessage = InitMessage | CallMessage | LoadVisionMessage;
 
 type LoadPyodide = (options: { indexURL: string }) => Promise<PyodideInterface>;
 
@@ -39,8 +43,33 @@ const BRIDGE_METHODS = new Set([
   "resize_unlocked",
 ]);
 
+// Bridge methods that need cv2: the vision wheel lazy-loads before these
+// run (S6). Everything else works on the boot closure alone.
+const VISION_METHODS = new Set(["reverse", "reverse_photo", "render", "compare"]);
+
 const scope = self as unknown as DedicatedWorkerGlobalScope;
 let pyodidePromise: Promise<PyodideInterface> | null = null;
+let visionPromise: Promise<void> | null = null;
+let stagingCounter = 0;
+
+function ensureVision(): Promise<void> {
+  if (visionPromise === null) {
+    visionPromise = (async () => {
+      const pyodide = await pyodidePromise!;
+      scope.postMessage({ type: "vision-progress" });
+      await pyodide.loadPackage(["opencv-python"]);
+      scope.postMessage({ type: "vision-ready" });
+    })().catch((error: unknown) => {
+      visionPromise = null; // retryable
+      scope.postMessage({
+        type: "vision-failed",
+        message: error instanceof Error ? error.message : String(error),
+      });
+      throw new Error("the vision engine failed to load; retry when back online");
+    });
+  }
+  return visionPromise;
+}
 
 async function boot(baseUrl: string): Promise<PyodideInterface> {
   const progress = (step: string) => scope.postMessage({ type: "boot-progress", step });
@@ -50,7 +79,8 @@ async function boot(baseUrl: string): Promise<PyodideInterface> {
   )) as { loadPyodide: LoadPyodide };
   const pyodide = await loadPyodide({ indexURL: `${baseUrl}pyodide/` });
   progress("Loading engine packages");
-  await pyodide.loadPackage(["numpy", "opencv-python", "pillow", "pydantic", "micropip"]);
+  // No opencv here: the vision wheel lazy-loads on first photo use (S6).
+  await pyodide.loadPackage(["numpy", "pillow", "pydantic", "micropip"]);
   progress("Loading the qrep engine");
   const manifest = (await (await fetch(`${baseUrl}wheels/manifest.json`)).json()) as {
     pypiWheels: string[];
@@ -74,7 +104,7 @@ async function serve(message: CallMessage): Promise<void> {
       id: message.id,
       envelope: { ok: false, error: { kind, message: text } },
     });
-  if (!BRIDGE_METHODS.has(message.method)) {
+  if (!BRIDGE_METHODS.has(message.method) && message.method !== "reverse_photo") {
     fail("value", `unknown bridge method: ${message.method}`);
     return;
   }
@@ -84,17 +114,42 @@ async function serve(message: CallMessage): Promise<void> {
   }
   try {
     const pyodide = await pyodidePromise;
+    if (VISION_METHODS.has(message.method)) {
+      await ensureVision();
+    }
+    let method = message.method;
+    let args = message.args;
+    if (method === "reverse_photo") {
+      // Photo staging (S6): bytes arrive from the UI already downscaled;
+      // the worker owns the MEMFS staging path per the bridge contract.
+      const [bytes, optionsJson] = args as [Uint8Array | ArrayBuffer, string];
+      const data = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+      const path = `/staging/upload-${++stagingCounter}.png`;
+      try {
+        pyodide.FS.mkdirTree("/staging");
+      } catch {
+        // already exists
+      }
+      pyodide.FS.writeFile(path, data);
+      method = "reverse";
+      args = [path, optionsJson];
+    }
     const bridge = pyodide.pyimport("qrep.bridge");
     try {
-      const raw: string = bridge[message.method](...message.args);
+      const raw: string = bridge[method](...args);
       scope.postMessage({ type: "result", id: message.id, envelope: JSON.parse(raw) });
     } finally {
       bridge.destroy();
     }
-  } catch {
+  } catch (error) {
     // The bridge itself wraps engine errors; reaching here means the worker
-    // plumbing failed (boot rejection or ffi error) - keep it generic.
-    fail("internal", "engine call failed in the worker");
+    // plumbing failed (boot rejection, vision load failure, or ffi error).
+    fail(
+      "internal",
+      error instanceof Error && error.message.includes("vision")
+        ? error.message
+        : "engine call failed in the worker",
+    );
   }
 }
 
@@ -110,6 +165,10 @@ scope.onmessage = (event: MessageEvent<InMessage>) => {
           message: error instanceof Error ? error.message : String(error),
         }),
       );
+  } else if (message.type === "load-vision") {
+    void ensureVision().catch(() => {
+      // vision-failed already posted; prefetch failures are silent by design.
+    });
   } else if (message.type === "call") {
     void serve(message);
   }
