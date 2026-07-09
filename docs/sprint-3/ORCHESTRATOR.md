@@ -124,16 +124,22 @@ WORK PROCEDURE:
   failure copy per the S8 contract; period phrasing per S4 (cells or
   repeats-across-width until a user size exists).
 - Committed fixtures are rights-clean composites only; Jake's saved shop
-  photos never enter the repo.
-- Manual-smoke checkboxes assigned to Jake are non-blocking for slice
-  merge; note them on #65 when a slice lands with pending smoke items.
+  photos never enter the repo. They live in the gitignored `local-photos/`
+  folder; run `scripts/local_photo_smoke.py` NATIVELY on every pipeline
+  slice (S1, S3, S4, S5, S6) and post its numbers (quad, dims, verdict,
+  confidences per photo) in a PROGRESS comment. An empty or absent folder
+  no-ops; say so in the comment.
+- HANDS-OFF SMOKE POLICY: real-device checks never block slice merges,
+  parent close, or the release. Per-slice "optional ask" smoke items are
+  noted once on #65 when the slice lands; do not wait on them.
 
 LANDING PROCEDURE (per slice):
 1. Self-audit: for every acceptance checkbox, run the command that proves
    it. Tick the boxes via `gh issue edit`. Unmet criteria (give-up path
    only) stay unticked and are named in the closing comment with their
-   KNOWN_ISSUES reference - never silently ticked. Jake-assigned smoke
-   boxes stay unticked for Jake.
+   KNOWN_ISSUES reference - never silently ticked. Boxes covered by the
+   local-photos script are ticked with its numbers as evidence; on-phone
+   optional-ask items are noted on #65, not ticked.
 2. Commit as `S<n>: <what passed>` (body: brief evidence, plus which tests
    were red first). Blessed goldens, if ever legitimately needed, land in
    their own `[bless]` commit with the reason. Before every commit:
@@ -196,9 +202,11 @@ with assets via `gh release view v0.3.0`; #33 closed by S5; sprint 1 and 2
 suites intact except the named traversal amendment), tick its boxes except
 Jake's smoke items, and verify branch hygiene:
 `gh api repos/jakemismas/QREP/branches --jq '.[].name'` returns exactly
-`main`. Then post a final summary comment on #65 (leave it OPEN if Jake's
-release smoke box is unticked, with a note that his phone walkthrough is
-the last gate; close it only if all boxes are ticked), output the line
+`main`. Then post a final summary comment on #65 that INCLUDES the
+requested (not required) phone-walkthrough ask for Jake (crop, size,
+verdict, editor on live Pages with a real shop photo; findings become NEW
+issues, never reopened slices), plus the latest local-photos script output
+for his three field-failure photos. Close #65, output the line
 `SPRINT COMPLETE` and stop the loop. On an environmental hard block (gh
 auth dead, disk full, npm registry unreachable after 3 distinct
 strategies), comment `BLOCKED:` on #65 with diagnosis and suggested human
