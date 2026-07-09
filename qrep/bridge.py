@@ -239,6 +239,64 @@ def render(model_json: str, level: int, seed: int, scale: int) -> dict:
 
 
 @_envelope
+def detect_quad(image_path: str) -> dict:
+    """Detection tiers only, no full reverse (S2, issue #68).
+
+    Runs the S1 tiered detector on a staged image and returns the quad in
+    NORMALIZED [0,1] image coordinates plus tier, confidence, and the
+    predicted_size field ({width_px, height_px, aspect, preset}). S6 owns
+    the preset suggestion logic; until it lands, preset is always null.
+    An unreadable all-background image answers with the honest tier-3 full
+    frame at low confidence, never an error: the crop screen makes that
+    visible and fixable.
+    """
+    path = Path(image_path)
+    if not path.exists():
+        raise ValueError(f"image file not found: {image_path}")
+    import cv2
+
+    from qrep.vision.rectify import TIER3_CONFIDENCE, rectify
+
+    image = cv2.imread(str(path))
+    if image is None:
+        raise ValueError(f"could not read image: {image_path}")
+    height, width = image.shape[:2]
+    try:
+        detected = rectify(image)
+        corners = [(float(x), float(y)) for x, y in detected.corners]
+        tier = detected.tier
+        confidence = float(detected.confidence)
+    except ValueError:
+        corners = [
+            (0.0, 0.0),
+            (float(width), 0.0),
+            (float(width), float(height)),
+            (0.0, float(height)),
+        ]
+        tier = 3
+        confidence = TIER3_CONFIDENCE
+
+    def _dist(a, b):
+        return ((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2) ** 0.5
+
+    # quad extents from mean opposite edge lengths (the rectify warp-target
+    # convention), so the aspect survives a perspective quad
+    quad_w = (_dist(corners[0], corners[1]) + _dist(corners[3], corners[2])) / 2
+    quad_h = (_dist(corners[0], corners[3]) + _dist(corners[1], corners[2])) / 2
+    return {
+        "quad": [[x / width, y / height] for x, y in corners],
+        "tier": tier,
+        "confidence": confidence,
+        "predicted_size": {
+            "width_px": quad_w,
+            "height_px": quad_h,
+            "aspect": (quad_w / quad_h) if quad_h > 0 else None,
+            "preset": None,
+        },
+    }
+
+
+@_envelope
 def reverse(image_path: str, options_json: str) -> dict:
     """Reverse a staged image path into a recovered model.
 
