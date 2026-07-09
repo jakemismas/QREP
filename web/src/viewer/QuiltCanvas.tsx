@@ -8,7 +8,7 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { QuiltModel } from "../model/types";
 import { EIGHTHS_PER_INCH, formatEighths } from "../model/units";
 import { useToast } from "../ui";
-import { clampCell, dedupeCells, pointToCell, supercoverLine } from "./paintGeometry";
+import { clampCell, dedupeCells, edgeBetween, pointToCell, supercoverLine } from "./paintGeometry";
 import type { PaintCell } from "./paintGeometry";
 
 const RULER_W = 41;
@@ -25,8 +25,25 @@ const TOUCH_MIN_CELL_PX = 14;
 const TOUCH_TARGET_CELL_PX = 22;
 const AUTO_ZOOM_TOAST =
   "Zoomed in — the squares were too small to touch. Tap again to edit; pan with two fingers.";
+// Seam overlay: a warm, half-opaque line stroked over the fabric on every
+// interior edge that is NOT merged (i.e. a real seam), matching the mock's
+// seam style (rgba(110,80,45,0.4), 1.5px), drawn only when squares are large
+// enough to read. Fixed alpha over user fabric colors reads in both skins.
+const SEAM_STROKE = "rgba(110, 80, 45, 0.4)";
+const SEAM_LINE_WIDTH = 1.5;
+const SEAM_MIN_CELL_PX = 4.5;
 
 type PaintStrokeState = { pointerId: number; cells: PaintCell[]; last: PaintCell };
+// One seam gesture: `moved` flips the first time the pointer enters a different
+// square (that is the merge drag); a gesture that never leaves its start square
+// is a tap (split). `edges` collects the same-fabric interior edges swept.
+type SeamGestureState = {
+  pointerId: number;
+  startCell: PaintCell;
+  lastCell: PaintCell;
+  edges: Set<string>;
+  moved: boolean;
+};
 
 interface View {
   ppi: number;
@@ -189,6 +206,72 @@ function drawStrokePreview(
   }
 }
 
+/**
+ * Seam-preview overlay (S5): in seams mode, stroke a line on every interior
+ * center-grid edge that is not in `merges`, plus the pieced center's outer
+ * frame. Merged edges get nothing (the two squares read as one piece). The
+ * whole overlay is one Path2D stroked once, so the translucent line never
+ * double-darkens where segments meet. Culled to the viewport and skipped when
+ * squares are too small to show a seam.
+ */
+function drawSeamOverlay(
+  ctx: CanvasRenderingContext2D,
+  view: View,
+  md: ModelData,
+  merges: Set<string>,
+): void {
+  const pxPerE = view.ppi / EIGHTHS_PER_INCH;
+  const cellPx = md.cell * pxPerE;
+  if (cellPx < SEAM_MIN_CELL_PX) return;
+  const cx0 = view.panX + md.bandTotal * pxPerE;
+  const cy0 = view.panY + md.bandTotal * pxPerE;
+
+  const colStart = Math.max(0, Math.floor((0 - cx0) / cellPx));
+  const colEnd = Math.min(md.cols - 1, Math.ceil((view.cvW - cx0) / cellPx));
+  const rowStart = Math.max(0, Math.floor((0 - cy0) / cellPx));
+  const rowEnd = Math.min(md.rows - 1, Math.ceil((view.cvH - cy0) / cellPx));
+  if (colStart > colEnd || rowStart > rowEnd) return;
+
+  const path = new Path2D();
+  // Interior vertical edges `r,c:v` (between columns c and c+1).
+  const vColEnd = Math.min(colEnd, md.cols - 2);
+  for (let r = rowStart; r <= rowEnd; r++) {
+    const y = cy0 + r * cellPx;
+    for (let c = colStart; c <= vColEnd; c++) {
+      if (merges.has(`${r},${c}:v`)) continue;
+      const x = cx0 + (c + 1) * cellPx;
+      path.moveTo(x, y);
+      path.lineTo(x, y + cellPx);
+    }
+  }
+  // Interior horizontal edges `r,c:h` (between rows r and r+1).
+  const hRowEnd = Math.min(rowEnd, md.rows - 2);
+  for (let r = rowStart; r <= hRowEnd; r++) {
+    const y = cy0 + (r + 1) * cellPx;
+    for (let c = colStart; c <= colEnd; c++) {
+      if (merges.has(`${r},${c}:h`)) continue;
+      const x = cx0 + c * cellPx;
+      path.moveTo(x, y);
+      path.lineTo(x + cellPx, y);
+    }
+  }
+  // Outer frame of the pieced center (the mock draws this perimeter too).
+  const gx1 = cx0 + md.cols * cellPx;
+  const gy1 = cy0 + md.rows * cellPx;
+  path.moveTo(cx0, cy0);
+  path.lineTo(gx1, cy0);
+  path.lineTo(gx1, gy1);
+  path.lineTo(cx0, gy1);
+  path.lineTo(cx0, cy0);
+
+  ctx.save();
+  ctx.strokeStyle = SEAM_STROKE;
+  ctx.lineWidth = SEAM_LINE_WIDTH;
+  ctx.lineCap = "butt";
+  ctx.stroke(path);
+  ctx.restore();
+}
+
 function drawTopRuler(
   ctx: CanvasRenderingContext2D,
   view: View,
@@ -287,6 +370,7 @@ const CSS = `
 .qc-canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; touch-action: none; user-select: none; cursor: grab; }
 .qc-canvas:active { cursor: grabbing; }
 .qc-canvas--paint, .qc-canvas--paint:active { cursor: crosshair; }
+.qc-canvas--seams, .qc-canvas--seams:active { cursor: cell; }
 .qc-ruler-end-x { position: absolute; top: 4px; left: 0; font: 700 12px var(--sans, sans-serif); color: var(--accent); pointer-events: none; white-space: nowrap; }
 .qc-ruler-end-y { position: absolute; top: 0; left: 0; width: 34px; text-align: right; font: 700 12px var(--sans, sans-serif); color: var(--accent); pointer-events: none; }
 .qc-caption { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 0 4px; }
@@ -300,11 +384,17 @@ export function QuiltCanvas({
   mode = "move",
   selectedFabricId = null,
   onPaintStroke,
+  seamMerges,
+  onSeamDrag,
+  onSeamTap,
 }: {
   model: QuiltModel;
-  mode?: "move" | "paint";
+  mode?: "move" | "paint" | "seams";
   selectedFabricId?: string | null;
   onPaintStroke?: (cells: { row: number; col: number }[]) => void;
+  seamMerges?: string[];
+  onSeamDrag?: (edges: string[]) => void;
+  onSeamTap?: (cell: { row: number; col: number }) => void;
 }) {
   const modelData = useMemo<ModelData>(() => {
     const cell = model.center.cell_size;
@@ -381,9 +471,17 @@ export function QuiltCanvas({
   selectedFabricRef.current = selectedFabricId ?? null;
   const onPaintStrokeRef = useRef(onPaintStroke);
   onPaintStrokeRef.current = onPaintStroke;
+  const onSeamDragRef = useRef(onSeamDrag);
+  onSeamDragRef.current = onSeamDrag;
+  const onSeamTapRef = useRef(onSeamTap);
+  onSeamTapRef.current = onSeamTap;
+  const seamMergeSet = useMemo(() => new Set(seamMerges ?? []), [seamMerges]);
+  const seamMergeSetRef = useRef(seamMergeSet);
+  seamMergeSetRef.current = seamMergeSet;
   const modelDataRef = useRef(modelData);
   modelDataRef.current = modelData;
   const strokeRef = useRef<PaintStrokeState | null>(null);
+  const seamRef = useRef<SeamGestureState | null>(null);
   const toast = useToast();
   const pushRef = useRef(toast.push);
   pushRef.current = toast.push;
@@ -423,6 +521,9 @@ export function QuiltCanvas({
       qctx.clearRect(0, 0, cvW, cvH);
       drawQuilt(qctx, view, modelData);
       drawStrokePreview(qctx, view, modelData, strokeRef.current, selectedFabricRef.current);
+      if (modeRef.current === "seams") {
+        drawSeamOverlay(qctx, view, modelData, seamMergeSetRef.current);
+      }
     }
     const tctx = prepCanvas(topR, cvW, RULER_H, dpr);
     if (tctx) drawTopRuler(tctx, view, modelData, colors);
@@ -574,9 +675,10 @@ export function QuiltCanvas({
       }
 
       if (pointers.size >= 2) {
-        // A second pointer abandons any in-progress paint stroke (nothing is
-        // committed) and turns the gesture into a two-finger pan/pinch.
+        // A second pointer abandons any in-progress paint or seam gesture
+        // (nothing is committed) and turns it into a two-finger pan/pinch.
         strokeRef.current = null;
+        seamRef.current = null;
         resyncGesture();
         return;
       }
@@ -622,6 +724,33 @@ export function QuiltCanvas({
         strokeRef.current = { pointerId: e.pointerId, cells: [cell], last: cell };
         gestureRef.current = { type: "none" };
         scheduleDraw();
+        return;
+      }
+
+      if (modeRef.current === "seams") {
+        // Single-pointer drag is the merge gesture, never a pan. The gesture
+        // stays a tap until the pointer enters a different square.
+        const md = modelDataRef.current;
+        const v = viewRef.current;
+        const cell = clampCell(
+          pointToCell(x, y, {
+            scale: v.ppi / EIGHTHS_PER_INCH,
+            originX: v.panX,
+            originY: v.panY,
+            cell: md.cell,
+            borderTotal: md.bandTotal,
+          }),
+          md.rows,
+          md.cols,
+        );
+        seamRef.current = {
+          pointerId: e.pointerId,
+          startCell: cell,
+          lastCell: cell,
+          edges: new Set(),
+          moved: false,
+        };
+        gestureRef.current = { type: "none" };
         return;
       }
 
@@ -683,6 +812,39 @@ export function QuiltCanvas({
         return;
       }
 
+      const seam = seamRef.current;
+      if (seam && seam.pointerId === e.pointerId) {
+        const md = modelDataRef.current;
+        const cell = clampCell(
+          pointToCell(x, y, {
+            scale: v.ppi / EIGHTHS_PER_INCH,
+            originX: v.panX,
+            originY: v.panY,
+            cell: md.cell,
+            borderTotal: md.bandTotal,
+          }),
+          md.rows,
+          md.cols,
+        );
+        if (cell.row !== seam.lastCell.row || cell.col !== seam.lastCell.col) {
+          // Walk the square line between samples so a fast drag skips no edge;
+          // keep only interior edges whose two squares are the same fabric.
+          const walk = supercoverLine(seam.lastCell, cell);
+          for (let i = 1; i < walk.length; i++) {
+            const p = walk[i - 1];
+            const q = walk[i];
+            const edge = edgeBetween(p, q);
+            if (!edge) continue;
+            const fa = md.cells[p.row]?.[p.col];
+            const fb = md.cells[q.row]?.[q.col];
+            if (fa != null && fa === fb) seam.edges.add(edge);
+          }
+          seam.lastCell = cell;
+          seam.moved = true;
+        }
+        return;
+      }
+
       if (g.type === "pan") {
         v.panX += x - g.lastX;
         v.panY += y - g.lastY;
@@ -710,6 +872,18 @@ export function QuiltCanvas({
         if (cells.length > 0) onPaintStrokeRef.current?.(cells);
         scheduleDraw();
       }
+      const seam = seamRef.current;
+      if (seam && seam.pointerId === e.pointerId) {
+        // A gesture that entered another square is a merge drag; one that never
+        // left its start square is a tap that splits the piece under it.
+        seamRef.current = null;
+        if (seam.moved) {
+          const edges = [...seam.edges];
+          if (edges.length > 0) onSeamDragRef.current?.(edges);
+        } else {
+          onSeamTapRef.current?.({ row: seam.startCell.row, col: seam.startCell.col });
+        }
+      }
       pointers.delete(e.pointerId);
       const canvas = canvasRef.current;
       if (canvas) {
@@ -726,8 +900,9 @@ export function QuiltCanvas({
 
   const onPointerCancel = useCallback(
     (e: PointerEvent) => {
-      // Cancel discards any pending stroke without committing.
+      // Cancel discards any pending paint or seam gesture without committing.
       strokeRef.current = null;
+      seamRef.current = null;
       const pointers = pointersRef.current;
       pointers.delete(e.pointerId);
       const canvas = canvasRef.current;
@@ -750,6 +925,13 @@ export function QuiltCanvas({
     drawRef.current = draw;
     scheduleDraw();
   }, [draw, scheduleDraw]);
+
+  // The seam overlay depends on the mode and the merge set, neither of which is
+  // a draw() dependency; repaint when either changes so it appears, hides, or
+  // reflects a new fix without waiting on the next zoom/pan.
+  useEffect(() => {
+    scheduleDraw();
+  }, [mode, seamMergeSet, scheduleDraw]);
 
   // Fit on mount and whenever the finished dimensions change (a new document).
   // Editing keeps the dimensions, so the current view is preserved.
@@ -826,7 +1008,9 @@ export function QuiltCanvas({
         <div className="qc-viewport" ref={quiltViewportRef}>
           <canvas
             ref={canvasRef}
-            className={`qc-canvas${mode === "paint" ? " qc-canvas--paint" : ""}`}
+            className={`qc-canvas${
+              mode === "paint" ? " qc-canvas--paint" : mode === "seams" ? " qc-canvas--seams" : ""
+            }`}
             data-testid="quilt-canvas"
             data-mode={mode}
             data-finished-width={finishedWidth}

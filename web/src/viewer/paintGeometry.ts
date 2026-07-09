@@ -92,6 +92,44 @@ export function supercoverLine(a: PaintCell, b: PaintCell): PaintCell[] {
   return out;
 }
 
+/**
+ * The interior edge shared by two 4-adjacent squares, or null when `a` and `b`
+ * are the same square or are not edge-adjacent. Edge ids match seams.ts:
+ * `${r},${c}:v` joins (r,c)-(r,c+1); `${r},${c}:h` joins (r,c)-(r+1,c). The id
+ * always names the lower-index square, so the order of `a`/`b` does not matter.
+ */
+export function edgeBetween(a: PaintCell, b: PaintCell): string | null {
+  const dr = b.row - a.row;
+  const dc = b.col - a.col;
+  if (dr === 0 && (dc === 1 || dc === -1)) {
+    return `${a.row},${Math.min(a.col, b.col)}:v`;
+  }
+  if (dc === 0 && (dr === 1 || dr === -1)) {
+    return `${Math.min(a.row, b.row)},${a.col}:h`;
+  }
+  return null;
+}
+
+/**
+ * The distinct interior edges a 4-connected walk of squares crosses, in
+ * first-seen order. Each consecutive pair contributes the edge between them;
+ * a pair that is not edge-adjacent contributes nothing, and a re-crossed edge
+ * is emitted once. Fed the supercover walk between two pointer samples, this is
+ * exactly the seam boundaries the pointer path swept.
+ */
+export function pathEdges(cells: PaintCell[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (let i = 1; i < cells.length; i++) {
+    const edge = edgeBetween(cells[i - 1], cells[i]);
+    if (edge && !seen.has(edge)) {
+      seen.add(edge);
+      out.push(edge);
+    }
+  }
+  return out;
+}
+
 /** De-duplicate squares, keeping first-seen paint order. */
 export function dedupeCells(cells: PaintCell[]): PaintCell[] {
   const seen = new Set<string>();

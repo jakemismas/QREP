@@ -214,6 +214,15 @@ describe("wrapper and autosave formats", () => {
     expect(doc.ui).toEqual({});
   });
 
+  it("carries ui.seamFix through the wrapper (PARITY item 2)", () => {
+    const ui = { seamFix: { "0,0:v": "split" as const }, seamStrategy: "strip" };
+    const doc = JSON.parse(buildProjectFile(tinyModel(), "My Quilt", ui));
+    expect(doc.ui.seamFix).toEqual({ "0,0:v": "split" });
+    // And autosave round-trips it.
+    const saved = buildAutosaveDoc(tinyModel(), "My Quilt", 5, ui);
+    expect(parseAutosaveDoc(saved).ui).toEqual(ui);
+  });
+
   it("autosave doc round-trips with age metadata", () => {
     const saved = buildAutosaveDoc(tinyModel(), "My Quilt", 1_700_000_000_000);
     const restored = parseAutosaveDoc(saved);

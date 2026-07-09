@@ -23,6 +23,7 @@ import { StartScreen } from "./shell/StartScreen";
 import { OpenModal } from "./shell/OpenModal";
 import { PalettePanel } from "./shell/PalettePanel";
 import { SizingPanel } from "./shell/SizingPanel";
+import { PatternPanel } from "./shell/PatternPanel";
 import { QuiltCanvas, EditorToolbar } from "./viewer";
 
 type PhoneTab = "quilt" | "fabrics" | "sizing" | "pattern";
@@ -33,7 +34,7 @@ type PhoneTab = "quilt" | "fabrics" | "sizing" | "pattern";
 const DESK_TABS: TabItem[] = [
   { id: "fabrics", label: "Fabrics" },
   { id: "sizing", label: "Sizing" },
-  { id: "pattern", label: "Pattern", disabled: true },
+  { id: "pattern", label: "Pattern" },
 ];
 
 type DeskTab = "fabrics" | "sizing" | "pattern";
@@ -42,7 +43,7 @@ const PHONE_TABS: { id: PhoneTab; label: string; icon: string; disabled?: boolea
   { id: "quilt", label: "Quilt", icon: "M3.5 3.5h15v15h-15zM3.5 9h15M3.5 14h15M9 3.5v15M14 3.5v15" },
   { id: "fabrics", label: "Fabrics", icon: "M3.5 3.5h9v9h-9zM9.5 9.5h9v9h-9z" },
   { id: "sizing", label: "Sizing", icon: "M2.5 7.5h17v7h-17zM6 7.5v3.5M9.5 7.5v3.5M13 7.5v3.5M16.5 7.5v3.5" },
-  { id: "pattern", label: "Pattern", icon: "M4.5 3h10l4 4v12h-14zM8 9.5h7M8 13h7M8 16.5h5", disabled: true },
+  { id: "pattern", label: "Pattern", icon: "M4.5 3h10l4 4v12h-14zM8 9.5h7M8 13h7M8 16.5h5" },
 ];
 
 function useIsDesktop(): boolean {
@@ -60,8 +61,21 @@ function useIsDesktop(): boolean {
 }
 
 function CanvasWithTools() {
-  const { model, mode, selectedFabricId, setMode, selectFabric, paintStroke, undo, redo, canUndo, canRedo } =
-    useProject();
+  const {
+    model,
+    mode,
+    selectedFabricId,
+    setMode,
+    selectFabric,
+    paintStroke,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+    seamMerges,
+    seamDrag,
+    seamTap,
+  } = useProject();
   if (model === null) return null;
   return (
     <>
@@ -81,6 +95,9 @@ function CanvasWithTools() {
         mode={mode}
         selectedFabricId={selectedFabricId}
         onPaintStroke={paintStroke}
+        seamMerges={seamMerges}
+        onSeamDrag={seamDrag}
+        onSeamTap={seamTap}
       />
     </>
   );
@@ -88,6 +105,10 @@ function CanvasWithTools() {
 
 function DesktopEditor() {
   const [tab, setTab] = useState<DeskTab>("fabrics");
+  const { setPatternActive } = useProject();
+  useEffect(() => {
+    setPatternActive(tab === "pattern");
+  }, [tab, setPatternActive]);
   return (
     <div data-testid="editor" className="editor editor--desk">
       <section className="canvas-area">
@@ -102,6 +123,7 @@ function DesktopEditor() {
           <PalettePanel />
         </div>
         {tab === "sizing" ? <SizingPanel /> : null}
+        {tab === "pattern" ? <PatternPanel /> : null}
       </aside>
     </div>
   );
@@ -130,12 +152,17 @@ function PhoneTabBar({ tab, onTab }: { tab: PhoneTab; onTab: (tab: PhoneTab) => 
 }
 
 function PhoneEditor({ tab, onTab }: { tab: PhoneTab; onTab: (tab: PhoneTab) => void }) {
+  const { setPatternActive } = useProject();
+  useEffect(() => {
+    setPatternActive(tab === "pattern");
+  }, [tab, setPatternActive]);
   return (
     <div data-testid="editor" className="editor editor--phone">
       <div className="phone-region">
         {tab === "quilt" ? <CanvasWithTools /> : null}
         {tab === "fabrics" ? <PalettePanel /> : null}
         {tab === "sizing" ? <SizingPanel /> : null}
+        {tab === "pattern" ? <PatternPanel /> : null}
       </div>
       <PhoneTabBar tab={tab} onTab={onTab} />
     </div>

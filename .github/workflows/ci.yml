@@ -86,6 +86,10 @@ jobs:
         run: pytest tests/test_wasm_artifacts.py -q
         env:
           QREP_WASM_PDF: web/test-results/spike/booklet.pdf
+      - name: Native pypdf checks on the downloaded booklet (S5)
+        run: pytest tests/test_wasm_artifacts.py -q
+        env:
+          QREP_WASM_PDF: web/test-results/downloads/booklet.pdf
       - name: Upload spike artifacts
         if: always()
         uses: actions/upload-artifact@v4

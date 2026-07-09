@@ -166,19 +166,28 @@ export class EditorStore {
 
 // ------------------------------------------------------------ serialization
 
+/** UI-layer state carried by the wrapper, never by the engine model. */
+export type ProjectUi = Record<string, unknown>;
+
 /** PARITY item 5: the save file wraps the canonical engine model. */
-export function buildProjectFile(model: QuiltModel, name: string): string {
-  return JSON.stringify({ app: "QREP", version: 1, name, model, ui: {} }, null, 2);
+export function buildProjectFile(model: QuiltModel, name: string, ui: ProjectUi = {}): string {
+  return JSON.stringify({ app: "QREP", version: 1, name, model, ui }, null, 2);
 }
 
 interface AutosaveDoc {
   name: string;
   savedAt: number;
   model: QuiltModel;
+  ui: ProjectUi;
 }
 
-export function buildAutosaveDoc(model: QuiltModel, name: string, savedAt: number): string {
-  return JSON.stringify({ app: "QREP", version: 1, name, savedAt, model, ui: {} });
+export function buildAutosaveDoc(
+  model: QuiltModel,
+  name: string,
+  savedAt: number,
+  ui: ProjectUi = {},
+): string {
+  return JSON.stringify({ app: "QREP", version: 1, name, savedAt, model, ui });
 }
 
 /**
@@ -203,6 +212,7 @@ export function parseAutosaveDoc(text: string): AutosaveDoc {
     name: doc.name ?? "Untitled",
     savedAt: doc.savedAt ?? 0,
     model: doc.model!,
+    ui: (doc as { ui?: ProjectUi }).ui ?? {},
   };
 }
 
