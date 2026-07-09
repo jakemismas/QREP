@@ -370,7 +370,10 @@ def resize_unlocked(model_json: str, target_json: str) -> dict:
     if "width" not in target and "height" not in target:
         raise ValueError("resize target needs width or height")
     structure = infer_block_structure(quilt.center.cells)
-    block = structure.size if structure is not None else 1
+    # A single-type structure is the degenerate all-identical tiling of a
+    # uniform grid, not a real block pattern: PARITY item 15 pins that a
+    # blank grid resizes one square at a time.
+    block = structure.size if structure is not None and len(structure.types) > 1 else 1
     border_total = sum(b.width for b in quilt.borders)
     requested: dict = {}
     width = height = None
