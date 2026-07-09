@@ -97,12 +97,8 @@ jobs:
           name: spike-artifacts
           path: web/test-results/spike/
           if-no-files-found: ignore
-      - name: Compose Pages artifact (docs site at root, app under /app/)
-        run: |
-          mkdir -p _site/app
-          cp -r docs/* _site/
-          cp -r web/dist/* _site/app/
-          touch _site/.nojekyll
+      - name: Compose Pages artifact (app at root, docs URLs preserved)
+        run: node web/scripts/compose-site.mjs _site
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
@@ -184,7 +180,7 @@ jobs:
         run: npx playwright test
         working-directory: web
         env:
-          SPIKE_BASE_URL: https://jakemismas.github.io/QREP/app/
+          SPIKE_BASE_URL: https://jakemismas.github.io/QREP/
       - name: Native pypdf checks on the live-site booklet
         run: pytest tests/test_wasm_artifacts.py -q
         env:

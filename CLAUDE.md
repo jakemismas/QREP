@@ -1,11 +1,15 @@
 # QREP
 
-QREP is an open-source Python library and CLI that reverse engineers quilts
-from photographs into production-ready patterns. The design doc
-(qrep-design-doc.md) is binding; the build contract
-(qrep-claude-code-prompt.md) implements it. Anything not in those docs is out
-of scope for v1. Where this Environment section conflicts with a stack pin in
-either doc, this section wins.
+QREP reverse engineers quilts from photographs into production-ready
+patterns. The product surface is the web app (web/, live at
+https://jakemismas.github.io/QREP/); the Python library and CLI remain the
+developer and test surface. The binding docs, in reading order:
+qrep-design-doc.md (v1 engine), docs/sprint-2/qrep-web-design-doc.md (the
+web app; its Amendments section supersedes the v1 "no web app" scope line),
+and docs/design/sprint-2/PARITY.md (UI behavior annex). The build contract
+(qrep-claude-code-prompt.md) implements the v1 doc. Anything not in those
+docs is out of scope. Where this Environment section conflicts with a stack
+pin in any doc, this section wins.
 
 ## Environment
 
