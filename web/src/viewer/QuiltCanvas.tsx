@@ -57,7 +57,12 @@ interface View {
 interface Colors {
   mut: string;
   ink2: string;
+  uncFill: string;
+  uncStroke: string;
 }
+
+/** PARITY item 6: a square is uncertain below this per-cell confidence. */
+const UNCERTAIN_THRESHOLD = 0.9;
 
 interface ModelData {
   cell: number;
@@ -72,6 +77,7 @@ interface ModelData {
   borders: { width: number; color: string }[];
   bindingStroke: string;
   cells: string[][];
+  cellConfidence: number[][] | null;
 }
 
 type Gesture =
@@ -99,7 +105,12 @@ function readColors(): Colors {
     const v = cs.getPropertyValue(name).trim();
     return v || fallback;
   };
-  return { mut: get("--mut", "#8a7a61"), ink2: get("--ink2", "#5d4f39") };
+  return {
+    mut: get("--mut", "#8a7a61"),
+    ink2: get("--ink2", "#5d4f39"),
+    uncFill: get("--uncertain-fill", "rgba(196, 90, 40, 0.32)"),
+    uncStroke: get("--uncertain-stroke", "#d06a35"),
+  };
 }
 
 function prepCanvas(
@@ -204,6 +215,51 @@ function drawStrokePreview(
     if (c.row < 0 || c.row >= md.rows || c.col < 0 || c.col >= md.cols) continue;
     ctx.fillRect(cx0 + c.col * cellPx, cy0 + c.row * cellPx, cellPx + 0.3, cellPx + 0.3);
   }
+}
+
+/**
+ * Low-confidence overlay (S6, PARITY item 6): a translucent terracotta rect
+ * plus outline over every center square whose per-cell confidence is below
+ * 0.90. Fixed uncertain tokens (both skins). Culled to the viewport and drawn
+ * only when squares are large enough to read.
+ */
+function drawUncertainOverlay(
+  ctx: CanvasRenderingContext2D,
+  view: View,
+  md: ModelData,
+  colors: Colors,
+): void {
+  const confidence = md.cellConfidence;
+  if (!confidence) return;
+  const pxPerE = view.ppi / EIGHTHS_PER_INCH;
+  const cellPx = md.cell * pxPerE;
+  if (cellPx < SEAM_MIN_CELL_PX) return;
+  const cx0 = view.panX + md.bandTotal * pxPerE;
+  const cy0 = view.panY + md.bandTotal * pxPerE;
+
+  const colStart = Math.max(0, Math.floor((0 - cx0) / cellPx));
+  const colEnd = Math.min(md.cols - 1, Math.ceil((view.cvW - cx0) / cellPx));
+  const rowStart = Math.max(0, Math.floor((0 - cy0) / cellPx));
+  const rowEnd = Math.min(md.rows - 1, Math.ceil((view.cvH - cy0) / cellPx));
+  if (colStart > colEnd || rowStart > rowEnd) return;
+
+  ctx.save();
+  ctx.fillStyle = colors.uncFill;
+  ctx.strokeStyle = colors.uncStroke;
+  ctx.lineWidth = 1;
+  for (let r = rowStart; r <= rowEnd; r++) {
+    const row = confidence[r];
+    if (!row) continue;
+    for (let c = colStart; c <= colEnd; c++) {
+      const value = row[c];
+      if (value == null || value >= UNCERTAIN_THRESHOLD) continue;
+      const x = cx0 + c * cellPx;
+      const y = cy0 + r * cellPx;
+      ctx.fillRect(x, y, cellPx, cellPx);
+      ctx.strokeRect(x + 0.5, y + 0.5, cellPx - 1, cellPx - 1);
+    }
+  }
+  ctx.restore();
 }
 
 /**
@@ -387,6 +443,7 @@ export function QuiltCanvas({
   seamMerges,
   onSeamDrag,
   onSeamTap,
+  showUncertain = false,
 }: {
   model: QuiltModel;
   mode?: "move" | "paint" | "seams";
@@ -395,6 +452,7 @@ export function QuiltCanvas({
   seamMerges?: string[];
   onSeamDrag?: (edges: string[]) => void;
   onSeamTap?: (cell: { row: number; col: number }) => void;
+  showUncertain?: boolean;
 }) {
   const modelData = useMemo<ModelData>(() => {
     const cell = model.center.cell_size;
@@ -442,6 +500,7 @@ export function QuiltCanvas({
       })),
       bindingStroke: shade(bindingColor, 0.72),
       cells,
+      cellConfidence: model.center.cell_confidence ?? null,
     };
   }, [model]);
 
@@ -460,7 +519,12 @@ export function QuiltCanvas({
   const viewRef = useRef<View>({ ppi: BASE_PPI, panX: 0, panY: 0, fit: true, cvW: 0, cvH: 0 });
   const pointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
   const gestureRef = useRef<Gesture>({ type: "none" });
-  const colorsRef = useRef<Colors>({ mut: "#8a7a61", ink2: "#5d4f39" });
+  const colorsRef = useRef<Colors>({
+    mut: "#8a7a61",
+    ink2: "#5d4f39",
+    uncFill: "rgba(196, 90, 40, 0.32)",
+    uncStroke: "#d06a35",
+  });
   const rafRef = useRef<number>(0);
   const drawRef = useRef<() => void>(() => {});
 
@@ -485,6 +549,8 @@ export function QuiltCanvas({
   const toast = useToast();
   const pushRef = useRef(toast.push);
   pushRef.current = toast.push;
+  const showUncertainRef = useRef(showUncertain);
+  showUncertainRef.current = showUncertain;
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -520,6 +586,9 @@ export function QuiltCanvas({
     if (qctx) {
       qctx.clearRect(0, 0, cvW, cvH);
       drawQuilt(qctx, view, modelData);
+      if (showUncertainRef.current) {
+        drawUncertainOverlay(qctx, view, modelData, colors);
+      }
       drawStrokePreview(qctx, view, modelData, strokeRef.current, selectedFabricRef.current);
       if (modeRef.current === "seams") {
         drawSeamOverlay(qctx, view, modelData, seamMergeSetRef.current);
@@ -931,7 +1000,7 @@ export function QuiltCanvas({
   // reflects a new fix without waiting on the next zoom/pan.
   useEffect(() => {
     scheduleDraw();
-  }, [mode, seamMergeSet, scheduleDraw]);
+  }, [mode, seamMergeSet, showUncertain, scheduleDraw]);
 
   // Fit on mount and whenever the finished dimensions change (a new document).
   // Editing keeps the dimensions, so the current view is preserved.

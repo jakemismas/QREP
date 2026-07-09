@@ -153,6 +153,35 @@ describe("EngineClient", () => {
     await expect(call).resolves.toBe("ok");
   });
 
+  it("streams vision state and prefetch posts load-vision (S6)", () => {
+    const { client, workers } = makeClient();
+    const states: string[] = [];
+    client.onVision((state) => states.push(state));
+    client.start();
+    workers[0].bootDone();
+    expect(states.at(-1)).toBe("cold");
+
+    client.prefetchVision();
+    expect(workers[0].sent.some((m) => m.type === "load-vision")).toBe(true);
+    workers[0].emit({ type: "vision-progress" });
+    expect(states.at(-1)).toBe("loading");
+    workers[0].emit({ type: "vision-ready" });
+    expect(states.at(-1)).toBe("ready");
+  });
+
+  it("vision failure surfaces failed state and restart resets to cold", () => {
+    const { client, workers } = makeClient();
+    const states: string[] = [];
+    client.onVision((state) => states.push(state));
+    client.start();
+    workers[0].bootDone();
+    client.prefetchVision();
+    workers[0].emit({ type: "vision-failed", message: "network" });
+    expect(states.at(-1)).toBe("failed");
+    client.restart();
+    expect(states.at(-1)).toBe("cold");
+  });
+
   it("calls made before boot completes queue and run after ready", async () => {
     const { client, workers } = makeClient();
     client.start();

@@ -57,9 +57,12 @@ from qrep.export.yardage_report import render_yardage_md
 from qrep.model import QrepSchemaError
 from qrep.model.io import loads
 from qrep.model.schema import Quilt
-from qrep.render import save_render
 from qrep.viewer.sizing import locked_resize, round_div, unlocked_resize
-from qrep.vision import compare_models, reverse as reverse_pipeline
+
+# qrep.vision AND qrep.render import cv2 at module load (the renderer for
+# its L2 homography); the browser lazy-loads the vision wheel on first
+# photo use, so reverse(), render(), and compare() import them lazily
+# (enforced by test_bridge_import_does_not_load_cv2).
 
 # PARITY item 4 clamps, integer eighths.
 CELL_MIN = 6  # 3/4"
@@ -218,6 +221,8 @@ def export_pdf(model_json: str, strategy: str) -> dict:
 @_envelope
 def render(model_json: str, level: int, seed: int, scale: int) -> dict:
     """Render the synthetic PNG; returns PNG bytes plus the sidecar dict."""
+    from qrep.render import save_render
+
     if not 0 <= int(level) <= 3:
         raise ValueError(f"level must be 0..3, got {level}")
     quilt = _load(model_json)
@@ -247,12 +252,16 @@ def reverse(image_path: str, options_json: str) -> dict:
     corners = options.get("corners")
     if corners is not None:
         corners = [(float(x), float(y)) for x, y in corners]
+    from qrep.vision import reverse as reverse_pipeline
+
     result = reverse_pipeline(path, corners=corners, fabrics=options.get("fabrics"))
     return {"model": result.quilt.model_dump(mode="json")}
 
 
 @_envelope
 def compare(truth_json: str, recovered_json: str) -> dict:
+    from qrep.vision import compare_models
+
     report = compare_models(_load(truth_json), _load(recovered_json))
     return report.model_dump(mode="json")
 

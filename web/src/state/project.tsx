@@ -12,8 +12,10 @@ import type { ReactNode } from "react";
 import { useEngine } from "../engine/useEngine";
 import type { Engine } from "../engine/useEngine";
 import { EngineError } from "../engine/rpc";
+import type { VisionState } from "../engine/rpc";
 import { parseProjectFile } from "../model/types";
 import type { QuiltModel, ModelSummary } from "../model/types";
+import { classifyDevice, targetSize } from "../model/downscale";
 import { effectiveMerges, pieceEstimate } from "../model/seams";
 import type { SeamFix, SeamStrategy } from "../model/seams";
 import { useToast } from "../ui";
@@ -39,6 +41,108 @@ export type EditorMode = "move" | "paint" | "seams";
 /** The three seam/plan strategies, in card order. */
 const STRATEGIES: SeamStrategy[] = ["historical", "strip", "modern"];
 const DEFAULT_STRATEGY: SeamStrategy = "strip";
+
+// ---- S6 photo reverse (issue #46) --------------------------------------
+
+/** Engine provenance stage keys -> UI stage keys (PARITY vocabulary). */
+const STAGE_NAME_MAP: Record<string, string> = {
+  rectify: "straighten",
+  palette: "colors",
+  grid: "grid",
+  cells: "squares",
+  repeat: "repeats",
+  border: "borders",
+};
+
+/** PARITY item 6: a square is uncertain below this per-cell confidence. */
+const UNCERTAIN_THRESHOLD = 0.9;
+
+/** Normalized [0,1] corner seeds, inset to match the corner-editor pins. */
+const DEFAULT_CORNERS: [number, number][] = [
+  [0.06, 0.06],
+  [0.94, 0.06],
+  [0.94, 0.94],
+  [0.06, 0.94],
+];
+
+function seedCorners(): [number, number][] {
+  return DEFAULT_CORNERS.map((corner) => [...corner]) as [number, number][];
+}
+
+function mapStageConfidence(raw: Record<string, number> | undefined): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (!raw) return out;
+  for (const [key, value] of Object.entries(raw)) out[STAGE_NAME_MAP[key] ?? key] = value;
+  return out;
+}
+
+function countUncertain(confidence: number[][] | null | undefined): number {
+  if (!confidence) return 0;
+  let count = 0;
+  for (const row of confidence) {
+    for (const value of row) if (value < UNCERTAIN_THRESHOLD) count += 1;
+  }
+  return count;
+}
+
+/** Encode a canvas to PNG bytes (worker stages these into MEMFS). */
+function canvasToPngBytes(canvas: HTMLCanvasElement): Promise<Uint8Array> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        reject(new Error("could not encode the photo"));
+        return;
+      }
+      blob.arrayBuffer().then((buffer) => resolve(new Uint8Array(buffer)), reject);
+    }, "image/png");
+  });
+}
+
+/** The recovered analysis surfaced to the results screen. */
+export interface PhotoResult {
+  modelJson: string;
+  stageConfidence: Record<string, number>;
+  uncertainCount: number;
+  reverseMs: number;
+}
+
+/** The photo-reverse flow API (owned by the state layer; PhotoFlow consumes it). */
+export interface PhotoApi {
+  /** True from the dropzone entry until the recovered model opens in the editor. */
+  active: boolean;
+  state: "idle" | "progress" | "results" | "corners";
+  photoUrl: string | null;
+  result: PhotoResult | null;
+  visionState: VisionState;
+  visionBytes: number | null;
+  corners: [number, number][] | null;
+  start: (file: File) => Promise<void>;
+  startSample: () => Promise<void>;
+  cancel: () => void;
+  toCorners: () => void;
+  setCorner: (index: number, xy: [number, number]) => void;
+  resetCorners: () => void;
+  rerunWithCorners: () => Promise<void>;
+  openInEditor: () => void;
+  backToDropzone: () => void;
+  /** Return from the corner editor to the results screen. */
+  backToResults: () => void;
+  /** Retry a stalled vision load (vision-retry affordance on the progress screen). */
+  retryVision: () => void;
+}
+
+/** Round-trip demo panel (render -> reverse -> compare) shown in the Pattern tab. */
+export interface RoundTripApi {
+  run: (level: 0 | 2) => Promise<void>;
+  report: { dimsMatch: boolean; cellAccuracy: number } | null;
+}
+
+/** Derived uncertainty state for the open (photo-sourced) model. */
+export interface UncertaintyApi {
+  count: number;
+  showUncertain: boolean;
+  toggle: () => void;
+}
 
 /** A user-initiated engine export (PARITY item 11). */
 export type ExportKind = "cutlist-csv" | "cutlist-md" | "yardage" | "svg" | "pdf";
@@ -174,6 +278,10 @@ interface ProjectApi {
   setPatternActive: (active: boolean) => void;
   exportDownload: (kind: ExportKind) => Promise<void>;
   copySettings: () => Promise<boolean>;
+  // --- S6 photo reverse + round trip + uncertainty ---
+  photo: PhotoApi;
+  roundtrip: RoundTripApi;
+  uncertainty: UncertaintyApi;
 }
 
 const ProjectContext = createContext<ProjectApi | null>(null);
@@ -237,6 +345,31 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const [dirty, setDirty] = useState(false);
   const [lastResize, setLastResize] = useState<ResizeInfo | null>(null);
   const [restore, setRestore] = useState<RestoreState>(readAutosave);
+
+  // ---- S6 photo reverse state --------------------------------------------
+  const [photoActive, setPhotoActive] = useState(false);
+  const [photoState, setPhotoState] = useState<"idle" | "progress" | "results" | "corners">("idle");
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [photoResult, setPhotoResult] = useState<PhotoResult | null>(null);
+  const [visionState, setVisionState] = useState<VisionState>("cold");
+  const [visionBytes, setVisionBytes] = useState<number | null>(null);
+  const [corners, setCorners] = useState<[number, number][] | null>(null);
+  const [roundtripReport, setRoundtripReport] = useState<
+    { dimsMatch: boolean; cellAccuracy: number } | null
+  >(null);
+  const [showUncertain, setShowUncertain] = useState(false);
+
+  const photoUrlRef = useRef<string | null>(null);
+  photoUrlRef.current = photoUrl;
+  const cornersRef = useRef<[number, number][] | null>(null);
+  cornersRef.current = corners;
+  const photoResultRef = useRef<PhotoResult | null>(null);
+  photoResultRef.current = photoResult;
+  const stagedBytesRef = useRef<Uint8Array | null>(null);
+  const stagedDimsRef = useRef<{ width: number; height: number } | null>(null);
+  const reverseTokenRef = useRef<{ cancelled: boolean }>({ cancelled: false });
+  const retryGateRef = useRef<(() => void) | null>(null);
+  const prefetchedRef = useRef(false);
 
   const [seamStrategy, setSeamStrategy] = useState<SeamStrategy>(DEFAULT_STRATEGY);
   const [seamFix, setSeamFix] = useState<SeamFix>({});
@@ -493,6 +626,325 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     }
     installModel(doc.model, doc.name, doc.ui);
   }, [installModel]);
+
+  // ---- S6 photo reverse flow (issue #46) ---------------------------------
+  //
+  // The state machine is idle(dropzone) -> progress -> results -> corners.
+  // `active` is the app-level "in the photo flow" bit: idle doubles as the
+  // dropzone, so App routes to PhotoFlow on `active`, not on state alone.
+  // The session bitmap (photoUrl) is never persisted (PARITY item 7).
+
+  const setSessionPhoto = useCallback((url: string | null) => {
+    const previous = photoUrlRef.current;
+    if (previous && previous !== url) {
+      try {
+        URL.revokeObjectURL(previous);
+      } catch {
+        /* revoke is best-effort */
+      }
+    }
+    photoUrlRef.current = url;
+    setPhotoUrl(url);
+  }, []);
+
+  // Mirror the RPC vision state onto <body> for the e2e and the loading bar,
+  // and fetch the manifest once for the measured payload size.
+  useEffect(() => {
+    const unsubscribe = engineRef.current.onVision((state) => {
+      try {
+        document.body.dataset.visionState = state;
+      } catch {
+        /* SSR guard; never reached in the browser */
+      }
+      setVisionState(state);
+    });
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+    fetch(new URL("wheels/manifest.json", document.baseURI))
+      .then((response) => response.json())
+      .then((manifest: { visionBytes?: number }) => {
+        if (alive && typeof manifest.visionBytes === "number") setVisionBytes(manifest.visionBytes);
+      })
+      .catch(() => {
+        /* the loading bar shows a placeholder size if the manifest is missing */
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // PARITY item 17: after the engine is ready and the page is idle, quietly
+  // prefetch the vision stack (skipped when the browser signals Save-Data).
+  const enginePhase = engine.status.phase;
+  useEffect(() => {
+    if (enginePhase !== "ready" || prefetchedRef.current) return;
+    const connection = (navigator as { connection?: { saveData?: boolean } }).connection;
+    if (connection?.saveData) return;
+    prefetchedRef.current = true;
+    const run = () => engineRef.current.prefetchVision();
+    const idle = (window as typeof window & { requestIdleCallback?: (cb: () => void) => number })
+      .requestIdleCallback;
+    if (typeof idle === "function") idle(run);
+    else window.setTimeout(run, 1500);
+  }, [enginePhase]);
+
+  const isVisionError = (error: unknown): boolean =>
+    error instanceof EngineError && /vision/i.test(error.message);
+
+  // One reverse attempt with a vision-retry loop: a blocked vision wheel
+  // rejects the call, so we wait for a retry ping (manual or a safety-net
+  // timeout) and re-issue, which re-triggers the worker's lazy vision load.
+  const runReverse = useCallback(
+    async (
+      bytes: Uint8Array,
+      optionsJson: string,
+      token: { cancelled: boolean },
+    ): Promise<{ model: QuiltModel; ms: number }> => {
+      for (;;) {
+        if (token.cancelled) throw new EngineError("worker", "cancelled");
+        try {
+          const started = performance.now();
+          const result = await engineRef.current.call<{ model: QuiltModel }>(
+            "reverse_photo",
+            bytes,
+            optionsJson,
+          );
+          return { model: result.model, ms: performance.now() - started };
+        } catch (error) {
+          if (token.cancelled || !isVisionError(error)) throw error;
+          await new Promise<void>((resolve) => {
+            let done = false;
+            const finish = () => {
+              if (done) return;
+              done = true;
+              retryGateRef.current = null;
+              clearTimeout(timer);
+              resolve();
+            };
+            const timer = setTimeout(finish, 2000);
+            retryGateRef.current = finish;
+          });
+        }
+      }
+    },
+    [],
+  );
+
+  const applyReverse = useCallback((model: QuiltModel, ms: number) => {
+    setPhotoResult({
+      modelJson: JSON.stringify(model),
+      stageConfidence: mapStageConfidence(model.provenance?.stage_confidence),
+      uncertainCount: countUncertain(model.center.cell_confidence),
+      reverseMs: ms,
+    });
+    setPhotoState("results");
+  }, []);
+
+  const start = useCallback(
+    async (file: File): Promise<void> => {
+      setPhotoActive(true);
+      setPhotoState("progress");
+      setPhotoResult(null);
+      setCorners(null);
+      cornersRef.current = null;
+      const token = { cancelled: false };
+      reverseTokenRef.current = token;
+      try {
+        const bitmap = await createImageBitmap(file);
+        const size = targetSize(bitmap.width, bitmap.height, classifyDevice(window.innerWidth));
+        const canvas = document.createElement("canvas");
+        canvas.width = size.width;
+        canvas.height = size.height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) throw new Error("no 2d canvas context");
+        ctx.drawImage(bitmap, 0, 0, size.width, size.height);
+        if (typeof bitmap.close === "function") bitmap.close();
+        const bytes = await canvasToPngBytes(canvas);
+        stagedBytesRef.current = bytes;
+        stagedDimsRef.current = { width: size.width, height: size.height };
+        setSessionPhoto(URL.createObjectURL(file));
+        if (token.cancelled) return;
+        const { model, ms } = await runReverse(bytes, "{}", token);
+        if (token.cancelled) return;
+        applyReverse(model, ms);
+      } catch {
+        if (token.cancelled) return;
+        toast.push("That photo didn’t come through — try another?", "error");
+        setPhotoState("idle");
+      }
+    },
+    [runReverse, applyReverse, setSessionPhoto, toast],
+  );
+
+  const startSample = useCallback(async (): Promise<void> => {
+    setPhotoActive(true);
+    setPhotoState("progress");
+    setPhotoResult(null);
+    setCorners(null);
+    cornersRef.current = null;
+    const token = { cancelled: false };
+    reverseTokenRef.current = token;
+    try {
+      const demoText = await (await fetch(new URL(DEMO_URL, document.baseURI))).text();
+      const rendered = await engineRef.current.call<{ png_b64: string }>(
+        "render",
+        demoText,
+        0,
+        42,
+        10,
+      );
+      if (token.cancelled) return;
+      const bytes = new Uint8Array(base64ToArrayBuffer(rendered.png_b64));
+      stagedBytesRef.current = bytes;
+      try {
+        const bitmap = await createImageBitmap(new Blob([bytes], { type: "image/png" }));
+        stagedDimsRef.current = { width: bitmap.width, height: bitmap.height };
+        if (typeof bitmap.close === "function") bitmap.close();
+      } catch {
+        stagedDimsRef.current = null;
+      }
+      setSessionPhoto(URL.createObjectURL(new Blob([bytes], { type: "image/png" })));
+      const { model, ms } = await runReverse(bytes, "{}", token);
+      if (token.cancelled) return;
+      applyReverse(model, ms);
+    } catch {
+      if (token.cancelled) return;
+      toast.push("The sample didn’t load — try again?", "error");
+      setPhotoState("idle");
+    }
+  }, [runReverse, applyReverse, setSessionPhoto, toast]);
+
+  const cancel = useCallback(() => {
+    reverseTokenRef.current.cancelled = true;
+    retryGateRef.current?.();
+    engineRef.current.restart();
+    setPhotoState("idle");
+    setPhotoResult(null);
+  }, []);
+
+  const retryVision = useCallback(() => {
+    engineRef.current.prefetchVision();
+    retryGateRef.current?.();
+  }, []);
+
+  const toCorners = useCallback(() => {
+    if (cornersRef.current === null) {
+      const seed = seedCorners();
+      cornersRef.current = seed;
+      setCorners(seed);
+    }
+    setPhotoState("corners");
+  }, []);
+
+  const backToResults = useCallback(() => {
+    setPhotoState("results");
+  }, []);
+
+  const setCorner = useCallback((index: number, xy: [number, number]) => {
+    const current = cornersRef.current ?? seedCorners();
+    const next = current.map((c, i) => (i === index ? xy : c)) as [number, number][];
+    cornersRef.current = next;
+    setCorners(next);
+  }, []);
+
+  const resetCorners = useCallback(() => {
+    const seed = seedCorners();
+    cornersRef.current = seed;
+    setCorners(seed);
+  }, []);
+
+  const rerunWithCorners = useCallback(async (): Promise<void> => {
+    const bytes = stagedBytesRef.current;
+    const cornerList = cornersRef.current;
+    if (!bytes || !cornerList) return;
+    setPhotoState("progress");
+    const token = { cancelled: false };
+    reverseTokenRef.current = token;
+    try {
+      // UI corners are normalized [0,1]; scale into staged-image pixel space.
+      const dims = stagedDimsRef.current ?? { width: 1, height: 1 };
+      const pixels = cornerList.map(([x, y]) => [x * dims.width, y * dims.height]);
+      const { model, ms } = await runReverse(bytes, JSON.stringify({ corners: pixels }), token);
+      if (token.cancelled) return;
+      applyReverse(model, ms);
+    } catch {
+      if (token.cancelled) return;
+      toast.push("That re-run didn’t finish — try again?", "error");
+      setPhotoState("results");
+    }
+  }, [runReverse, applyReverse, toast]);
+
+  const openInEditor = useCallback(() => {
+    const result = photoResultRef.current;
+    if (!result) return;
+    let model: QuiltModel;
+    try {
+      model = JSON.parse(result.modelJson) as QuiltModel;
+    } catch {
+      return;
+    }
+    const displayName = model.metadata?.name || "Photo quilt";
+    installModel(model, displayName);
+    // Persist immediately so a reload can resume (the bitmap stays session-only).
+    nameRef.current = displayName;
+    writeAutosave();
+    setPhotoActive(false);
+    setPhotoState("idle");
+    // photoUrl stays: the editor compare affordance reads it until reload.
+  }, [installModel, writeAutosave]);
+
+  const backToDropzone = useCallback(() => {
+    setPhotoActive(true);
+    setPhotoState("idle");
+    setPhotoResult(null);
+    setCorners(null);
+    cornersRef.current = null;
+    setSessionPhoto(null);
+  }, [setSessionPhoto]);
+
+  // ---- round-trip demo panel (render -> reverse -> compare) ----------------
+
+  const runRoundtrip = useCallback(
+    async (level: 0 | 2): Promise<void> => {
+      const s = storeRef.current;
+      if (!s) return;
+      const json = JSON.stringify(s.model);
+      try {
+        const rendered = await engineRef.current.call<{ png_b64: string }>(
+          "render",
+          json,
+          level,
+          42,
+          10,
+        );
+        const bytes = new Uint8Array(base64ToArrayBuffer(rendered.png_b64));
+        const recovered = await engineRef.current.call<{ model: QuiltModel }>(
+          "reverse_photo",
+          bytes,
+          "{}",
+        );
+        const report = await engineRef.current.call<{ dims_match: boolean; cell_accuracy: number }>(
+          "compare",
+          json,
+          JSON.stringify(recovered.model),
+        );
+        setRoundtripReport({ dimsMatch: report.dims_match, cellAccuracy: report.cell_accuracy });
+      } catch (err) {
+        const message =
+          err instanceof EngineError ? err.message : "The round trip didn’t finish — try again?";
+        toast.push(message, "error");
+      }
+    },
+    [toast],
+  );
+
+  // ---- derived uncertainty for the open (photo-sourced) model --------------
+
+  const uncertainCount = useMemo(() => countUncertain(model?.center.cell_confidence), [model]);
+  const toggleUncertain = useCallback(() => setShowUncertain((value) => !value), []);
 
   // ---- editing actions ---------------------------------------------------
 
@@ -761,7 +1213,16 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     setSeamFix({});
     seamFixRef.current = {};
     setPlans({ historical: null, strip: null, modern: null });
-  }, []);
+    // Leaving for home also exits any photo flow and drops the session bitmap.
+    setPhotoActive(false);
+    setPhotoState("idle");
+    setPhotoResult(null);
+    setCorners(null);
+    cornersRef.current = null;
+    setShowUncertain(false);
+    setRoundtripReport(null);
+    setSessionPhoto(null);
+  }, [setSessionPhoto]);
 
   // ---- seams tool (PARITY item 2; preview layer over ui.seamFix) ----------
 
@@ -1011,6 +1472,28 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     setPatternActive,
     exportDownload,
     copySettings,
+    photo: {
+      active: photoActive,
+      state: photoState,
+      photoUrl,
+      result: photoResult,
+      visionState,
+      visionBytes,
+      corners,
+      start,
+      startSample,
+      cancel,
+      toCorners,
+      setCorner,
+      resetCorners,
+      rerunWithCorners,
+      openInEditor,
+      backToDropzone,
+      backToResults,
+      retryVision,
+    },
+    roundtrip: { run: runRoundtrip, report: roundtripReport },
+    uncertainty: { count: uncertainCount, showUncertain, toggle: toggleUncertain },
   };
 
   return <ProjectContext.Provider value={api}>{children}</ProjectContext.Provider>;

@@ -109,6 +109,29 @@ def test_bridge_never_imports_typer():
             assert not name.startswith(("typer", "click")), f"bridge imports {name}"
 
 
+@pytest.mark.skipif(
+    __import__("sys").platform == "emscripten",
+    reason="subprocess is unavailable under wasm; the import graph is "
+    "platform-independent and verified on native CPython",
+)
+def test_bridge_import_does_not_load_cv2():
+    # S6 (issue #46): the vision wheel lazy-loads in the browser on first
+    # photo use, so importing the bridge must not pull cv2 - otherwise the
+    # worker boot would need opencv. Clean interpreter via subprocess.
+    import subprocess
+    import sys
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import qrep.bridge, sys; raise SystemExit(0 if 'cv2' not in sys.modules else 1)",
+        ],
+        capture_output=True,
+    )
+    assert result.returncode == 0, "importing qrep.bridge must not import cv2"
+
+
 # ------------------------------------------------------------------- validate
 
 

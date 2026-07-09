@@ -4,7 +4,6 @@
  * blank-grid card, the autosave resume banner (with the save age), and the
  * loud autosave-error surface for a foreign schema_version.
  */
-import { Tooltip } from "../ui";
 import { useProject } from "../state/project";
 
 /** Human age of an autosave, coarse by design ("saved just now" .. days). */
@@ -52,7 +51,16 @@ function MiniQuilt() {
   );
 }
 
-export function StartScreen({ onOpenProject }: { onOpenProject: () => void }) {
+export function StartScreen({
+  onOpenProject,
+  onStartPhoto,
+}: {
+  onOpenProject: () => void;
+  // Wired by the app shell: entering the photo flow is an app-routing concern,
+  // so the shell passes the callback that mounts PhotoFlow. Optional so the
+  // shell still type-checks before that wiring lands.
+  onStartPhoto?: () => void;
+}) {
   const { openDemo, startBlank, resume, autosaveError, resumeAutosave } = useProject();
 
   return (
@@ -118,18 +126,14 @@ export function StartScreen({ onOpenProject }: { onOpenProject: () => void }) {
             quilt you can repaint, resize and re-plan — with the fabric math done for you.
           </p>
 
-          <Tooltip tip="Coming soon">
-            <span className="start-cta-wrap">
-              <button
-                type="button"
-                data-testid="photo-teaser"
-                className="btn start-cta"
-                disabled
-              >
-                Start from a photo
-              </button>
-            </span>
-          </Tooltip>
+          <button
+            type="button"
+            data-testid="start-photo"
+            className="btn start-cta"
+            onClick={onStartPhoto}
+          >
+            Start from a photo
+          </button>
 
           <button
             type="button"
