@@ -512,5 +512,20 @@ def test_resize_unlocked_blockless_model_moves_by_one():
     assert center["cells"][1][7] == "c"
 
 
+def test_resize_unlocked_uniform_grid_moves_by_single_squares():
+    # PARITY item 15: a uniform single-fabric grid has no real block
+    # structure - the trivial all-identical-blocks tiling must not quantize
+    # resize. Blank-grid-like model: 24 rows x 18 cols of 20 eighths, one
+    # 20-eighth border (border total 20). Width 420: interior 420-40 = 380;
+    # single-square steps give round_div(380,20) = floor((380+10)/20) = 19
+    # cols. (A degenerate block-2 reading would give round_div(380,40)*2 =
+    # 20 - that is the bug this test pins against.)
+    doc = json.loads(mini_model(cell_size=20, band_width=20, rows=24, cols=18))
+    doc["center"]["cells"] = [["c"] * 18 for _ in range(24)]
+    result = ok_result(bridge.resize_unlocked(json.dumps(doc), json.dumps({"width": 420})))
+    assert result["model"]["center"]["cols"] == 19
+    assert result["achieved"]["width"] == 19 * 20 + 40
+
+
 def test_resize_unlocked_no_target_is_value_kind(model_json):
     assert error_of(bridge.resize_unlocked(model_json, "{}"))["kind"] == "value"

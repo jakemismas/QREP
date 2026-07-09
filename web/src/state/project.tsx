@@ -42,6 +42,26 @@ interface RestoreState {
   autosaveError: string | null;
 }
 
+/** A locked/unlocked/cell/preset resize target handed to the bridge. */
+export type ResizeTarget =
+  | { width: number }
+  | { height: number }
+  | { cell: number }
+  | { preset: { width: number; height: number } };
+
+/** The bridge's resize envelope, kept so the panel can show asked-vs-got. */
+export interface ResizeInfo {
+  requested: { width?: number; height?: number; cell?: number };
+  achieved: {
+    width: number;
+    height: number;
+    cell_size: number;
+    rows: number;
+    cols: number;
+    borders: number[];
+  };
+}
+
 interface ProjectApi {
   model: QuiltModel | null;
   name: string;
@@ -59,6 +79,14 @@ interface ProjectApi {
   renameFabric: (id: string, name: string) => void;
   addFabric: () => void;
   deleteFabric: (id: string) => Promise<void>;
+  lastResize: ResizeInfo | null;
+  resizeLocked: (target: ResizeTarget) => Promise<void>;
+  resizeUnlocked: (target: { width?: number; height?: number }) => Promise<void>;
+  setBorderWidth: (index: number, eighths: number) => Promise<void>;
+  setBorderFabric: (index: number, fabricId: string) => Promise<void>;
+  addBorder: () => Promise<void>;
+  removeBorder: (index: number) => Promise<void>;
+  clearResizeHint: () => void;
   undo: () => void;
   redo: () => void;
   saveToFile: () => void;
@@ -129,6 +157,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [lastResize, setLastResize] = useState<ResizeInfo | null>(null);
   const [restore, setRestore] = useState<RestoreState>(readAutosave);
 
   const nameRef = useRef(name);
@@ -228,6 +257,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       setMode("move");
       setSelectedFabricId(next.palette.fabrics[0]?.id ?? null);
       setSummary(null);
+      setLastResize(null);
       refresh();
       requestValidation();
     },
@@ -373,6 +403,123 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     [advanceClock, afterMutation, toast],
   );
 
+  // ---- sizing actions (S4, issue #44) ------------------------------------
+  //
+  // PARITY item 4: every commit adopts the band-scaling bridge model; the JS
+  // preview mirror only makes typing feel immediate. Locked/unlocked resize go
+  // through resize_locked/resize_unlocked; border ops build a candidate and
+  // pass the same validate-then-commit gate deleteFabric uses.
+
+  const runResize = useCallback(
+    async (
+      method: "resize_locked" | "resize_unlocked",
+      target: ResizeTarget | { width?: number; height?: number },
+    ): Promise<void> => {
+      const s = storeRef.current;
+      if (!s) return;
+      let result: ResizeInfo & { model: QuiltModel };
+      try {
+        result = await engineRef.current.call<ResizeInfo & { model: QuiltModel }>(
+          method,
+          JSON.stringify(s.model),
+          JSON.stringify(target),
+        );
+      } catch (err) {
+        const message = err instanceof EngineError ? err.message : "That size didn’t work — try again?";
+        toast.push(message, "error");
+        return;
+      }
+      advanceClock();
+      s.commitCandidate(result.model, "resize");
+      setLastResize({ requested: result.requested, achieved: result.achieved });
+      afterMutation();
+    },
+    [advanceClock, afterMutation, toast],
+  );
+
+  const resizeLocked = useCallback(
+    (target: ResizeTarget): Promise<void> => runResize("resize_locked", target),
+    [runResize],
+  );
+
+  const resizeUnlocked = useCallback(
+    (target: { width?: number; height?: number }): Promise<void> =>
+      runResize("resize_unlocked", target),
+    [runResize],
+  );
+
+  const commitBorderCandidate = useCallback(
+    async (candidate: QuiltModel, kind: string): Promise<boolean> => {
+      const s = storeRef.current;
+      if (!s) return false;
+      try {
+        // The bridge owns referential integrity and band bounds; a bad border
+        // fails here and the model is left untouched (exact deleteFabric shape).
+        await engineRef.current.validate(JSON.stringify(candidate));
+      } catch (err) {
+        const message = err instanceof EngineError ? err.message : "That border can’t be applied.";
+        toast.push(message, "error");
+        return false;
+      }
+      advanceClock();
+      s.commitCandidate(candidate, kind);
+      // A border edit is a fresh commit with no requested finished size, so the
+      // asked-vs-got hint from a prior resize no longer applies.
+      setLastResize(null);
+      afterMutation();
+      return true;
+    },
+    [advanceClock, afterMutation, toast],
+  );
+
+  const setBorderWidth = useCallback(
+    async (index: number, eighths: number): Promise<void> => {
+      const s = storeRef.current;
+      if (!s || !s.model.borders[index]) return;
+      const candidate = structuredClone(s.model);
+      candidate.borders[index].width = eighths;
+      await commitBorderCandidate(candidate, "border-width");
+    },
+    [commitBorderCandidate],
+  );
+
+  const setBorderFabric = useCallback(
+    async (index: number, fabricId: string): Promise<void> => {
+      const s = storeRef.current;
+      if (!s || !s.model.borders[index]) return;
+      const candidate = structuredClone(s.model);
+      candidate.borders[index].fabric_id = fabricId;
+      await commitBorderCandidate(candidate, "border-fabric");
+    },
+    [commitBorderCandidate],
+  );
+
+  const addBorder = useCallback(async (): Promise<void> => {
+    const s = storeRef.current;
+    if (!s) return;
+    const backgroundId = s.model.palette.fabrics[0]?.id;
+    if (backgroundId == null) return;
+    const candidate = structuredClone(s.model);
+    // Innermost = index 0 (the engine stores bands inner-to-outer); 2" default.
+    candidate.borders.unshift({ fabric_id: backgroundId, width: 16 });
+    if (await commitBorderCandidate(candidate, "border-add")) {
+      toast.push("New border added inside the others.", "success");
+    }
+  }, [commitBorderCandidate, toast]);
+
+  const removeBorder = useCallback(
+    async (index: number): Promise<void> => {
+      const s = storeRef.current;
+      if (!s || s.model.borders.length <= 1) return;
+      const candidate = structuredClone(s.model);
+      candidate.borders.splice(index, 1);
+      await commitBorderCandidate(candidate, "border-remove");
+    },
+    [commitBorderCandidate],
+  );
+
+  const clearResizeHint = useCallback(() => setLastResize(null), []);
+
   const undo = useCallback(() => {
     const s = storeRef.current;
     if (!s || !s.canUndo()) return;
@@ -433,6 +580,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     setCanUndo(false);
     setCanRedo(false);
     setDirty(false);
+    setLastResize(null);
   }, []);
 
   // ---- beforeunload guard (registered only while file-dirty) -------------
@@ -468,6 +616,14 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     renameFabric,
     addFabric,
     deleteFabric,
+    lastResize,
+    resizeLocked,
+    resizeUnlocked,
+    setBorderWidth,
+    setBorderFabric,
+    addBorder,
+    removeBorder,
+    clearResizeHint,
     undo,
     redo,
     saveToFile,
