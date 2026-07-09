@@ -36,6 +36,8 @@ function chip(page: Page) {
 
 test("demo quilt renders true to scale with correct rulers", async ({ page }) => {
   await openDemo(page);
+  // #58: the app page carries the product title, not the S0 spike's.
+  await expect(page).toHaveTitle("QREP");
   // Fixture finished dims: 600 x 720 eighths = 75" x 90" (design doc).
   await expect(page.getByTestId("quilt-canvas")).toHaveAttribute("data-finished-width", "600");
   await expect(page.getByTestId("quilt-canvas")).toHaveAttribute("data-finished-height", "720");
