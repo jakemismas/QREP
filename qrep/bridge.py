@@ -117,11 +117,24 @@ def _load(model_json: str) -> Quilt:
 def _summary(quilt: Quilt) -> dict:
     # Batting per PARITY item 9: finished dims + 4" per side = +64 eighths
     # per axis (the same margin convention as the backing formula).
+    counts: dict[str, int] = {}
+    for row in quilt.center.cells:
+        for fabric_id in row:
+            counts[fabric_id] = counts.get(fabric_id, 0) + 1
     return {
         "name": quilt.metadata.name,
         "rows": quilt.center.rows,
         "cols": quilt.center.cols,
         "fabric_count": len(quilt.palette.fabrics),
+        "fabrics": [
+            {
+                "id": f.id,
+                "name": f.name,
+                "color": f.color,
+                "cell_count": counts.get(f.id, 0),
+            }
+            for f in quilt.palette.fabrics
+        ],
         "finished_width": quilt.finished_width,
         "finished_height": quilt.finished_height,
         "batting_width": quilt.finished_width + quilt.settings.backing_margin,
