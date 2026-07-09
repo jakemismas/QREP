@@ -82,3 +82,51 @@ scales, greedy mapping at k > 2).
    (#15-#21): pieced borders, stitch detection, applique regions, colorway
    generator, reference-object absolute scale, machine formats, multi-image
    fusion.
+
+# QREP Sprint 2 report (QREP Web)
+
+Sprint 2 shipped the engine to the browser: the app at
+https://jakemismas.github.io/QREP/ runs the unchanged qrep wheel in a Web
+Worker on a pinned, self-hosted Pyodide 0.28.3 (Python 3.13.2). Slices S0-S7
+landed as issues #40-#47 via PRs #55-#57 and #60-#64. Every number below is a
+fresh measurement taken during S7 against the built artifact and live e2e
+runs on the build machine (desktop Chromium; CI reproduces them in the
+web-spike job's artifacts).
+
+## Payload as shipped (uncompressed bytes in the Pages artifact)
+
+- Core Pyodide runtime (asm.wasm, asm.js, stdlib, lockfile, loader): 11.7 MB
+- Engine wheels (numpy, pillow, pydantic + core deps, micropip,
+  charset-normalizer, reportlab 5.0.0, svgwrite, qrep 0.2.0): 9.8 MB
+- App assets (JS/CSS, hashed filenames): 0.3 MB
+- Python-ready total (no photo use): 21.8 MB, browser-cached afterward
+- Vision wheel (opencv 4.11.0.86), lazy-loaded on first photo use or idle
+  prefetch: 11.2 MB (33.0 MB cumulative)
+
+## Timings (local desktop Chromium, fresh S7 e2e runs)
+
+- Engine boot to Python-ready: 865 ms boot + 556 ms closure load + 281 ms
+  qrep install (about 1.7 s end to end)
+- reverse() on the L0 render, engine call alone (spike path): 506 ms wasm
+  (S0 measured 230 ms native CPython on the same machine)
+- Full photo flow end to end (dropzone upload, downscale, staging, reverse,
+  results): 2449 ms
+- Byte parity: browser cut-list CSV/MD and SVG downloads byte-equal the
+  frozen native goldens (asserted in e2e on every run, including against the
+  live deployed site)
+
+## Cross-runtime test status
+
+The full native pytest suite runs under the pinned Pyodide runtime in CI on
+every push (pyodide-tests job): 196 passed, 2 skipped (the two skips are
+environment-gated - the wasm-artifact opt-in and a subprocess-based test that
+cannot run under emscripten). Zero wasm-only failures all sprint: no
+KNOWN_ISSUES entry was needed for cross-runtime divergence, and cv2.kmeans
+produced confidences identical to native to six decimals on the benchmark.
+
+## Known issues added in sprint 2
+
+None. The suite gained no xfails (guarded by tests/test_known_issues_audit.py).
+The one open measurement gap is the manual iPhone/iPad Safari smoke of the
+photo flow, documented on #46 with the engineering mitigations that bound the
+risk (device-classed downscale caps, lazy vision load, disposable worker).

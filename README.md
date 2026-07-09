@@ -2,17 +2,49 @@
 
 [![CI](https://github.com/jakemismas/QREP/actions/workflows/ci.yml/badge.svg)](https://github.com/jakemismas/QREP/actions/workflows/ci.yml)
 
-QREP (Quilt Reverse Engineering Platform) is an open-source Python library and
-CLI that reverse engineers quilts from photographs into production-ready
-patterns: cut lists, yardage, strip-piecing plans, SVG diagrams, a PDF pattern
-booklet, and an interactive sizing viewer.
+QREP (Quilt Reverse Engineering Platform) turns quilts into production-ready
+patterns: cut lists, yardage, strip-piecing plans, SVG diagrams, and a PDF
+pattern booklet, from a photo or from scratch.
+
+**Use it now: <https://jakemismas.github.io/QREP/>**
+
+It runs entirely in your browser. Your photos and designs never leave your
+device; there is no server and no account. The Python engine that passes this
+repo's test suite runs unchanged in the page through a pinned, self-hosted
+Pyodide runtime.
+
+![The QREP editor with the benchmark Double Irish Chain quilt](docs/media/app-editor.png)
+
+## The web app
+
+Open the link, then load the demo quilt, start from a blank grid, or start
+from a photo.
+
+- Photo to pattern: drop a photo, the vision stages recover the grid, fabrics,
+  repeats, and borders with honest per-stage and per-square confidence; adjust
+  corner pins and re-run when a shot is skewed. The vision engine (about
+  11.2 MB) loads on first photo use only.
+- Edit: paint squares, manage fabrics (recolor is one edit), undo and redo
+  deep history, resize with a proportion lock, add or remove border bands. All
+  sizing math is computed by the Python engine; the app adopts its numbers.
+- Output: three construction strategies with engine metrics, a per-fabric
+  yardage table (binding, backing, batting), five downloads (cut list CSV and
+  Markdown, yardage report, SVG diagram, PDF booklet), a one-page print plan,
+  and a copy-my-settings summary.
+- Saving: your durable save is the downloaded `.qrep.json` project file.
+  Browser autosave is a convenience only; Safari deletes site storage after
+  seven days away, so the app never pretends otherwise.
 
 All lengths live as integer eighths of an inch, so pattern math is exact and
-every export is deterministic. Computer-vision results carry per-stage and
-per-cell confidence scores; hand-authored data is always 1.0. The benchmark
-quilt is a two-fabric Double Irish Chain (75" x 90").
+every export is deterministic: the cut list the browser produces is
+byte-identical to the one the native test suite freezes as a golden file.
 
-## Install
+## The library and CLI (developer surface)
+
+The same engine is a Python library with a pinned CLI, used as the test and
+development harness.
+
+### Install
 
 ```
 git clone https://github.com/jakemismas/QREP.git
@@ -21,13 +53,14 @@ python -m venv .venv
 .venv/Scripts/python -m pip install -e ".[dev]"
 ```
 
-Python 3.12+ (3.12 and 3.13 are tested in CI). On macOS/Linux the venv paths
-are `.venv/bin/...`. The commands below assume the venv is on PATH.
+Python 3.12+ (3.12 and 3.13 are tested in CI, plus the full suite under the
+pinned Pyodide runtime). On macOS/Linux the venv paths are `.venv/bin/...`.
+The commands below assume the venv is on PATH.
 
-## Walkthrough: the benchmark quilt end to end
+### Walkthrough: the benchmark quilt end to end
 
-Every command below was executed verbatim against this repo during Sprint 1
-(see issue #12 for the run log). The benchmark model is committed at
+Every command below was re-executed verbatim during Sprint 2 (see issue #47
+for the run log). The benchmark model is committed at
 `tests/fixtures/double_irish_chain.json`.
 
 Validate the model:
@@ -71,8 +104,8 @@ qrep export tests/fixtures/double_irish_chain.json --strategy strip --out dist/
 ```
 
 Emit the sizing viewer, a single self-contained HTML file quilters can open
-from disk, resize with live rulers (proportion lock on or off), and copy the
-adjusted settings back out of:
+from disk (the web app's Sizing panel supersedes it as the product surface;
+the viewer remains a supported artifact):
 
 ```
 qrep view tests/fixtures/double_irish_chain.json -o viewer.html
@@ -104,19 +137,21 @@ stage confidence (truth | recovered):
 Difficulty levels 0-3 add texture noise, perspective + lighting, and
 folds/clutter/occlusion; see [REPORT.md](REPORT.md) for measured accuracy per
 level. Absolute scale is unknowable from a single photo, so the recovered
-cell size is a labeled low-confidence guess you correct with one edit (or the
-viewer).
+cell size is a labeled low-confidence guess you correct with one edit.
 
 ## Project shape
 
 - `qrep/model` pydantic schema, integer-eighths units, benchmark fixture
 - `qrep/construct` three construction strategies plus metrics and yardage
 - `qrep/export` cut list, yardage, SVG diagrams, PDF booklet
-- `qrep/viewer` the static sizing viewer emitter
 - `qrep/render` seeded synthetic renderer (the CV test oracle), levels L0-L3
 - `qrep/vision` rectify, palette, grid, cells, repeats, borders, compare
+- `qrep/bridge.py` the engine-side seam the web app calls (JSON envelopes)
+- `qrep/viewer` the static sizing viewer emitter (legacy surface)
+- `web/` the app: React + TypeScript, Pyodide worker, vendored pinned runtime
 
-Design decisions live in [qrep-design-doc.md](qrep-design-doc.md); sprint
-status and measured numbers in [REPORT.md](REPORT.md); known limitations in
-[KNOWN_ISSUES.md](KNOWN_ISSUES.md) and issue
+Design decisions live in [qrep-design-doc.md](qrep-design-doc.md) and
+[docs/sprint-2/qrep-web-design-doc.md](docs/sprint-2/qrep-web-design-doc.md);
+sprint status and measured numbers in [REPORT.md](REPORT.md); known
+limitations in [KNOWN_ISSUES.md](KNOWN_ISSUES.md) and issue
 [#33](https://github.com/jakemismas/QREP/issues/33). MIT license.
