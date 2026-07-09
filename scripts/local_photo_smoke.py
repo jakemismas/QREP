@@ -34,7 +34,8 @@ def describe(path: Path) -> None:
     diag = result.diagnostics
     quad = ", ".join(f"({x:.0f}, {y:.0f})" for x, y in diag["detected_corners"])
     rows, cols = diag["interior_dims"]
-    print(f"  quad: {quad}  (identity={diag['identity']})")
+    tier = diag.get("detection_tier", "n/a (pre-S1)")
+    print(f"  quad: {quad}  (identity={diag['identity']}, tier={tier})")
     print(f"  dims: {rows} rows x {cols} cols; pitch_px={diag['pitch_px']}")
     print(f"  repeat_period: {diag['repeat_period']}; palette_k={diag['palette_k']}")
     print(f"  verdict: {diag.get('verdict', 'n/a (pre-S4)')}")

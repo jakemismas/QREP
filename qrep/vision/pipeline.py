@@ -120,6 +120,7 @@ def reverse(
     )
     diagnostics = {
         "identity": rect.identity,
+        "detection_tier": rect.tier,
         "detected_corners": rect.corners,
         "rectified_size": [rect.image.shape[1], rect.image.shape[0]],
         "pitch_px": [grid.x.pitch, grid.y.pitch],
