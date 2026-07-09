@@ -96,9 +96,42 @@ jobs:
         with:
           path: _site
 
+  pyodide-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install web deps
+        run: npm ci
+        working-directory: web
+      - name: Cache vendored wheels
+        uses: actions/cache@v4
+        with:
+          path: web/.vendor-cache
+          key: vendor-${{ hashFiles('web/vendor.lock.json') }}
+      - name: Vendor pinned Pyodide runtime and wheels
+        run: node scripts/vendor.mjs
+        working-directory: web
+      - name: Build qrep wheel
+        run: node scripts/wheel.mjs
+        working-directory: web
+        env:
+          QREP_PYTHON: python
+      - name: Full pytest suite under pinned Pyodide
+        run: node scripts/pytest-pyodide.mjs
+        working-directory: web
+
   deploy-pages:
     if: github.ref == 'refs/heads/main'
-    needs: [test, web-spike]
+    needs: [test, web-spike, pyodide-tests]
     runs-on: ubuntu-latest
     permissions:
       pages: write
