@@ -1,0 +1,43 @@
+{
+  "background": "render",
+  "canvas": [
+    1199,
+    1400
+  ],
+  "cap": 1400,
+  "cells_ref": "double_irish_chain",
+  "character": "squares",
+  "grid": {
+    "border_pitches": 2.5,
+    "cols": 45,
+    "rows": 55
+  },
+  "name": "fabric_print",
+  "palette_hex": [
+    "#9db8d9",
+    "#f2e8d5"
+  ],
+  "quad": [
+    [
+      96.0,
+      96.0
+    ],
+    [
+      1102.0,
+      96.0
+    ],
+    [
+      1102.0,
+      1303.0
+    ],
+    [
+      96.0,
+      1303.0
+    ]
+  ],
+  "repeat_cells": [
+    10,
+    10
+  ],
+  "seed": 42
+}
