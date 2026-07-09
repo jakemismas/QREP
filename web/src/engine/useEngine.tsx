@@ -4,15 +4,21 @@
  */
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { EngineClient, type EngineStatus, type WorkerLike } from "./rpc";
+import { EngineClient, type EngineStatus, type VisionState, type WorkerLike } from "./rpc";
 import type { ModelSummary } from "../model/types";
 
 export interface Engine {
   status: EngineStatus;
   retry: () => void;
+  /** Terminate and re-boot the disposable worker (cancel / recover). */
+  restart: () => void;
   /** bridge.validate: model JSON -> summary (rejects with EngineError). */
   validate: (modelJson: string) => Promise<ModelSummary>;
   call: <T>(method: string, ...args: unknown[]) => Promise<T>;
+  /** Vision wheel lifecycle (S6): subscribe, prefetch, read. */
+  onVision: (listener: (state: VisionState) => void) => () => void;
+  prefetchVision: () => void;
+  getVision: () => VisionState;
 }
 
 function makeWorker(): WorkerLike {
@@ -37,8 +43,12 @@ export function EngineProvider({ children }: { children: ReactNode }) {
     () => ({
       status,
       retry: () => client.restart(),
+      restart: () => client.restart(),
       validate: (modelJson: string) => client.call<ModelSummary>("validate", modelJson),
       call: (method, ...args) => client.call(method, ...args),
+      onVision: (listener) => client.onVision(listener),
+      prefetchVision: () => client.prefetchVision(),
+      getVision: () => client.getVision(),
     }),
     [client, status],
   );

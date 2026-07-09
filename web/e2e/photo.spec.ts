@@ -33,20 +33,16 @@ test.beforeAll(() => {
   mkdirSync(generatedDir, { recursive: true });
   const venvPython = path.join(repoRoot, ".venv", "Scripts", "python.exe");
   const python = process.env.QREP_PYTHON ?? (existsSync(venvPython) ? venvPython : "python");
+  // Direct API call: qrep.cli has no __main__ guard, so `-m qrep.cli` is a
+  // silent no-op. Same seeded renderer the CLI wraps.
   execFileSync(python, [
-    "-m",
-    "qrep.cli",
-    "render",
+    "-c",
+    "import sys; from pathlib import Path; from qrep.model import load; from qrep.render import save_render; " +
+      "save_render(load(sys.argv[1]), Path(sys.argv[2]), level=0, seed=42, scale=10)",
     path.join(repoRoot, "tests", "fixtures", "double_irish_chain.json"),
-    "--level",
-    "0",
-    "--seed",
-    "42",
-    "--scale",
-    "10",
-    "-o",
     l0Path,
   ]);
+  if (!existsSync(l0Path)) throw new Error("fixture render produced no file");
 });
 
 async function uploadPhoto(page: Page): Promise<void> {
@@ -154,13 +150,30 @@ test("pre-prefetch reverse shows the staged loading bar with the measured size",
 });
 
 test("vision loading copy is loading, sized, and cached on repeat", async ({ page }) => {
+  // Hold the opencv fetch open while we read the progress screen: locally
+  // the whole reverse can finish in ~2.5s, faster than transient-screen
+  // assertions can observe.
+  let releaseVision: () => void = () => {};
+  const gate = new Promise<void>((resolve) => {
+    releaseVision = resolve;
+  });
+  await page.route("**/*opencv*", async (route) => {
+    await gate;
+    await route.continue();
+  });
   await page.goto("./");
   await page.getByTestId("start-photo").click();
   await page.getByTestId("photo-file-input").setInputFiles(l0Path);
   const progress = page.getByTestId("photo-progress");
   await expect(progress).toBeVisible();
+  const loading = page.getByTestId("vision-loading");
+  await expect(loading).toBeVisible();
+  // Measured size, loading vocabulary, no download language anywhere.
+  await expect(loading).toContainText("11.2 MB");
+  await expect(loading).toContainText(/loading the vision engine/i);
   const bodyText = (await progress.textContent()) ?? "";
   expect(bodyText).not.toMatch(/download/i);
+  releaseVision();
   await expect(page.getByTestId("photo-results")).toBeVisible({ timeout: REVERSE_TIMEOUT });
 });
 

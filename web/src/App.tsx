@@ -24,6 +24,7 @@ import { OpenModal } from "./shell/OpenModal";
 import { PalettePanel } from "./shell/PalettePanel";
 import { SizingPanel } from "./shell/SizingPanel";
 import { PatternPanel } from "./shell/PatternPanel";
+import PhotoFlow, { RoundTripPanel, Lightbox } from "./shell/PhotoFlow";
 import { QuiltCanvas, EditorToolbar } from "./viewer";
 
 type PhoneTab = "quilt" | "fabrics" | "sizing" | "pattern";
@@ -75,8 +76,15 @@ function CanvasWithTools() {
     seamMerges,
     seamDrag,
     seamTap,
+    photo,
+    uncertainty,
   } = useProject();
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxTab, setLightboxTab] = useState<"photo" | "side" | "quilt">("side");
   if (model === null) return null;
+  const photoSourced = model.provenance?.source === "cv";
+  const showUncertainBtn = photoSourced && uncertainty.count > 0;
+  const showCompareBtn = photoSourced && photo.photoUrl !== null;
   return (
     <>
       <EditorToolbar
@@ -90,6 +98,31 @@ function CanvasWithTools() {
         canUndo={canUndo}
         canRedo={canRedo}
       />
+      {(showUncertainBtn || showCompareBtn) && (
+        <div className="editor-photo-tools">
+          {showUncertainBtn && (
+            <button
+              type="button"
+              data-testid="uncertain-toggle"
+              className={`btn btn--secondary${uncertainty.showUncertain ? " is-active" : ""}`}
+              aria-pressed={uncertainty.showUncertain}
+              onClick={uncertainty.toggle}
+            >
+              {uncertainty.count} uncertain
+            </button>
+          )}
+          {showCompareBtn && (
+            <button
+              type="button"
+              data-testid="open-lightbox"
+              className="btn btn--secondary"
+              onClick={() => setLightboxOpen(true)}
+            >
+              Compare with your photo
+            </button>
+          )}
+        </div>
+      )}
       <QuiltCanvas
         model={model}
         mode={mode}
@@ -98,7 +131,17 @@ function CanvasWithTools() {
         seamMerges={seamMerges}
         onSeamDrag={seamDrag}
         onSeamTap={seamTap}
+        showUncertain={uncertainty.showUncertain}
       />
+      {lightboxOpen && photo.photoUrl !== null && (
+        <Lightbox
+          photoUrl={photo.photoUrl}
+          model={model}
+          tab={lightboxTab}
+          onTab={setLightboxTab}
+          onClose={() => setLightboxOpen(false)}
+        />
+      )}
     </>
   );
 }
@@ -123,7 +166,12 @@ function DesktopEditor() {
           <PalettePanel />
         </div>
         {tab === "sizing" ? <SizingPanel /> : null}
-        {tab === "pattern" ? <PatternPanel /> : null}
+        {tab === "pattern" ? (
+          <>
+            <PatternPanel />
+            <RoundTripPanel />
+          </>
+        ) : null}
       </aside>
     </div>
   );
@@ -162,7 +210,12 @@ function PhoneEditor({ tab, onTab }: { tab: PhoneTab; onTab: (tab: PhoneTab) => 
         {tab === "quilt" ? <CanvasWithTools /> : null}
         {tab === "fabrics" ? <PalettePanel /> : null}
         {tab === "sizing" ? <SizingPanel /> : null}
-        {tab === "pattern" ? <PatternPanel /> : null}
+        {tab === "pattern" ? (
+          <>
+            <PatternPanel />
+            <RoundTripPanel />
+          </>
+        ) : null}
       </div>
       <PhoneTabBar tab={tab} onTab={onTab} />
     </div>
@@ -170,11 +223,13 @@ function PhoneEditor({ tab, onTab }: { tab: PhoneTab; onTab: (tab: PhoneTab) => 
 }
 
 function AppShell() {
-  const { model } = useProject();
+  const { model, photo } = useProject();
   const isDesk = useIsDesktop();
   const [modalOpen, setModalOpen] = useState(false);
   const [tab, setTab] = useState<PhoneTab>("quilt");
   const openModal = useCallback(() => setModalOpen(true), []);
+  // `idle` doubles as the dropzone, so route on the flow flag, not the state.
+  const inPhotoFlow = photo.active;
 
   // A freshly-opened project starts on the Quilt tab (phone). Fire only on the
   // null -> model transition, not on every in-place edit.
@@ -191,9 +246,15 @@ function AppShell() {
   return (
     <div className="app-root">
       <Header isDesk={isDesk} onOpenProject={openModal} />
-      <main className={model === null ? "app-main" : "app-main app-main--editor"}>
-        {model === null ? (
-          <StartScreen onOpenProject={openModal} />
+      <main
+        className={
+          inPhotoFlow || model === null ? "app-main" : "app-main app-main--editor"
+        }
+      >
+        {inPhotoFlow ? (
+          <PhotoFlow />
+        ) : model === null ? (
+          <StartScreen onOpenProject={openModal} onStartPhoto={photo.backToDropzone} />
         ) : isDesk ? (
           <DesktopEditor />
         ) : (
