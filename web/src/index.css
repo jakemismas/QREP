@@ -1,6 +1,451 @@
-/* S0 spike page: intentionally minimal. The design-system styles land in S2. */
+/*
+ * App base styles (S2, issue #42). Design tokens live in ./ui/tokens.css
+ * (owned by the ui slice); this file consumes them and never redefines a
+ * color literal that a token already covers. Font stacks fall back to the
+ * MOCK-NOTES stacks so the shell still renders if tokens.css loads late.
+ */
+@import "./ui/tokens.css";
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
 body {
   margin: 0;
-  background: #fff;
-  color: #1a1a1a;
+  background: var(--bg);
+  color: var(--ink2);
+  font-family: var(--sans, Seravek, "Gill Sans", "Trebuchet MS", Verdana, sans-serif);
+  font-size: 16.5px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+input {
+  font-family: inherit;
+}
+
+@keyframes qFade {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ---------- app frame ---------- */
+
+.app-root {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-main {
+  width: 100%;
+  max-width: 1420px;
+  margin: 0 auto;
+  padding: 16px 14px 44px;
+}
+
+@media (min-width: 720px) {
+  .app-main {
+    padding: 20px 22px 44px;
+  }
+}
+
+@media (max-width: 719px) {
+  .app-main--editor {
+    padding: 12px 12px 96px;
+  }
+}
+
+/* ---------- shared button system (DS section 2) ---------- */
+
+.btn {
+  border: none;
+  border-radius: 10px;
+  font: 500 14.5px var(--sans, sans-serif);
+  color: var(--ink2);
+  background: var(--card);
+  transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.btn--secondary {
+  background: var(--card);
+  border: 1.5px solid var(--line2);
+  border-radius: 10px;
+  padding: 11px 16px;
+  color: var(--ink2);
+}
+
+.btn--secondary:hover:not(:disabled) {
+  background: var(--card2);
+}
+
+.btn--primary {
+  background: var(--accent);
+  color: var(--accentInk);
+  border: none;
+  border-radius: 11px;
+  padding: 13px 20px;
+  font: 600 15.5px var(--sans, sans-serif);
+  box-shadow: 0 4px 12px var(--shadow);
+}
+
+.btn--primary:hover:not(:disabled) {
+  background: var(--accentB);
+}
+
+.btn--link {
+  background: none;
+  border: none;
+  padding: 4px 0;
+  font: 500 14.5px var(--sans, sans-serif);
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ---------- header ---------- */
+
+.qrep-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 16px;
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
+  box-shadow: 0 2px 10px var(--shadow);
+}
+
+.qrep-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  background: none;
+  border: none;
+  padding: 2px 4px;
+  color: var(--ink);
+}
+
+.qrep-wordmark {
+  font: 700 20px var(--serif, "Bookman Old Style", serif);
+  letter-spacing: 0.05em;
+  color: var(--ink);
+}
+
+.qrep-tagline {
+  font: italic 13px var(--serif, "Bookman Old Style", serif);
+  color: var(--mut);
+}
+
+.qrep-projname {
+  flex: 0 1 240px;
+  min-width: 120px;
+  border: 1.5px solid transparent;
+  border-radius: 9px;
+  padding: 8px 10px;
+  font: 600 15.5px var(--sans, sans-serif);
+  color: var(--ink2);
+  background: none;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.qrep-projname:hover {
+  border-color: var(--line2);
+}
+
+.qrep-projname--edit:focus {
+  border-color: var(--accent);
+  outline: none;
+  background: var(--card2);
+}
+
+.qrep-spacer {
+  flex: 1;
+}
+
+.theme-toggle {
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  border: 1.5px solid var(--line2);
+  background: var(--card);
+  color: var(--ink2);
+}
+
+.theme-toggle:hover {
+  background: var(--card2);
+}
+
+/* ---------- start screen ---------- */
+
+.start-screen {
+  max-width: 880px;
+  margin: 30px auto 0;
+  animation: qFade 0.4s ease;
+}
+
+.start-eyebrow {
+  font-size: 12.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--denim);
+  margin: 0 0 10px;
+}
+
+.start-title {
+  margin: 0 0 14px;
+  font: 700 40px var(--serif, "Bookman Old Style", serif);
+  line-height: 1.12;
+  color: var(--denim);
+}
+
+.start-subhead {
+  margin: 0 0 24px;
+  font-size: 17.5px;
+  color: var(--mut);
+  max-width: 56ch;
+}
+
+.start-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 44px;
+  align-items: center;
+}
+
+.start-polaroid {
+  transform: rotate(-2deg);
+  background: #fffdf7;
+  border: 1px solid #e7dcc4;
+  border-radius: 4px;
+  padding: 13px 13px 9px;
+  box-shadow: 0 18px 38px var(--shadow);
+}
+
+.start-polaroid svg {
+  display: block;
+  border-radius: 2px;
+}
+
+.start-polaroid-caption {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-top: 9px;
+}
+
+.start-polaroid-name {
+  font: italic 14px var(--serif, serif);
+  color: #8a7a61;
+}
+
+.start-polaroid-tag {
+  font-size: 12.5px;
+  color: #b3a488;
+}
+
+.start-actions {
+  flex: 1 1 300px;
+  max-width: 430px;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  align-items: flex-start;
+}
+
+.start-lede {
+  margin: 0;
+  font-size: 16.5px;
+  color: var(--ink2);
+}
+
+.start-cta-wrap {
+  display: inline-flex;
+}
+
+.start-cta {
+  border-radius: 12px;
+  padding: 16px 26px;
+  font: 600 18px var(--sans, sans-serif);
+  background: var(--accent);
+  color: var(--accentInk);
+  border: none;
+  box-shadow: 0 4px 12px var(--shadow);
+}
+
+.start-note {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  color: var(--faint);
+}
+
+/* ---------- editor layout ---------- */
+
+.editor {
+  animation: qFade 0.35s ease;
+}
+
+.editor--desk {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.canvas-area {
+  flex: 1 1 560px;
+  min-width: 0;
+}
+
+.side-panel {
+  flex: 0 0 376px;
+  max-width: 376px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.editor--phone {
+  display: block;
+}
+
+.phone-region {
+  display: block;
+}
+
+.phone-tabbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 35;
+  display: flex;
+  gap: 4px;
+  padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
+  background: var(--card);
+  border-top: 1px solid var(--line);
+  box-shadow: 0 -4px 14px var(--shadow);
+}
+
+.phone-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 8px 4px;
+  border: none;
+  border-radius: 11px;
+  background: none;
+  color: var(--mut);
+  font: 600 11.5px var(--sans, sans-serif);
+}
+
+.phone-tab--active {
+  background: var(--card3);
+  color: var(--accent);
+}
+
+.phone-tab:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ---------- open modal body ---------- */
+
+.open-modal-body {
+  font-size: 14.5px;
+  color: var(--mut);
+}
+
+.open-modal-lead {
+  margin: 0 0 16px;
+}
+
+.dropzone {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  border: 2.5px dashed var(--line2);
+  border-radius: 14px;
+  background: var(--card2);
+  padding: 26px 16px;
+  text-align: center;
+  cursor: pointer;
+}
+
+.dropzone:hover {
+  border-color: var(--accent);
+  background: var(--card);
+}
+
+.dropzone svg {
+  color: var(--mut);
+}
+
+.dropzone-title {
+  font: 600 16.5px var(--sans, sans-serif);
+  color: var(--ink2);
+}
+
+.dropzone-sub {
+  font-size: 13.5px;
+  color: var(--faint);
+}
+
+.dropzone-input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.open-modal-footer {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+
+.open-modal-footer .btn {
+  flex: 1;
+  padding: 12px;
+  font-weight: 600;
+  font-size: 15px;
 }

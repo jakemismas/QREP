@@ -1,0 +1,27 @@
+{
+  "comment": "Hand-authored eighths -> mixed-fraction display pairs. Shared parity fixture: tests/test_fraction_parity.py asserts qrep.model.units.format_inches and web/src/model/units.test.ts asserts the TS formatter against the SAME pairs, so the two implementations can never drift. Derivations: value/8 inches, remainder reduced by gcd with 8.",
+  "cases": [
+    { "eighths": 0, "display": "0\"" },
+    { "eighths": 1, "display": "1/8\"" },
+    { "eighths": 2, "display": "1/4\"" },
+    { "eighths": 3, "display": "3/8\"" },
+    { "eighths": 4, "display": "1/2\"" },
+    { "eighths": 5, "display": "5/8\"" },
+    { "eighths": 6, "display": "3/4\"" },
+    { "eighths": 7, "display": "7/8\"" },
+    { "eighths": 8, "display": "1\"" },
+    { "eighths": 10, "display": "1 1/4\"" },
+    { "eighths": 12, "display": "1 1/2\"" },
+    { "eighths": 20, "display": "2 1/2\"" },
+    { "eighths": 30, "display": "3 3/4\"" },
+    { "eighths": 34, "display": "4 1/4\"" },
+    { "eighths": 38, "display": "4 3/4\"" },
+    { "eighths": 96, "display": "12\"" },
+    { "eighths": 600, "display": "75\"" },
+    { "eighths": 664, "display": "83\"" },
+    { "eighths": 720, "display": "90\"" },
+    { "eighths": 785, "display": "98 1/8\"" },
+    { "eighths": -12, "display": "-1 1/2\"" },
+    { "eighths": -2, "display": "-1/4\"" }
+  ]
+}

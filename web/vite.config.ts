@@ -10,6 +10,16 @@ export default defineConfig({
   worker: {
     format: "es",
   },
+  build: {
+    rollupOptions: {
+      // Two pages: the app at the root, the S0 spike page kept reachable at
+      // /spike.html for the gate e2e.
+      input: {
+        main: "index.html",
+        spike: "spike.html",
+      },
+    },
+  },
   test: {
     passWithNoTests: true,
     exclude: ["e2e/**", "node_modules/**"],

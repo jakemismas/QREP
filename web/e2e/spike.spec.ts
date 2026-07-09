@@ -58,7 +58,7 @@ test("S0 spike: closure, cut-list golden, booklet PDF, reverse, MEMFS staging", 
     if (new URL(request.url()).origin !== origin) offOrigin.push(request.url());
   });
 
-  await page.goto("./");
+  await page.goto("./spike.html");
   await page.getByTestId("run-spike").click();
   await expect(page.locator("[data-spike-status='done']")).toBeVisible({ timeout: 540_000 });
 

@@ -130,6 +130,20 @@ def test_validate_happy_summary(model_json):
     assert result["usable_width"] == 336
 
 
+def test_validate_summary_fabric_census(model_json):
+    # S2 fabric-summary criterion: per-fabric center-cell counts come from
+    # the bridge, not JS. Design-doc census over the 45x55 center field:
+    # 1246 blue (b), 1229 cream (c), total 2475 (also pinned by the fixture
+    # tests). Names/colors are the fixture's authored palette.
+    result = ok_result(bridge.validate(model_json))
+    fabrics = {f["id"]: f for f in result["fabrics"]}
+    assert fabrics["b"]["cell_count"] == 1246
+    assert fabrics["c"]["cell_count"] == 1229
+    assert fabrics["b"]["name"] == "Chain blue"
+    assert fabrics["c"]["name"] == "Background cream"
+    assert fabrics["b"]["color"].startswith("#")
+
+
 def test_validate_malformed_json_is_schema_kind():
     assert error_of(bridge.validate("{not json"))["kind"] == "schema"
 
