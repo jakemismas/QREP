@@ -1,0 +1,43 @@
+{
+  "background": "wood",
+  "canvas": [
+    1400,
+    1050
+  ],
+  "cap": 1400,
+  "cells_ref": "double_irish_chain",
+  "character": "squares",
+  "grid": {
+    "border_pitches": 2.5,
+    "cols": 45,
+    "rows": 55
+  },
+  "name": "render_on_wood",
+  "palette_hex": [
+    "#9db8d9",
+    "#f2e8d5"
+  ],
+  "quad": [
+    [
+      350.0,
+      105.0
+    ],
+    [
+      1050.0,
+      105.0
+    ],
+    [
+      1050.0,
+      945.0
+    ],
+    [
+      350.0,
+      945.0
+    ]
+  ],
+  "repeat_cells": [
+    10,
+    10
+  ],
+  "seed": 42
+}

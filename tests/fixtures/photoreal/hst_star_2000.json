@@ -1,0 +1,43 @@
+{
+  "background": "render",
+  "canvas": [
+    1754,
+    2000
+  ],
+  "cap": 2000,
+  "character": "non_square",
+  "grid": {
+    "border_pitches": 0.0,
+    "cols": 24,
+    "rows": 28
+  },
+  "name": "hst_star",
+  "palette_hex": [
+    "#2b3a67",
+    "#926eae",
+    "#f2ead8"
+  ],
+  "quad": [
+    [
+      138.0,
+      138.0
+    ],
+    [
+      1616.0,
+      138.0
+    ],
+    [
+      1616.0,
+      1862.0
+    ],
+    [
+      138.0,
+      1862.0
+    ]
+  ],
+  "repeat_cells": [
+    4,
+    4
+  ],
+  "seed": 42
+}

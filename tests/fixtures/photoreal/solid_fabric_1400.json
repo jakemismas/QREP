@@ -1,0 +1,34 @@
+{
+  "background": "render",
+  "canvas": [
+    1400,
+    1098
+  ],
+  "cap": 1400,
+  "character": "no_pattern",
+  "grid": null,
+  "name": "solid_fabric",
+  "palette_hex": [
+    "#7a8b6f"
+  ],
+  "quad": [
+    [
+      96.0,
+      96.0
+    ],
+    [
+      1303.0,
+      96.0
+    ],
+    [
+      1303.0,
+      1001.0
+    ],
+    [
+      96.0,
+      1001.0
+    ]
+  ],
+  "repeat_cells": null,
+  "seed": 42
+}

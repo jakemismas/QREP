@@ -1,0 +1,42 @@
+{
+  "background": "render",
+  "canvas": [
+    1228,
+    1400
+  ],
+  "cap": 1400,
+  "character": "non_square",
+  "grid": {
+    "border_pitches": 0.0,
+    "cols": 12,
+    "rows": 14
+  },
+  "name": "drunkards_path",
+  "palette_hex": [
+    "#3f7f7a",
+    "#efe7d6"
+  ],
+  "quad": [
+    [
+      96.0,
+      96.0
+    ],
+    [
+      1131.0,
+      96.0
+    ],
+    [
+      1131.0,
+      1303.0
+    ],
+    [
+      96.0,
+      1303.0
+    ]
+  ],
+  "repeat_cells": [
+    2,
+    2
+  ],
+  "seed": 42
+}
