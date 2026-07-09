@@ -1,0 +1,393 @@
+/*
+ * QREP design-system stylesheet (S2). Source of truth: docs/design/sprint-2/
+ * MOCK-NOTES.md "DESIGN SYSTEM" section. This file carries three concerns in
+ * one importable sheet: (1) the themed token set, (2) keyframes + base
+ * document styles, (3) the reusable component classes the ui/ primitives
+ * consume. Components reference these classes and the var(--*) tokens; they
+ * never hard-code color, so light/dark theming is automatic.
+ *
+ * Theme mechanism: ThemeProvider stamps data-skin="light|dark" on <html>.
+ * The bare :root block below is the pre-hydration fallback (light).
+ */
+
+/* -------------------------------------------------------------------------
+ * 1. Tokens that never theme (fabric/overlay/toast/tooltip fixed colors,
+ *    font stacks). Same value in both skins.
+ * ---------------------------------------------------------------------- */
+:root {
+  --serif: 'Bookman Old Style', 'URW Bookman', Bookman, 'Iowan Old Style', Palatino, serif;
+  --sans: Seravek, 'Gill Sans', 'Trebuchet MS', Verdana, sans-serif;
+
+  --uncertain-fill: rgba(196, 90, 40, 0.32);
+  --uncertain-stroke: #d06a35;
+  --toggle-knob: #fffdf7;
+
+  --toast-ok-bg: #43372a;
+  --toast-ok-ink: #fbf4e4;
+  --toast-err-bg: #8c3f22;
+  --toast-err-ink: #fdf6e9;
+
+  --tooltip-bg: #2b2115;
+  --tooltip-ink: #f6ecd9;
+
+  --modal-backdrop: rgba(18, 12, 6, 0.6);
+}
+
+/* -------------------------------------------------------------------------
+ * 2. Themed color tokens. :root (bare) doubles as the light fallback so
+ *    there is no unstyled frame before ThemeProvider runs.
+ * ---------------------------------------------------------------------- */
+:root,
+:root[data-skin="light"] {
+  --bg: #f2ebdc;
+  --card: #fffdf7;
+  --card2: #faf5e8;
+  --card3: #f8f1df;
+  --ink: #453a2a;
+  --ink2: #5d4f39;
+  --mut: #8a7a61;
+  --faint: #a3937a;
+  --line: #e7dcc4;
+  --line2: #d9c8a8;
+  --accent: #a5502f;
+  --accentB: #8c3f22;
+  --accentInk: #fdf6e9;
+  --sage: #4c7a5a;
+  --sageBg: #eef2e2;
+  --sageLn: #d4dcba;
+  --amber: #a8781f;
+  --denim: #53718b;
+  --stage: #e9dfc9;
+  --pill: #fbf7ec;
+  --pillLn: #ddcfb2;
+  --shadow: rgba(96, 66, 28, 0.12);
+
+  /* Accent-tint pair for the proportion-lock locked state (MOCK-NOTES gap
+   * #2 wants a token, not the mock's hard-coded #f6e7da/#cf9a7f). */
+  --accentBg: #f6e7da;
+  --accentLn: #cf9a7f;
+}
+
+:root[data-skin="dark"] {
+  --bg: #211a10;
+  --card: #2e2517;
+  --card2: #382e1d;
+  --card3: #3f3421;
+  --ink: #f0e6d0;
+  --ink2: #ddcfb0;
+  --mut: #b3a184;
+  --faint: #93826a;
+  --line: #453a26;
+  --line2: #5b4b2e;
+  --accent: #d98a5e;
+  --accentB: #e3a077;
+  --accentInk: #2a1305;
+  --sage: #9cc2a1;
+  --sageBg: #2b3722;
+  --sageLn: #48593a;
+  --amber: #d9ae55;
+  --denim: #93b3cf;
+  --stage: #181208;
+  --pill: #382e1d;
+  --pillLn: #5b4b2e;
+  --shadow: rgba(0, 0, 0, 0.45);
+
+  /* Evening equivalents of the accent tint (extrapolated; no dark value
+   * exists in the mock). */
+  --accentBg: #3d2a1c;
+  --accentLn: #7c4a30;
+}
+
+/* -------------------------------------------------------------------------
+ * 3. Keyframes (MOCK-NOTES 1g).
+ * ---------------------------------------------------------------------- */
+@keyframes qSpin {
+  to { transform: rotate(360deg); }
+}
+@keyframes qPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+@keyframes qToast {
+  from { opacity: 0; transform: translate(-50%, 10px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+/* -------------------------------------------------------------------------
+ * 4. Base document styles. Body is 17px sans (MOCK-NOTES: quilters read
+ *    glasses-off); headings are serif.
+ * ---------------------------------------------------------------------- */
+body {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: 17px;
+  line-height: 1.55;
+  color: var(--ink);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  margin: 0;
+  font-family: var(--serif);
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.15;
+}
+
+/* -------------------------------------------------------------------------
+ * 5. Component classes. Consumed by the ui/ primitives. Kept here because
+ *    hover/focus/animation/media rules cannot live in inline styles, and
+ *    this is the one design-system stylesheet.
+ * ---------------------------------------------------------------------- */
+
+/* Button */
+.q-btn {
+  font-family: var(--sans);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.q-btn[data-variant="primary"] {
+  background: var(--accent);
+  color: var(--accentInk);
+  border-radius: 11px;
+  padding: 13px 20px;
+  font-weight: 600;
+  font-size: 15.5px;
+  box-shadow: 0 4px 12px var(--shadow);
+}
+.q-btn[data-variant="primary"]:hover:not(:disabled) {
+  background: var(--accentB);
+}
+.q-btn[data-variant="secondary"] {
+  background: var(--card);
+  color: var(--ink2);
+  border: 1.5px solid var(--line2);
+  border-radius: 10px;
+  padding: 11px 16px;
+  font-weight: 500;
+  font-size: 14.5px;
+}
+.q-btn[data-variant="secondary"]:hover:not(:disabled) {
+  background: var(--card2);
+}
+.q-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.q-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(165, 80, 47, 0.35);
+}
+
+/* Engine status chip */
+.q-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 13px;
+  border: 1px solid var(--pillLn);
+  border-radius: 999px;
+  background: var(--pill);
+  font: 13px var(--sans);
+  color: var(--ink2);
+}
+.q-chip--failed {
+  color: var(--accent);
+}
+.q-chip__label {
+  white-space: nowrap;
+}
+.q-chip__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  flex: none;
+}
+.q-chip__dot--sage { background: var(--sage); }
+.q-chip__dot--amber { background: var(--amber); animation: qPulse 1s ease infinite; }
+.q-chip__dot--accent { background: var(--accent); }
+.q-chip__spin { flex: none; animation: qSpin 0.9s linear infinite; }
+.q-chip__retry {
+  margin-left: 2px;
+  padding: 2px 9px;
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  background: transparent;
+  border: 1px solid var(--pillLn);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.q-chip__retry:hover { background: var(--card2); }
+.q-chip__retry:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(165, 80, 47, 0.35);
+}
+
+/* Toast (fixed bottom-center, never stacks; colors fixed in both themes) */
+.q-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 26px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 24px;
+  border-radius: 999px;
+  font-family: var(--sans);
+  font-size: 15.5px;
+  z-index: 80;
+  white-space: nowrap;
+  max-width: 92vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 10px 26px rgba(30, 18, 6, 0.4);
+  animation: qToast 0.28s ease;
+}
+.q-toast[data-tone="success"] { background: var(--toast-ok-bg); color: var(--toast-ok-ink); }
+.q-toast[data-tone="error"] { background: var(--toast-err-bg); color: var(--toast-err-ink); }
+.q-toast__glyph { flex: none; }
+
+/* Tooltip (hover-only, desktop-only, dark in both themes) */
+.q-tip-wrap {
+  position: relative;
+  display: inline-flex;
+}
+.q-tip {
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  transform: translate(-50%, -9px);
+  background: var(--tooltip-bg);
+  color: var(--tooltip-ink);
+  padding: 7px 12px;
+  border-radius: 8px;
+  font: 13px var(--sans);
+  white-space: nowrap;
+  max-width: 320px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
+  z-index: 90;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.1s ease;
+}
+.q-tip-wrap:hover .q-tip,
+.q-tip-wrap:focus-within .q-tip {
+  opacity: 1;
+  visibility: visible;
+}
+@media (max-width: 719.98px), (pointer: coarse) {
+  .q-tip { display: none; }
+}
+
+/* Modal */
+.q-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+}
+.q-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: var(--modal-backdrop);
+}
+.q-modal__panel {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(420px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+  padding: 24px;
+}
+.q-modal__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.q-modal__title {
+  flex: 1;
+  font-family: var(--serif);
+  font-weight: 700;
+  font-size: 22px;
+  color: var(--denim);
+}
+.q-modal__close {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--card2);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--ink2);
+  font-size: 16px;
+  cursor: pointer;
+}
+.q-modal__close:hover { background: var(--card3); }
+.q-modal__close:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(165, 80, 47, 0.35);
+}
+.q-modal__body {
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: var(--mut);
+}
+
+/* Tabs (segmented control: radius 11 outside / 8 inside) */
+.q-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 5px;
+  background: var(--card2);
+  border-radius: 11px;
+}
+.q-tabs__tab {
+  flex: 1;
+  font-family: var(--sans);
+  font-weight: 600;
+  font-size: 14px;
+  padding: 8px 12px;
+  background: transparent;
+  color: var(--mut);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.q-tabs__tab[data-active="true"] {
+  background: var(--card);
+  border-color: var(--line2);
+  color: var(--accent);
+  box-shadow: 0 2px 6px var(--shadow);
+}
+.q-tabs__tab:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.q-tabs__tab:not(:disabled):not([data-active="true"]):hover {
+  color: var(--ink2);
+}
+.q-tabs__tab:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(165, 80, 47, 0.35);
+}

@@ -22,5 +22,8 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  // Tests run (and are type-handled) under vitest; the app build only
+  // type-checks shipping code.
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]
 }

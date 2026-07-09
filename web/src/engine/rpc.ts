@@ -68,8 +68,11 @@ export class EngineClient {
   private inFlight: QueuedCall | null = null;
   private status: EngineStatus = { phase: "booting", step: "Starting the engine" };
   private listeners = new Set<(status: EngineStatus) => void>();
+  private readonly createWorker: () => WorkerLike;
 
-  constructor(private readonly createWorker: () => WorkerLike) {}
+  constructor(createWorker: () => WorkerLike) {
+    this.createWorker = createWorker;
+  }
 
   start(): void {
     this.booted = false;
