@@ -23,6 +23,8 @@ import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import { useProject } from "../state/project";
 import { QuiltCanvas } from "../viewer";
 import { formatEighths } from "../model/units";
+import { formatCmEquivalent } from "../model/sizeEntry";
+import { PRESETS } from "../model/sizing";
 import type { QuiltModel } from "../model/types";
 import { usePhoto, useRoundTrip, useUncertainty } from "./photoApi";
 import type { PhotoApi } from "./photoApi";
@@ -80,12 +82,7 @@ function visionMb(bytes: number): string {
   return (bytes / (1024 * 1024)).toFixed(1);
 }
 
-function finishedText(model: QuiltModel): string {
-  const bandTotal = model.borders.reduce((sum, b) => sum + b.width, 0);
-  const w = model.center.cols * model.center.cell_size + 2 * bandTotal;
-  const h = model.center.rows * model.center.cell_size + 2 * bandTotal;
-  return `${formatEighths(w)} × ${formatEighths(h)} finished`;
-}
+
 
 // ---------------------------------------------------------------------------
 // Dropzone (photo.state === "idle")
@@ -343,7 +340,7 @@ function Results({ photo }: { photo: PhotoApi }) {
             <QuiltCanvas model={model} showUncertain={showUncertain} />
           </div>
           <div className="pf-recovered-cap">
-            <span>{finishedText(model)}</span>
+            <SizeStory photo={photo} model={model} />
             <span>
               {model.center.cols} &times; {model.center.rows} squares
             </span>
@@ -531,6 +528,155 @@ export function PinOverlay({
   );
 }
 
+/** The S7 size block (UI-SPEC section 2): PRESET chips, W x H fraction
+ * inputs, in/cm toggle. One component, two hosts: the crop screen and the
+ * results inline editor. Squares vocabulary; mixed fractions everywhere. */
+function SizeBlock({ photo, compact }: { photo: PhotoApi; compact?: boolean }) {
+  const size = photo.size;
+  const [widthDraft, setWidthDraft] = useState("");
+  const [heightDraft, setHeightDraft] = useState("");
+
+  // resync drafts from committed state (chip taps, suggestions, seeds)
+  useEffect(() => {
+    setWidthDraft(size.widthEighths === null ? "" : formatEighths(size.widthEighths));
+    setHeightDraft(size.heightEighths === null ? "" : formatEighths(size.heightEighths));
+  }, [size.widthEighths, size.heightEighths]);
+
+  const commit = (which: "width" | "height", draft: string) => {
+    if (!draft.trim()) return;
+    size.editInput(which, draft);
+  };
+
+  return (
+    <div className="pf-size" data-testid="size-block" data-compact={compact || undefined}>
+      {!compact ? (
+        <>
+          <h2 className="pf-size-h">How big is it?</h2>
+          <p className="pf-size-sub">
+            Skip this if you&rsquo;re not sure &mdash; you can set it any time.
+          </p>
+        </>
+      ) : null}
+      <div className="pf-size-chips">
+        {PRESETS.map((preset) => {
+          const suggested = size.suggestedPreset === preset.name;
+          return (
+            <button
+              key={preset.name}
+              type="button"
+              className="pf-chip"
+              data-testid={`size-chip-${preset.name.toLowerCase()}`}
+              data-suggested={suggested || undefined}
+              title={`${formatEighths(preset.width)} \u00d7 ${formatEighths(preset.height)}`}
+              onClick={() => size.tapChip(preset.name)}
+            >
+              {preset.name}
+              {suggested ? <span className="pf-chip-hint">looks about right?</span> : null}
+            </button>
+          );
+        })}
+      </div>
+      <div className="pf-size-row">
+        <input
+          className="pf-size-input"
+          data-testid="size-width"
+          data-suggested={size.source === "suggested" || undefined}
+          placeholder={size.unit === "in" ? "width in" : "width cm"}
+          value={widthDraft}
+          onChange={(e) => setWidthDraft(e.target.value)}
+          onBlur={() => commit("width", widthDraft)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commit("width", widthDraft);
+          }}
+        />
+        <span className="pf-size-x">&times;</span>
+        <input
+          className="pf-size-input"
+          data-testid="size-height"
+          data-suggested={size.source === "suggested" || undefined}
+          placeholder={size.unit === "in" ? "height in" : "height cm"}
+          value={heightDraft}
+          onChange={(e) => setHeightDraft(e.target.value)}
+          onBlur={() => commit("height", heightDraft)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commit("height", heightDraft);
+          }}
+        />
+        <button
+          type="button"
+          className="pf-size-unit"
+          data-testid="size-unit-toggle"
+          data-unit={size.unit}
+          onClick={() => size.toggleUnit()}
+        >
+          in / cm
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** The results size line + asked-vs-got (UI-SPEC 2.4). */
+function SizeStory({ photo, model }: { photo: PhotoApi; model: QuiltModel }) {
+  const [editing, setEditing] = useState(false);
+  const result = photo.result;
+  const sized = result?.diagnostics?.["size_source"] === "user";
+  const achieved = result?.sizeAchieved ?? null;
+  const requested = result?.sizeRequested ?? null;
+  const bandTotal = model.borders.reduce((sum, b) => sum + b.width, 0);
+  const width = achieved?.width ?? model.center.cols * model.center.cell_size + 2 * bandTotal;
+  const height = achieved?.height ?? model.center.rows * model.center.cell_size + 2 * bandTotal;
+  const line = `${formatEighths(width)} \u00d7 ${formatEighths(height)} finished`;
+  const cm = photo.size.enteredInCm
+    ? ` (${formatCmEquivalent(width)} \u00d7 ${formatCmEquivalent(height)} cm)`
+    : "";
+  const askedDiffers =
+    sized &&
+    requested !== null &&
+    ((requested.width !== null && requested.width !== width) ||
+      (requested.height !== null && requested.height !== height));
+  return (
+    <div className="pf-size-story">
+      <button
+        type="button"
+        className="pf-size-line"
+        data-testid="size-line"
+        data-sized={sized || undefined}
+        onClick={() => {
+          photo.size.seedForEdit(width, height);
+          setEditing((v) => !v);
+        }}
+      >
+        {sized ? `${line}${cm} \u2014 tap to edit` : `${line} \u2014 our guess, tap to set the real size`}
+      </button>
+      {askedDiffers && requested ? (
+        <div className="pf-size-asked" data-testid="size-asked-got">
+          You asked for {requested.width !== null ? formatEighths(requested.width) : "?"}
+          {" \u00d7 "}
+          {requested.height !== null ? formatEighths(requested.height) : "?"} &mdash; the squares
+          work out to {formatEighths(width)} &times; {formatEighths(height)}.
+        </div>
+      ) : null}
+      {editing ? (
+        <div className="pf-size-inline" data-testid="size-inline-editor">
+          <SizeBlock photo={photo} compact />
+          <button
+            type="button"
+            className="pf-btn pf-btn--secondary pf-size-apply"
+            data-testid="size-apply"
+            disabled={!photo.size.canApply}
+            onClick={() => {
+              void photo.applySizeFromResults().then(() => setEditing(false));
+            }}
+          >
+            Apply size
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function CropScreen({ photo }: { photo: PhotoApi }) {
   // Reset to auto is meaningful only when the pins differ from their auto
   // target (UI-SPEC section 1); a user move is exactly that condition.
@@ -551,6 +697,8 @@ function CropScreen({ photo }: { photo: PhotoApi }) {
             Finding your quilt&hellip;
           </div>
         ) : null}
+
+        <SizeBlock photo={photo} />
 
         <div className="pf-corner-actions">
           <button
@@ -875,6 +1023,28 @@ const PF_CSS = `
 .pf-btn--secondary:hover:not(:disabled) { background: var(--card2); }
 .pf-btn:disabled { opacity: 0.6; cursor: wait; }
 .pf-timing { font-size: 12.5px; color: var(--faint); padding-top: 2px; }
+
+.pf-size { margin-top: 16px; }
+.pf-size-h { margin: 0 0 2px; font: 700 18px var(--serif); color: var(--denim); }
+.pf-size-sub { margin: 0 0 10px; font-size: 13px; color: var(--faint); }
+.pf-size-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.pf-chip { display: inline-flex; flex-direction: column; align-items: center; gap: 1px; padding: 7px 13px; border-radius: 999px; border: 1.5px solid var(--line2); background: var(--card); color: var(--ink2); font: 600 13.5px var(--sans); cursor: pointer; }
+.pf-chip:hover { border-color: var(--accent); }
+.pf-chip[data-suggested] { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(165,80,47,0.18); }
+.pf-chip-hint { font: 500 10.5px var(--sans); color: var(--accent); }
+.pf-size-row { display: flex; align-items: center; gap: 8px; }
+.pf-size-input { width: 108px; padding: 9px 10px; font: 500 14.5px var(--sans); color: var(--ink); background: var(--card); border: 1.5px solid var(--line2); border-radius: 9px; }
+.pf-size-input[data-suggested] { color: var(--faint); }
+.pf-size-x { color: var(--faint); }
+.pf-size-unit { padding: 8px 11px; border-radius: 9px; border: 1.5px solid var(--line2); background: var(--card2); color: var(--ink2); font: 600 12.5px var(--sans); cursor: pointer; }
+.pf-size-unit[data-unit="cm"] { color: var(--accent); border-color: var(--accent); }
+.pf-size-story { display: flex; flex-direction: column; gap: 6px; }
+.pf-size-line { background: none; border: none; padding: 0; text-align: left; font-size: 13.5px; color: var(--accent); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.pf-size-asked { font-size: 12.5px; color: var(--mut); }
+.pf-size-inline { margin-top: 6px; padding: 10px; border: 1px dashed var(--line2); border-radius: 10px; }
+.pf-size-apply { width: auto; margin-top: 8px; padding: 9px 14px; font-size: 14px; }
+@media (max-width: 400px) { .pf-size-chips { max-width: 100%; } }
+@media (max-width: 720px) { .pf-corner-img { max-height: 48vh; } }
 
 .pf-detecting { display: flex; align-items: center; gap: 9px; margin-top: 12px; font-size: 14px; color: var(--mut); }
 .pf-corner-stage { display: flex; justify-content: center; }
