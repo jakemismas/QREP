@@ -124,6 +124,7 @@ export function StartScreen({
           <p className="start-lede">
             Lay the quilt flat, take one straight-on shot, and drop it in. You get back a
             quilt you can repaint, resize and re-plan — with the fabric math done for you.
+            Size is optional: QREP guesses until you set the real one.
           </p>
 
           <button

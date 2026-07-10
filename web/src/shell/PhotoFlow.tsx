@@ -24,6 +24,7 @@ import { useProject } from "../state/project";
 import { QuiltCanvas } from "../viewer";
 import { formatEighths } from "../model/units";
 import { formatCmEquivalent } from "../model/sizeEntry";
+import { verdictStory } from "../model/verdictStory";
 import { PRESETS } from "../model/sizing";
 import type { QuiltModel } from "../model/types";
 import { usePhoto, useRoundTrip, useUncertainty } from "./photoApi";
@@ -103,7 +104,8 @@ function Dropzone({ photo, onHome }: { photo: PhotoApi; onHome: () => void }) {
       </button>
       <h1 className="pf-h1">Start from a photo</h1>
       <p className="pf-lede">
-        Flat, straight-on shots in daylight work best. QREP straightens small angles for you.
+        Flat, straight-on shots in daylight work best. QREP straightens small angles for you. A
+        photo, a screenshot, or a shop listing picture all work.
       </p>
 
       <div
@@ -183,6 +185,12 @@ function Progress({ photo }: { photo: PhotoApi }) {
   }, [photo.visionState]);
 
   const result = photo.result;
+  // S8 (issue #74, UI-SPEC section 5): rows at/after the failure point show
+  // a neutral dash. Only dashedStages is read here; the grid arg is unused
+  // by that field, so a placeholder grid is passed.
+  const dashed = result
+    ? verdictStory(result, { cols: 1, rows: 1, cellSize: 8 }).dashedStages
+    : [];
   const sized =
     photo.visionBytes != null ? ` - about ${visionMb(photo.visionBytes)} MB` : "";
   const showCached = cached && photo.visionState !== "loading";
@@ -232,6 +240,21 @@ function Progress({ photo }: { photo: PhotoApi }) {
 
         <div className="pf-stages">
           {STAGES.map((stage) => {
+            if (dashed.includes(stage.ui)) {
+              return (
+                <div
+                  key={stage.ui}
+                  className="pf-stage"
+                  data-testid={`stage-${stage.ui}`}
+                  data-dashed
+                >
+                  <span className="pf-stage-icon pf-stage-dash" aria-hidden="true">
+                    &ndash;
+                  </span>
+                  <span className="pf-stage-label">{stage.label}</span>
+                </div>
+              );
+            }
             const conf = result ? stageConf(result.stageConfidence, stage) : null;
             const done = conf != null;
             const pct = done ? Math.round(conf * 100) : 0;
@@ -307,21 +330,45 @@ function Results({ photo }: { photo: PhotoApi }) {
 
   const confs = STAGES.map((stage) => stageConf(result.stageConfidence, stage));
   const pill = overallPill(confs);
+  const story = verdictStory(result, {
+    cols: model.center.cols,
+    rows: model.center.rows,
+    cellSize: model.center.cell_size,
+  });
   const uncCount = uncertainty?.count ?? result.uncertainCount;
   const showUncertain = uncertainty?.showUncertain ?? false;
   const showToggle = uncCount > 0;
 
   return (
-    <div className="pf-wrap" data-testid="photo-results" data-screen-label="Photo results">
+    <div
+      className="pf-wrap"
+      data-testid="photo-results"
+      data-screen-label="Photo results"
+      data-verdict={result.verdict ?? "readable"}
+    >
       <div className="pf-results-head">
         <h1 className="pf-h1">Here&rsquo;s what we found</h1>
-        <span
-          className={`pf-pill pf-pill--${pill.tone}`}
-          data-testid="overall-pill"
-          data-value={pill.pct / 100}
-        >
-          Overall confidence {pill.pct}% - {pill.word}
-        </span>
+        {story.pill.mode === "failure" ? (
+          <span className="pf-pill pf-pill--accent" data-testid="overall-pill" data-failure>
+            {story.pill.text}
+          </span>
+        ) : story.pill.mode === "nonsquare" ? (
+          <span
+            className={`pf-pill pf-pill--${pill.tone}`}
+            data-testid="overall-pill"
+            data-value={pill.pct / 100}
+          >
+            {story.pill.text} ({pill.pct}%)
+          </span>
+        ) : (
+          <span
+            className={`pf-pill pf-pill--${pill.tone}`}
+            data-testid="overall-pill"
+            data-value={pill.pct / 100}
+          >
+            Overall confidence {pill.pct}% - {pill.word}
+          </span>
+        )}
       </div>
 
       <div className="pf-results-grid">
@@ -336,15 +383,83 @@ function Results({ photo }: { photo: PhotoApi }) {
 
         <div className="pf-panel">
           <div className="pf-panel-eyebrow">Recovered quilt</div>
-          <div className="pf-recovered">
-            <QuiltCanvas model={model} showUncertain={showUncertain} />
-          </div>
-          <div className="pf-recovered-cap">
-            <SizeStory photo={photo} model={model} />
-            <span>
-              {model.center.cols} &times; {model.center.rows} squares
-            </span>
-          </div>
+          {story.failurePanel ? (
+            <div className="pf-fail" data-testid="failure-panel">
+              <h2 className="pf-fail-title">{story.failurePanel.title}</h2>
+              <p className="pf-fail-reason">{story.failurePanel.reason}</p>
+              <div className="pf-fail-actions">
+                <button
+                  type="button"
+                  className="pf-btn pf-btn--primary"
+                  data-testid="failure-adjust-crop"
+                  onClick={() => photo.toCrop()}
+                >
+                  Adjust the crop
+                </button>
+                <details className="pf-tips" data-testid="failure-tips">
+                  <summary>Photo tips</summary>
+                  <ul>
+                    <li>Fill the frame with the quilt.</li>
+                    <li>Shoot square-on, not at an angle.</li>
+                    <li>Even light beats a bright window behind the quilt.</li>
+                  </ul>
+                </details>
+                <button
+                  type="button"
+                  className="pf-btn pf-btn--secondary"
+                  data-testid="failure-start-editor"
+                  onClick={() => photo.startInEditorFromFailure()}
+                >
+                  Start in the editor
+                </button>
+              </div>
+            </div>
+          ) : null}
+          {story.infoPanel ? (
+            <div className="pf-info" data-testid="nonsquare-panel">
+              <h2 className="pf-info-title">{story.infoPanel.title}</h2>
+              {story.infoPanel.period ? (
+                <p className="pf-info-line">{story.infoPanel.period}</p>
+              ) : null}
+              {story.infoPanel.sizeInvite ? (
+                <p className="pf-info-line">Know the size? Add it for a better answer.</p>
+              ) : null}
+            </div>
+          ) : null}
+          {story.disclosure ? (
+            <details className="pf-disclose" data-testid="verdict-disclosure">
+              <summary data-testid="verdict-disclosure-summary">{story.disclosure.label}</summary>
+              <div className="pf-wrong-banner" data-testid="wrong-banner">
+                {story.disclosure.banner}
+              </div>
+              <div className="pf-recovered">
+                <QuiltCanvas model={model} showUncertain={showUncertain} />
+              </div>
+              <div className="pf-recovered-cap">
+                <SizeStory photo={photo} model={model} />
+                <span>
+                  {model.center.cols} &times; {model.center.rows} squares
+                </span>
+              </div>
+            </details>
+          ) : (
+            <>
+              <div className="pf-recovered">
+                <QuiltCanvas model={model} showUncertain={showUncertain} />
+              </div>
+              <div className="pf-recovered-cap">
+                <SizeStory photo={photo} model={model} />
+                <span>
+                  {model.center.cols} &times; {model.center.rows} squares
+                </span>
+              </div>
+              {story.caption ? (
+                <p className="pf-caption" data-testid="verdict-caption">
+                  {story.caption}
+                </p>
+              ) : null}
+            </>
+          )}
         </div>
 
         <div className="pf-side">
@@ -397,14 +512,16 @@ function Results({ photo }: { photo: PhotoApi }) {
           </div>
 
           <div className="pf-actions">
-            <button
-              type="button"
-              className="pf-btn pf-btn--primary"
-              data-testid="open-in-editor"
-              onClick={() => photo.openInEditor()}
-            >
-              Open in the editor
-            </button>
+            {story.failurePanel ? null : (
+              <button
+                type="button"
+                className="pf-btn pf-btn--primary"
+                data-testid="open-in-editor"
+                onClick={() => photo.openInEditor()}
+              >
+                Open in the editor
+              </button>
+            )}
             <button
               type="button"
               className="pf-btn pf-btn--secondary"
@@ -1024,6 +1141,19 @@ const PF_CSS = `
 .pf-btn:disabled { opacity: 0.6; cursor: wait; }
 .pf-timing { font-size: 12.5px; color: var(--faint); padding-top: 2px; }
 
+.pf-fail { border: 1.5px solid var(--accent); border-radius: 14px; padding: 14px; margin-bottom: 12px; background: var(--card2); }
+.pf-fail-title { margin: 0 0 6px; font: 700 19px var(--serif); color: var(--denim); }
+.pf-fail-reason { margin: 0 0 12px; font-size: 14px; color: var(--mut); }
+.pf-fail-actions { display: flex; flex-direction: column; gap: 8px; }
+.pf-tips summary { cursor: pointer; color: var(--accent); font-size: 13.5px; }
+.pf-tips ul { margin: 6px 0 0 18px; padding: 0; font-size: 13px; color: var(--mut); }
+.pf-info { border: 1px solid var(--line2); border-radius: 14px; padding: 12px 14px; margin-bottom: 12px; background: var(--card2); }
+.pf-info-title { margin: 0 0 6px; font: 700 15.5px var(--serif); color: var(--denim); }
+.pf-info-line { margin: 0 0 4px; font-size: 13.5px; color: var(--mut); }
+.pf-disclose summary { cursor: pointer; color: var(--accent); font-size: 13.5px; padding: 4px 0; }
+.pf-wrong-banner { background: var(--pill); border: 1px solid var(--accent); color: var(--accent); border-radius: 9px; padding: 7px 10px; font-size: 12.5px; font-weight: 600; margin: 8px 0; }
+.pf-caption { margin: 6px 0 0; font-size: 13.5px; color: var(--mut); }
+.pf-stage-dash { color: var(--faint); font-weight: 700; }
 .pf-size { margin-top: 16px; }
 .pf-size-h { margin: 0 0 2px; font: 700 18px var(--serif); color: var(--denim); }
 .pf-size-sub { margin: 0 0 10px; font-size: 13px; color: var(--faint); }

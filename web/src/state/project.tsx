@@ -20,6 +20,7 @@ import { effectiveMerges, pieceEstimate } from "../model/seams";
 import type { SeamFix, SeamStrategy } from "../model/seams";
 import { useToast } from "../ui";
 import { SizeEntryState } from "../model/sizeEntry";
+import { paletteGate } from "../model/verdictStory";
 import type { SizeSource, SizeUnit } from "../model/sizeEntry";
 import { PhotoFlowMachine } from "./photoFlow";
 import type { PhotoScreen, QuadSource } from "./photoFlow";
@@ -160,6 +161,8 @@ export interface PhotoApi {
   resetToAuto: () => void;
   backFromCrop: () => void;
   openInEditor: () => void;
+  /** S8 (issue #74): blank-grid escape from a failure verdict. */
+  startInEditorFromFailure: () => void;
   backToDropzone: () => void;
   /** Retry a stalled vision load (vision-retry affordance on the progress screen). */
   retryVision: () => void;
@@ -1066,6 +1069,37 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     // photoUrl stays: the editor compare affordance reads it until reload.
   }, [installModel, writeAutosave]);
 
+  const startInEditorFromFailure = useCallback(() => {
+    // S8 (issue #74): the recovered LAYOUT is wrong by definition on a
+    // failure verdict, but the fabric palette can still be worth keeping.
+    // Gate on the frozen trust bounds (paletteGate); below them a plain
+    // blank grid - prefilled junk fabrics would undermine the honesty theme.
+    const blank = makeBlankModel();
+    const result = photoResultRef.current;
+    if (result) {
+      try {
+        const recovered = JSON.parse(result.modelJson) as QuiltModel;
+        const fabrics = recovered.palette?.fabrics ?? [];
+        const conf = result.stageConfidence["palette"] ?? 0;
+        if (fabrics.length > 0 && paletteGate(conf, fabrics.length)) {
+          const bg = fabrics[0].id;
+          blank.palette = { fabrics };
+          blank.center.cells = blank.center.cells.map((row) => row.map(() => bg));
+          blank.borders = [{ fabric_id: bg, width: blank.borders[0]?.width ?? 20 }];
+          blank.binding = { fabric_id: fabrics[1]?.id ?? bg };
+        }
+      } catch {
+        /* junk model JSON: plain blank grid */
+      }
+    }
+    const displayName = blank.metadata.name || "New quilt";
+    installModel(blank, displayName);
+    nameRef.current = displayName;
+    writeAutosave();
+    setPhotoActive(false);
+    setPhotoState("idle");
+  }, [installModel, writeAutosave]);
+
   const backToDropzone = useCallback(() => {
     setPhotoActive(true);
     machineRef.current.reset();
@@ -1697,6 +1731,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       resetToAuto,
       backFromCrop,
       openInEditor,
+      startInEditorFromFailure,
       backToDropzone,
       retryVision,
     },
