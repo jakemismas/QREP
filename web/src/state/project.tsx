@@ -19,6 +19,8 @@ import { classifyDevice, targetSize } from "../model/downscale";
 import { effectiveMerges, pieceEstimate } from "../model/seams";
 import type { SeamFix, SeamStrategy } from "../model/seams";
 import { useToast } from "../ui";
+import { SizeEntryState } from "../model/sizeEntry";
+import type { SizeSource, SizeUnit } from "../model/sizeEntry";
 import { PhotoFlowMachine } from "./photoFlow";
 import type { PhotoScreen, QuadSource } from "./photoFlow";
 import {
@@ -110,6 +112,9 @@ export interface PhotoResult {
   /** S4 (issue #70), additive: the verdict contract. S8 renders these. */
   verdict?: string;
   diagnostics?: Record<string, unknown>;
+  /** S6/S7 (issues #72/#73), additive: the size story. */
+  sizeRequested?: { width: number | null; height: number | null } | null;
+  sizeAchieved?: { width: number; height: number } | null;
 }
 
 /** The photo-reverse flow API (owned by the state layer; PhotoFlow consumes it).
@@ -133,6 +138,21 @@ export interface PhotoApi {
   quadSource: "default" | "detected" | "user" | "seeded";
   stage: (file: File) => Promise<void>;
   analyze: () => Promise<void>;
+  /** S7 (issue #73): the size block state + gestures (UI-SPEC section 2). */
+  size: {
+    widthEighths: number | null;
+    heightEighths: number | null;
+    source: SizeSource;
+    unit: SizeUnit;
+    enteredInCm: boolean;
+    suggestedPreset: string | null;
+    editInput: (which: "width" | "height", text: string) => boolean;
+    tapChip: (name: string) => void;
+    toggleUnit: () => void;
+    seedForEdit: (width: number, height: number) => void;
+    canApply: boolean;
+  };
+  applySizeFromResults: () => Promise<void>;
   startSample: () => Promise<void>;
   cancel: () => void;
   toCrop: () => void;
@@ -362,6 +382,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
 
   // ---- S6/S2 photo reverse state ------------------------------------------
   const machineRef = useRef<PhotoFlowMachine>(new PhotoFlowMachine());
+  const sizeRef = useRef<SizeEntryState>(new SizeEntryState());
   const [photoActive, setPhotoActive] = useState(false);
   const [photoState, setPhotoState] = useState<PhotoScreen>("idle");
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
@@ -377,7 +398,9 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   >(null);
   const [showUncertain, setShowUncertain] = useState(false);
 
-  // mirror the pure machine into React state after every transition
+  const [, setSizeMirror] = useState(0);
+
+  // mirror the pure machines into React state after every transition
   const syncPhoto = useCallback(() => {
     const m = machineRef.current;
     setPhotoState(m.state);
@@ -385,6 +408,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     setDetectedQuad(m.detectedQuad);
     setDetectPending(m.detectPending);
     setQuadSource(m.quadSource);
+    setSizeMirror((v) => v + 1);
   }, []);
 
   const photoUrlRef = useRef<string | null>(null);
@@ -733,6 +757,8 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       model: QuiltModel;
       verdict?: string;
       diagnostics?: Record<string, unknown>;
+      requested?: { width: number | null; height: number | null } | null;
+      achieved?: { width: number; height: number } | null;
       ms: number;
     }> => {
       for (;;) {
@@ -743,11 +769,15 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
             model: QuiltModel;
             verdict?: string;
             diagnostics?: Record<string, unknown>;
+            requested?: { width: number | null; height: number | null };
+            achieved?: { width: number; height: number };
           }>("reverse_photo", payload, optionsJson);
           return {
             model: result.model,
             verdict: result.verdict,
             diagnostics: result.diagnostics,
+            requested: result.requested ?? null,
+            achieved: result.achieved ?? null,
             ms: performance.now() - started,
           };
         } catch (error) {
@@ -776,6 +806,8 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       ms: number,
       verdict?: string,
       diagnostics?: Record<string, unknown>,
+      requested?: { width: number | null; height: number | null } | null,
+      achieved?: { width: number; height: number } | null,
     ) => {
       setPhotoResult({
         modelJson: JSON.stringify(model),
@@ -784,6 +816,8 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         reverseMs: ms,
         verdict,
         diagnostics,
+        sizeRequested: requested ?? null,
+        sizeAchieved: achieved ?? null,
       });
     },
     [],
@@ -808,6 +842,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       setPhotoActive(true);
       setPhotoResult(null);
       stagedTokenRef.current = null;
+      sizeRef.current.reset();
       const seq = machineRef.current.enterCrop();
       syncPhoto();
       setSessionPhoto(URL.createObjectURL(file));
@@ -832,6 +867,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
           tier: detected.tier,
           confidence: detected.confidence,
         });
+        sizeRef.current.suggest(detected.predicted_size?.preset ?? null);
         syncPhoto();
       } catch {
         // the crop screen stays fully usable on default pins; the finding-
@@ -853,15 +889,24 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     reverseTokenRef.current = token;
     try {
       const dims = stagedDimsRef.current ?? { width: 1, height: 1 };
-      const optionsJson = passed
-        ? JSON.stringify({ corners: passed.map(([x, y]) => [x * dims.width, y * dims.height]) })
-        : "{}";
+      const options: Record<string, unknown> = {};
+      if (passed) {
+        options.corners = passed.map(([x, y]) => [x * dims.width, y * dims.height]);
+      }
+      const sized = sizeRef.current.sizeOptions();
+      if (sized) {
+        options.finished_width = sized.finished_width;
+        options.finished_height = sized.finished_height;
+      }
+      const optionsJson = Object.keys(options).length ? JSON.stringify(options) : "{}";
       let staged = await ensureStagedToken();
       if (!staged) throw new Error("no staged photo");
       let outcome: {
         model: QuiltModel;
         verdict?: string;
         diagnostics?: Record<string, unknown>;
+        requested?: { width: number | null; height: number | null } | null;
+        achieved?: { width: number; height: number } | null;
         ms: number;
       };
       try {
@@ -879,7 +924,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         outcome = await runReverse(staged, optionsJson, token);
       }
       if (token.cancelled) return;
-      applyReverse(outcome.model, outcome.ms, outcome.verdict, outcome.diagnostics);
+      applyReverse(outcome.model, outcome.ms, outcome.verdict, outcome.diagnostics, outcome.requested, outcome.achieved);
       machineRef.current.results();
       syncPhoto();
     } catch {
@@ -921,7 +966,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       setSessionPhoto(URL.createObjectURL(new Blob([bytes], { type: "image/png" })));
       const outcome = await runReverse(bytes, "{}", token);
       if (token.cancelled) return;
-      applyReverse(outcome.model, outcome.ms, outcome.verdict, outcome.diagnostics);
+      applyReverse(outcome.model, outcome.ms, outcome.verdict, outcome.diagnostics, outcome.requested, outcome.achieved);
       machineRef.current.results();
       syncPhoto();
     } catch {
@@ -948,6 +993,30 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     engineRef.current.prefetchVision();
     retryGateRef.current?.();
   }, []);
+
+  // S7: inline size edit from results via apply_finished_size (no re-run)
+  const applySizeFromResults = useCallback(async (): Promise<void> => {
+    const current = photoResultRef.current;
+    const sized = sizeRef.current.sizeOptions();
+    if (!current || !sized) return;
+    try {
+      const applied = await engineRef.current.call<{
+        model: QuiltModel;
+        requested: { width: number | null; height: number | null };
+        achieved: { width: number; height: number };
+      }>("apply_finished_size", current.modelJson, sized.finished_width, sized.finished_height);
+      setPhotoResult({
+        ...current,
+        modelJson: JSON.stringify(applied.model),
+        sizeRequested: applied.requested,
+        sizeAchieved: applied.achieved,
+        diagnostics: { ...(current.diagnostics ?? {}), size_source: "user", size_is_guess: false },
+      });
+    } catch (err) {
+      const message = err instanceof EngineError ? err.message : "That size did not apply. Try again?";
+      toast.push(message, "error");
+    }
+  }, [toast]);
 
   // "Adjust the crop" from results: one pin surface, reachable from both ends
   const toCrop = useCallback(() => {
@@ -1591,6 +1660,36 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       quadSource,
       stage,
       analyze,
+      size: {
+        widthEighths: sizeRef.current.widthEighths,
+        heightEighths: sizeRef.current.heightEighths,
+        source: sizeRef.current.source,
+        unit: sizeRef.current.unit,
+        enteredInCm: sizeRef.current.enteredInCm,
+        suggestedPreset: sizeRef.current.suggestedPreset,
+        editInput: (which: "width" | "height", text: string) => {
+          const ok = sizeRef.current.editInput(which, text);
+          syncPhoto();
+          return ok;
+        },
+        tapChip: (name: string) => {
+          sizeRef.current.tapChip(name);
+          syncPhoto();
+        },
+        toggleUnit: () => {
+          sizeRef.current.toggleUnit();
+          syncPhoto();
+        },
+        seedForEdit: (width: number, height: number) => {
+          if (sizeRef.current.source === "none") {
+            sizeRef.current.widthEighths = width;
+            sizeRef.current.heightEighths = height;
+          }
+          syncPhoto();
+        },
+        canApply: sizeRef.current.sizeOptions() !== null,
+      },
+      applySizeFromResults,
       startSample,
       cancel,
       toCrop,

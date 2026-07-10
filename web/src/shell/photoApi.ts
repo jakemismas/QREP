@@ -27,6 +27,9 @@ export interface PhotoResult {
   /** S4 (issue #70), additive: the verdict contract. S8 renders these. */
   verdict?: string;
   diagnostics?: Record<string, unknown>;
+  /** S6/S7 (issues #72/#73), additive: the size story. */
+  sizeRequested?: { width: number | null; height: number | null } | null;
+  sizeAchieved?: { width: number; height: number } | null;
 }
 
 /** S2 (issue #68): idle -> crop -> progress -> results; the post-results
@@ -44,6 +47,21 @@ export interface PhotoApi {
   quadSource: "default" | "detected" | "user" | "seeded";
   stage(file: File): Promise<void>;
   analyze(): Promise<void>;
+  /** S7 (issue #73): the size block (UI-SPEC section 2). */
+  size: {
+    widthEighths: number | null;
+    heightEighths: number | null;
+    source: "none" | "suggested" | "user";
+    unit: "in" | "cm";
+    enteredInCm: boolean;
+    suggestedPreset: string | null;
+    editInput(which: "width" | "height", text: string): boolean;
+    tapChip(name: string): void;
+    toggleUnit(): void;
+    seedForEdit(width: number, height: number): void;
+    canApply: boolean;
+  };
+  applySizeFromResults(): Promise<void>;
   startSample(): Promise<void>;
   cancel(): void;
   toCrop(): void;
