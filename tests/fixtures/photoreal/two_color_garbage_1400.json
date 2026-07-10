@@ -1,0 +1,35 @@
+{
+  "background": "white",
+  "canvas": [
+    1400,
+    1050
+  ],
+  "cap": 1400,
+  "character": "garbage",
+  "grid": null,
+  "name": "two_color_garbage",
+  "palette_hex": [
+    "#966054",
+    "#cec6b0"
+  ],
+  "quad": [
+    [
+      140.0,
+      105.0
+    ],
+    [
+      1260.0,
+      105.0
+    ],
+    [
+      1260.0,
+      945.0
+    ],
+    [
+      140.0,
+      945.0
+    ]
+  ],
+  "repeat_cells": null,
+  "seed": 42
+}

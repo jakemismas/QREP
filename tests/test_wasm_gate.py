@@ -34,6 +34,17 @@ GATE_DIR = Path(__file__).parent / "fixtures" / "wasm_gate"
 
 GRABCUT_IOU_TOL = 0.95
 DFT_VALUE_TOL = 0.01
+# ladder-autocorr SNR tolerance, frozen at write time BEFORE any wasm parity
+# run, from failure-mode reasoning: the canonical-config fundamental lags are
+# integer-exact across runtimes (as the dft peaks are), and the SNR is O(1-13)
+# with a global-background median/std whose FFT-reordering noise is ~1e-4; a
+# genuine structural divergence (the ladder landing on a different period)
+# shifts SNR by more than 1, so 0.25 is far above float noise and far below
+# any real difference. The argmax (channel, sigma) may flip on a near-tie, so
+# only the canonical config's lags are pinned exactly; the argmax period is
+# checked within a loose band that still catches a gross divergence.
+LADDER_SNR_TOL = 0.25
+LADDER_PERIOD_BAND = 3
 
 
 def _load(name: str):
@@ -91,3 +102,27 @@ def test_dft_autocorr_agrees_with_native_reference(reference, name, cap):
         assert abs(got - want) <= DFT_VALUE_TOL
     for got, want in zip(result["profile_y"], ref["profile_y"]):
         assert abs(got - want) <= DFT_VALUE_TOL
+
+
+@pytest.mark.parametrize(
+    "name,cap", OPS.LADDER_CASES, ids=[f"{n}-{c}" for n, c in OPS.LADDER_CASES]
+)
+def test_ladder_autocorr_agrees_with_native_reference(reference, name, cap):
+    result = OPS.lab_ladder_autocorr_op(OPS.load_fixture_bgr(name, cap))
+    ref = reference["ladder"][f"{name}_{cap}"]
+    # canonical config (L channel, finest sigma): lags integer-exact
+    assert result["ref_lag_x"] == ref["ref_lag_x"]
+    assert result["ref_lag_y"] == ref["ref_lag_y"]
+    assert abs(result["ref_snr"] - ref["ref_snr"]) <= LADDER_SNR_TOL
+    # argmax config: SNR within tol; periods within a loose band (a near-tie
+    # may flip the winning channel/sigma across runtimes)
+    assert abs(result["snr"] - ref["snr"]) <= LADDER_SNR_TOL
+    assert abs(result["period_x"] - ref["period_x"]) <= LADDER_PERIOD_BAND
+    assert abs(result["period_y"] - ref["period_y"]) <= LADDER_PERIOD_BAND
+
+
+def test_ladder_autocorr_repeat_determinism_same_process():
+    image = OPS.load_fixture_bgr("antique_wash_chain", 1400)
+    first = OPS.lab_ladder_autocorr_op(image)
+    second = OPS.lab_ladder_autocorr_op(image)
+    assert first == second

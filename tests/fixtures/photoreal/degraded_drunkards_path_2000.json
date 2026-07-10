@@ -1,0 +1,50 @@
+{
+  "background": "render",
+  "canvas": [
+    1754,
+    2000
+  ],
+  "cap": 2000,
+  "character": "non_square",
+  "degraded": {
+    "contrast": 0.9,
+    "frac": 0.58,
+    "gamma": 1.05,
+    "jpeg": 60,
+    "source": "drunkards_path"
+  },
+  "grid": {
+    "border_pitches": 0.0,
+    "cols": 12,
+    "rows": 14
+  },
+  "jpeg_quality": 60,
+  "name": "degraded_drunkards_path",
+  "palette_hex": [
+    "#3f7f7a",
+    "#efe7d6"
+  ],
+  "quad": [
+    [
+      138.0,
+      138.0
+    ],
+    [
+      1616.0,
+      138.0
+    ],
+    [
+      1616.0,
+      1862.0
+    ],
+    [
+      138.0,
+      1862.0
+    ]
+  ],
+  "repeat_cells": [
+    2,
+    2
+  ],
+  "seed": 42
+}
