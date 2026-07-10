@@ -50,6 +50,11 @@ async function uploadPhoto(page: Page): Promise<void> {
   await page.getByTestId("start-photo").click();
   await expect(page.getByTestId("photo-dropzone")).toBeVisible();
   await page.getByTestId("photo-file-input").setInputFiles(l0Path);
+  // S2 traversal amendment (issue #68): the crop screen now sits between the
+  // dropzone and analysis; click through it with the pins untouched, which
+  // preserves the pre-S2 automatic-detection behavior bit-for-bit.
+  await expect(page.getByTestId("crop-screen")).toBeVisible();
+  await page.getByTestId("crop-analyze").click();
 }
 
 test("L0 photo reverses in-browser to 45x55 with the palette mapped", async ({ page }) => {
@@ -116,6 +121,9 @@ test("idle prefetch: post-prefetch reverse shows no loading bar (PARITY 17)", as
   });
   await page.getByTestId("start-photo").click();
   await page.getByTestId("photo-file-input").setInputFiles(l0Path);
+  // S2 traversal amendment (issue #68): click through the crop screen.
+  await expect(page.getByTestId("crop-screen")).toBeVisible();
+  await page.getByTestId("crop-analyze").click();
   // The vision stack is already here: straight to stages, no loading bar.
   await expect(page.getByTestId("vision-loading")).toHaveCount(0);
   await expect(page.getByTestId("photo-results")).toBeVisible({ timeout: REVERSE_TIMEOUT });
@@ -164,6 +172,9 @@ test("vision loading copy is loading, sized, and cached on repeat", async ({ pag
   await page.goto("./");
   await page.getByTestId("start-photo").click();
   await page.getByTestId("photo-file-input").setInputFiles(l0Path);
+  // S2 traversal amendment (issue #68): click through the crop screen.
+  await expect(page.getByTestId("crop-screen")).toBeVisible();
+  await page.getByTestId("crop-analyze").click();
   const progress = page.getByTestId("photo-progress");
   await expect(progress).toBeVisible();
   const loading = page.getByTestId("vision-loading");
@@ -193,8 +204,11 @@ test("cancel returns to the dropzone and the engine reboots safely", async ({ pa
 test("corner adjust re-runs reverse with user corners", async ({ page }) => {
   await uploadPhoto(page);
   await expect(page.getByTestId("photo-results")).toBeVisible({ timeout: REVERSE_TIMEOUT });
+  // S2 traversal amendment (issue #68): "Adjust the crop" returns to the
+  // crop screen (the corners screen is retired); the pins and the re-run
+  // assertions below are unchanged.
   await page.getByTestId("adjust-corners").click();
-  const editor = page.getByTestId("corner-editor");
+  const editor = page.getByTestId("crop-screen");
   await expect(editor).toBeVisible();
   // Nudge pin 0 by a few pixels and re-run.
   const pin = page.getByTestId("corner-pin-0");
@@ -203,7 +217,7 @@ test("corner adjust re-runs reverse with user corners", async ({ page }) => {
   await page.mouse.down();
   await page.mouse.move(box.x + box.width / 2 + 6, box.y + box.height / 2 + 6, { steps: 3 });
   await page.mouse.up();
-  await page.getByTestId("corner-rerun").click();
+  await page.getByTestId("crop-analyze").click();
   await expect(page.getByTestId("photo-results")).toBeVisible({ timeout: REVERSE_TIMEOUT });
   await expect(page.getByTestId("confidence-grid")).toBeVisible();
 });

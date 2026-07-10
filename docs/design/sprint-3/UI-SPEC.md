@@ -71,10 +71,13 @@ Cold-start contract (binding, from the plan):
 
 Flow rules:
 - Analyze proceeds with the current quad (normalized coordinates) into the
-  existing staged progress screen.
+  existing staged progress screen. Corners ride along to the engine ONLY
+  when the user moved a pin; untouched pins (default, detected, or seeded)
+  pass nothing and the pipeline re-detects deterministically.
 - Back returns to the dropzone and discards the staged photo.
-- Cancel from progress returns to THIS crop screen with the same photo and
-  quad, not to the dropzone.
+- Cancel from progress returns to the DROPZONE (sprint 2 PARITY item 14,
+  frozen by the sprint 2 e2e suite; corrected in S2 - this section
+  originally said crop screen, which contradicted the frozen contract).
 - A second photo (including after cancel) starts from ITS OWN detection,
   never the previous photo's corners.
 - The sample photo bypasses this screen entirely (auto-confirmed

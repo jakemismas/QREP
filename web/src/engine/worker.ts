@@ -39,18 +39,33 @@ const BRIDGE_METHODS = new Set([
   "render",
   "reverse",
   "compare",
+  "detect_quad",
   "resize_locked",
   "resize_unlocked",
 ]);
 
 // Bridge methods that need cv2: the vision wheel lazy-loads before these
 // run (S6). Everything else works on the boot closure alone.
-const VISION_METHODS = new Set(["reverse", "reverse_photo", "render", "compare"]);
+const VISION_METHODS = new Set(["reverse", "reverse_photo", "render", "compare", "detect_quad"]);
 
 const scope = self as unknown as DedicatedWorkerGlobalScope;
 let pyodidePromise: Promise<PyodideInterface> | null = null;
 let visionPromise: Promise<void> | null = null;
 let stagingCounter = 0;
+// S2 crop flow (issue #68): the photo is staged ONCE via stage_photo and the
+// token (a MEMFS path) is reused across detect_quad and reverse calls, so the
+// bytes cross the RPC boundary a single time. The previous token's file is
+// unlinked when a new one is staged; a worker restart wipes MEMFS, so stale
+// tokens fail with a "not found" value error and the client re-stages.
+let stagedTokenPath: string | null = null;
+
+function unlinkQuietly(pyodide: PyodideInterface, path: string): void {
+  try {
+    pyodide.FS.unlink(path);
+  } catch {
+    // already gone
+  }
+}
 
 function ensureVision(): Promise<void> {
   if (visionPromise === null) {
@@ -104,7 +119,11 @@ async function serve(message: CallMessage): Promise<void> {
       id: message.id,
       envelope: { ok: false, error: { kind, message: text } },
     });
-  if (!BRIDGE_METHODS.has(message.method) && message.method !== "reverse_photo") {
+  if (
+    !BRIDGE_METHODS.has(message.method) &&
+    message.method !== "reverse_photo" &&
+    message.method !== "stage_photo"
+  ) {
     fail("value", `unknown bridge method: ${message.method}`);
     return;
   }
@@ -119,20 +138,52 @@ async function serve(message: CallMessage): Promise<void> {
     }
     let method = message.method;
     let args = message.args;
-    if (method === "reverse_photo") {
-      // Photo staging (S6): bytes arrive from the UI already downscaled;
-      // the worker owns the MEMFS staging path per the bridge contract.
-      const [bytes, optionsJson] = args as [Uint8Array | ArrayBuffer, string];
+    // one staged file per crop session; cleaned up per the S2 contract
+    let unlinkAfterCall: string | null = null;
+    if (method === "stage_photo") {
+      const [bytes] = args as [Uint8Array | ArrayBuffer];
       const data = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
-      const path = `/staging/upload-${++stagingCounter}.png`;
+      const path = `/staging/photo-${++stagingCounter}.png`;
       try {
         pyodide.FS.mkdirTree("/staging");
       } catch {
         // already exists
       }
+      if (stagedTokenPath) unlinkQuietly(pyodide, stagedTokenPath);
       pyodide.FS.writeFile(path, data);
+      stagedTokenPath = path;
+      scope.postMessage({
+        type: "result",
+        id: message.id,
+        envelope: { ok: true, result: { token: path } },
+      });
+      return;
+    }
+    if (method === "detect_quad") {
+      // args: [token] from stage_photo; the file stays for the analyze call
+      const [token] = args as [string];
+      args = [token];
+    }
+    if (method === "reverse_photo") {
+      const [payload, optionsJson] = args as [Uint8Array | ArrayBuffer | string, string];
+      if (typeof payload === "string") {
+        // token path from stage_photo: reuse the staged file (crop flow)
+        args = [payload, optionsJson];
+      } else {
+        // legacy inline bytes (sample photo, round-trip panel): stage a
+        // scratch file and unlink it after the call - the pre-S2 leak fix
+        const data = payload instanceof Uint8Array ? payload : new Uint8Array(payload);
+        const path = `/staging/upload-${++stagingCounter}.png`;
+        try {
+          pyodide.FS.mkdirTree("/staging");
+        } catch {
+          // already exists
+        }
+        pyodide.FS.writeFile(path, data);
+        unlinkAfterCall = path;
+        args = [path, optionsJson];
+      }
       method = "reverse";
-      args = [path, optionsJson];
     }
     const bridge = pyodide.pyimport("qrep.bridge");
     try {
@@ -140,6 +191,7 @@ async function serve(message: CallMessage): Promise<void> {
       scope.postMessage({ type: "result", id: message.id, envelope: JSON.parse(raw) });
     } finally {
       bridge.destroy();
+      if (unlinkAfterCall) unlinkQuietly(pyodide, unlinkAfterCall);
     }
   } catch (error) {
     // The bridge itself wraps engine errors; reaching here means the worker
