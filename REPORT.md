@@ -130,3 +130,11 @@ None. The suite gained no xfails (guarded by tests/test_known_issues_audit.py).
 The one open measurement gap is the manual iPhone/iPad Safari smoke of the
 photo flow, documented on #46 with the engineering mitigations that bound the
 risk (device-classed downscale caps, lazy vision load, disposable worker).
+
+# QREP Sprint 3 report (real-photo robustness)
+
+Sprint 3 made the photo flow honest: real-photo detection, verdicts that say
+when a quilt cannot be read, and real sizes. Full slice status, the fresh
+verdict sweep over the photoreal corpus, the field-photo results, and the
+release test status are in
+[docs/sprint-3/REPORT.md](docs/sprint-3/REPORT.md).

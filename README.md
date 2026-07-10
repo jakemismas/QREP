@@ -20,10 +20,18 @@ Pyodide runtime.
 Open the link, then load the demo quilt, start from a blank grid, or start
 from a photo.
 
-- Photo to pattern: drop a photo, the vision stages recover the grid, fabrics,
-  repeats, and borders with honest per-stage and per-square confidence; adjust
-  corner pins and re-run when a shot is skewed. The vision engine (about
+- Photo to pattern: drop a photo (a straight-on shot, a screenshot, or a shop
+  listing picture), check the auto-detected crop and nudge the corner pins if
+  needed, then optionally set the real finished size in inches or centimeters.
+  The vision stages recover the grid, fabrics, repeats, and borders with
+  honest per-stage and per-square confidence. The vision engine (about
   11.2 MB) loads on first photo use only.
+- Honest about what it can read: when a photo is not a readable grid of
+  squares, QREP says so and why (too steep an angle, a busy print, no quilt
+  in frame) instead of showing a confident wrong answer, and offers to adjust
+  the crop or start a blank grid seeded with the recovered fabrics. Quilts
+  built from triangles or curves are flagged as such, with a squares
+  approximation offered behind a disclosure rather than presented as fact.
 - Edit: paint squares, manage fabrics (recolor is one edit), undo and redo
   deep history, resize with a proportion lock, add or remove border bands. All
   sizing math is computed by the Python engine; the app adopts its numbers.

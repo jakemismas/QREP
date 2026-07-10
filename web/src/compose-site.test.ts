@@ -54,12 +54,23 @@ describe("composed Pages artifact", () => {
 });
 
 describe("release version sync", () => {
+  const pyproject = readFileSync(path.join(repoRoot, "pyproject.toml"), "utf8");
+  const init = readFileSync(path.join(repoRoot, "qrep", "__init__.py"), "utf8");
+  const pkg = readFileSync(path.join(webRoot, "package.json"), "utf8");
+  const pyVersion = pyproject.match(/^version = "([^"]+)"/m)?.[1];
+  const initVersion = init.match(/__version__ = "([^"]+)"/)?.[1];
+  const webVersion = (JSON.parse(pkg) as { version?: string }).version;
+
   it("pyproject and qrep.__version__ agree", () => {
-    const pyproject = readFileSync(path.join(repoRoot, "pyproject.toml"), "utf8");
-    const init = readFileSync(path.join(repoRoot, "qrep", "__init__.py"), "utf8");
-    const pyVersion = pyproject.match(/^version = "([^"]+)"/m)?.[1];
-    const initVersion = init.match(/__version__ = "([^"]+)"/)?.[1];
     expect(pyVersion).toBeTruthy();
     expect(pyVersion).toBe(initVersion);
+  });
+
+  // S9 (issue #75): the release ships one version everywhere - the web
+  // package.json must track the engine version so a bumped release cannot
+  // half-land (pyproject moved, the app left behind).
+  it("web package.json tracks the engine version", () => {
+    expect(webVersion).toBeTruthy();
+    expect(webVersion).toBe(pyVersion);
   });
 });
