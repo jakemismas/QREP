@@ -10,7 +10,8 @@ import cv2
 import numpy as np
 from pydantic import BaseModel
 
-from qrep.vision.verdict import INTEGER_RATIO_EPSILON, T1
+from qrep.vision.repeats import BlockLatticeResult
+from qrep.vision.verdict import INTEGER_RATIO_EPSILON, T1, T4
 
 MIN_PITCH_PX = 5
 
@@ -308,6 +309,7 @@ def estimate_grid(
     mask: np.ndarray | None = None,
     warp_magnitude: float = 0.0,
     period_hint: tuple[float, float] | None = None,
+    block_lattice: BlockLatticeResult | None = None,
 ) -> GridResult:
     gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY).astype(np.float32)
     grad = np.abs(cv2.Sobel(gray, cv2.CV_32F, 1, 0, ksize=3))
@@ -342,6 +344,24 @@ def estimate_grid(
     if period_hint is not None:
         pitch_x, prom_x = _apply_period_feedback(grad_x, pitch_x, prom_x, period_hint[0], width)
         pitch_y, prom_y = _apply_period_feedback(grad_y, pitch_y, prom_y, period_hint[1], height)
+
+    # S1 (issue #93) block-lattice hint: the peak-contrast 2D evidence period
+    # feeds the SAME feedback, per axis, ONLY where the 1D read is failing
+    # (prominence < T1), the block-lattice statistic clears T4, and the block
+    # period is at least the cell pitch. The T2 healthy-photo hint above takes
+    # precedence: where it lifted prominence to T1 the gate below is closed, so
+    # a passing read is byte-untouched. This adopts a better PITCH; the decisive
+    # S0 finding is that the recomputed prominence stays below T1 (rescue is the
+    # additive corroboration leg S2 lands), so this leg never flips a verdict.
+    if block_lattice is not None and block_lattice.snr >= T4:
+        if prom_x < T1 and block_lattice.period_x >= pitch_x:
+            pitch_x, prom_x = _apply_period_feedback(
+                grad_x, pitch_x, prom_x, float(block_lattice.period_x), width
+            )
+        if prom_y < T1 and block_lattice.period_y >= pitch_y:
+            pitch_y, prom_y = _apply_period_feedback(
+                grad_y, pitch_y, prom_y, float(block_lattice.period_y), height
+            )
 
     diagnosis: str | None = None
     tolerance = _isotropy_tolerance(warp_magnitude)
