@@ -291,9 +291,17 @@ def detect_quad(image_path: str) -> dict:
             "width_px": quad_w,
             "height_px": quad_h,
             "aspect": (quad_w / quad_h) if quad_h > 0 else None,
-            "preset": None,
+            "preset": _preset_suggestion(quad_w, quad_h),
         },
     }
+
+
+def _preset_suggestion(quad_w: float, quad_h: float):
+    if quad_w <= 0 or quad_h <= 0:
+        return None
+    from qrep.model.finished_size import suggest_preset
+
+    return suggest_preset(quad_w / quad_h)
 
 
 @_envelope
@@ -312,15 +320,29 @@ def reverse(image_path: str, options_json: str) -> dict:
         corners = [(float(x), float(y)) for x, y in corners]
     from qrep.vision import reverse as reverse_pipeline
 
-    result = reverse_pipeline(path, corners=corners, fabrics=options.get("fabrics"))
+    def _size_option(key: str) -> int | None:
+        value = options.get(key)
+        return int(value) if value is not None else None
+
+    result = reverse_pipeline(
+        path,
+        corners=corners,
+        fabrics=options.get("fabrics"),
+        finished_width=_size_option("finished_width"),
+        finished_height=_size_option("finished_height"),
+    )
     diagnostics = _jsonable(result.diagnostics)
     # S4 (issue #70): the envelope grows additively from {"model"} to
     # {"model", "verdict", "diagnostics"} per the verdict contract
-    return {
+    envelope = {
         "model": result.quilt.model_dump(mode="json"),
         "verdict": diagnostics.get("verdict"),
         "diagnostics": diagnostics,
     }
+    if diagnostics.get("size_achieved") is not None:
+        envelope["requested"] = diagnostics.get("size_requested")
+        envelope["achieved"] = diagnostics.get("size_achieved")
+    return envelope
 
 
 def _jsonable(value):
@@ -334,6 +356,40 @@ def _jsonable(value):
     if hasattr(value, "item"):
         return value.item()
     return str(value)
+
+
+@_envelope
+def presets() -> dict:
+    """The shipped standard-size table, verbatim (S6, issue #72): the
+    single source of truth for size chips - no second table anywhere."""
+    from qrep.viewer.sizing import PRESETS
+
+    return {"presets": [{"name": n, "width": w, "height": h} for n, w, h in PRESETS]}
+
+
+@_envelope
+def apply_finished_size(model_json: str, width, height) -> dict:
+    """Re-derive cell and borders on an existing model for a user-entered
+    finished size, without re-running vision (S6, issue #72). width/height
+    are integer eighths; either may be null."""
+    from qrep.model.finished_size import apply_finished_size as apply_size
+
+    quilt = _load(model_json)
+    w = int(width) if width is not None else None
+    h = int(height) if height is not None else None
+    if w is None and h is None:
+        raise ValueError("apply_finished_size needs a width or a height")
+    updated, requested, achieved = apply_size(quilt, w, h)
+    updated.metadata.notes = (
+        "Recovered by the QREP CV pipeline. Finished size provided by "
+        "you; squares and borders were fitted to it."
+    )
+    return {
+        "model": updated.model_dump(mode="json"),
+        "requested": requested,
+        "achieved": achieved,
+        "size_source": "user",
+    }
 
 
 @_envelope

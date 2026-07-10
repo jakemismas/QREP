@@ -40,6 +40,8 @@ const BRIDGE_METHODS = new Set([
   "reverse",
   "compare",
   "detect_quad",
+  "presets",
+  "apply_finished_size",
   "resize_locked",
   "resize_unlocked",
 ]);

@@ -45,8 +45,10 @@ def test_detect_quad_predicted_size_field_shape():
     result = _call(PHOTOREAL / "render_on_white_1400.png")
     predicted = result["predicted_size"]
     assert set(predicted) == {"width_px", "height_px", "aspect", "preset"}
-    # S6 owns the preset suggestion logic; S2 ships the field with no claim
-    assert predicted["preset"] is None
+    # S6 landed the suggestion this field was defined for (the S2-era
+    # assertion "preset is None until S6" is superseded by contract): the
+    # 60:50-pitch quad normalizes to aspect 1.2 = Queen (108/90) uniquely
+    assert predicted["preset"] == "Queen"
     assert predicted["width_px"] > 0 and predicted["height_px"] > 0
     # aspect is defined as width_px / height_px of the detected quad
     assert predicted["aspect"] == pytest.approx(
