@@ -26,6 +26,7 @@ from qrep.model.schema import (
     Quilt,
     QuiltMetadata,
 )
+from qrep.model.finished_size import apply_finished_size
 from qrep.vision.borders import detect_borders
 from qrep.vision.cells import assign_cells
 from qrep.vision.grid import estimate_grid
@@ -117,6 +118,10 @@ def _fallback_result(
         "integer_ratio": {"x": 0.0, "y": 0.0, "passed": False},
         "block_period_cells": None,
         "repeat_vote": {"applied": False, "cells_changed": 0},
+        "size_source": "guess",
+        "size_is_guess": True,
+        "size_requested": None,
+        "size_achieved": None,
     }
     return ReverseResult(quilt=quilt, diagnostics=diagnostics)
 
@@ -125,6 +130,9 @@ def reverse(
     image_path: str | Path,
     corners: list[tuple[float, float]] | None = None,
     fabrics: int | None = None,
+    *,
+    finished_width: int | None = None,
+    finished_height: int | None = None,
 ) -> ReverseResult:
     image = cv2.imread(str(image_path))
     if image is None:
@@ -247,6 +255,19 @@ def reverse(
         binding=Binding(fabric_id=binding_fabric),
         provenance=Provenance(source="cv", stage_confidence=stage_confidence),
     )
+    # S6 (issue #72): user-entered finished size reconciles onto the grid;
+    # ASSUMED_PPI survives only as the size_source="guess" fallback
+    size_requested = None
+    size_achieved = None
+    if finished_width is not None or finished_height is not None:
+        quilt, size_requested, size_achieved = apply_finished_size(
+            quilt, finished_width, finished_height
+        )
+        quilt.metadata.notes = (
+            "Recovered by the QREP CV pipeline. Finished size provided by "
+            "you; squares and borders were fitted to it."
+        )
+
     verdict = decide_verdict(
         stage_confidence["grid"],
         periodicity.score,
@@ -279,5 +300,9 @@ def reverse(
         "integer_ratio": {"x": ratio_x, "y": ratio_y, "passed": ratio_passed},
         "block_period_cells": block_period_cells,
         "repeat_vote": {"applied": vote_applied, "cells_changed": vote_changed},
+        "size_source": "user" if size_achieved is not None else "guess",
+        "size_is_guess": size_achieved is None,
+        "size_requested": size_requested,
+        "size_achieved": size_achieved,
     }
     return ReverseResult(quilt=quilt, diagnostics=diagnostics)
