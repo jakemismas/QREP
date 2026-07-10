@@ -1,11 +1,15 @@
 /*
- * Photo-reverse screens (S6, issue #46; PARITY items 6, 7, 14, 17). Renders
- * the four photo-flow screens off useProject().photo.state:
+ * Photo-reverse screens (S6 issue #46; S2 sprint 3 issue #68; PARITY items
+ * 6, 7, 14, 17 + the sprint 3 amendment). Renders the four photo-flow
+ * screens off useProject().photo.state:
  *   idle     -> dropzone (file input, drag/drop, sample photo)
+ *   crop     -> the photo with draggable pins BEFORE any analysis; the
+ *               detected quad snaps in unless the user already moved a pin
  *   progress -> staged analysis (vision-loading/cached/retry, six stage rows)
  *   results  -> side-by-side photo + recovered quilt, per-stage confidence
  *               meters, overall pill, uncertain toggle, lightbox, timing
- *   corners  -> draggable corner pins over the photo, re-run through the bridge
+ * The post-results corners screen is retired: "Adjust the crop" returns to
+ * the crop screen seeded with the confirmed quad (UI-SPEC section 1).
  *
  * Also exports RoundTripPanel (the Pattern-tab round-trip check) and Lightbox
  * (reusable Photo / Side by side / Quilt viewer).
@@ -38,12 +42,6 @@ const STAGES: { ui: string; engine: string; label: string }[] = [
 ];
 
 const VISION_CACHE_KEY = "qrep-vision-cached";
-const DEFAULT_CORNERS: [number, number][] = [
-  [0.06, 0.06],
-  [0.94, 0.06],
-  [0.94, 0.94],
-  [0.06, 0.94],
-];
 
 function stageConf(sc: Record<string, number>, stage: { ui: string; engine: string }): number {
   const value = sc[stage.engine] ?? sc[stage.ui];
@@ -98,7 +96,7 @@ function Dropzone({ photo, onHome }: { photo: PhotoApi; onHome: () => void }) {
 
   const takeFiles = (files: FileList | null): void => {
     const file = files?.[0];
-    if (file) void photo.start(file);
+    if (file) void photo.stage(file);
   };
 
   return (
@@ -414,9 +412,9 @@ function Results({ photo }: { photo: PhotoApi }) {
               type="button"
               className="pf-btn pf-btn--secondary"
               data-testid="adjust-corners"
-              onClick={() => photo.toCorners()}
+              onClick={() => photo.toCrop()}
             >
-              Try again with corner pins
+              Adjust the crop
             </button>
             {photo.photoUrl ? (
               <button
@@ -454,7 +452,7 @@ function Results({ photo }: { photo: PhotoApi }) {
 }
 
 // ---------------------------------------------------------------------------
-// Corner editor (photo.state === "corners")
+// Shared pin/quad overlay (S2: one pin surface, one behavior) + crop screen
 // ---------------------------------------------------------------------------
 
 function quadPath(corners: [number, number][]): string {
@@ -462,10 +460,20 @@ function quadPath(corners: [number, number][]): string {
   return `M${pts[0]}L${pts[1]}L${pts[2]}L${pts[3]}Z`;
 }
 
-function CornerEditor({ photo }: { photo: PhotoApi }) {
+/** The draggable pin/quad overlay, extracted from the retired corner editor
+ * so the crop screen and any future pin surface share one behavior. Pin
+ * drag is pure JS: it never waits on the engine (cold-start contract). */
+export function PinOverlay({
+  photoUrl,
+  corners,
+  onMovePin,
+}: {
+  photoUrl: string | null;
+  corners: [number, number][];
+  onMovePin: (index: number, xy: [number, number]) => void;
+}) {
   const boxRef = useRef<HTMLDivElement>(null);
   const activeRef = useRef<number | null>(null);
-  const corners = photo.corners ?? DEFAULT_CORNERS;
 
   const onDown = (i: number) => (e: ReactPointerEvent<HTMLButtonElement>) => {
     activeRef.current = i;
@@ -482,7 +490,7 @@ function CornerEditor({ photo }: { photo: PhotoApi }) {
     if (!box || box.width < 2 || box.height < 2) return;
     const x = Math.min(1, Math.max(0, (e.clientX - box.left) / box.width));
     const y = Math.min(1, Math.max(0, (e.clientY - box.top) / box.height));
-    photo.setCorner(i, [Number(x.toFixed(4)), Number(y.toFixed(4))]);
+    onMovePin(i, [Number(x.toFixed(4)), Number(y.toFixed(4))]);
   };
   const onUp = (e: ReactPointerEvent<HTMLButtonElement>) => {
     activeRef.current = null;
@@ -494,65 +502,81 @@ function CornerEditor({ photo }: { photo: PhotoApi }) {
   };
 
   return (
-    <div className="pf-wrap pf-wrap--mid" data-testid="corner-editor" data-screen-label="Corner pins">
+    <div className="pf-corner-stage">
+      <div className="pf-corner-box" ref={boxRef}>
+        {photoUrl ? (
+          <img className="pf-corner-img" src={photoUrl} alt="Your uploaded quilt" />
+        ) : (
+          <div className="pf-corner-img pf-photo--gone">Photo cleared</div>
+        )}
+        <svg className="pf-corner-quad" viewBox="0 0 100 100" preserveAspectRatio="none">
+          <path d={quadPath(corners)} />
+        </svg>
+        {corners.map((c, i) => (
+          <button
+            key={i}
+            type="button"
+            className="pf-pin"
+            data-testid={`corner-pin-${i}`}
+            aria-label={`Corner ${i + 1}`}
+            style={{ left: `${c[0] * 100}%`, top: `${c[1] * 100}%` }}
+            onPointerDown={onDown(i)}
+            onPointerMove={onMove}
+            onPointerUp={onUp}
+            onPointerCancel={onUp}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CropScreen({ photo }: { photo: PhotoApi }) {
+  // Reset to auto is meaningful only when the pins differ from their auto
+  // target (UI-SPEC section 1); a user move is exactly that condition.
+  const canReset = photo.quadSource === "user";
+  return (
+    <div className="pf-wrap pf-wrap--mid" data-testid="crop-screen" data-screen-label="Check the crop">
       <div className="pf-card">
-        <h1 className="pf-h1 pf-h1--sm">Line up the corners</h1>
+        <h1 className="pf-h1 pf-h1--sm">Check the crop</h1>
         <p className="pf-lede pf-lede--sm">
-          Drag each pin onto a corner of the quilt in your photo. It gives the straighten and grid
-          stages a head start, and confidence usually jumps.
+          Drag the pins so they sit on the quilt&rsquo;s corners.
         </p>
 
-        <div className="pf-corner-stage">
-          <div className="pf-corner-box" ref={boxRef}>
-            {photo.photoUrl ? (
-              <img className="pf-corner-img" src={photo.photoUrl} alt="Your uploaded quilt" />
-            ) : (
-              <div className="pf-corner-img pf-photo--gone">Photo cleared</div>
-            )}
-            <svg className="pf-corner-quad" viewBox="0 0 100 100" preserveAspectRatio="none">
-              <path d={quadPath(corners)} />
-            </svg>
-            {corners.map((c, i) => (
-              <button
-                key={i}
-                type="button"
-                className="pf-pin"
-                data-testid={`corner-pin-${i}`}
-                aria-label={`Corner ${i + 1}`}
-                style={{ left: `${c[0] * 100}%`, top: `${c[1] * 100}%` }}
-                onPointerDown={onDown(i)}
-                onPointerMove={onMove}
-                onPointerUp={onUp}
-                onPointerCancel={onUp}
-              />
-            ))}
+        <PinOverlay photoUrl={photo.photoUrl} corners={photo.corners} onMovePin={photo.setCorner} />
+
+        {photo.detectPending ? (
+          <div className="pf-detecting" data-testid="crop-detecting">
+            <span className="pf-stage-spin" aria-hidden="true" />
+            Finding your quilt&hellip;
           </div>
-        </div>
+        ) : null}
 
         <div className="pf-corner-actions">
           <button
             type="button"
             className="pf-btn pf-btn--primary"
-            data-testid="corner-rerun"
-            onClick={() => void photo.rerunWithCorners()}
+            data-testid="crop-analyze"
+            onClick={() => void photo.analyze()}
           >
-            Re-run the analysis
+            Analyze
           </button>
           <button
             type="button"
             className="pf-btn pf-btn--secondary"
-            data-testid="corner-reset"
-            onClick={() => photo.resetCorners()}
+            data-testid="crop-reset"
+            disabled={!canReset}
+            onClick={() => photo.resetToAuto()}
           >
-            Reset pins
+            Reset to auto
           </button>
           <button
             type="button"
             className="pf-link"
-            data-testid="corner-back"
-            onClick={() => (photo.backToResults ? photo.backToResults() : photo.toCorners())}
+            data-testid="crop-back"
+            onClick={() => photo.backFromCrop()}
           >
-            Back to results
+            Back
           </button>
         </div>
       </div>
@@ -724,6 +748,12 @@ export default function PhotoFlow() {
   const photo = usePhoto();
 
   switch (photo.state) {
+    case "crop":
+      return (
+        <PhotoStyle>
+          <CropScreen photo={photo} />
+        </PhotoStyle>
+      );
     case "progress":
       return (
         <PhotoStyle>
@@ -734,12 +764,6 @@ export default function PhotoFlow() {
       return (
         <PhotoStyle>
           <Results photo={photo} />
-        </PhotoStyle>
-      );
-    case "corners":
-      return (
-        <PhotoStyle>
-          <CornerEditor photo={photo} />
         </PhotoStyle>
       );
     case "idle":
@@ -852,6 +876,7 @@ const PF_CSS = `
 .pf-btn:disabled { opacity: 0.6; cursor: wait; }
 .pf-timing { font-size: 12.5px; color: var(--faint); padding-top: 2px; }
 
+.pf-detecting { display: flex; align-items: center; gap: 9px; margin-top: 12px; font-size: 14px; color: var(--mut); }
 .pf-corner-stage { display: flex; justify-content: center; }
 .pf-corner-box { position: relative; display: inline-block; background: var(--stage); padding: 14px; border-radius: 8px; touch-action: none; max-width: 100%; }
 .pf-corner-img { display: block; max-width: min(560px, 78vw); max-height: 60vh; width: auto; height: auto; border-radius: 3px; }

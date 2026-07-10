@@ -103,6 +103,13 @@ export class PhotoFlowMachine {
     this.state = "results";
   }
 
+  /** Sample photo bypass: the crop screen is skipped entirely (the sample
+   * is an auto-confirmed full-frame render, per the S2 contract). */
+  bypassToProgress(): void {
+    this.state = "progress";
+    this.confirmed = clonePins(this.corners);
+  }
+
   /** "Adjust the crop" from results: re-enter crop seeded with the quad the
    * confirmed run used. */
   seedFromConfirmed(): void {

@@ -144,6 +144,18 @@ describe("PhotoFlowMachine", () => {
     expect(m.quadSource).toBe("default");
   });
 
+  it("sample bypass: straight to progress, no crop, default pins untouched", () => {
+    const m = new PhotoFlowMachine();
+    m.bypassToProgress();
+    expect(m.state).toBe("progress");
+    expect(m.corners).toEqual(DEFAULT_PIN_CORNERS);
+    expect(m.quadSource).toBe("default");
+    m.results();
+    expect(m.state).toBe("results");
+    m.cancel();
+    expect(m.state).toBe("idle");
+  });
+
   it("detection failure just clears the pending flag; pins stay usable", () => {
     const m = new PhotoFlowMachine();
     const seq = m.enterCrop();

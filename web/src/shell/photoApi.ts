@@ -17,7 +17,7 @@
 import { useProject } from "../state/project";
 import type { VisionState } from "../engine/rpc";
 
-export type PhotoScreen = "idle" | "progress" | "results" | "corners";
+export type PhotoScreen = "idle" | "crop" | "progress" | "results";
 
 export interface PhotoResult {
   modelJson: string;
@@ -26,30 +26,29 @@ export interface PhotoResult {
   reverseMs: number;
 }
 
+/** S2 (issue #68): idle -> crop -> progress -> results; the post-results
+ * corners screen is retired and toCrop() re-enters the crop screen seeded
+ * with the confirmed quad. */
 export interface PhotoApi {
   state: PhotoScreen;
   photoUrl: string | null;
   result: PhotoResult | null;
   visionState: VisionState;
   visionBytes: number | null;
-  start(file: File): Promise<void>;
+  corners: [number, number][];
+  detectedQuad: [number, number][] | null;
+  detectPending: boolean;
+  quadSource: "default" | "detected" | "user" | "seeded";
+  stage(file: File): Promise<void>;
+  analyze(): Promise<void>;
   startSample(): Promise<void>;
   cancel(): void;
-  toCorners(): void;
-  corners: [number, number][] | null;
+  toCrop(): void;
   setCorner(index: number, xy: [number, number]): void;
-  resetCorners(): void;
-  rerunWithCorners(): Promise<void>;
+  resetToAuto(): void;
+  backFromCrop(): void;
   openInEditor(): void;
   backToDropzone(): void;
-  /**
-   * Optional state-layer hooks the fixed contract left implicit:
-   *  - backToResults returns from the corner editor to the results screen.
-   *  - retryVision reloads the vision stack and re-runs the pending reverse
-   *    after a failed load (drives the vision-retry button).
-   * The shell degrades to a no-op when the state layer does not expose them.
-   */
-  backToResults?(): void;
   retryVision?(): void;
 }
 

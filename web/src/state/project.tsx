@@ -19,6 +19,8 @@ import { classifyDevice, targetSize } from "../model/downscale";
 import { effectiveMerges, pieceEstimate } from "../model/seams";
 import type { SeamFix, SeamStrategy } from "../model/seams";
 import { useToast } from "../ui";
+import { PhotoFlowMachine } from "./photoFlow";
+import type { PhotoScreen, QuadSource } from "./photoFlow";
 import {
   COALESCE_WINDOW_MS,
   EditorStore,
@@ -57,16 +59,17 @@ const STAGE_NAME_MAP: Record<string, string> = {
 /** PARITY item 6: a square is uncertain below this per-cell confidence. */
 const UNCERTAIN_THRESHOLD = 0.9;
 
-/** Normalized [0,1] corner seeds, inset to match the corner-editor pins. */
-const DEFAULT_CORNERS: [number, number][] = [
-  [0.06, 0.06],
-  [0.94, 0.06],
-  [0.94, 0.94],
-  [0.06, 0.94],
-];
-
-function seedCorners(): [number, number][] {
-  return DEFAULT_CORNERS.map((corner) => [...corner]) as [number, number][];
+/** detect_quad's bridge result (S2, issue #68). */
+interface DetectQuadResult {
+  quad: [number, number][];
+  tier: number | null;
+  confidence: number;
+  predicted_size: {
+    width_px: number;
+    height_px: number;
+    aspect: number | null;
+    preset: string | null;
+  };
 }
 
 function mapStageConfidence(raw: Record<string, number> | undefined): Record<string, number> {
@@ -106,27 +109,35 @@ export interface PhotoResult {
   reverseMs: number;
 }
 
-/** The photo-reverse flow API (owned by the state layer; PhotoFlow consumes it). */
+/** The photo-reverse flow API (owned by the state layer; PhotoFlow consumes it).
+ *
+ * S2 (issue #68): the flow is idle -> crop -> progress -> results. start()
+ * split into stage() (file in, photo shown immediately, detect_quad kicked
+ * off) and analyze() (reverse with the user's pins when they moved one).
+ * The post-results corners screen is retired; toCrop() re-enters the crop
+ * screen seeded with the confirmed quad. */
 export interface PhotoApi {
   /** True from the dropzone entry until the recovered model opens in the editor. */
   active: boolean;
-  state: "idle" | "progress" | "results" | "corners";
+  state: "idle" | "crop" | "progress" | "results";
   photoUrl: string | null;
   result: PhotoResult | null;
   visionState: VisionState;
   visionBytes: number | null;
-  corners: [number, number][] | null;
-  start: (file: File) => Promise<void>;
+  corners: [number, number][];
+  detectedQuad: [number, number][] | null;
+  detectPending: boolean;
+  quadSource: "default" | "detected" | "user" | "seeded";
+  stage: (file: File) => Promise<void>;
+  analyze: () => Promise<void>;
   startSample: () => Promise<void>;
   cancel: () => void;
-  toCorners: () => void;
+  toCrop: () => void;
   setCorner: (index: number, xy: [number, number]) => void;
-  resetCorners: () => void;
-  rerunWithCorners: () => Promise<void>;
+  resetToAuto: () => void;
+  backFromCrop: () => void;
   openInEditor: () => void;
   backToDropzone: () => void;
-  /** Return from the corner editor to the results screen. */
-  backToResults: () => void;
   /** Retry a stalled vision load (vision-retry affordance on the progress screen). */
   retryVision: () => void;
 }
@@ -346,27 +357,40 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const [lastResize, setLastResize] = useState<ResizeInfo | null>(null);
   const [restore, setRestore] = useState<RestoreState>(readAutosave);
 
-  // ---- S6 photo reverse state --------------------------------------------
+  // ---- S6/S2 photo reverse state ------------------------------------------
+  const machineRef = useRef<PhotoFlowMachine>(new PhotoFlowMachine());
   const [photoActive, setPhotoActive] = useState(false);
-  const [photoState, setPhotoState] = useState<"idle" | "progress" | "results" | "corners">("idle");
+  const [photoState, setPhotoState] = useState<PhotoScreen>("idle");
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [photoResult, setPhotoResult] = useState<PhotoResult | null>(null);
   const [visionState, setVisionState] = useState<VisionState>("cold");
   const [visionBytes, setVisionBytes] = useState<number | null>(null);
-  const [corners, setCorners] = useState<[number, number][] | null>(null);
+  const [corners, setCorners] = useState<[number, number][]>(machineRef.current.corners);
+  const [detectedQuad, setDetectedQuad] = useState<[number, number][] | null>(null);
+  const [detectPending, setDetectPending] = useState(false);
+  const [quadSource, setQuadSource] = useState<QuadSource>("default");
   const [roundtripReport, setRoundtripReport] = useState<
     { dimsMatch: boolean; cellAccuracy: number } | null
   >(null);
   const [showUncertain, setShowUncertain] = useState(false);
 
+  // mirror the pure machine into React state after every transition
+  const syncPhoto = useCallback(() => {
+    const m = machineRef.current;
+    setPhotoState(m.state);
+    setCorners(m.corners);
+    setDetectedQuad(m.detectedQuad);
+    setDetectPending(m.detectPending);
+    setQuadSource(m.quadSource);
+  }, []);
+
   const photoUrlRef = useRef<string | null>(null);
   photoUrlRef.current = photoUrl;
-  const cornersRef = useRef<[number, number][] | null>(null);
-  cornersRef.current = corners;
   const photoResultRef = useRef<PhotoResult | null>(null);
   photoResultRef.current = photoResult;
   const stagedBytesRef = useRef<Uint8Array | null>(null);
   const stagedDimsRef = useRef<{ width: number; height: number } | null>(null);
+  const stagedTokenRef = useRef<string | null>(null);
   const reverseTokenRef = useRef<{ cancelled: boolean }>({ cancelled: false });
   const retryGateRef = useRef<(() => void) | null>(null);
   const prefetchedRef = useRef(false);
@@ -699,7 +723,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   // timeout) and re-issue, which re-triggers the worker's lazy vision load.
   const runReverse = useCallback(
     async (
-      bytes: Uint8Array,
+      payload: Uint8Array | string,
       optionsJson: string,
       token: { cancelled: boolean },
     ): Promise<{ model: QuiltModel; ms: number }> => {
@@ -709,7 +733,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
           const started = performance.now();
           const result = await engineRef.current.call<{ model: QuiltModel }>(
             "reverse_photo",
-            bytes,
+            payload,
             optionsJson,
           );
           return { model: result.model, ms: performance.now() - started };
@@ -740,18 +764,30 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       uncertainCount: countUncertain(model.center.cell_confidence),
       reverseMs: ms,
     });
-    setPhotoState("results");
   }, []);
 
-  const start = useCallback(
+  /** Stage the photo's bytes into the worker once; the token is reused by
+   * detect_quad and analyze, and re-staged if a worker restart wiped it. */
+  const ensureStagedToken = useCallback(async (): Promise<string | null> => {
+    if (stagedTokenRef.current) return stagedTokenRef.current;
+    const bytes = stagedBytesRef.current;
+    if (!bytes) return null;
+    const staged = await engineRef.current.call<{ token: string }>("stage_photo", bytes);
+    stagedTokenRef.current = staged.token;
+    return staged.token;
+  }, []);
+
+  // S2 stage(): the photo and default pins render IMMEDIATELY (no engine on
+  // the critical path); detection resolves in the background and snaps in
+  // unless the user already moved a pin (the machine owns that race).
+  const stage = useCallback(
     async (file: File): Promise<void> => {
       setPhotoActive(true);
-      setPhotoState("progress");
       setPhotoResult(null);
-      setCorners(null);
-      cornersRef.current = null;
-      const token = { cancelled: false };
-      reverseTokenRef.current = token;
+      stagedTokenRef.current = null;
+      const seq = machineRef.current.enterCrop();
+      syncPhoto();
+      setSessionPhoto(URL.createObjectURL(file));
       try {
         const bitmap = await createImageBitmap(file);
         const size = targetSize(bitmap.width, bitmap.height, classifyDevice(window.innerWidth));
@@ -765,26 +801,73 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         const bytes = await canvasToPngBytes(canvas);
         stagedBytesRef.current = bytes;
         stagedDimsRef.current = { width: size.width, height: size.height };
-        setSessionPhoto(URL.createObjectURL(file));
-        if (token.cancelled) return;
-        const { model, ms } = await runReverse(bytes, "{}", token);
-        if (token.cancelled) return;
-        applyReverse(model, ms);
+        const token = await ensureStagedToken();
+        if (!token) throw new Error("no staged photo");
+        const detected = await engineRef.current.call<DetectQuadResult>("detect_quad", token);
+        machineRef.current.detectionResolved(seq, {
+          quad: detected.quad,
+          tier: detected.tier,
+          confidence: detected.confidence,
+        });
+        syncPhoto();
       } catch {
-        if (token.cancelled) return;
-        toast.push("That photo didn’t come through — try another?", "error");
-        setPhotoState("idle");
+        // the crop screen stays fully usable on default pins; the finding-
+        // your-quilt affordance simply disappears (cold-start contract)
+        machineRef.current.detectionFailed(seq);
+        syncPhoto();
       }
     },
-    [runReverse, applyReverse, setSessionPhoto, toast],
+    [ensureStagedToken, setSessionPhoto, syncPhoto],
   );
 
-  const startSample = useCallback(async (): Promise<void> => {
-    setPhotoActive(true);
-    setPhotoState("progress");
+  // S2 analyze(): reverse via the staged token; corners ride along ONLY when
+  // the user moved a pin (see photoFlow.ts for the honesty rationale).
+  const analyze = useCallback(async (): Promise<void> => {
+    const passed = machineRef.current.analyze();
+    syncPhoto();
     setPhotoResult(null);
-    setCorners(null);
-    cornersRef.current = null;
+    const token = { cancelled: false };
+    reverseTokenRef.current = token;
+    try {
+      const dims = stagedDimsRef.current ?? { width: 1, height: 1 };
+      const optionsJson = passed
+        ? JSON.stringify({ corners: passed.map(([x, y]) => [x * dims.width, y * dims.height]) })
+        : "{}";
+      let staged = await ensureStagedToken();
+      if (!staged) throw new Error("no staged photo");
+      let outcome: { model: QuiltModel; ms: number };
+      try {
+        outcome = await runReverse(staged, optionsJson, token);
+      } catch (error) {
+        // a worker restart wiped MEMFS: the token is stale; re-stage once
+        const stale =
+          error instanceof EngineError &&
+          error.kind === "value" &&
+          /not found/i.test(error.message);
+        if (!stale) throw error;
+        stagedTokenRef.current = null;
+        staged = await ensureStagedToken();
+        if (!staged) throw error;
+        outcome = await runReverse(staged, optionsJson, token);
+      }
+      if (token.cancelled) return;
+      applyReverse(outcome.model, outcome.ms);
+      machineRef.current.results();
+      syncPhoto();
+    } catch {
+      if (token.cancelled) return;
+      toast.push("That photo didn’t come through — try another?", "error");
+      machineRef.current.seedFromConfirmed();
+      syncPhoto();
+    }
+  }, [ensureStagedToken, runReverse, applyReverse, syncPhoto, toast]);
+
+  const startSample = useCallback(async (): Promise<void> => {
+    // sample bypass (S2 contract): auto-confirmed full-frame render, no crop
+    setPhotoActive(true);
+    setPhotoResult(null);
+    machineRef.current.bypassToProgress();
+    syncPhoto();
     const token = { cancelled: false };
     reverseTokenRef.current = token;
     try {
@@ -799,6 +882,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       if (token.cancelled) return;
       const bytes = new Uint8Array(base64ToArrayBuffer(rendered.png_b64));
       stagedBytesRef.current = bytes;
+      stagedTokenRef.current = null;
       try {
         const bitmap = await createImageBitmap(new Blob([bytes], { type: "image/png" }));
         stagedDimsRef.current = { width: bitmap.width, height: bitmap.height };
@@ -810,72 +894,61 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       const { model, ms } = await runReverse(bytes, "{}", token);
       if (token.cancelled) return;
       applyReverse(model, ms);
+      machineRef.current.results();
+      syncPhoto();
     } catch {
       if (token.cancelled) return;
       toast.push("The sample didn’t load — try again?", "error");
-      setPhotoState("idle");
+      machineRef.current.reset();
+      syncPhoto();
     }
-  }, [runReverse, applyReverse, setSessionPhoto, toast]);
+  }, [runReverse, applyReverse, setSessionPhoto, syncPhoto, toast]);
 
   const cancel = useCallback(() => {
+    // PARITY item 14 (sprint 2, frozen): cancel returns to the dropzone;
+    // the worker restart also invalidates the staged token by design
     reverseTokenRef.current.cancelled = true;
     retryGateRef.current?.();
     engineRef.current.restart();
-    setPhotoState("idle");
+    stagedTokenRef.current = null;
+    machineRef.current.cancel();
+    syncPhoto();
     setPhotoResult(null);
-  }, []);
+  }, [syncPhoto]);
 
   const retryVision = useCallback(() => {
     engineRef.current.prefetchVision();
     retryGateRef.current?.();
   }, []);
 
-  const toCorners = useCallback(() => {
-    if (cornersRef.current === null) {
-      const seed = seedCorners();
-      cornersRef.current = seed;
-      setCorners(seed);
-    }
-    setPhotoState("corners");
-  }, []);
+  // "Adjust the crop" from results: one pin surface, reachable from both ends
+  const toCrop = useCallback(() => {
+    machineRef.current.seedFromConfirmed();
+    syncPhoto();
+  }, [syncPhoto]);
 
-  const backToResults = useCallback(() => {
-    setPhotoState("results");
-  }, []);
+  const setCorner = useCallback(
+    (index: number, xy: [number, number]) => {
+      machineRef.current.movePin(index, xy);
+      syncPhoto();
+    },
+    [syncPhoto],
+  );
 
-  const setCorner = useCallback((index: number, xy: [number, number]) => {
-    const current = cornersRef.current ?? seedCorners();
-    const next = current.map((c, i) => (i === index ? xy : c)) as [number, number][];
-    cornersRef.current = next;
-    setCorners(next);
-  }, []);
+  const resetToAuto = useCallback(() => {
+    machineRef.current.resetToAuto();
+    syncPhoto();
+  }, [syncPhoto]);
 
-  const resetCorners = useCallback(() => {
-    const seed = seedCorners();
-    cornersRef.current = seed;
-    setCorners(seed);
-  }, []);
-
-  const rerunWithCorners = useCallback(async (): Promise<void> => {
-    const bytes = stagedBytesRef.current;
-    const cornerList = cornersRef.current;
-    if (!bytes || !cornerList) return;
-    setPhotoState("progress");
-    const token = { cancelled: false };
-    reverseTokenRef.current = token;
-    try {
-      // UI corners are normalized [0,1]; scale into staged-image pixel space.
-      const dims = stagedDimsRef.current ?? { width: 1, height: 1 };
-      const pixels = cornerList.map(([x, y]) => [x * dims.width, y * dims.height]);
-      const { model, ms } = await runReverse(bytes, JSON.stringify({ corners: pixels }), token);
-      if (token.cancelled) return;
-      applyReverse(model, ms);
-    } catch {
-      if (token.cancelled) return;
-      toast.push("That re-run didn’t finish — try again?", "error");
-      setPhotoState("results");
-    }
-  }, [runReverse, applyReverse, toast]);
+  const backFromCrop = useCallback(() => {
+    // Back discards the staged photo (UI-SPEC section 1 flow rules)
+    machineRef.current.backFromCrop();
+    syncPhoto();
+    stagedBytesRef.current = null;
+    stagedDimsRef.current = null;
+    stagedTokenRef.current = null;
+    setSessionPhoto(null);
+  }, [setSessionPhoto, syncPhoto]);
 
   const openInEditor = useCallback(() => {
     const result = photoResultRef.current;
@@ -898,12 +971,16 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
 
   const backToDropzone = useCallback(() => {
     setPhotoActive(true);
-    setPhotoState("idle");
+    machineRef.current.reset();
+    syncPhoto();
     setPhotoResult(null);
-    setCorners(null);
-    cornersRef.current = null;
+    stagedBytesRef.current = null;
+    stagedTokenRef.current = null;
     setSessionPhoto(null);
-  }, [setSessionPhoto]);
+    // vision prefetch fires on photo-flow ENTRY, not on drop (S2 contract);
+    // this is also the entry path from the start screen
+    engineRef.current.prefetchVision();
+  }, [setSessionPhoto, syncPhoto]);
 
   // ---- round-trip demo panel (render -> reverse -> compare) ----------------
 
@@ -1215,14 +1292,15 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     setPlans({ historical: null, strip: null, modern: null });
     // Leaving for home also exits any photo flow and drops the session bitmap.
     setPhotoActive(false);
-    setPhotoState("idle");
+    machineRef.current.reset();
+    syncPhoto();
     setPhotoResult(null);
-    setCorners(null);
-    cornersRef.current = null;
+    stagedBytesRef.current = null;
+    stagedTokenRef.current = null;
     setShowUncertain(false);
     setRoundtripReport(null);
     setSessionPhoto(null);
-  }, [setSessionPhoto]);
+  }, [setSessionPhoto, syncPhoto]);
 
   // ---- seams tool (PARITY item 2; preview layer over ui.seamFix) ----------
 
@@ -1480,16 +1558,19 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       visionState,
       visionBytes,
       corners,
-      start,
+      detectedQuad,
+      detectPending,
+      quadSource,
+      stage,
+      analyze,
       startSample,
       cancel,
-      toCorners,
+      toCrop,
       setCorner,
-      resetCorners,
-      rerunWithCorners,
+      resetToAuto,
+      backFromCrop,
       openInEditor,
       backToDropzone,
-      backToResults,
       retryVision,
     },
     roundtrip: { run: runRoundtrip, report: roundtripReport },
