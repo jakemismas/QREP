@@ -135,7 +135,13 @@ def reverse(
     except ValueError:
         # rectify's "no quilt found": typed result, never a raise (S3)
         return _fallback_result(image, "no_quilt_found")
-    palette = extract_palette(rect.image, fabrics, mask=rect.mask)
+    # S5: lighting normalization only on trusted crops - detection tiers
+    # 0-2 or user-confirmed corners; a tier-3 full frame would feed the
+    # detrend content structure instead of lighting (see palette.py)
+    trusted_crop = corners is not None or rect.tier in (0, 1, 2)
+    palette = extract_palette(
+        rect.image, fabrics, mask=rect.mask, lighting_detrend=trusted_crop
+    )
     # S4: image-level periodicity runs BEFORE the grid so a trustworthy
     # period (score at or above T2, per axis) can feed the pitch back
     periodicity = image_periodicity(rect.image)
