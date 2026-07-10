@@ -36,6 +36,20 @@ VOTE_MIN_COPIES = 3  # frozen: minimum periodic copies on a voted axis
 VOTE_HIGH_MARGIN = 0.8  # cells at or above this margin are never mutated
 SUBLATTICE_MIN_ENERGY = 0.25  # admissibility floor for the half-pitch probe
 
+# --- S1 (issue #93): block-lattice SNR evidence detector -----------------
+# The FROZEN ladder + SNR shape, proposed by S0's baseline report on #92 and
+# frozen by Jake on #91 (2026-07-10). These literals MIRROR the wasm-gate op
+# in tests/fixtures/wasm_gate/ops.py exactly (production cannot import from
+# tests/, so they are re-declared here and a cross-check test pins the two
+# byte-aligned). A high pass only removes structure FINER than its sigma, so
+# the fine rungs rescue the phone-cap ~10 px block that a single fixed detrend
+# sigma collapses to SNR 0; large motif periods survive every rung.
+LADDER_SIGMAS = (1.5, 3.0, 6.0)
+SNR_HARMONICS = (1, 2, 3)  # fundamental + first two harmonics of the comb
+SNR_MIN_LAG = 5  # grid.MIN_PITCH_PX; ignore the zero-lag envelope
+SNR_STD_FLOOR = 1e-6  # a flat band carries no SNR
+SNR_CHANNEL_FLOOR = 0.5  # a detrended channel below this std has no signal
+
 
 class RepeatResult(BaseModel):
     period_rows: int  # 0 when no repeat found
@@ -52,6 +66,20 @@ class PeriodicityResult(BaseModel):
     @property
     def score(self) -> float:
         return max(self.score_x, self.score_y)
+
+
+class BlockLatticeResult(BaseModel):
+    """Peak-contrast 2D lattice evidence (S1, issue #93). period_* are 0 and
+    channel is -1 when no lattice survives any ladder rung; snr is the
+    min-over-axes statistic at the argmax (channel, sigma)."""
+
+    period_x: int
+    period_y: int
+    snr: float  # min over axes at the argmax config: the block-lattice floor
+    snr_x: float
+    snr_y: float
+    channel: int  # winning Lab channel index (0=L,1=a,2=b); -1 when none
+    sigma: float  # winning detrend sigma; 0.0 when none
 
 
 def _axis_period(grid: np.ndarray, axis: int) -> tuple[int, float]:
@@ -147,6 +175,143 @@ def image_periodicity(image_bgr: np.ndarray) -> PeriodicityResult:
     period_y, score_y = _profile_fundamental(profile_y)
     return PeriodicityResult(
         period_x=period_x, period_y=period_y, score_x=score_x, score_y=score_y
+    )
+
+
+# ---------------------------------------------------------------------------
+# S1 block-lattice SNR evidence (issue #93)
+# ---------------------------------------------------------------------------
+# A faithful mirror of lab_ladder_autocorr_op in tests/fixtures/wasm_gate/
+# ops.py (the wasm-gate op): normalized 2D autocorrelation of the high-passed
+# best Lab channel over the frozen sigma ladder; per axis the fundamental's
+# harmonic-comb SNR over a global background; statistic = min over axes at the
+# argmax (channel, sigma). The op is the parity reference; this is the
+# production entry the pipeline calls on the rectified quilt.
+
+
+def _block_autocorr_axis_lines(field: np.ndarray) -> tuple[np.ndarray, np.ndarray] | None:
+    """Zero-lag-normalized axis profiles of the 2D autocorrelation of `field`.
+
+    Pads to cv2.getOptimalDFTSize so the two DFTs stay fast on odd widths; the
+    zero pad beyond the signal divides out under the zero-lag normalization.
+    Returns (profile_x over columns, profile_y over rows) or None when the
+    field is flat (degenerate zero-lag)."""
+    h, w = field.shape
+    oh, ow = cv2.getOptimalDFTSize(h), cv2.getOptimalDFTSize(w)
+    padded = np.zeros((oh, ow), np.float32)
+    padded[:h, :w] = field
+    spectrum = cv2.dft(padded, flags=cv2.DFT_COMPLEX_OUTPUT)
+    power = spectrum[..., 0] ** 2 + spectrum[..., 1] ** 2
+    packed = np.stack([power, np.zeros_like(power)], axis=-1)
+    autocorr = cv2.dft(
+        packed, flags=cv2.DFT_INVERSE | cv2.DFT_SCALE | cv2.DFT_COMPLEX_OUTPUT
+    )[..., 0]
+    zero_lag = float(autocorr[0, 0])
+    if zero_lag <= 0:
+        return None
+    return autocorr[0, :w] / zero_lag, autocorr[:, 0][:h] / zero_lag
+
+
+def _block_axis_fundamental(profile: np.ndarray, hi: int) -> int:
+    """Smallest comparably-strong (>= 0.5x the strongest) local maximum in
+    [SNR_MIN_LAG, hi) - grid.py's frozen fundamental rule, so the coarse block
+    period wins over its own harmonics rather than an aliased multiple."""
+    lo = SNR_MIN_LAG
+    if hi <= lo + 2:
+        return 0
+    window = profile[lo:hi]
+    peaks = [
+        i
+        for i in range(1, len(window) - 1)
+        if window[i] >= window[i - 1] and window[i] >= window[i + 1] and window[i] > 0
+    ]
+    if not peaks:
+        return 0
+    strongest = max(float(window[i]) for i in peaks)
+    fundamental = next(i for i in peaks if window[i] >= FUNDAMENTAL_FACTOR * strongest)
+    return lo + fundamental
+
+
+def _block_axis_snr(profile: np.ndarray, period: int, hi: int) -> float:
+    """Peak SNR of the harmonic comb over a global background.
+
+    For each harmonic k the peak at lag k*period (with +/-1 lag jitter) is
+    scored against the whole search band's median and std. A global (not local)
+    background does not collapse in the trough of a clean lattice, so the
+    statistic stays bounded and thresholdable; averaging over k=1..3 rewards a
+    genuine comb over a lone accidental peak."""
+    if period < SNR_MIN_LAG:
+        return 0.0
+    band = profile[SNR_MIN_LAG:hi]
+    if band.size == 0:
+        return 0.0
+    median = float(np.median(band))
+    std = float(np.std(band))
+    if std < SNR_STD_FLOOR:
+        return 0.0
+    snrs: list[float] = []
+    for k in SNR_HARMONICS:
+        center = int(round(k * period))
+        if center + 1 >= len(profile):
+            break
+        peak = float(profile[max(0, center - 1) : center + 2].max())
+        snrs.append((peak - median) / std)
+    if not snrs:
+        return 0.0
+    return float(sum(snrs) / len(snrs))
+
+
+def _block_config_snr(channel: np.ndarray, sigma: float, hi_x: int, hi_y: int):
+    """(min-axis SNR, period_x, period_y, snr_x, snr_y) for one (channel,
+    sigma) config, or None when the detrended channel carries no signal."""
+    highpass = channel - cv2.GaussianBlur(channel, (0, 0), sigma)
+    if float(highpass.std()) < SNR_CHANNEL_FLOOR:
+        return None
+    lines = _block_autocorr_axis_lines(highpass)
+    if lines is None:
+        return None
+    profile_x, profile_y = lines
+    period_x = _block_axis_fundamental(profile_x, hi_x)
+    period_y = _block_axis_fundamental(profile_y, hi_y)
+    snr_x = _block_axis_snr(profile_x, period_x, hi_x)
+    snr_y = _block_axis_snr(profile_y, period_y, hi_y)
+    return min(snr_x, snr_y), period_x, period_y, snr_x, snr_y
+
+
+def block_lattice_snr(image_bgr: np.ndarray) -> BlockLatticeResult:
+    """Block-lattice evidence: the max min-axis SNR over the Lab channel sweep
+    (L, a, b) and the frozen detrend-sigma ladder, with the argmax config's
+    per-axis block periods. Periods are at the INPUT image resolution (no
+    internal downscale, so phone-cap fine periods survive and lags stay
+    integer-exact). Runs on the rectified quilt when the 1D read is failing;
+    the pipeline gates the call, this function always measures."""
+    lab = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2Lab).astype(np.float32)
+    h, w = lab.shape[:2]
+    hi_x, hi_y = w // 4, h // 4
+
+    best = None  # (snr, period_x, period_y, snr_x, snr_y, channel, sigma)
+    for channel_index in range(3):
+        channel = lab[:, :, channel_index]
+        for sigma in LADDER_SIGMAS:
+            result = _block_config_snr(channel, sigma, hi_x, hi_y)
+            if result is None:
+                continue
+            snr, period_x, period_y, snr_x, snr_y = result
+            if best is None or snr > best[0]:
+                best = (snr, period_x, period_y, snr_x, snr_y, channel_index, sigma)
+
+    if best is None:
+        return BlockLatticeResult(
+            period_x=0, period_y=0, snr=0.0, snr_x=0.0, snr_y=0.0, channel=-1, sigma=0.0
+        )
+    return BlockLatticeResult(
+        period_x=best[1],
+        period_y=best[2],
+        snr=best[0],
+        snr_x=best[3],
+        snr_y=best[4],
+        channel=best[5],
+        sigma=best[6],
     )
 
 

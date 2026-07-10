@@ -33,12 +33,13 @@ from qrep.vision.grid import estimate_grid
 from qrep.vision.palette import extract_palette
 from qrep.vision.rectify import rectify
 from qrep.vision.repeats import (
+    block_lattice_snr,
     coherence_with_sublattice,
     detect_repeat,
     image_periodicity,
     vote_cells,
 )
-from qrep.vision.verdict import INTEGER_RATIO_EPSILON, T2, decide_verdict
+from qrep.vision.verdict import INTEGER_RATIO_EPSILON, T1, T2, decide_verdict
 
 ASSUMED_PPI = 10  # matches the renderer default; a guess for real photos
 
@@ -117,6 +118,7 @@ def _fallback_result(
         "coherence": 0.0,
         "integer_ratio": {"x": 0.0, "y": 0.0, "passed": False},
         "block_period_cells": None,
+        "lattice_snr": None,
         "repeat_vote": {"applied": False, "cells_changed": 0},
         "size_source": "guess",
         "size_is_guess": True,
@@ -167,6 +169,22 @@ def reverse(
     except ValueError as error:
         reason = "profile_too_short" if "too short" in str(error) else "no_periodicity"
         return _fallback_result(image, reason, rect=rect, palette=palette)
+
+    # S1 (issue #93): the peak-contrast block-lattice evidence is computed only
+    # when the 1D read is FAILING (grid confidence below the verdict floor);
+    # every passing fixture skips it, so the block hint is structurally inert
+    # there. When it engages, estimate_grid re-runs with the block period fed
+    # per axis into the same pitch feedback (admissibility gated inside).
+    block_lattice = None
+    if grid.confidence < T1:
+        block_lattice = block_lattice_snr(rect.image)
+        grid = estimate_grid(
+            rect.image,
+            mask=rect.mask,
+            warp_magnitude=rect.warp_magnitude,
+            period_hint=hint if hint != (0.0, 0.0) else None,
+            block_lattice=block_lattice,
+        )
     cells = assign_cells(rect.image, grid.x.boundaries, grid.y.boundaries, palette.centers_lab)
     borders = detect_borders(cells.assignments, grid.x.boundaries, grid.y.boundaries)
 
@@ -299,6 +317,16 @@ def reverse(
         "coherence": coherence,
         "integer_ratio": {"x": ratio_x, "y": ratio_y, "passed": ratio_passed},
         "block_period_cells": block_period_cells,
+        "lattice_snr": (
+            {
+                "period_px": [block_lattice.period_x, block_lattice.period_y],
+                "snr": block_lattice.snr,
+                "channel": block_lattice.channel,
+                "sigma": block_lattice.sigma,
+            }
+            if block_lattice is not None
+            else None
+        ),
         "repeat_vote": {"applied": vote_applied, "cells_changed": vote_changed},
         "size_source": "user" if size_achieved is not None else "guess",
         "size_is_guess": size_achieved is None,

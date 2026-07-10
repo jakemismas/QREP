@@ -12,6 +12,12 @@ S3 uses T1 as the honest-failure floor its guards push violators below.
 T1 = 0.60  # grid-confidence floor
 T2 = 0.45  # image-level periodicity floor
 T3 = 1.05  # intra-cell coherence ceiling for squares content
+# T4 (sprint 4; proposed by S0's baseline report on issue #92, frozen by Jake
+# via the parent-issue checkbox on #91, 2026-07-10). IMMUTABLE from here, same
+# standing as T1-T3: the block-lattice SNR floor below which the peak-contrast
+# 2D evidence is noise. S1 (#93) admits the block period as a pitch hint only
+# above this floor; S2 (#94) gates the corroboration exits on it.
+T4 = 1.50  # block-lattice SNR floor
 
 VERDICTS = ("readable", "readable_no_repeat", "non_square_repeat", "no_grid")
 
