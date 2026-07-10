@@ -69,6 +69,9 @@ export interface PhotoApi {
   resetToAuto(): void;
   backFromCrop(): void;
   openInEditor(): void;
+  /** S8 (issue #74): blank-grid escape from a failure verdict; keeps the
+   * recovered palette only when it clears the frozen trust gate. */
+  startInEditorFromFailure(): void;
   backToDropzone(): void;
   retryVision?(): void;
 }
