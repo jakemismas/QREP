@@ -31,7 +31,13 @@ from qrep.vision.cells import assign_cells
 from qrep.vision.grid import estimate_grid
 from qrep.vision.palette import extract_palette
 from qrep.vision.rectify import rectify
-from qrep.vision.repeats import detect_repeat
+from qrep.vision.repeats import (
+    coherence_with_sublattice,
+    detect_repeat,
+    image_periodicity,
+    vote_cells,
+)
+from qrep.vision.verdict import INTEGER_RATIO_EPSILON, T2, decide_verdict
 
 ASSUMED_PPI = 10  # matches the renderer default; a guess for real photos
 
@@ -93,6 +99,7 @@ def _fallback_result(
         "identity": rect.identity if rect is not None else True,
         "detection_tier": rect.tier if rect is not None else None,
         "grid_diagnosis": reason,
+        "verdict": "no_grid",
         "detected_corners": rect.corners
         if rect is not None
         else [(0.0, 0.0), (float(width), 0.0), (float(width), float(height)), (0.0, float(height))],
@@ -105,6 +112,11 @@ def _fallback_result(
         "repeat_period": [0, 0],
         "palette_k": palette.k if palette is not None else 0,
         "interior_dims": [2, 2],
+        "periodicity": {"period_px": [0, 0], "score_x": 0.0, "score_y": 0.0, "score": 0.0},
+        "coherence": 0.0,
+        "integer_ratio": {"x": 0.0, "y": 0.0, "passed": False},
+        "block_period_cells": None,
+        "repeat_vote": {"applied": False, "cells_changed": 0},
     }
     return ReverseResult(quilt=quilt, diagnostics=diagnostics)
 
@@ -124,8 +136,20 @@ def reverse(
         # rectify's "no quilt found": typed result, never a raise (S3)
         return _fallback_result(image, "no_quilt_found")
     palette = extract_palette(rect.image, fabrics, mask=rect.mask)
+    # S4: image-level periodicity runs BEFORE the grid so a trustworthy
+    # period (score at or above T2, per axis) can feed the pitch back
+    periodicity = image_periodicity(rect.image)
+    hint = (
+        float(periodicity.period_x) if periodicity.score_x >= T2 else 0.0,
+        float(periodicity.period_y) if periodicity.score_y >= T2 else 0.0,
+    )
     try:
-        grid = estimate_grid(rect.image, mask=rect.mask, warp_magnitude=rect.warp_magnitude)
+        grid = estimate_grid(
+            rect.image,
+            mask=rect.mask,
+            warp_magnitude=rect.warp_magnitude,
+            period_hint=hint if hint != (0.0, 0.0) else None,
+        )
     except ValueError as error:
         reason = "profile_too_short" if "too short" in str(error) else "no_periodicity"
         return _fallback_result(image, reason, rect=rect, palette=palette)
@@ -143,6 +167,29 @@ def reverse(
         row[left : total_cols - right] for row in cells.cell_confidence[top : total_rows - bottom]
     ]
     repeat = detect_repeat(interior)
+
+    # S4: integer-ratio cross-check (period_px / pitch_px within the frozen
+    # epsilon of an integer confirms the pitch), coherence, voting, verdict
+    def _ratio_ok(period: float, pitch: float) -> tuple[float, bool]:
+        if period <= 0 or pitch <= 0:
+            return 0.0, False
+        ratio = period / pitch
+        return ratio, round(ratio) >= 1 and abs(ratio - round(ratio)) <= INTEGER_RATIO_EPSILON
+
+    ratio_x, ok_x = _ratio_ok(float(periodicity.period_x), grid.x.pitch)
+    ratio_y, ok_y = _ratio_ok(float(periodicity.period_y), grid.y.pitch)
+    ratio_passed = ok_x and ok_y
+
+    vote_changed = 0
+    vote_applied = False
+    if ratio_passed and interior and repeat.period_rows > 0 and repeat.period_cols > 0:
+        voted, vote_changed, vote_applied = vote_cells(
+            interior, interior_conf, repeat.period_rows, repeat.period_cols
+        )
+        if vote_changed > 0:
+            interior = voted
+
+    coherence = coherence_with_sublattice(rect.image, grid.x.boundaries, grid.y.boundaries)
 
     fabric_ids = [f"f{i}" for i in range(palette.k)]
     cell_size = max(1, round(grid.x.pitch * 8 / ASSUMED_PPI))
@@ -194,10 +241,20 @@ def reverse(
         binding=Binding(fabric_id=binding_fabric),
         provenance=Provenance(source="cv", stage_confidence=stage_confidence),
     )
+    verdict = decide_verdict(
+        stage_confidence["grid"],
+        periodicity.score,
+        coherence,
+        repeat.period_rows > 0 and repeat.period_cols > 0,
+    )
+    block_period_cells = (
+        [int(round(ratio_x)), int(round(ratio_y))] if ratio_passed else None
+    )
     diagnostics = {
         "identity": rect.identity,
         "detection_tier": rect.tier,
         "grid_diagnosis": grid.diagnosis,
+        "verdict": verdict,
         "detected_corners": rect.corners,
         "rectified_size": [rect.image.shape[1], rect.image.shape[0]],
         "pitch_px": [grid.x.pitch, grid.y.pitch],
@@ -206,5 +263,15 @@ def reverse(
         "repeat_period": [repeat.period_rows, repeat.period_cols],
         "palette_k": palette.k,
         "interior_dims": [len(interior), len(interior[0]) if interior else 0],
+        "periodicity": {
+            "period_px": [periodicity.period_x, periodicity.period_y],
+            "score_x": periodicity.score_x,
+            "score_y": periodicity.score_y,
+            "score": periodicity.score,
+        },
+        "coherence": coherence,
+        "integer_ratio": {"x": ratio_x, "y": ratio_y, "passed": ratio_passed},
+        "block_period_cells": block_period_cells,
+        "repeat_vote": {"applied": vote_applied, "cells_changed": vote_changed},
     }
     return ReverseResult(quilt=quilt, diagnostics=diagnostics)
