@@ -107,6 +107,9 @@ export interface PhotoResult {
   stageConfidence: Record<string, number>;
   uncertainCount: number;
   reverseMs: number;
+  /** S4 (issue #70), additive: the verdict contract. S8 renders these. */
+  verdict?: string;
+  diagnostics?: Record<string, unknown>;
 }
 
 /** The photo-reverse flow API (owned by the state layer; PhotoFlow consumes it).
@@ -726,17 +729,27 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       payload: Uint8Array | string,
       optionsJson: string,
       token: { cancelled: boolean },
-    ): Promise<{ model: QuiltModel; ms: number }> => {
+    ): Promise<{
+      model: QuiltModel;
+      verdict?: string;
+      diagnostics?: Record<string, unknown>;
+      ms: number;
+    }> => {
       for (;;) {
         if (token.cancelled) throw new EngineError("worker", "cancelled");
         try {
           const started = performance.now();
-          const result = await engineRef.current.call<{ model: QuiltModel }>(
-            "reverse_photo",
-            payload,
-            optionsJson,
-          );
-          return { model: result.model, ms: performance.now() - started };
+          const result = await engineRef.current.call<{
+            model: QuiltModel;
+            verdict?: string;
+            diagnostics?: Record<string, unknown>;
+          }>("reverse_photo", payload, optionsJson);
+          return {
+            model: result.model,
+            verdict: result.verdict,
+            diagnostics: result.diagnostics,
+            ms: performance.now() - started,
+          };
         } catch (error) {
           if (token.cancelled || !isVisionError(error)) throw error;
           await new Promise<void>((resolve) => {
@@ -757,14 +770,24 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const applyReverse = useCallback((model: QuiltModel, ms: number) => {
-    setPhotoResult({
-      modelJson: JSON.stringify(model),
-      stageConfidence: mapStageConfidence(model.provenance?.stage_confidence),
-      uncertainCount: countUncertain(model.center.cell_confidence),
-      reverseMs: ms,
-    });
-  }, []);
+  const applyReverse = useCallback(
+    (
+      model: QuiltModel,
+      ms: number,
+      verdict?: string,
+      diagnostics?: Record<string, unknown>,
+    ) => {
+      setPhotoResult({
+        modelJson: JSON.stringify(model),
+        stageConfidence: mapStageConfidence(model.provenance?.stage_confidence),
+        uncertainCount: countUncertain(model.center.cell_confidence),
+        reverseMs: ms,
+        verdict,
+        diagnostics,
+      });
+    },
+    [],
+  );
 
   /** Stage the photo's bytes into the worker once; the token is reused by
    * detect_quad and analyze, and re-staged if a worker restart wiped it. */
@@ -835,7 +858,12 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         : "{}";
       let staged = await ensureStagedToken();
       if (!staged) throw new Error("no staged photo");
-      let outcome: { model: QuiltModel; ms: number };
+      let outcome: {
+        model: QuiltModel;
+        verdict?: string;
+        diagnostics?: Record<string, unknown>;
+        ms: number;
+      };
       try {
         outcome = await runReverse(staged, optionsJson, token);
       } catch (error) {
@@ -851,7 +879,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         outcome = await runReverse(staged, optionsJson, token);
       }
       if (token.cancelled) return;
-      applyReverse(outcome.model, outcome.ms);
+      applyReverse(outcome.model, outcome.ms, outcome.verdict, outcome.diagnostics);
       machineRef.current.results();
       syncPhoto();
     } catch {
@@ -891,9 +919,9 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         stagedDimsRef.current = null;
       }
       setSessionPhoto(URL.createObjectURL(new Blob([bytes], { type: "image/png" })));
-      const { model, ms } = await runReverse(bytes, "{}", token);
+      const outcome = await runReverse(bytes, "{}", token);
       if (token.cancelled) return;
-      applyReverse(model, ms);
+      applyReverse(outcome.model, outcome.ms, outcome.verdict, outcome.diagnostics);
       machineRef.current.results();
       syncPhoto();
     } catch {

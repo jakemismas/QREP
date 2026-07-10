@@ -174,12 +174,23 @@ def test_perspective_mis_crop_13x43_class_is_caught_below_t1():
 
 
 def test_anisotropic_garbage_is_caught_below_t1():
-    # the other face of the class: the drunkards-path composite reads today
-    # as a 70x4 grid (pitch skew ~14x at zero warp); guard (a) must set
-    # anisotropic_pitch and cap grid confidence below T1
-    result = reverse(PHOTOREAL / "drunkards_path_1400.png")
-    assert result.diagnostics["grid_diagnosis"] == "anisotropic_pitch"
-    assert result.quilt.provenance.stage_confidence["grid"] < T1
+    # guard (a)'s standing-violation face, on a case NO harmonic pair can
+    # rescue: a 20 x 33 px grating. Hand-check of every re-search pair
+    # (factors 1, 2, 3, 1/2, 1/3): x candidates {20, 40, 60, 10, 6.7} vs
+    # y candidates {33, 66, 99, 16.5, 11} - the closest ratios (10:11,
+    # 60:66) are 1.10, all above TOL(0) = 1.06. The violation stands:
+    # anisotropic_pitch, confidence capped below T1.
+    # (This test originally pinned drunkards_path's interim S3 state; the
+    # S4 contract supersedes that - its integer-ratio feedback now recovers
+    # drunkards to non_square_repeat, pinned in test_repeats_verdict.py.)
+    image = np.full((330, 400, 3), 200, dtype=np.uint8)
+    for x in range(0, 400, 20):
+        image[:, x : x + 2] = 60
+    for y in range(0, 330, 33):
+        image[y : y + 2, :] = 60
+    grid = estimate_grid(image)
+    assert grid.diagnosis == "anisotropic_pitch"
+    assert grid.confidence < T1
 
 
 # ---------------------------------------------------------------------------

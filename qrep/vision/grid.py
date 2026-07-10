@@ -10,7 +10,7 @@ import cv2
 import numpy as np
 from pydantic import BaseModel
 
-from qrep.vision.verdict import T1
+from qrep.vision.verdict import INTEGER_RATIO_EPSILON, T1
 
 MIN_PITCH_PX = 5
 
@@ -28,6 +28,13 @@ NO_EDGE_FLOOR = 0.3
 # covers frontal rounding jitter.
 ISOTROPY_BASE_TOL = 0.06
 ISOTROPY_WARP_FACTOR = 3.0
+# S4 (issue #70) integer-ratio feedback: candidates period/k, k = 1..MAX_K,
+# scored by the same lattice fit as the re-search; the SMALLEST comparably
+# strong candidate wins (grid.py's fundamental philosophy), and a winner
+# within 1% of the current pitch keeps the current float bit-exactly.
+FEEDBACK_MAX_K = 24
+FEEDBACK_COMPARABLE = 0.5
+FEEDBACK_REFINE = 1.05  # same-lattice candidate adopted only on a 5%+ better fit
 # Confidence cap when a guard's violation stands: strictly below the frozen
 # verdict floor T1 = 0.60, so S4's tree reads the result as no_grid.
 GUARD_CONFIDENCE_CAP = 0.5
@@ -193,10 +200,14 @@ def _boundaries(extent: int, pitch: float, offset: float, profile: np.ndarray) -
 
 
 def _lattice_score(profile: np.ndarray, pitch: float) -> float:
-    """Joint-re-search score for a pitch candidate on the RAW profile:
-    hit fraction (lattice lines landing within 1 px of an above-mean local
-    max) times the energy those lines capture. Rewards the fundamental
-    (hits every boundary) over a harmonic (hits half of them)."""
+    """Lattice-fit score for a pitch candidate on the RAW profile.
+
+    A line HITS when it lands within 1 px of a genuine spike (value at
+    least mean + 0.5 std - plain above-mean is too weak on dense curved
+    content, where every position clears the mean). Score = hit_fraction
+    squared times the mean hit energy: the squared fraction punishes
+    lattices whose extra lines land on nothing (a too-fine pitch), the
+    mean (not total) energy stops line COUNT from beating line QUALITY."""
     if pitch < MIN_PITCH_PX or pitch > len(profile) / 2:
         return 0.0
     offset = _find_offset(profile, pitch)
@@ -204,21 +215,87 @@ def _lattice_score(profile: np.ndarray, pitch: float) -> float:
     idx = np.clip(np.round(lines).astype(int), 0, len(profile) - 1)
     if idx.size == 0:
         return 0.0
-    mean = float(profile.mean())
+    floor = float(profile.mean()) + 0.5 * float(profile.std())
     hits = 0
     captured = 0.0
     for i in idx:
         lo, hi = max(0, i - 1), min(len(profile), i + 2)
-        window = profile[lo:hi]
-        peak = float(window.max())
-        captured += peak
-        if peak > mean:
+        peak = float(profile[lo:hi].max())
+        if peak >= floor:
             hits += 1
-    return (hits / idx.size) * captured
+            captured += peak
+    if hits == 0:
+        return 0.0
+    fraction = hits / idx.size
+    return fraction * fraction * (captured / hits)
+
+
+def _lattice_prominence(profile: np.ndarray, pitch: float) -> float:
+    """Periodicity strength of an ADOPTED lattice: the strongest normalized
+    RAW-profile autocorrelation over its first few multiples. The binarized
+    spike train weights all lines equally, which under-represents a lattice
+    whose alternate boundaries are legitimately weak (merged piecing pairs);
+    the raw profile keeps that structure. Adopted paths only - the clean
+    detection path keeps the sprint 1 binarized prominence bit-exactly."""
+    corr = _autocorrelate(profile)
+    best = 0.0
+    for m in range(1, 5):
+        lag = int(round(pitch * m))
+        if 0 < lag < len(corr):
+            best = max(best, float(corr[lag]))
+    return max(0.0, min(1.0, best))
 
 
 def _isotropy_tolerance(warp_magnitude: float) -> float:
     return ISOTROPY_BASE_TOL + ISOTROPY_WARP_FACTOR * warp_magnitude
+
+
+def _apply_period_feedback(
+    profile: np.ndarray, pitch: float, prominence: float, period: float, extent: int
+) -> tuple[float, float]:
+    """S4 integer-ratio feedback: the image-level period constrains the
+    pitch to period/k; adopt the smallest comparably strong candidate."""
+    if period <= 0:
+        return pitch, prominence
+    # feedback engages only on the plan's own triggers: the read is failing
+    # (below the verdict floor) or the period contradicts the pitch (non-
+    # integer ratio). A healthy, integer-confirmed read is left untouched -
+    # the L0-L2 pin freezes its floats and prominences byte-exactly.
+    ratio = period / max(pitch, 1e-9)
+    ratio_ok = round(ratio) >= 1 and abs(ratio - round(ratio)) <= INTEGER_RATIO_EPSILON
+    if prominence >= T1 and ratio_ok:
+        return pitch, prominence
+    candidates = sorted(
+        {
+            period / k
+            for k in range(1, FEEDBACK_MAX_K + 1)
+            if MIN_PITCH_PX <= period / k <= extent / 4
+        }
+    )
+    if not candidates:
+        return pitch, prominence
+    current_score = _lattice_score(profile, pitch)
+    scored = [(c, _lattice_score(profile, c)) for c in candidates]
+    best = max([current_score] + [s for _c, s in scored])
+    if best <= 0:
+        return pitch, prominence
+    for candidate, score in scored:  # ascending: smallest comparable wins
+        if score >= FEEDBACK_COMPARABLE * best:
+            if abs(candidate - pitch) / max(pitch, 1e-9) <= 0.01:
+                # same lattice - but a parabolic mis-rounding of the pitch
+                # can park every sampled lag one pixel off a razor-sharp
+                # autocorr peak (council finding, issue #70: raw corr 0.36
+                # at lag 85 vs 0.82 at 86 on the HST star). The period-
+                # derived candidate replaces it only when its lattice fit
+                # is MATERIALLY better AND the current measurement sits
+                # below the verdict floor - the only regime the artifact
+                # matters; healthy reads keep sprint 1's floats bit-exact
+                # (the L0-L2 pin is the contract there).
+                if score >= FEEDBACK_REFINE * current_score and prominence < T1:
+                    return float(candidate), _lattice_prominence(profile, candidate)
+                return pitch, prominence
+            return float(candidate), _lattice_prominence(profile, candidate)
+    return pitch, prominence
 
 
 def _pitch_skew(pitch_x: float, pitch_y: float) -> float:
@@ -230,6 +307,7 @@ def estimate_grid(
     image_bgr: np.ndarray,
     mask: np.ndarray | None = None,
     warp_magnitude: float = 0.0,
+    period_hint: tuple[float, float] | None = None,
 ) -> GridResult:
     gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY).astype(np.float32)
     grad = np.abs(cv2.Sobel(gray, cv2.CV_32F, 1, 0, ksize=3))
@@ -261,31 +339,36 @@ def estimate_grid(
     pitch_x, prom_x = _find_pitch(grad_x, max_pitch=width // 4)
     pitch_y, prom_y = _find_pitch(grad_y, max_pitch=height // 4)
 
+    if period_hint is not None:
+        pitch_x, prom_x = _apply_period_feedback(grad_x, pitch_x, prom_x, period_hint[0], width)
+        pitch_y, prom_y = _apply_period_feedback(grad_y, pitch_y, prom_y, period_hint[1], height)
+
     diagnosis: str | None = None
     tolerance = _isotropy_tolerance(warp_magnitude)
     if _pitch_skew(pitch_x, pitch_y) > tolerance:
-        # guard (a) fired: joint harmonic re-search over both axes; the
-        # best ISOTROPIC candidate pair replaces the pitches, otherwise the
-        # violation stands and confidence is capped below T1
-        best: tuple[float, float, float] | None = None
+        # guard (a) fired: joint harmonic re-search over both axes. Among
+        # ISOTROPIC candidate pairs comparably strong (>= 0.5x the best
+        # pair), the SMALLEST pitches win - the same fundamental philosophy
+        # as _find_pitch, so a strong 2x harmonic pair cannot outrank the
+        # true pitch pair that also fits. No viable pair: the violation
+        # stands and confidence is capped below T1.
+        pairs: list[tuple[float, float, float]] = []
         for fx in HARMONIC_FACTORS:
             for fy in HARMONIC_FACTORS:
                 cx, cy = pitch_x * fx, pitch_y * fy
                 if _pitch_skew(cx, cy) > tolerance:
                     continue
                 score = _lattice_score(grad_x, cx) + _lattice_score(grad_y, cy)
-                if score > 0 and (best is None or score > best[0]):
-                    best = (score, cx, cy)
-        if best is not None:
-            _score, pitch_x, pitch_y = best
-            # re-derive the autocorr prominence at the corrected lags
-            corr_x = _autocorrelate(_binarize(grad_x))
-            corr_y = _autocorrelate(_binarize(grad_y))
-            ix, iy = int(round(pitch_x)), int(round(pitch_y))
-            if 0 < ix < len(corr_x):
-                prom_x = float(max(0.0, min(1.0, corr_x[ix])))
-            if 0 < iy < len(corr_y):
-                prom_y = float(max(0.0, min(1.0, corr_y[iy])))
+                if score > 0:
+                    pairs.append((score, cx, cy))
+        if pairs:
+            best_score = max(score for score, _cx, _cy in pairs)
+            viable = [
+                (cx, cy) for score, cx, cy in pairs if score >= FEEDBACK_COMPARABLE * best_score
+            ]
+            pitch_x, pitch_y = min(viable, key=lambda p: p[0] + p[1])
+            prom_x = _lattice_prominence(grad_x, pitch_x)
+            prom_y = _lattice_prominence(grad_y, pitch_y)
         else:
             diagnosis = "anisotropic_pitch"
             prom_x = min(prom_x, GUARD_CONFIDENCE_CAP)

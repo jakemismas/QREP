@@ -313,7 +313,27 @@ def reverse(image_path: str, options_json: str) -> dict:
     from qrep.vision import reverse as reverse_pipeline
 
     result = reverse_pipeline(path, corners=corners, fabrics=options.get("fabrics"))
-    return {"model": result.quilt.model_dump(mode="json")}
+    diagnostics = _jsonable(result.diagnostics)
+    # S4 (issue #70): the envelope grows additively from {"model"} to
+    # {"model", "verdict", "diagnostics"} per the verdict contract
+    return {
+        "model": result.quilt.model_dump(mode="json"),
+        "verdict": diagnostics.get("verdict"),
+        "diagnostics": diagnostics,
+    }
+
+
+def _jsonable(value):
+    """Diagnostics carry numpy scalars and tuples; JSON needs plain types."""
+    if isinstance(value, dict):
+        return {str(k): _jsonable(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_jsonable(v) for v in value]
+    if isinstance(value, bool) or value is None or isinstance(value, (int, float, str)):
+        return value
+    if hasattr(value, "item"):
+        return value.item()
+    return str(value)
 
 
 @_envelope

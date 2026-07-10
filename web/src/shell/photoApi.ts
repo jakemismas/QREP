@@ -24,6 +24,9 @@ export interface PhotoResult {
   stageConfidence: Record<string, number>;
   uncertainCount: number;
   reverseMs: number;
+  /** S4 (issue #70), additive: the verdict contract. S8 renders these. */
+  verdict?: string;
+  diagnostics?: Record<string, unknown>;
 }
 
 /** S2 (issue #68): idle -> crop -> progress -> results; the post-results
