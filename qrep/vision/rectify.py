@@ -71,6 +71,7 @@ class RectifyResult(BaseModel):
     identity: bool
     confidence: float
     tier: int | None = None  # 0..3 for detected quads; None for user corners
+    warp_magnitude: float = 0.0  # mean corner pull / max_dim (identity: 0.0)
 
 
 def _order_corners(points: np.ndarray) -> np.ndarray:
@@ -540,4 +541,5 @@ def rectify(image: np.ndarray, corners: list[tuple[float, float]] | None = None)
         identity=False,
         confidence=min(confidence, 0.999),
         tier=tier,
+        warp_magnitude=warp_magnitude,
     )

@@ -41,6 +41,74 @@ class ReverseResult(BaseModel):
     diagnostics: dict
 
 
+def _fallback_result(
+    image: "cv2.typing.MatLike",
+    reason: str,
+    rect=None,
+    palette=None,
+) -> ReverseResult:
+    """S3 (issue #69): unreadable input is a typed zero-confidence result,
+    never an exception. The minimal 2x2 fallback quilt keeps every consumer
+    model-safe; grid_diagnosis carries the structured reason."""
+    height, width = image.shape[:2]
+    if palette is not None:
+        fabric_ids = [f"f{i}" for i in range(palette.k)]
+        fabrics_out = [
+            Fabric(id=fid, name=f"Fabric {i + 1}", color=palette.colors_hex[i])
+            for i, fid in enumerate(fabric_ids)
+        ]
+    else:
+        fabric_ids = ["f0"]
+        fabrics_out = [Fabric(id="f0", name="Fabric 1", color="#808080")]
+    stage_confidence = {
+        "rectify": round(rect.confidence, 6) if rect is not None else 0.0,
+        "palette": round(palette.confidence, 6) if palette is not None else 0.0,
+        "grid": 0.0,
+        "cells": 0.0,
+        "repeat": 0.0,
+        "border": 0.0,
+    }
+    assert set(stage_confidence) == set(STAGES)
+    quilt = Quilt(
+        metadata=QuiltMetadata(
+            name="Recovered quilt",
+            notes=(
+                "QREP could not read a square grid in this photo "
+                f"(reason: {reason}). This placeholder is not a recovered design."
+            ),
+        ),
+        palette=Palette(fabrics=fabrics_out),
+        center=GridRegion(
+            rows=2,
+            cols=2,
+            cell_size=12,
+            cells=[[fabric_ids[0], fabric_ids[0]], [fabric_ids[0], fabric_ids[0]]],
+            cell_confidence=[[0.0, 0.0], [0.0, 0.0]],
+        ),
+        borders=[],
+        binding=Binding(fabric_id=fabric_ids[0]),
+        provenance=Provenance(source="cv", stage_confidence=stage_confidence),
+    )
+    diagnostics = {
+        "identity": rect.identity if rect is not None else True,
+        "detection_tier": rect.tier if rect is not None else None,
+        "grid_diagnosis": reason,
+        "detected_corners": rect.corners
+        if rect is not None
+        else [(0.0, 0.0), (float(width), 0.0), (float(width), float(height)), (0.0, float(height))],
+        "rectified_size": [rect.image.shape[1], rect.image.shape[0]]
+        if rect is not None
+        else [width, height],
+        "pitch_px": [0.0, 0.0],
+        "border_strips": {"left": 0, "right": 0, "top": 0, "bottom": 0},
+        "border_widths_px": {"left": 0.0, "right": 0.0, "top": 0.0, "bottom": 0.0},
+        "repeat_period": [0, 0],
+        "palette_k": palette.k if palette is not None else 0,
+        "interior_dims": [2, 2],
+    }
+    return ReverseResult(quilt=quilt, diagnostics=diagnostics)
+
+
 def reverse(
     image_path: str | Path,
     corners: list[tuple[float, float]] | None = None,
@@ -50,9 +118,17 @@ def reverse(
     if image is None:
         raise ValueError(f"could not read image: {image_path}")
 
-    rect = rectify(image, corners)
+    try:
+        rect = rectify(image, corners)
+    except ValueError:
+        # rectify's "no quilt found": typed result, never a raise (S3)
+        return _fallback_result(image, "no_quilt_found")
     palette = extract_palette(rect.image, fabrics, mask=rect.mask)
-    grid = estimate_grid(rect.image, mask=rect.mask)
+    try:
+        grid = estimate_grid(rect.image, mask=rect.mask, warp_magnitude=rect.warp_magnitude)
+    except ValueError as error:
+        reason = "profile_too_short" if "too short" in str(error) else "no_periodicity"
+        return _fallback_result(image, reason, rect=rect, palette=palette)
     cells = assign_cells(rect.image, grid.x.boundaries, grid.y.boundaries, palette.centers_lab)
     borders = detect_borders(cells.assignments, grid.x.boundaries, grid.y.boundaries)
 
@@ -121,6 +197,7 @@ def reverse(
     diagnostics = {
         "identity": rect.identity,
         "detection_tier": rect.tier,
+        "grid_diagnosis": grid.diagnosis,
         "detected_corners": rect.corners,
         "rectified_size": [rect.image.shape[1], rect.image.shape[0]],
         "pitch_px": [grid.x.pitch, grid.y.pitch],

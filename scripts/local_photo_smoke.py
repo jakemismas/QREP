@@ -38,6 +38,7 @@ def describe(path: Path) -> None:
     print(f"  quad: {quad}  (identity={diag['identity']}, tier={tier})")
     print(f"  dims: {rows} rows x {cols} cols; pitch_px={diag['pitch_px']}")
     print(f"  repeat_period: {diag['repeat_period']}; palette_k={diag['palette_k']}")
+    print(f"  grid_diagnosis: {diag.get('grid_diagnosis', 'n/a (pre-S3)')}")
     print(f"  verdict: {diag.get('verdict', 'n/a (pre-S4)')}")
     conf = result.quilt.provenance.stage_confidence
     print("  confidences: " + "  ".join(f"{k}={v:.3f}" for k, v in conf.items()))
