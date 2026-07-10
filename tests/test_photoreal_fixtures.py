@@ -35,7 +35,8 @@ def _load_generator():
 
 GEN = _load_generator()
 
-# the fifteen named fixture kinds from the sprint 3 plan (S0 section)
+# the fifteen sprint 3 fixtures plus the seven sprint 4 S0 additions (three
+# field-class composites and the four-fixture degraded tier)
 PLAN_NAMES = [
     "render_on_white",
     "render_on_wood",
@@ -52,6 +53,15 @@ PLAN_NAMES = [
     "busy_print_squares",
     "low_contrast_hst",
     "solid_fabric",
+    # sprint 4 S0 (issue #92) field-class composites
+    "antique_wash_chain",
+    "quarter_circle_fine",
+    "two_color_garbage",
+    # sprint 4 S0 degraded tier (JPEG stage)
+    "degraded_render_on_white",
+    "degraded_drunkards_path",
+    "degraded_hst_star",
+    "degraded_busy_print",
 ]
 
 BYTE_COMPARED = [n for n in PLAN_NAMES if n not in GEN.JPEG_FIXTURES]
@@ -89,32 +99,34 @@ def test_regenerated_pixels_match_committed(name, cap):
     assert committed_side == json.loads(json.dumps(side))
 
 
-@pytest.mark.parametrize("cap", GEN.CAPS)
-def test_jpeg_fixture_matches_prejpeg_within_quantization_bounds(cap):
+JPEG_CASES = [(n, c) for n in sorted(GEN.JPEG_FIXTURES) for c in GEN.CAPS]
+
+
+@pytest.mark.parametrize("name,cap", JPEG_CASES, ids=[f"{n}-{c}" for n, c in JPEG_CASES])
+def test_jpeg_fixture_matches_prejpeg_within_quantization_bounds(name, cap):
     # bounds rationale (hand-chosen once, structural sanity only, NOT a
-    # pipeline threshold): JPEG q82 with 4:2:0 subsampling perturbs smooth
-    # regions by a few counts and block edges by tens; a regenerated scene
-    # that diverged for a REAL reason (different rng stream, different
-    # geometry) would miss by whole cell widths, not by quantization noise.
-    pre, side = GEN._perspective_prejpeg(cap)
-    committed = np.asarray(
-        Image.open(GEN.fixture_path("render_perspective_jpeg", cap)).convert("RGB")
-    )
+    # pipeline threshold): JPEG q55-82 with 4:2:0 subsampling perturbs smooth
+    # regions by a few counts and block edges by tens (measured max 59 on the
+    # sprint 4 degraded tier at q55); a regenerated scene that diverged for a
+    # REAL reason (different rng stream, different geometry) would miss by
+    # whole cell widths, not by quantization noise. One bound covers every
+    # JPEG fixture, the sprint 3 perspective render and the sprint 4 tier.
+    pre, side = GEN.prejpeg(name, cap)
+    committed = np.asarray(Image.open(GEN.fixture_path(name, cap)).convert("RGB"))
     assert committed.shape == pre.shape
     diff = np.abs(committed.astype(np.int64) - pre.astype(np.int64))
     assert float(diff.mean()) < 3.0
     assert int(diff.max()) <= 96
-    committed_side = json.loads(
-        GEN.sidecar_path("render_perspective_jpeg", cap).read_text(encoding="utf-8")
-    )
+    committed_side = json.loads(GEN.sidecar_path(name, cap).read_text(encoding="utf-8"))
     assert committed_side == json.loads(json.dumps(side))
 
 
-def test_jpeg_encode_is_deterministic_in_process():
+@pytest.mark.parametrize("name", sorted(GEN.JPEG_FIXTURES))
+def test_jpeg_encode_is_deterministic_in_process(name):
     # same-process re-encode yields identical pixels; cross-build variance
     # is the only exemption the determinism spec grants
-    a, _ = GEN.generate("render_perspective_jpeg", 1400)
-    b, _ = GEN.generate("render_perspective_jpeg", 1400)
+    a, _ = GEN.generate(name, 1400)
+    b, _ = GEN.generate(name, 1400)
     assert np.array_equal(a, b)
 
 

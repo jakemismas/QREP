@@ -46,6 +46,7 @@ def write_all() -> None:
         },
         "grabcut": {},
         "dft": {},
+        "ladder": {},
     }
     for name, cap in ops.GRABCUT_CASES:
         fg = ops.grabcut_op(ops.load_fixture_bgr(name, cap))
@@ -59,6 +60,15 @@ def write_all() -> None:
         reference["dft"][f"{name}_{cap}"] = ops.dft_autocorr_op(ops.load_fixture_bgr(name, cap))
         r = reference["dft"][f"{name}_{cap}"]
         print(f"dft {name}_{cap}: peak_x={r['peak_x']} peak_y={r['peak_y']}")
+    for name, cap in ops.LADDER_CASES:
+        reference["ladder"][f"{name}_{cap}"] = ops.lab_ladder_autocorr_op(
+            ops.load_fixture_bgr(name, cap)
+        )
+        r = reference["ladder"][f"{name}_{cap}"]
+        print(
+            f"ladder {name}_{cap}: ref_lag=({r['ref_lag_x']},{r['ref_lag_y']}) "
+            f"snr={r['snr']:.3f} ref_snr={r['ref_snr']:.3f}"
+        )
     reference_path().write_text(
         json.dumps(reference, indent=2) + "\n", encoding="utf-8", newline="\n"
     )

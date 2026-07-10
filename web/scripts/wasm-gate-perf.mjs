@@ -53,6 +53,14 @@ for name, cap in [("render_on_white", 1400), ("render_on_white", 2000)]:
     ops.dft_autocorr_op(image)
     dt = time.monotonic() - t
     lines.append(f"dft autocorr {name}@{cap} (full cap): {dt*1000:.0f} ms")
+# sprint 4 S0: the block-lattice ladder op sweeps 3 Lab channels x 3 detrend
+# sigmas, each a padded 2D autocorr; this is the wall-time/memory gate case
+for name, cap in [("antique_wash_chain", 1400), ("hst_star", 2000), ("quarter_circle_fine", 2000)]:
+    image = ops.load_fixture_bgr(name, cap)
+    t = time.monotonic()
+    ops.lab_ladder_autocorr_op(image)
+    dt = time.monotonic() - t
+    lines.append(f"ladder autocorr {name}@{cap} (3ch x 3sigma sweep): {dt*1000:.0f} ms")
 "\\n".join(lines)
 `);
 console.log(report);

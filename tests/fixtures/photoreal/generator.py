@@ -56,6 +56,16 @@ CHECKER_WHITE = (244, 241, 234)
 SOLID_GREEN = (122, 139, 111)
 CHROME_DARK = (30, 33, 36)
 PAGE_WHITE = (250, 250, 250)
+# sprint 4 S0 (issue #92): antique-wash Irish-chain class. Chain and ground
+# sit CLOSE in luminance (grayscale gap ~21, so the 1D grid-line prominence
+# reads weak, as on the field Irish chain at grid confidence 0.472) but far
+# apart in Lab chroma (so cell assignment stays clean and mean cell
+# confidence stays high) - the exit-(a) readable-rescue class.
+ANTIQUE_CHAIN = (186, 198, 216)  # faded dusty blue
+ANTIQUE_GROUND = (228, 222, 208)  # warm cream
+# 2-color garbage control: two mid-contrast tones, blob-shaped, no lattice.
+GARBAGE_A = (150, 96, 84)
+GARBAGE_B = (206, 198, 176)
 
 
 def _rng(name: str, cap: int) -> np.random.Generator:
@@ -354,6 +364,108 @@ def _checker_with_border(
         "cells": labels.tolist(),
     }
     return image, truth
+
+
+# ---------------------------------------------------------------------------
+# sprint 4 S0: deterministic degradation + field-class composites
+# ---------------------------------------------------------------------------
+
+
+def _resize_bilinear(image: np.ndarray, new_h: int, new_w: int) -> np.ndarray:
+    """Bilinear resample in pure numpy (half-pixel centers), so the degraded
+    tier's downscale/upscale stays byte-stable up to the final JPEG stage
+    (cv2/PIL resamplers are not byte-promised across the CI builds)."""
+    h, w = image.shape[:2]
+    ys = np.clip((np.arange(new_h) + 0.5) * h / new_h - 0.5, 0, h - 1)
+    xs = np.clip((np.arange(new_w) + 0.5) * w / new_w - 0.5, 0, w - 1)
+    y0 = np.floor(ys).astype(np.int64)
+    x0 = np.floor(xs).astype(np.int64)
+    y1 = np.minimum(y0 + 1, h - 1)
+    x1 = np.minimum(x0 + 1, w - 1)
+    fy = (ys - y0).reshape(new_h, 1, 1)
+    fx = (xs - x0).reshape(1, new_w, 1)
+    img = image.astype(np.float64)
+    top = img[np.ix_(y0, x0)] * (1 - fx) + img[np.ix_(y0, x1)] * fx
+    bot = img[np.ix_(y1, x0)] * (1 - fx) + img[np.ix_(y1, x1)] * fx
+    out = top * (1 - fy) + bot * fy
+    return np.clip(np.rint(out), 0, 255).astype(np.uint8)
+
+
+def _degrade_scene(
+    image: np.ndarray,
+    rng: np.random.Generator,
+    downscale_frac: float,
+    gamma: float,
+    contrast: float,
+) -> np.ndarray:
+    """Screenshot-degradation stage BEFORE JPEG: resolution loss (downscale
+    then re-upscale to the original size), a gamma shift, a contrast
+    compression, and a small global brightness wobble. Pure numpy so the
+    pre-JPEG stage is byte-reproducible; the fx wrapper adds the libjpeg
+    stage, whose bytes are the only cross-build exemption."""
+    h, w = image.shape[:2]
+    small = _resize_bilinear(image, max(8, int(round(h * downscale_frac))), max(8, int(round(w * downscale_frac))))
+    up = _resize_bilinear(small, h, w)
+    x = np.clip(up.astype(np.float64) / 255.0, 0.0, 1.0) ** gamma
+    x = (x - 0.5) * contrast + 0.5
+    x = x + float(rng.uniform(-0.02, 0.02))
+    return np.clip(np.rint(x * 255.0), 0, 255).astype(np.uint8)
+
+
+def _chain_content_with_palette(
+    box_h: int,
+    box_w: int,
+    rng: np.random.Generator,
+    chain: tuple[int, int, int],
+    ground: tuple[int, int, int],
+    tint_amp: int,
+) -> tuple[np.ndarray, dict]:
+    """The Double Irish Chain labels rasterized with an explicit two-fabric
+    palette (chain, ground) and a cream-equivalent border of the ground
+    fabric - the same geometry as _irish_chain_content with a swapped
+    palette for the low-contrast antique-wash class."""
+    labels, _colors, border_pitches, _bl, _hex = _load_irish_chain()
+    colors = [chain, ground]
+    rows, cols = labels.shape
+    span_x, span_y = cols + 2 * border_pitches, rows + 2 * border_pitches
+    pitch_x, pitch_y = box_w / span_x, box_h / span_y
+    u = (np.arange(box_w, dtype=np.float64) + 0.5) / pitch_x
+    v = (np.arange(box_h, dtype=np.float64) + 0.5) / pitch_y
+    col = np.clip(np.floor(u - border_pitches), 0, cols - 1).astype(np.int64)
+    row = np.clip(np.floor(v - border_pitches), 0, rows - 1).astype(np.int64)
+    in_x = (u >= border_pitches) & (u < span_x - border_pitches)
+    in_y = (v >= border_pitches) & (v < span_y - border_pitches)
+    per_cell = _tinted_cell_colors(labels, colors, rng, tint_amp)
+    image = per_cell[row[:, None], col[None, :]].copy()
+    image[~(in_y[:, None] & in_x[None, :])] = np.array(ground, dtype=np.uint8)
+    truth = {
+        "grid": {"rows": rows, "cols": cols, "border_pitches": border_pitches},
+        "palette_hex": [_rgb_to_hex(chain), _rgb_to_hex(ground)],
+        "repeat_cells": [10, 10],
+        "character": "squares",
+    }
+    return image, truth
+
+
+def _two_color_garbage_field(
+    field_h: int, field_w: int, rng: np.random.Generator, blob_px: float
+) -> np.ndarray:
+    """Random two-tone blobs at ~blob_px scale, with NO lattice: a coarse
+    random field bilinearly upsampled (smooth blobs), thresholded at its
+    median into two fabrics, then per-pixel tinted. The negative control that
+    can accidentally clear a coarse block-SNR peak yet must fail mean cell
+    confidence (blobs straddle any imposed cell)."""
+    ch = max(2, int(round(field_h / blob_px)))
+    cw = max(2, int(round(field_w / blob_px)))
+    coarse = rng.random((ch, cw))
+    coarse_img = np.repeat(coarse[:, :, None], 3, axis=2)
+    field = _resize_bilinear((coarse_img * 255).astype(np.uint8), field_h, field_w)[:, :, 0].astype(
+        np.float64
+    )
+    labels = (field >= np.median(field)).astype(np.int64)
+    return np.where(
+        labels[:, :, None] == 1, np.array(GARBAGE_A), np.array(GARBAGE_B)
+    ).astype(np.uint8)
 
 
 # ---------------------------------------------------------------------------
@@ -776,6 +888,108 @@ def fx_solid_fabric(cap: int):
     return image, side
 
 
+# --- sprint 4 S0 field-class composites (byte-reproducible) ----------------
+
+
+def fx_antique_wash_chain(cap: int):
+    """Low-contrast antique-wash Double Irish Chain (the exit-a squares
+    class): weak luminance separation, clean chroma separation."""
+    rng = _rng("antique_wash_chain", cap)
+    h, w = int(round(cap * 0.75)), cap
+    canvas = _apply_factor(_flat(h, w, (236, 231, 220)), _ramp(h, w, 0.97, 1.0))
+    y0, x0, bh, bw = _fit_box(h, w, 60.0, 50.0, 0.82)
+    content, truth = _chain_content_with_palette(
+        bh, bw, rng, ANTIQUE_CHAIN, ANTIQUE_GROUND, tint_amp=4
+    )
+    image = _paste(canvas, content, y0, x0)
+    side = _base_sidecar("antique_wash_chain", cap, image, _rect_quad(y0, x0, bh, bw), "white")
+    side.update(truth)
+    return image, side
+
+
+def fx_quarter_circle_fine(cap: int):
+    """Quarter-circle (Old Mill Wheel) quilt at a fine ~20 px block pitch:
+    cells fixed at 10 px so the 2-cell circle block is 20 px at both caps -
+    the phone-cap class where a single fixed detrend sigma collapses the
+    lattice and the fine ladder rung must rescue it."""
+    rng = _rng("quarter_circle_fine", cap)
+    h, w = int(round(cap * 0.75)), cap
+    canvas = _apply_factor(_flat(h, w, (247, 245, 241)), _ramp(h, w, 0.98, 1.0))
+    cols = int(round(w * 0.8 / 10.0))
+    rows = int(round(h * 0.8 / 10.0))
+    qw, qh = cols * 10, rows * 10
+    y0, x0 = (h - qh) // 2, (w - qw) // 2
+    content = _drunkards_field(qh, qw, rows, cols, rng)
+    image = _paste(canvas, content, y0, x0)
+    side = _base_sidecar("quarter_circle_fine", cap, image, _rect_quad(y0, x0, qh, qw), "white")
+    side.update(
+        {
+            "grid": {"rows": rows, "cols": cols, "border_pitches": 0.0},
+            "palette_hex": [_rgb_to_hex(DP_TEAL), _rgb_to_hex(DP_IVORY)],
+            "repeat_cells": [2, 2],
+            "character": "non_square",
+            "block_pitch_px": 20,
+        }
+    )
+    return image, side
+
+
+def fx_two_color_garbage(cap: int):
+    """Two-tone random-blob control: two fabrics, real edge energy, no
+    lattice. The T5 make-or-break negative for exit (a)."""
+    rng = _rng("two_color_garbage", cap)
+    h, w = int(round(cap * 0.75)), cap
+    canvas = _flat(h, w, (247, 245, 241))
+    qw, qh = int(round(w * 0.8)), int(round(h * 0.8))
+    y0, x0 = (h - qh) // 2, (w - qw) // 2
+    content = _two_color_garbage_field(qh, qw, rng, blob_px=cap / 70.0)
+    image = _paste(canvas, content, y0, x0)
+    side = _base_sidecar("two_color_garbage", cap, image, _rect_quad(y0, x0, qh, qw), "white")
+    side.update(
+        {
+            "grid": None,
+            "palette_hex": [_rgb_to_hex(GARBAGE_A), _rgb_to_hex(GARBAGE_B)],
+            "repeat_cells": None,
+            "character": "garbage",
+        }
+    )
+    return image, side
+
+
+# --- sprint 4 S0 degraded tier (JPEG stage; pre-JPEG numpy is canonical) ----
+
+DEGRADE_PARAMS = {
+    "degraded_render_on_white": {"source": "render_on_white", "frac": 0.62, "gamma": 1.07, "contrast": 0.88, "jpeg": 55},
+    "degraded_drunkards_path": {"source": "drunkards_path", "frac": 0.58, "gamma": 1.05, "contrast": 0.9, "jpeg": 60},
+    "degraded_hst_star": {"source": "hst_star", "frac": 0.6, "gamma": 1.06, "contrast": 0.9, "jpeg": 58},
+    "degraded_busy_print": {"source": "busy_print_squares", "frac": 0.55, "gamma": 1.04, "contrast": 0.92, "jpeg": 62},
+}
+
+
+def _degraded_prejpeg(name: str, cap: int):
+    params = DEGRADE_PARAMS[name]
+    src_image, src_side = FIXTURES[params["source"]](cap)
+    rng = _rng(name, cap)
+    pre = _degrade_scene(src_image, rng, params["frac"], params["gamma"], params["contrast"])
+    side = dict(src_side)
+    side["name"] = name
+    side["degraded"] = {k: params[k] for k in ("source", "frac", "gamma", "contrast", "jpeg")}
+    side["jpeg_quality"] = params["jpeg"]
+    return pre, side
+
+
+def _make_degraded_fx(name: str):
+    def fx(cap: int):
+        pre, side = _degraded_prejpeg(name, cap)
+        buf = io.BytesIO()
+        Image.fromarray(pre).save(buf, format="JPEG", quality=side["jpeg_quality"], subsampling=2)
+        buf.seek(0)
+        return np.asarray(Image.open(buf).convert("RGB")), side
+
+    fx.__name__ = f"fx_{name}"
+    return fx
+
+
 FIXTURES = {
     "render_on_white": fx_render_on_white,
     "render_on_wood": fx_render_on_wood,
@@ -792,10 +1006,27 @@ FIXTURES = {
     "busy_print_squares": fx_busy_print_squares,
     "low_contrast_hst": fx_low_contrast_hst,
     "solid_fabric": fx_solid_fabric,
+    # sprint 4 S0 field-class composites
+    "antique_wash_chain": fx_antique_wash_chain,
+    "quarter_circle_fine": fx_quarter_circle_fine,
+    "two_color_garbage": fx_two_color_garbage,
+    # sprint 4 S0 degraded tier
+    "degraded_render_on_white": _make_degraded_fx("degraded_render_on_white"),
+    "degraded_drunkards_path": _make_degraded_fx("degraded_drunkards_path"),
+    "degraded_hst_star": _make_degraded_fx("degraded_hst_star"),
+    "degraded_busy_print": _make_degraded_fx("degraded_busy_print"),
 }
 
-# fixtures whose committed pixels are NOT byte-reproducible (JPEG stage)
-JPEG_FIXTURES = {"render_perspective_jpeg"}
+# fixtures whose committed pixels are NOT byte-reproducible (JPEG stage); the
+# committed PNG is compared to the regenerated pre-JPEG numpy within bounds
+JPEG_FIXTURES = {"render_perspective_jpeg", *DEGRADE_PARAMS}
+
+
+def prejpeg(name: str, cap: int) -> tuple[np.ndarray, dict]:
+    """Regenerate a JPEG fixture's byte-reproducible pre-JPEG numpy stage."""
+    if name == "render_perspective_jpeg":
+        return _perspective_prejpeg(cap)
+    return _degraded_prejpeg(name, cap)
 
 
 def generate(name: str, cap: int) -> tuple[np.ndarray, dict]:

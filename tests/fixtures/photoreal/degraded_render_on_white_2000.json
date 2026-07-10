@@ -1,0 +1,51 @@
+{
+  "background": "white",
+  "canvas": [
+    2000,
+    1500
+  ],
+  "cap": 2000,
+  "cells_ref": "double_irish_chain",
+  "character": "squares",
+  "degraded": {
+    "contrast": 0.88,
+    "frac": 0.62,
+    "gamma": 1.07,
+    "jpeg": 55,
+    "source": "render_on_white"
+  },
+  "grid": {
+    "border_pitches": 2.5,
+    "cols": 45,
+    "rows": 55
+  },
+  "jpeg_quality": 55,
+  "name": "degraded_render_on_white",
+  "palette_hex": [
+    "#9db8d9",
+    "#f2e8d5"
+  ],
+  "quad": [
+    [
+      487.0,
+      135.0
+    ],
+    [
+      1512.0,
+      135.0
+    ],
+    [
+      1512.0,
+      1365.0
+    ],
+    [
+      487.0,
+      1365.0
+    ]
+  ],
+  "repeat_cells": [
+    10,
+    10
+  ],
+  "seed": 42
+}

@@ -1,0 +1,43 @@
+{
+  "background": "white",
+  "block_pitch_px": 20,
+  "canvas": [
+    2000,
+    1500
+  ],
+  "cap": 2000,
+  "character": "non_square",
+  "grid": {
+    "border_pitches": 0.0,
+    "cols": 160,
+    "rows": 120
+  },
+  "name": "quarter_circle_fine",
+  "palette_hex": [
+    "#3f7f7a",
+    "#efe7d6"
+  ],
+  "quad": [
+    [
+      200.0,
+      150.0
+    ],
+    [
+      1800.0,
+      150.0
+    ],
+    [
+      1800.0,
+      1350.0
+    ],
+    [
+      200.0,
+      1350.0
+    ]
+  ],
+  "repeat_cells": [
+    2,
+    2
+  ],
+  "seed": 42
+}
