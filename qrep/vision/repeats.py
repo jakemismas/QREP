@@ -340,6 +340,28 @@ def coherence_with_sublattice(
     return ratio1
 
 
+def block_lattice_coherence(image_bgr: np.ndarray, period_x: int, period_y: int) -> float:
+    """Exit-(b) evidence (S2, issue #94): intra-cell coherence on the block
+    lattice the SNR detector certified, built as uniform period_x/period_y
+    boundaries over the image extent (the SNR statistic gives periods, not
+    phased boundaries, so an even lattice from the origin is the honest probe).
+    0.0 when either period is below the min resolvable lag - no block to score.
+    Mirrors scripts/sprint4_baseline.py's block-coherence measurement."""
+    h, w = image_bgr.shape[:2]
+    x_boundaries = _uniform_block_boundaries(w, period_x)
+    y_boundaries = _uniform_block_boundaries(h, period_y)
+    if not x_boundaries or not y_boundaries:
+        return 0.0
+    return coherence_with_sublattice(image_bgr, x_boundaries, y_boundaries)
+
+
+def _uniform_block_boundaries(extent: int, period: int) -> list[float]:
+    if period < SNR_MIN_LAG:
+        return []
+    edges = [float(v) for v in np.arange(0.0, float(extent), float(period))]
+    return edges + [float(extent)]
+
+
 def _with_midpoints(boundaries: list[float]) -> list[float]:
     out: list[float] = []
     for i, b in enumerate(boundaries[:-1]):

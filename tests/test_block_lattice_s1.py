@@ -33,7 +33,7 @@ from qrep.vision.repeats import (
     _block_config_snr,
     block_lattice_snr,
 )
-from qrep.vision.verdict import T4
+from qrep.vision.verdict import T1, T4
 
 PHOTOREAL = Path(__file__).parent / "fixtures" / "photoreal"
 GATE_DIR = Path(__file__).parent / "fixtures" / "wasm_gate"
@@ -253,28 +253,19 @@ _ALL_CASES = [(n, c) for n in _FIXTURES for c in (1400, 2000)]
 
 
 @pytest.mark.parametrize("name,cap", _ALL_CASES, ids=[f"{n}-{c}" for n, c in _ALL_CASES])
-def test_passing_fixtures_never_compute_the_block_hint(name, cap):
-    # INERTNESS: a fixture whose 1D read succeeds (verdict != no_grid, i.e.
-    # grid confidence >= T1) never triggers block_lattice_snr, so lattice_snr
-    # is None and estimate_grid ran byte-identically to pre-S1. Conversely, a
-    # failing read is the only place the detector runs at all.
+def test_passing_1d_read_never_computes_the_block_hint(name, cap):
+    # INERTNESS: a fixture whose 1D read succeeds ON ITS OWN (grid confidence
+    # >= T1) never triggers block_lattice_snr, so lattice_snr is None and
+    # estimate_grid ran byte-identically to pre-S1. Keyed on grid confidence,
+    # not the verdict: S2's corroboration NEVER inflates grid confidence, so a
+    # rescued verdict (readable/non_square) still reads grid conf < T1 and DID
+    # compute the hint. The invariant that survives S2 is the confidence one.
     result = reverse(PHOTOREAL / f"{name}_{cap}.png")
-    d = result.diagnostics
-    if d["verdict"] != "no_grid":
-        assert d["lattice_snr"] is None, f"{name}_{cap}: block hint leaked into a passing read"
-
-
-@pytest.mark.parametrize("name,cap", _ALL_CASES, ids=[f"{n}-{c}" for n, c in _ALL_CASES])
-def test_block_hint_never_rescues_a_verdict_in_s1(name, cap):
-    # VERDICT-NEUTRALITY (S1 non-goal: verdict changes are S2). Wherever the
-    # block-lattice detector DID run (lattice_snr present), the outcome is
-    # still no_grid - the additive corroboration leg that turns evidence into
-    # a rescued verdict lands in S2, not here. The decisive S0 finding is that
-    # pitch feedback alone keeps the recomputed prominence below T1.
-    result = reverse(PHOTOREAL / f"{name}_{cap}.png")
-    d = result.diagnostics
-    if d["lattice_snr"] is not None:
-        assert d["verdict"] == "no_grid", f"{name}_{cap}: S1 flipped a verdict via the block hint"
+    grid_conf = result.quilt.provenance.stage_confidence["grid"]
+    if grid_conf >= T1:
+        assert result.diagnostics["lattice_snr"] is None, (
+            f"{name}_{cap}: block hint leaked into a passing read"
+        )
 
 
 def test_lattice_snr_diagnostic_shape_when_present():
@@ -294,14 +285,20 @@ def test_lattice_snr_diagnostic_shape_when_present():
 
 
 @pytest.mark.parametrize(
-    "name", ["degraded_render_on_white", "degraded_drunkards_path"]
+    "name,expected",
+    [("degraded_render_on_white", "readable"), ("degraded_drunkards_path", "non_square_repeat")],
 )
-def test_degraded_failing_read_engages_block_lattice(name):
+def test_degraded_failing_read_engages_block_lattice(name, expected):
     # at the 1400 (phone) cap these degraded renders read below T1 today; the
     # S0 baseline measures a strong block lattice (SNR well over T4) on both.
-    # S1 computes it and feeds the pitch, but the verdict stays no_grid.
+    # S1 computed the hint and fed the pitch; S2's corroboration now RESCUES
+    # them - the squares render via exit (a) to readable, the curved render via
+    # exit (a)'s tree (coherence > T3) to non_square_repeat. The block hint ran
+    # either way (lattice_snr present) - the rescue is verified in
+    # test_corroboration_s2.py; here we pin that engaging the detector no longer
+    # forces no_grid.
     d = reverse(PHOTOREAL / f"{name}_1400.png").diagnostics
-    assert d["verdict"] == "no_grid"
+    assert d["verdict"] == expected
     ls = d["lattice_snr"]
     assert ls is not None
     assert ls["snr"] >= T4

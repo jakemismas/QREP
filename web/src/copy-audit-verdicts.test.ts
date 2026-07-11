@@ -71,6 +71,7 @@ describe("verdict/pill consistency invariants", () => {
       "anisotropic_pitch",
       "implausible_dims",
       "weak_periodicity",
+      "non_square_content",
       "some_future_diagnosis",
     ]) {
       const s = story("no_grid", { grid_diagnosis: diagnosis });

@@ -33,13 +33,22 @@ from qrep.vision.grid import estimate_grid
 from qrep.vision.palette import extract_palette
 from qrep.vision.rectify import rectify
 from qrep.vision.repeats import (
+    block_lattice_coherence,
     block_lattice_snr,
     coherence_with_sublattice,
     detect_repeat,
     image_periodicity,
     vote_cells,
 )
-from qrep.vision.verdict import INTEGER_RATIO_EPSILON, T1, T2, decide_verdict
+from qrep.vision.verdict import (
+    INTEGER_RATIO_EPSILON,
+    RESCUE_MIN_PITCH_PX,
+    T1,
+    T2,
+    T4,
+    CorroborationEvidence,
+    decide_verdict,
+)
 
 ASSUMED_PPI = 10  # matches the renderer default; a guess for real photos
 
@@ -286,19 +295,59 @@ def reverse(
             "you; squares and borders were fitted to it."
         )
 
+    # S2 (issue #94): block-lattice corroboration for a failing 1D read. Built
+    # ONLY for a quilt-plausible read - a texture-scale inversion (adopted cell
+    # pitch below the piecing floor, or a grid the S3 guards flagged broken)
+    # passes corroboration=None and stays no_grid by absence-identity, so #82's
+    # nested-lattice inversion cannot leak a garbage "readable". This
+    # plausibility gate lives here, never in the frozen tree; decide_verdict
+    # sees only the contract's exit (a)/(b) gates.
+    corroboration = None
+    if block_lattice is not None:
+        min_pitch = min(grid.x.pitch, grid.y.pitch)
+        hard_guard = grid.diagnosis in ("implausible_dims", "anisotropic_pitch")
+        if not hard_guard and min_pitch >= RESCUE_MIN_PITCH_PX:
+            _rx, lock_x = _ratio_ok(float(block_lattice.period_x), grid.x.pitch)
+            _ry, lock_y = _ratio_ok(float(block_lattice.period_y), grid.y.pitch)
+            corroboration = CorroborationEvidence(
+                min_axis_snr=block_lattice.snr,
+                integer_lock=lock_x and lock_y,
+                mean_cell_confidence=cells.confidence,
+                block_coherence=block_lattice_coherence(
+                    rect.image, block_lattice.period_x, block_lattice.period_y
+                ),
+            )
+
     verdict = decide_verdict(
         stage_confidence["grid"],
         periodicity.score,
         coherence,
         repeat.period_rows > 0 and repeat.period_cols > 0,
+        corroboration=corroboration,
     )
+
+    # non_square_content: a quilt-plausible read certified a COARSE block
+    # lattice (snr >= T4, block period >= cell pitch per axis) but the verdict
+    # is not a clean square read. The wrong "steep angle" (anisotropic_pitch)
+    # copy now survives only on genuine skew - a bare anisotropy with no coarse
+    # block found.
+    grid_diagnosis = grid.diagnosis
+    if (
+        corroboration is not None
+        and block_lattice.snr >= T4
+        and block_lattice.period_x >= grid.x.pitch
+        and block_lattice.period_y >= grid.y.pitch
+        and verdict in ("no_grid", "non_square_repeat")
+    ):
+        grid_diagnosis = "non_square_content"
+
     block_period_cells = (
         [int(round(ratio_x)), int(round(ratio_y))] if ratio_passed else None
     )
     diagnostics = {
         "identity": rect.identity,
         "detection_tier": rect.tier,
-        "grid_diagnosis": grid.diagnosis,
+        "grid_diagnosis": grid_diagnosis,
         "verdict": verdict,
         "detected_corners": rect.corners,
         "rectified_size": [rect.image.shape[1], rect.image.shape[0]],
