@@ -46,6 +46,37 @@ describe("verdictStory", () => {
     ]);
   });
 
+  it("no_grid non_square_content: honest curved-quilt reason, NOT steep angle", () => {
+    // S2 (#94): a coarse block lattice was found but the shapes are not squares.
+    // The failure panel must carry the honest non-square copy, never the wrong
+    // steep-angle message that shipped on frontal curved quilts in sprint 3.
+    const story = verdictStory(
+      result({
+        verdict: "no_grid",
+        diagnostics: { grid_diagnosis: "non_square_content", size_source: "guess" },
+      }),
+      { cols: 20, rows: 20, cellSize: 12 },
+    );
+    expect(story.failurePanel!.reason).toBe(
+      "The blocks repeat, but the shapes inside are not squares - QREP can only recover square patchwork, not curves or triangles yet.",
+    );
+    expect(story.failurePanel!.reason).not.toMatch(/steep angle/i);
+  });
+
+  it("no_grid anisotropic_pitch keeps the steep-angle reason (genuine skew only)", () => {
+    // the steep-angle copy is now CONDITIONED: the pipeline emits
+    // anisotropic_pitch only when no coarse block was found (genuine skew), so
+    // this string legitimately maps to the steep-angle message.
+    const story = verdictStory(
+      result({
+        verdict: "no_grid",
+        diagnostics: { grid_diagnosis: "anisotropic_pitch", size_source: "guess" },
+      }),
+      { cols: 20, rows: 20, cellSize: 12 },
+    );
+    expect(story.failurePanel!.reason).toContain("steep angle");
+  });
+
   it("non_square_repeat: softened copy, unsized period phrasing, disclosure", () => {
     // 24 cols with a 4-cell block period: repeats about 6 times across
     const story = verdictStory(

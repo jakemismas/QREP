@@ -47,6 +47,12 @@ const REASONS: Record<string, string> = {
     "The rows and columns disagree - the photo may show the quilt at a steep angle.",
   implausible_dims: "The grid we found is not a plausible quilt.",
   weak_periodicity: "The square pattern is too faint to read confidently.",
+  // S2 (#94): a coarse block lattice IS present, but the shapes inside are not
+  // squares (curves or triangles). This replaces the wrong steep-angle message
+  // on frontal curved quilts - the pipeline emits anisotropic_pitch only on
+  // genuine skew now, and non_square_content when it found repeating blocks.
+  non_square_content:
+    "The blocks repeat, but the shapes inside are not squares - QREP can only recover square patchwork, not curves or triangles yet.",
 };
 
 function periodPhrase(
