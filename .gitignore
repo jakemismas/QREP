@@ -1,6 +1,21 @@
 # Per-machine Claude settings
 .claude/settings.local.json
 
+# Sprint orchestration state. Worker worktrees live outside the repo
+# (scripts/worker_bootstrap.sh), but Claude Code's own worktrees and the
+# orchestrator's STATE.md land here and must never be committed or linted.
+.claude/worktrees/
+.claude/sprint/
+
+# Per-worker settings written by scripts/worker_bootstrap.sh (Playwright port)
+.qrep-worker.env
+
+# The live overnight report stays local; only its template is committed
+docs/sprint-5/OVERNIGHT-REPORT.md
+
+# Salesforce CLI state dropped by unrelated tooling
+.sf/
+
 # Python
 .venv/
 __pycache__/
@@ -28,6 +43,13 @@ Quilt Sizing Viewer.zip
 # Jake's saved shop photos (rights-unclean, never committed, absent on CI);
 # smoked locally via scripts/local_photo_smoke.py per the hands-off policy
 local-photos/
+
+# Private corpus tiers (shop screenshots, personal phone captures and their
+# truth files): any folder named private under corpus/. The repo is public
+# and history cannot be rewritten; scripts/corpus_guard.py fails CI if one
+# is ever force-added.
+corpus/private/
+corpus/**/private/
 
 # OS noise
 Thumbs.db
