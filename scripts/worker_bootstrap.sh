@@ -238,8 +238,10 @@ echo "  python     $py"
 echo "  e2e port   $port (in $env_file)"
 echo "  head       $(git -C "$wt" rev-parse --short HEAD)"
 # A pushed commit is public for good (on the branch and on refs/pull/<n>/head),
-# so the guards run before every push, not only in CI after it.
+# so the guards run before every push, not only in CI after it. The index
+# check runs before every commit: a corpus version that no manifest row ever
+# licensed (say an unrecorded re-encode) fails every later range check too.
 echo "  guards, from the worktree:"
-echo "    before each commit that adds files:  \"\$QREP_PYTHON\" scripts/corpus_guard.py"
+echo "    before every commit:  \"\$QREP_PYTHON\" scripts/corpus_guard.py"
 echo "    before every push:  \"\$QREP_PYTHON\" scripts/corpus_guard.py --range origin/main HEAD"
 echo "                        \"\$QREP_PYTHON\" scripts/golden_guard.py origin/main HEAD"
