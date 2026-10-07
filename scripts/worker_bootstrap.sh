@@ -69,12 +69,17 @@ else
     step "adding worktree $wt for existing branch $branch"
     git -C "$main_root" worktree add "$wt" "$branch" \
       || die "git worktree add failed (is $branch checked out in another worktree?)"
+  elif git -C "$main_root" show-ref --verify --quiet "refs/remotes/origin/$branch"; then
+    # Resuming pushed work whose local branch is gone: start from the pushed
+    # tip, never from base, or the new worktree would silently drop it.
+    step "adding worktree $wt for $branch from origin/$branch"
+    git -C "$main_root" worktree add --track -b "$branch" "$wt" "origin/$branch"
   else
     git -C "$main_root" rev-parse --verify --quiet "$base^{commit}" >/dev/null \
       || die "base ref not found: $base"
     step "adding worktree $wt on new branch $branch from $base"
-    # --no-track: the branch must not inherit origin/main as its upstream,
-    # or a bare `git push` would aim at main.
+    # --no-track: with origin/main as upstream, a bare `git pull` or
+    # `git push` would target main. Workers push with `git push -u origin`.
     git -C "$main_root" worktree add --no-track -b "$branch" "$wt" "$base"
   fi
 fi
