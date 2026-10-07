@@ -5,7 +5,7 @@
  * build output into a temp dir and inspects the result.
  */
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -50,6 +50,24 @@ describe("composed Pages artifact", () => {
     expect(existsSync(path.join(siteDir, "wheels", "manifest.json"))).toBe(true);
     expect(existsSync(path.join(siteDir, ".nojekyll"))).toBe(true);
     expect(existsSync(path.join(siteDir, "spike.html"))).toBe(true);
+  });
+
+  // #105: Pages publishes the app without internal sprint docs. Only
+  // viewer.html and demo/ come from docs/ (the old docs index.html gives way
+  // to the app's), so any other docs/ entry in the site is a leak, including
+  // folders added to docs/ after this test was written.
+  it("publishes no internal docs: no other docs/ entry and no Markdown anywhere", () => {
+    const fromDocs = new Set(["viewer.html", "demo", "index.html"]);
+    const leaked = readdirSync(path.join(repoRoot, "docs")).filter(
+      (entry) => !fromDocs.has(entry) && existsSync(path.join(siteDir, entry)),
+    );
+    expect(leaked).toEqual([]);
+    for (const name of ["design", "stretch", "media", "support.js", "viewer-mock.html"]) {
+      expect(existsSync(path.join(siteDir, name))).toBe(false);
+    }
+    const entries = readdirSync(siteDir, { recursive: true }).map(String);
+    expect(entries.filter((entry) => path.basename(entry).startsWith("sprint-"))).toEqual([]);
+    expect(entries.filter((entry) => entry.toLowerCase().endsWith(".md"))).toEqual([]);
   });
 });
 

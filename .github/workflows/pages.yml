@@ -1,0 +1,114 @@
+name: Pages
+
+# The product site changes only on a release tag or a manual dispatch, never
+# on an ordinary merge to main, so the live app stays at the last release
+# while a sprint lands work.
+#
+# A release tag is vMAJOR.MINOR.PATCH (v0.4.0). The tag filter below and
+# release-ref both insist on that shape, so a tag such as vendor-snapshot or
+# verify-1 never deploys.
+#
+# Repository settings must agree with this file. The github-pages
+# environment admits only the refs its deployment rules list (Settings >
+# Environments > github-pages); today that is the branches main and gh-pages,
+# so a tag run fails at the deploy job after the whole CI run. Before the
+# first release tag, add a tag rule in Ruby fnmatch syntax (it has no "one or
+# more"), for example:
+#   gh api -X POST repos/jakemismas/QREP/environments/github-pages/deployment-branch-policies -f name='v[0-9]*.[0-9]*.[0-9]*' -f type=tag
+# Such a rule admits a tag on any commit, so release-ref below also refuses a
+# commit that is not on main.
+#
+# Roll back by dispatching this workflow on an earlier release tag
+# (force-pushing is banned, so redeploying is the undo). A dispatch needs this
+# file in the chosen ref: v0.1.0 to v0.3.0 predate it, so they cannot be
+# redeployed this way.
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  release-ref:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Deploy only release tags and commits that are on main
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ] && ! [[ $GITHUB_REF_NAME =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::tag $GITHUB_REF_NAME is not a release tag (vMAJOR.MINOR.PATCH)"
+            exit 1
+          fi
+          if git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "$GITHUB_REF ($GITHUB_SHA) is on main"
+          else
+            echo "::error::$GITHUB_REF ($GITHUB_SHA) is not on main; Pages deploys only commits that are on main"
+            exit 1
+          fi
+
+  # The CI workflow's build and test jobs run next on the exact commit being
+  # deployed and upload the composed site artifact. (The guards in guards.yml
+  # judged that commit when it reached main.)
+  ci:
+    needs: release-ref
+    uses: ./.github/workflows/ci.yml
+    with:
+      publish: true
+
+  deploy:
+    needs: ci
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
+
+  live-spike:
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install python deps (pinned by constraints.txt)
+        run: |
+          python -m pip install pip==25.0.1
+          pip install -e ".[dev]" -c constraints.txt
+      - name: Install web deps
+        run: npm ci
+        working-directory: web
+      - name: Install Playwright chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: web
+      - name: Spike e2e against the deployed Pages site
+        run: npx playwright test
+        working-directory: web
+        env:
+          SPIKE_BASE_URL: ${{ needs.deploy.outputs.page_url }}
+      - name: Native pypdf checks on the live-site booklet
+        run: pytest tests/test_wasm_artifacts.py -q
+        env:
+          QREP_WASM_PDF: web/test-results/spike/booklet.pdf
