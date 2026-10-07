@@ -1,8 +1,8 @@
 """The CI guards in scripts/: golden_guard (every commit that edits
 tests/golden is a [bless] commit, and a merge leaves no golden content that
 no commit wrote) and corpus_guard (no private-tier paths and no unlicensed
-corpus files, in the tree or anywhere in a change range), plus the shape of
-the workflow that runs them.
+corpus files, in the index, in a range's merge result, or in any file version
+the range wrote), plus the shape of the workflow that runs them.
 
 Expected outcomes come from the rules the scripts enforce (CLAUDE.md's bless
 protocol and the documented corpus contract), never from observed output.
@@ -71,7 +71,10 @@ def test_private_folders_under_corpus_fail_at_any_depth():
 
 
 def test_a_file_merely_named_private_is_not_a_tier():
-    assert corpus_guard.violations(["corpus/notes/private.md"], None) == []
+    # Not a private tier; it needs a row only because notes other than
+    # corpus/README.md and corpus/ATTRIBUTION.md are content like any file.
+    problems = corpus_guard.violations(["corpus/notes/private.md"], None)
+    assert problems == ["corpus/notes/private.md: corpus/manifest.csv is missing"]
 
 
 def test_licensed_corpus_image_passes():
@@ -222,14 +225,49 @@ def test_text_files_outside_the_annotation_folder_need_a_row(path):
     assert corpus_guard.violations([path], None) == [f"{path}: corpus/manifest.csv is missing"]
 
 
-def test_annotations_markdown_notes_and_the_manifest_need_no_row():
+def test_qrep_authored_corpus_files_the_plan_names_need_no_row():
+    # The sprint plan's D3a and D3b own these; none is a corpus image.
     tracked = [
         "corpus/manifest.csv",
+        "corpus/README.md",
+        "corpus/ATTRIBUTION.md",
+        "corpus/schema/annotation.schema.json",
         "corpus/annotations/truth/met-1.json",
-        "corpus/annotations/notes.txt",
-        "corpus/museum/README.md",
+        "corpus/annotations/met-1.proposed-a.json",
+        "corpus/gold/met-1.json",
+        "corpus/holdout.json",
+        "corpus/images/.gitkeep",
     ]
     assert corpus_guard.violations(tracked, "file,license\n") == []
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "corpus/annotations/IMG_4461_corners_overlay.png",
+        "corpus/annotations/truth/IMG_4462.jpg",
+        "corpus/Annotations/shop/screenshot.jpeg",
+        "corpus/annotations/notes.txt",
+        "corpus/annotations/met-1.md",
+        "corpus/patterns/rk_kona_cubic.md",
+        "corpus/museum/README.md",
+        "corpus/schema/annotation.schema.yaml",
+        "corpus/gold/met-1.png",
+        "corpus/holdout.csv",
+    ],
+)
+def test_only_qrep_json_and_the_named_notes_skip_the_row(path):
+    # An overlay saved beside its sidecar, or a pattern transcribed into a
+    # note, is content: the folder or the extension alone does not exempt it.
+    problems = corpus_guard.violations(["corpus/manifest.csv", path], "file,license\n")
+    assert problems == [f"{path}: no row in corpus/manifest.csv"]
+
+
+def test_files_that_skip_the_row_must_be_text():
+    tracked = ["corpus/annotations/met-1.json", "corpus/README.md", "corpus/images/.gitkeep"]
+    binary = {"corpus/annotations/met-1.json"}
+    problems = corpus_guard.violations(tracked, None, is_text=lambda key: key not in binary)
+    assert problems == [f"corpus/annotations/met-1.json: {corpus_guard.BINARY}"]
 
 
 def test_rows_for_one_file_that_disagree_fail():
@@ -280,7 +318,48 @@ def test_a_path_row_whose_sha256_differs_from_the_file_fails():
     manifest = f"file,license,sha256\nmom/IMG_1234.jpg,CC0-1.0,{_sha('other bytes')}\n"
     problems = corpus_guard.violations(["corpus/mom/IMG_1234.jpg"], manifest, digest=_digest)
     assert len(problems) == 1
-    assert "update the row" in problems[0]
+    assert "not the file that row licenses" in problems[0]
+    # sha256 is the source image's hash; the guard must never advise
+    # overwriting it with the hash of whatever bytes were committed.
+    assert "file_sha256" in problems[0]
+    assert "update the row" not in problems[0]
+
+
+SOURCE_SHA = _sha("full-size source bytes")
+DOWNSIZED = {"corpus/images/met-1.jpg": "downsized 800 px bytes"}
+
+
+def test_file_sha256_licenses_a_downsized_copy_while_sha256_stays_the_source():
+    manifest = (
+        "file,license,sha256,file_sha256\n"
+        f"images/met-1.jpg,CC0-1.0,{SOURCE_SHA},{_sha('downsized 800 px bytes')}\n"
+    )
+    problems = corpus_guard.violations(
+        ["corpus/images/met-1.jpg"], manifest, digest=lambda p: _sha(DOWNSIZED[p])
+    )
+    assert problems == []
+
+
+def test_a_downsized_copy_without_file_sha256_fails_and_says_how_to_record_it():
+    manifest = f"file,license,sha256\nimages/met-1.jpg,CC0-1.0,{SOURCE_SHA}\n"
+    problems = corpus_guard.violations(
+        ["corpus/images/met-1.jpg"], manifest, digest=lambda p: _sha(DOWNSIZED[p])
+    )
+    assert len(problems) == 1
+    assert "keeps sha256 and records its own hash in a file_sha256 column" in problems[0]
+
+
+def test_a_file_sha256_that_differs_from_the_file_fails():
+    manifest = (
+        "file,license,sha256,file_sha256\n"
+        f"images/met-1.jpg,CC0-1.0,{SOURCE_SHA},{_sha('another copy')}\n"
+    )
+    problems = corpus_guard.violations(
+        ["corpus/images/met-1.jpg"], manifest, digest=lambda p: _sha(DOWNSIZED[p])
+    )
+    assert len(problems) == 1
+    assert "records file_sha256" in problems[0]
+    assert "not the copy that row licenses" in problems[0]
 
 
 def test_a_malformed_sha256_fails():
@@ -325,11 +404,58 @@ def test_a_removed_file_that_no_manifest_named_fails():
 
 
 def test_a_moved_file_keeps_its_bare_name_row():
-    # The removed old path and the tracked new path share a name; each group
-    # counts names on its own, so neither makes the other ambiguous.
+    # The removed old path holds the same bytes as the tracked new path, so it
+    # is the licensed file, moved; the shared name makes nothing ambiguous.
     tracked = ["corpus/manifest.csv", "corpus/museum/a.jpg"]
     manifest = "file,license\na.jpg,CC0-1.0\n"
-    assert corpus_guard.violations(tracked, manifest, added=["corpus/incoming/a.jpg"]) == []
+    problems = corpus_guard.violations(
+        tracked, manifest, added=["corpus/incoming/a.jpg"], digest=lambda path: _sha("a")
+    )
+    assert problems == []
+
+
+Version = corpus_guard.Version
+
+
+def test_a_removed_file_cannot_borrow_a_tracked_namesakes_bare_name_row():
+    # Phone names repeat: a shop capture added and removed in the range must
+    # not pass on the row of Jake's tracked photo with the same name.
+    tracked = {"corpus/manifest.csv": "m", "corpus/jake/IMG_1234.jpg": "jake"}
+    manifest = "file,license\nIMG_1234.jpg,CC0-1.0\n"
+    added = [Version("corpus/shop/IMG_1234.jpg", "shop", "c1")]
+    digest = {"jake": _sha("jake's photo"), "shop": _sha("shop capture")}.get
+    problems = corpus_guard.violations(tracked, manifest, added, digest=digest)
+    assert len(problems) == 1
+    assert problems[0].startswith("corpus/shop/IMG_1234.jpg (committed in this range")
+    assert "ambiguous" in problems[0]
+
+
+def test_an_earlier_version_with_other_bytes_at_a_licensed_path_fails():
+    # A fix-forward commit restored the licensed bytes, but the version before
+    # it stays in history: every version the range wrote must be licensed.
+    tracked = {"corpus/manifest.csv": "m", "corpus/museum/met_1.jpg": "licensed"}
+    manifest = f"file,license,sha256\nmuseum/met_1.jpg,CC0-1.0,{_sha('museum bytes')}\n"
+    added = [
+        Version("corpus/museum/met_1.jpg", "licensed", "c2" * 20),
+        Version("corpus/museum/met_1.jpg", "private", "c1" * 20),
+    ]
+    digest = {"licensed": _sha("museum bytes"), "private": _sha("private photo")}.get
+    problems = corpus_guard.violations(tracked, manifest, added, digest=digest)
+    assert len(problems) == 1
+    assert problems[0].startswith(
+        "corpus/museum/met_1.jpg (committed in this range, then removed or replaced; "
+        "commit c1c1c1c1c1c1)"
+    )
+    assert "not the file that row licenses" in problems[0]
+
+
+def test_an_earlier_version_with_a_licensed_files_bytes_passes():
+    # Renamed before its row was written: the bytes are the licensed file's.
+    tracked = {"corpus/manifest.csv": "m", "corpus/museum/met-1.jpg": "b1"}
+    manifest = "file,license\nmuseum/met-1.jpg,CC0-1.0\n"
+    added = [Version("corpus/incoming/download.jpg", "b1", "c1")]
+    digest = {"b1": _sha("met one")}.get
+    assert corpus_guard.violations(tracked, manifest, added, digest=digest) == []
 
 
 def test_a_removed_file_skips_rows_that_record_other_content():
@@ -410,12 +536,21 @@ def test_only_a_subject_of_its_own_marks_a_bless(subject, blessed):
     [
         ("Re-render top diagram\n\n[bless]\n", True),
         ("Re-render top diagram\n\nApproved in #91.\n  [bless]  \n", True),
-        ("Re-render top diagram\n\n[bless] approved by Jake\n", False),
-        ("Re-render top diagram\n\nThe golden lands in the next [bless] commit.\n", False),
+        ("Re-render top diagram\n\n[bless] approved by Jake\n", True),
+        # CLAUDE.md, #105 and plan A6 word the rule as "a commit whose message
+        # contains [bless]", and only commits that edit tests/golden/ are judged.
+        (
+            "A6: consolidated golden refresh at the new defaults\n\n"
+            "This is the one consolidated [bless] that REBASELINE.md names:\n"
+            "tests/golden/top.svg\n",
+            True,
+        ),
+        ("Re-render top diagram\r\n\r\nApproved in #91 as a [bless].\r\n", True),
+        ("Re-render top diagram\n\nNo marker here.\n", False),
         ('Revert "Re-render top diagram [bless]"\n\nThis reverts commit 0123abcd.\n', False),
     ],
 )
-def test_a_marker_line_of_its_own_also_marks_a_bless(message, blessed):
+def test_a_marker_anywhere_in_the_commits_own_message_marks_a_bless(message, blessed):
     subject = message.splitlines()[0]
     commit = golden_guard.GoldenCommit("0" * 40, subject, (TOP,), message)
     assert golden_guard.is_bless(commit) is blessed
@@ -472,11 +607,16 @@ def _git(repo: Path, *args: str) -> str:
     return result.stdout.strip()
 
 
-def _commit(repo: Path, message: str, files: dict[str, str] | None = None) -> str:
-    for rel, text in (files or {}).items():
+def _commit(repo: Path, message: str, files: dict[str, str | bytes] | None = None) -> str:
+    # bytes are written exactly, so a test can know the committed blob's sha256
+    # (text mode on Windows would write CRLF line ends).
+    for rel, content in (files or {}).items():
         path = repo / rel
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(text, encoding="utf-8")
+        if isinstance(content, bytes):
+            path.write_bytes(content)
+        else:
+            path.write_text(content, encoding="utf-8")
         _git(repo, "add", rel)
     _git(repo, "commit", "-q", "--allow-empty", "-m", message)
     return _git(repo, "rev-parse", "HEAD")
@@ -535,14 +675,27 @@ def test_golden_guard_script_fails_an_unblessed_edit_even_after_a_bless_commit(r
 
 
 @needs_git
-def test_golden_guard_script_ignores_a_marker_that_only_a_body_mentions(repo):
+def test_golden_guard_script_ignores_a_marker_in_another_commits_body(repo):
+    # Only the commit that edits tests/golden/ can bless its own edit.
     base = _start_branch(repo)
-    _commit(
-        repo, "Re-render cut list\n\nThe golden lands in the next [bless] commit.", {CUT: "z\n"}
-    )
+    _commit(repo, "Re-render cut list", {CUT: "z\n"})
     head = _commit(repo, "Tidy notes\n\nOutput is unchanged, so this needs no [bless] commit.")
     result = _run(repo, "golden_guard.py", base, head)
     assert result.returncode == 1, result.stdout + result.stderr
+    assert "without [bless] in its own message" in result.stdout
+
+
+@needs_git
+def test_golden_guard_script_accepts_a_marker_in_the_editing_commits_body(repo):
+    # Plan A6's one consolidated bless, worded the way CLAUDE.md states the rule.
+    base = _start_branch(repo)
+    message = (
+        "A6: consolidated golden refresh at the new defaults\n\n"
+        f"This is the one consolidated [bless] that REBASELINE.md names:\n{CUT}"
+    )
+    head = _commit(repo, message, {CUT: "a,b,c\n"})
+    result = _run(repo, "golden_guard.py", base, head)
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 @needs_git
@@ -824,6 +977,196 @@ def test_corpus_guard_range_judges_the_heads_tree_not_the_index(repo):
     assert "UNVERIFIED" in result.stdout
 
 
+def _bsha(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+MANIFEST_PATH = "corpus/manifest.csv"
+MET = "corpus/museum/met_1.jpg"
+MUSEUM = b"MUSEUM-CC0-BYTES\n"
+PRIVATE = b"PRIVATE-PHONE-PHOTO\n"
+PNG = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR"
+
+
+@needs_git
+def test_corpus_guard_range_judges_the_merge_result(repo):
+    # main starts relying on an existing row for m.jpg while a branch cut from
+    # older main drops that row as a cleanup. Each tip passes on its own, but
+    # the merge would land m.jpg without a row, so the branch fails now.
+    rows = "file,license\nimages/a.jpg,CC0-1.0\nimages/k.jpg,CC0-1.0\nimages/m.jpg,CC0-1.0\n"
+    images = {"corpus/images/a.jpg": "a\n", "corpus/images/k.jpg": "k\n"}
+    _commit(repo, "Corpus", {MANIFEST_PATH: rows, **images})
+    _start_branch(repo)
+    without_m = rows.replace("images/m.jpg,CC0-1.0\n", "")
+    head = _commit(repo, "Drop the unused m row", {MANIFEST_PATH: without_m})
+    assert _run(repo, "corpus_guard.py").returncode == 0
+    _git(repo, "checkout", "-q", "main")
+    base = _commit(repo, "Add m", {"corpus/images/m.jpg": "m\n"})
+    assert _run(repo, "corpus_guard.py").returncode == 0
+    result = _run(repo, "corpus_guard.py", "--range", base, head)
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "corpus/images/m.jpg: no row in corpus/manifest.csv" in result.stdout
+
+
+@needs_git
+def test_corpus_guard_range_reports_a_head_that_conflicts_with_the_base_as_exit_2(repo):
+    _start_branch(repo)
+    head = _commit(repo, "Branch rows", {MANIFEST_PATH: "file,license\nimages/b.jpg,CC0-1.0\n"})
+    _git(repo, "checkout", "-q", "main")
+    base = _commit(repo, "Main rows", {MANIFEST_PATH: "file,license\nimages/c.jpg,CC0-1.0\n"})
+    result = _run(repo, "corpus_guard.py", "--range", base, head)
+    assert result.returncode == 2, result.stdout + result.stderr
+    assert "does not merge cleanly" in result.stderr
+
+
+def _license_met(repo: Path, *, committed: bool = True) -> str:
+    """main licenses MUSEUM's bytes at MET by sha256. Returns main's tip, the base."""
+    files: dict[str, str | bytes] = {
+        MANIFEST_PATH: f"file,license,sha256\nmuseum/met_1.jpg,CC0-1.0,{_bsha(MUSEUM)}\n"
+    }
+    if committed:
+        files[MET] = MUSEUM
+    _commit(repo, "License met_1", files)
+    return _start_branch(repo)
+
+
+@needs_git
+def test_corpus_guard_range_fails_other_bytes_that_a_later_commit_restored(repo):
+    base = _license_met(repo)
+    _commit(repo, "Re-encode met_1", {MET: PRIVATE})
+    _git(repo, "checkout", base, "--", MET)
+    head = _commit(repo, "Restore met_1")
+    # The final tree is the licensed one; history still holds the other bytes.
+    assert _run(repo, "corpus_guard.py").returncode == 0
+    assert _git(repo, "show", f"{head}~1:{MET}") == PRIVATE.decode().strip()
+    result = _run(repo, "corpus_guard.py", "--range", base, head)
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert f"{MET} (committed in this range, then removed or replaced" in result.stdout
+
+
+@needs_git
+def test_corpus_guard_range_fails_other_bytes_dropped_with_their_row(repo):
+    base = _license_met(repo)
+    _commit(repo, "Swap in a better photo", {MET: PRIVATE})
+    _git(repo, "rm", "-q", MET)
+    head = _commit(repo, "Drop met_1", {MANIFEST_PATH: "file,license,sha256\n"})
+    result = _run(repo, "corpus_guard.py", "--range", base, head)
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert MET in result.stdout
+
+
+@needs_git
+def test_corpus_guard_range_fails_wrong_bytes_removed_and_then_replaced(repo):
+    base = _license_met(repo, committed=False)
+    _commit(repo, "Add met_1", {MET: PRIVATE})
+    _git(repo, "rm", "-q", MET)
+    _commit(repo, "Wrong file")
+    head = _commit(repo, "Add the right met_1", {MET: MUSEUM})
+    result = _run(repo, "corpus_guard.py", "--range", base, head)
+    assert result.returncode == 1, result.stdout + result.stderr
+
+
+@needs_git
+def test_corpus_guard_range_fails_a_fix_forward_and_never_advises_editing_the_row(repo):
+    base = _license_met(repo, committed=False)
+    head = _commit(repo, "Add met_1", {MET: PRIVATE})
+    first = _run(repo, "corpus_guard.py", "--range", base, head)
+    assert first.returncode == 1, first.stdout + first.stderr
+    assert "not the file that row licenses" in first.stdout
+    assert "update the row" not in first.stdout
+    head = _commit(repo, "Use the licensed bytes", {MET: MUSEUM})
+    second = _run(repo, "corpus_guard.py", "--range", base, head)
+    assert second.returncode == 1, second.stdout + second.stderr
+    # Once pushed, the bytes are public: the hint says to stop, not to fix forward.
+    assert "stop pushing" in second.stdout
+    assert "refs/pull/<n>/head" in second.stdout
+    assert "do not merge such a branch" not in second.stdout
+
+
+@needs_git
+def test_corpus_guard_range_fails_a_removed_namesake_of_a_licensed_photo(repo):
+    licensed = {
+        MANIFEST_PATH: "file,license\nIMG_1234.jpg,CC0-1.0\n",
+        "corpus/jake/IMG_1234.jpg": b"JAKE-CC0\n",
+    }
+    _commit(repo, "Jake's photo", licensed)
+    base = _start_branch(repo)
+    shop = "corpus/shop/IMG_1234.jpg"
+    head = _commit(repo, "Add shop capture", {shop: b"SHOP-SCREENSHOT\n"})
+    kept = _run(repo, "corpus_guard.py", "--range", base, head)
+    assert kept.returncode == 1, kept.stdout + kept.stderr
+    _git(repo, "rm", "-q", shop)
+    head = _commit(repo, "Remove shop capture")
+    removed = _run(repo, "corpus_guard.py", "--range", base, head)
+    assert removed.returncode == 1, removed.stdout + removed.stderr
+    assert f"{shop} (committed in this range" in removed.stdout
+    assert "ambiguous" in removed.stdout
+
+
+PLAN_FILES: dict[str, str | bytes] = {
+    MANIFEST_PATH: "file,license\n",
+    "corpus/README.md": "Accepted and rejected sources.\n",
+    "corpus/ATTRIBUTION.md": "Credits generated from the manifest.\n",
+    "corpus/schema/annotation.schema.json": '{"type": "object"}\n',
+    "corpus/annotations/met-1.proposed-a.json": '{"corners": []}\n',
+    "corpus/gold/met-1.json": '{"rows": 8}\n',
+    "corpus/holdout.json": '{"holdout": []}\n',
+}
+
+
+@needs_git
+def test_corpus_guard_passes_the_plans_qrep_authored_corpus_files(repo):
+    base = _start_branch(repo)
+    head = _commit(repo, "D3a and D3b files", PLAN_FILES)
+    index = _run(repo, "corpus_guard.py")
+    assert index.returncode == 0, index.stdout + index.stderr
+    result = _run(repo, "corpus_guard.py", "--range", base, head)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+@needs_git
+def test_corpus_guard_fails_an_image_saved_beside_its_annotation(repo):
+    base = _start_branch(repo)
+    overlay = "corpus/annotations/IMG_4461_overlay.png"
+    head = _commit(repo, "Annotation and overlay", {**PLAN_FILES, overlay: PNG})
+    index = _run(repo, "corpus_guard.py")
+    assert index.returncode == 1, index.stdout + index.stderr
+    assert f"{overlay}: no row in corpus/manifest.csv" in index.stdout
+    assert "git restore --staged" in index.stdout
+    result = _run(repo, "corpus_guard.py", "--range", base, head)
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert f"{overlay}: no row in corpus/manifest.csv" in result.stdout
+
+
+@needs_git
+def test_corpus_guard_range_fails_binary_bytes_under_a_json_name(repo):
+    base = _start_branch(repo)
+    disguised = "corpus/annotations/met-1.json"
+    _commit(repo, "Annotation", {disguised: PNG})
+    head = _commit(repo, "Real annotation", {disguised: '{"corners": []}\n'})
+    result = _run(repo, "corpus_guard.py", "--range", base, head)
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "not UTF-8 text" in result.stdout
+
+
+@needs_git
+def test_corpus_guard_range_licenses_a_downsized_copy_through_file_sha256(repo):
+    full, small = b"FULL-SIZE SOURCE IMAGE BYTES", b"DOWNSIZED 800PX COPY BYTES"
+    header = "file,license,sha256,file_sha256\n"
+    source_row = f"{header}images/met-1.jpg,CC0-1.0,{_bsha(full)},\n"
+    _commit(repo, "Source row", {MANIFEST_PATH: source_row})
+    base = _start_branch(repo)
+    head = _commit(repo, "Commit the downsized example", {"corpus/images/met-1.jpg": small})
+    refused = _run(repo, "corpus_guard.py", "--range", base, head)
+    assert refused.returncode == 1, refused.stdout + refused.stderr
+    assert "file_sha256" in refused.stdout
+    assert "update the row" not in refused.stdout
+    copy_row = f"{header}images/met-1.jpg,CC0-1.0,{_bsha(full)},{_bsha(small)}\n"
+    head = _commit(repo, "Record the copy's own hash", {MANIFEST_PATH: copy_row})
+    result = _run(repo, "corpus_guard.py", "--range", base, head)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
 # The guard workflow itself
 
 WORKFLOWS = Path(__file__).resolve().parents[1] / ".github" / "workflows"
@@ -847,6 +1190,10 @@ def test_the_guards_run_main_copies_and_treat_the_pull_request_as_data():
     # pull_request would run the PR's own workflow copy; a dispatch could run
     # a branch's copy and replace a failing check on that branch's tip.
     assert not any(t.startswith(("pull_request:", "workflow_dispatch")) for t in triggers)
+    # Retargeting a pull request (a base change is an "edited" event) must
+    # re-run the guards against the new base.
+    types = next(t for t in triggers if t.startswith("types:"))
+    assert {"opened", "synchronize", "reopened", "edited"} <= set(re.findall(r"\w+", types))
     # No checkout of the PR and nothing installed from it.
     assert not re.search(r"^\s*ref:", text, re.MULTILINE)
     assert not re.search(r"setup-python|setup-node|pip install|npm ", text)

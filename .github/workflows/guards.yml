@@ -1,11 +1,10 @@
 name: Guards
 
-# Two required checks that the pull request under test must not be able to
-# switch off:
+# Two required checks, run from main's copy of this file and of the scripts:
 #   golden-guard  tests/golden changes only through [bless] commits
 #                 (scripts/golden_guard.py)
-#   corpus-guard  no private-tier or unlicensed corpus file in the tree or
-#                 anywhere in the change range (scripts/corpus_guard.py)
+#   corpus-guard  no private-tier or unlicensed corpus file in the merge
+#                 result or anywhere in the change range (scripts/corpus_guard.py)
 #
 # Why pull_request_target: on pull_request GitHub runs the pull request's own
 # copy of the workflow and checks out its own scripts, so a pull request
@@ -17,22 +16,32 @@ name: Guards
 # from the pull request here: this trigger runs with the base repository's
 # token.
 #
-# Consequences:
+# Limits and consequences:
+#   - This keeps a pull request from editing these jobs, not from adding a
+#     job with the same name to a workflow that runs its own copy (ci.yml
+#     does). Branch protection matches a required check by name, and GitHub
+#     does not document which run counts when two runs of one name disagree
+#     on a commit. So no other workflow on main may use these job names, and
+#     a pull request that touches .github/workflows/ or scripts/*_guard.py
+#     needs Jake's review before it merges.
 #   - A change to this file or to scripts/*_guard.py takes effect only once
 #     it is on main. These checks first appear on pull requests opened or
 #     updated after this file lands.
 #   - GitHub blocks pull_request_target in public repositories from
-#     2026-11-02 unless an Actions event policy allows it (Settings > Actions
-#     > Policies). Allow it for this workflow file before then, or these
-#     checks stop running.
+#     2026-11-02 unless a repository Actions event policy allows it for this
+#     file; #108 tracks that setting. Without it these checks never report.
+#   - The edited type re-runs the guards when a pull request's base branch
+#     changes (by hand, or when GitHub retargets a stacked pull request), so
+#     a result computed against the old base cannot stand on the head commit.
+#     Title and body edits re-run them too, which takes seconds. No job-level
+#     `if:` skips those runs, because a skipped job reports success.
 #   - No workflow_dispatch: a dispatch runs the chosen branch's copy of this
 #     file and attaches its result to that branch's tip, where it could
 #     replace a failing check. Re-run a failed run instead.
-#   - Branch protection matches a required check by name, so no job in any
-#     other workflow may be named golden-guard or corpus-guard. No path
-#     filters: a required check that never runs blocks every merge.
+#   - No path filters: a required check that never runs blocks every merge.
 on:
   pull_request_target:
+    types: [opened, synchronize, reopened, edited]
   push:
     branches: [main]
 
@@ -40,8 +49,9 @@ permissions:
   contents: read
 
 concurrency:
-  # A new push to a pull request cancels that pull request's older run. Every
-  # other run gets a group of its own, so runs on main are never cancelled.
+  # A newer event on a pull request (a push, a reopen, an edit) cancels that
+  # pull request's older run. Every other run gets a group of its own, so runs
+  # on main are never cancelled.
   group: guards-${{ github.event_name == 'pull_request_target' && format('pr-{0}', github.event.pull_request.number) || format('run-{0}', github.run_id) }}
   cancel-in-progress: ${{ github.event_name == 'pull_request_target' }}
 
@@ -107,9 +117,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      # A file added and then removed inside a pull request is gone from its
-      # tree but stays in main's history after the merge, so the range is
-      # checked too. Same range resolution as golden-guard.
+      # A file version that a later commit replaced or removed is gone from
+      # the tree but stays in main's history after the merge, so every version
+      # the range wrote is checked too. Same range resolution as golden-guard,
+      # and the tree checked is the merge result, as golden-guard's is.
       - name: Resolve the change range (pull request commits as data only)
         id: range
         env:
@@ -144,7 +155,7 @@ jobs:
           esac
           echo "base=$base" >> "$GITHUB_OUTPUT"
           echo "head=$head" >> "$GITHUB_OUTPUT"
-      - name: No private-tier or unlicensed corpus files in the tree or the change range
+      - name: No private-tier or unlicensed corpus files in the merge result or the change range
         env:
           RANGE_BASE: ${{ steps.range.outputs.base }}
           RANGE_HEAD: ${{ steps.range.outputs.head }}

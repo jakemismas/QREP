@@ -2,8 +2,10 @@
 # Pinned, with the backend's own dependencies (pip resolves these into an
 # isolated build environment that constraints.txt does not reach): this
 # backend builds the qrep wheel the web app ships, and pathspec decides which
-# files go into it.
+# files go into it. hatchling also asks for editables~=0.3 before an editable
+# install; listing editables here pins the version that request finds.
 requires = [
+    "editables==0.6",
     "hatchling==1.32.4",
     "packaging==26.2",
     "pathspec==1.1.1",

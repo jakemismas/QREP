@@ -15,11 +15,12 @@ git merge-tree computes that merge, so the answer never depends on which of
 several merge bases a three-dot diff happens to pick. The check is then per
 commit, so one bless cannot excuse another commit's edit:
   - every non-merge commit in <base>..<head> that touches tests/golden/ must
-    be a bless commit: [bless] in its subject line, or a line of its message
-    that is exactly [bless]. A marker inside a sentence does not count,
-    because messages often mention it in passing ("the golden lands in the
-    next [bless] commit"), and neither does git's 'Revert "... [bless]"'
-    subject: undoing a bless is not a bless;
+    be a bless commit: its own message contains [bless], in the subject or
+    anywhere in the body, as CLAUDE.md and #105 word the rule. Only commits
+    that touch tests/golden/ are judged, so a body elsewhere in the branch
+    that mentions the marker in passing excuses nothing. git's
+    'Revert "... [bless]"' and 'Reapply "... [bless]"' subjects do not count
+    by their quoted part: undoing a bless is not a bless;
   - every golden file the merge changes must end with the content (blob and
     mode) that one of those commits wrote. A merge commit therefore cannot
     leave golden content that no commit in the range produced: a hand-resolved
@@ -68,12 +69,14 @@ def is_bless_subject(subject: str) -> bool:
     return BLESS_MARKER in text
 
 
-def has_bless_line(message: str) -> bool:
-    return any(line.strip() == BLESS_MARKER for line in message.splitlines())
+def message_body(message: str) -> str:
+    """The message after its subject paragraph (git's %B is subject, blank line, body)."""
+    _subject, blank, body = message.replace("\r\n", "\n").partition("\n\n")
+    return body if blank else ""
 
 
 def is_bless(commit: GoldenCommit) -> bool:
-    return is_bless_subject(commit.subject) or has_bless_line(commit.message)
+    return is_bless_subject(commit.subject) or BLESS_MARKER in message_body(commit.message)
 
 
 def _wrote_final(commit: GoldenCommit, path: str, final: Mapping[str, str | None] | None) -> bool:
@@ -105,7 +108,7 @@ def verdict(
         )
     problems = [
         f"  {c.sha[:12]} '{c.subject}' edits {', '.join(c.files)} without "
-        f"{BLESS_MARKER} in its subject line or on a line of its own"
+        f"{BLESS_MARKER} in its own message"
         for c in unblessed
     ] + [
         f"  {path} ends with content that no commit in the range wrote: a merge commit "
@@ -115,9 +118,9 @@ def verdict(
     return False, (
         f"{len(changed)} golden file(s) changed:\n{listing}\nnot through a bless:\n"
         + "\n".join(problems)
-        + "\nGolden files change only through `pytest --bless`, in a commit with "
-        f"{BLESS_MARKER} in its subject line or on a line of its own. If an edit is not "
-        "approved, undo it in a new commit. Golden content that a merge produced (a "
+        + "\nGolden files change only through `pytest --bless`, in a commit whose own "
+        f"message contains {BLESS_MARKER}. If an edit is not approved, undo it in a new "
+        "commit. Golden content that a merge produced (a "
         "hand-resolved conflict, or two blesses merged as text) needs the approved bless "
         "redone in a new commit after the merge. History cannot be rewritten (force-push "
         "is banned), so an approved edit that landed in an unblessed commit needs a new "

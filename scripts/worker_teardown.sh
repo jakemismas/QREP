@@ -26,11 +26,17 @@
 #   checkout after `git pull`). The branch defaults to the one the worktree
 #   has checked out; pass it to finish a teardown whose worktree is already
 #   gone.
+# Shell: on Windows, Git Bash only, as for worker_bootstrap.sh (in PowerShell,
+# `bash` starts WSL, whose git sees the Windows worktrees as missing).
 # Env: QREP_WT_ROOT, as for worker_bootstrap.sh.
 set -euo pipefail
 
 die() { echo "worker_teardown: $*" >&2; exit 1; }
 step() { echo "==> $*"; }
+
+if grep -qi microsoft /proc/version 2>/dev/null; then
+  die "run this from Git Bash, not WSL (in PowerShell, 'bash' starts WSL here): WSL's git sees the Windows worktrees as missing"
+fi
 
 [ $# -ge 1 ] && [ $# -le 2 ] || die "usage: worker_teardown.sh <ticket> [branch]"
 ticket=$1

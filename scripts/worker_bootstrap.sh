@@ -17,6 +17,9 @@
 #   branch    branch to check out; created from base-ref if it exists on
 #             neither side, resumed from origin/<branch> if only pushed
 #   base-ref  start point for a new branch (default origin/main, fetched first)
+# Shell: on Windows, Git Bash only (the Bash tool). In PowerShell, `bash`
+# starts WSL on this machine, whose git sees every worktree that Git for
+# Windows registered as missing; the script refuses to run there.
 # Re-running on an existing worktree repairs it instead of failing. Any failed
 # step stops the script with a message. No git operation is ever forced; the
 # only things rebuilt from scratch are node_modules (npm ci), the qrep wheel,
@@ -27,6 +30,12 @@ set -euo pipefail
 
 die() { echo "worker_bootstrap: $*" >&2; exit 1; }
 step() { echo "==> $*"; }
+
+# Before any git call: under WSL even a harmless-looking git command acts on
+# a registry whose Windows paths all look gone.
+if grep -qi microsoft /proc/version 2>/dev/null; then
+  die "run this from Git Bash, not WSL (in PowerShell, 'bash' starts WSL here): WSL's git sees the Windows worktrees as missing"
+fi
 
 [ $# -ge 2 ] && [ $# -le 3 ] || die "usage: worker_bootstrap.sh <ticket> <branch> [base-ref]"
 ticket=$1
@@ -60,12 +69,29 @@ is_registered() {
   git -C "$main_root" worktree list --porcelain | grep -qxF "worktree $1"
 }
 
+prunable_worktrees() {
+  git -C "$main_root" worktree list --porcelain | awk '
+    index($0, "worktree ") == 1 { path = substr($0, 10); next }
+    $0 == "prunable" || index($0, "prunable ") == 1 { print path }'
+}
+
 # 1. Worktree
 if [[ $base == origin/* ]]; then
   step "fetching origin so $base is current"
   git -C "$main_root" fetch --quiet origin || die "git fetch origin failed; refusing to branch from a stale $base"
 fi
-git -C "$main_root" worktree prune
+# git worktree prune is repo-wide: it unregisters every worktree whose folder
+# it cannot see, a sibling worker's included. So prune only a stale entry for
+# this ticket's own folder, and only while it is the sole prunable entry.
+prunable=$(prunable_worktrees)
+if [ "$prunable" = "$wt" ]; then
+  step "pruning the stale registration of $wt (its folder is gone)"
+  git -C "$main_root" worktree prune
+elif [ -n "$prunable" ] && grep -qxF "$wt" <<<"$prunable"; then
+  die "$wt is registered but its folder is gone, and git also lists other worktrees as prunable:
+$prunable
+git worktree prune would unregister all of them. Check each one and report; prune by hand only once every listed folder is really gone"
+fi
 if is_registered "$wt"; then
   current=$(worktree_branch "$wt")
   [ "$current" = "$branch" ] || die "$wt is already a worktree on '$current', not '$branch'"
@@ -155,9 +181,11 @@ step "installing qrep[dev] editable from the worktree, pinned by constraints.txt
 "$py" -m pip install --disable-pip-version-check --quiet -e "${wt}[dev]" -c "$wt/constraints.txt"
 
 step "asserting qrep imports from the worktree"
-# -I keeps the current directory off sys.path, so only the editable install
-# can satisfy the import.
-(cd "$wt_root" && "$py" -I -c '
+# -P keeps the current directory off sys.path but honors PYTHONPATH, which is
+# how web/e2e's `QREP_PYTHON -c` calls import. A PYTHONPATH that points at
+# another checkout therefore fails here instead of letting those runs test
+# that checkout's engine.
+(cd "$wt_root" && "$py" -P -c '
 import importlib.metadata
 import os
 import sys
@@ -209,3 +237,9 @@ echo "  branch     $branch"
 echo "  python     $py"
 echo "  e2e port   $port (in $env_file)"
 echo "  head       $(git -C "$wt" rev-parse --short HEAD)"
+# A pushed commit is public for good (on the branch and on refs/pull/<n>/head),
+# so the guards run before every push, not only in CI after it.
+echo "  guards, from the worktree:"
+echo "    before each commit that adds files:  \"\$QREP_PYTHON\" scripts/corpus_guard.py"
+echo "    before every push:  \"\$QREP_PYTHON\" scripts/corpus_guard.py --range origin/main HEAD"
+echo "                        \"\$QREP_PYTHON\" scripts/golden_guard.py origin/main HEAD"
