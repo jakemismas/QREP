@@ -58,11 +58,13 @@ development harness.
 git clone https://github.com/jakemismas/QREP.git
 cd QREP
 python -m venv .venv
-.venv/Scripts/python -m pip install -e ".[dev]"
+.venv/Scripts/python -m pip install -e ".[dev]" -c constraints.txt
 ```
 
 Python 3.12+ (3.12 and 3.13 are tested in CI, plus the full suite under the
-pinned Pyodide runtime). On macOS/Linux the venv paths are `.venv/bin/...`.
+pinned Pyodide runtime). `constraints.txt` pins every dependency at the
+versions the suite is frozen against; CI installs the same way. On
+macOS/Linux the venv paths are `.venv/bin/...`.
 The commands below assume the venv is on PATH.
 
 ### Walkthrough: the benchmark quilt end to end
