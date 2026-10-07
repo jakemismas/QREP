@@ -1,13 +1,30 @@
 name: CI
 
+# Job names are the required status checks on main; keep them stable. No job
+# may get a path filter: a required check that never runs stays pending and
+# blocks every merge.
 on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+  # pages.yml runs this whole workflow on a release tag and deploys only what
+  # passed it; `publish` adds the Pages artifact upload.
+  workflow_call:
+    inputs:
+      publish:
+        description: Upload the composed site as the GitHub Pages artifact
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: false
+  # A new push to a PR cancels that PR's older run. Every other run gets a
+  # group of its own, so runs on main are never cancelled or replaced.
+  group: ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || format('run-{0}', github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   test:
@@ -20,10 +37,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Install
+      - name: Install (pinned by constraints.txt)
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[dev]"
+          pip install -e ".[dev]" -c constraints.txt
       - name: Lint
         run: ruff check .
       - name: Test
@@ -42,12 +59,15 @@ jobs:
           node-version: "24"
           cache: npm
           cache-dependency-path: web/package-lock.json
-      - name: Install python deps
+      - name: Install python deps (pinned by constraints.txt)
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[dev]"
+          pip install -e ".[dev]" -c constraints.txt
       - name: Install web deps
         run: npm ci
+        working-directory: web
+      - name: Lint (oxlint, fails on errors)
+        run: npm run lint -- --format=github
         working-directory: web
       - name: Cache vendored wheels
         uses: actions/cache@v4
@@ -62,7 +82,7 @@ jobs:
         working-directory: web
         env:
           QREP_PYTHON: python
-      - name: Build site
+      - name: Build site (prebuild refuses a stale wheel)
         run: npm run build
         working-directory: web
       - name: Unit tests (vitest)
@@ -97,9 +117,11 @@ jobs:
           name: spike-artifacts
           path: web/test-results/spike/
           if-no-files-found: ignore
-      - name: Compose Pages artifact (app at root, docs URLs preserved)
+      - name: Compose Pages artifact (app at root, legacy viewer and demo only)
+        if: inputs.publish
         run: node web/scripts/compose-site.mjs _site
       - name: Upload Pages artifact
+        if: inputs.publish
         uses: actions/upload-pages-artifact@v3
         with:
           path: _site
@@ -133,55 +155,41 @@ jobs:
         working-directory: web
         env:
           QREP_PYTHON: python
-      - name: Full pytest suite under pinned Pyodide
+      - name: Full pytest suite under pinned Pyodide (test deps pinned by constraints.txt)
         run: node scripts/pytest-pyodide.mjs
         working-directory: web
 
-  deploy-pages:
-    if: github.ref == 'refs/heads/main'
-    needs: [test, web-spike, pyodide-tests]
+  golden-guard:
     runs-on: ubuntu-latest
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
-
-  live-spike:
-    if: github.ref == 'refs/heads/main'
-    needs: deploy-pages
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-          cache: npm
-          cache-dependency-path: web/package-lock.json
-      - name: Install python deps
+          fetch-depth: 0
+      - name: tests/golden changes only through a [bless] commit
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
         run: |
-          python -m pip install --upgrade pip
-          pip install -e ".[dev]"
-      - name: Install web deps
-        run: npm ci
-        working-directory: web
-      - name: Install Playwright chromium
-        run: npx playwright install --with-deps chromium
-        working-directory: web
-      - name: Spike e2e against the deployed Pages site
-        run: npx playwright test
-        working-directory: web
-        env:
-          SPIKE_BASE_URL: https://jakemismas.github.io/QREP/
-      - name: Native pypdf checks on the live-site booklet
-        run: pytest tests/test_wasm_artifacts.py -q
-        env:
-          QREP_WASM_PDF: web/test-results/spike/booklet.pdf
+          case "$EVENT_NAME" in
+            pull_request)
+              python3 scripts/golden_guard.py "$PR_BASE" "$PR_HEAD" ;;
+            push)
+              if [ -z "$PUSH_BEFORE" ] || [ "$PUSH_BEFORE" = "0000000000000000000000000000000000000000" ]; then
+                echo "golden_guard: no earlier commit to compare (new ref); nothing to check"
+              else
+                python3 scripts/golden_guard.py "$PUSH_BEFORE" "$GITHUB_SHA"
+              fi ;;
+            *)
+              echo "golden_guard: $EVENT_NAME has no change range; nothing to check" ;;
+          esac
+
+  corpus-guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: No private-tier paths tracked; every corpus image has a license row
+        run: python3 scripts/corpus_guard.py
