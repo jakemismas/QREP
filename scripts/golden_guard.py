@@ -53,13 +53,18 @@ REWRAP_PREFIXES = ('Revert "', 'Reapply "')
 # <date>)", always with a short date, and a merge revert names the mainline
 # parent the same way after ", reversing changes made to". Without --edit the
 # reference is in the body; with --edit and an untouched message, cleanup drops
-# git's '#' title and the reference becomes the subject. The match runs to the
+# git's '#' title and the reference becomes the subject. A match runs to the
 # last such date in its paragraph, so it takes an undone subject that holds its
-# own parentheses and a merge revert's second reference, and it stops at git's
-# closing date, so a marker the revert adds after it still counts.
+# own parentheses and a merge revert's second reference; a marker after that
+# date still counts, one before a later dated reference in the same paragraph
+# does not. A reference that lost its closing date (cleanup drops a wrapped
+# line that starts with '#') runs to the end of its paragraph instead, so the
+# undone commit's marker never survives a cut.
 REVERT_REFERENCE = re.compile(
-    r"This\s+reverts\s+commit\s+[0-9a-f]{4,}\s+\(.*,\s+\d{4}-\d{2}-\d{2}\)"
+    r"This\s+reverts\s+commit\s+[0-9a-f]{4,}\s+\((?:.*,\s+\d{4,}-\d{2}-\d{2}\)|.*)", re.ASCII
 )
+# git ends a paragraph at a line that holds only spaces or tabs, too.
+PARAGRAPH_BREAK = re.compile(r"\n[ \t]*\n")
 
 
 @dataclass(frozen=True)
@@ -91,7 +96,7 @@ def without_revert_references(text: str) -> str:
     subject the same way), so each paragraph's lines are joined first. A space
     stands in for each reference, so the text around it cannot join into a marker.
     """
-    paragraphs = text.replace("\r\n", "\n").split("\n\n")
+    paragraphs = PARAGRAPH_BREAK.split(text.replace("\r\n", "\n"))
     return "\n\n".join(REVERT_REFERENCE.sub(" ", " ".join(p.split("\n"))) for p in paragraphs)
 
 

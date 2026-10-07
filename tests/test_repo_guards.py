@@ -597,6 +597,8 @@ def test_a_golden_change_no_commit_explains_fails():
             True,
         ),
         ("Re-bless changes made to 0f58109 (border [bless], #91)", True),
+        # A reflowed reference that cleanup cut before git's closing date.
+        ("This reverts commit e91f724 (Bless v2 golden [bless] as approved on", False),
     ],
 )
 def test_only_a_subject_of_its_own_marks_a_bless(subject, blessed):
@@ -636,6 +638,15 @@ def test_only_a_subject_of_its_own_marks_a_bless(subject, blessed):
         ),
         # Cutting a reference out must not join the text around it into a marker.
         ("Re-render top diagram\n\nOK [blThis reverts commit abcd (x, 2026-10-07)ess]\n", False),
+        # A reflowed reference whose second line started with '#91': commit
+        # cleanup dropped that line, so git's closing date is gone.
+        (
+            "Undo the v2 top golden\n\n"
+            "This reverts commit e91f724 (Bless v2 golden [bless] as approved on\n",
+            False,
+        ),
+        # git prints a year past 9999 with five digits.
+        ("Undo v2\n\nThis reverts commit b89b007 (Bless v2 [bless], 10000-01-01).\n", False),
         (
             "Undo the v2 golden\n\nThis reverts commit bb65318 (Bless v2 [bless], 2026-10-07).\n",
             False,
@@ -660,6 +671,12 @@ def test_only_a_subject_of_its_own_marks_a_bless(subject, blessed):
         (
             "Undo the v2 golden\n\nThis reverts commit bb65318 (Bless v2 [bless], 2026-10-07). "
             "Approved as a [bless] (#91).\n",
+            True,
+        ),
+        # A line of only spaces ends the reference's paragraph, as it does for git.
+        (
+            "Undo v2\n\nThis reverts commit bb65318 (Bless v2 [bless], 2026-10-07).\n \n"
+            "Re-blessed v1 [bless] (Jake, 2026-10-08).\n",
             True,
         ),
         (
