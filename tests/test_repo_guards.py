@@ -917,6 +917,25 @@ def test_corpus_guard_range_catches_a_private_file_added_inside_a_merge(repo):
 
 
 @needs_git
+def test_corpus_guard_range_sees_a_root_commit_even_when_log_hides_root_diffs(repo):
+    # A private file can arrive through an unrelated history whose root commit
+    # added it; log.showRoot=false hides root diffs from git log by default.
+    _git(repo, "config", "log.showRoot", "false")
+    base = _start_branch(repo)
+    _commit(repo, "Work", {"w.txt": "w\n"})
+    _git(repo, "checkout", "-q", "--orphan", "side")
+    _git(repo, "rm", "-r", "-q", "--cached", ".")
+    _commit(repo, "Side root", {"local-photos/IMG_4461.png": b"PNG BYTES"})
+    _git(repo, "checkout", "-q", "-f", "work")
+    _git(repo, "merge", "-q", "--allow-unrelated-histories", "--no-edit", "side")
+    _git(repo, "rm", "-q", "local-photos/IMG_4461.png")
+    head = _commit(repo, "Remove the stray photo")
+    result = _run(repo, "corpus_guard.py", "--range", base, head)
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "local-photos/IMG_4461.png" in result.stdout
+
+
+@needs_git
 def test_corpus_guard_range_passes_licensed_images_that_were_moved_or_dropped(repo):
     base = _start_branch(repo)
     _commit(

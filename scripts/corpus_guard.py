@@ -499,18 +499,21 @@ def range_versions(repo: Path, base: str, head: str) -> list[Version]:
     """Every corpus or private-tier file version that a commit in base..head wrote.
 
     Newest commit first. No pathspec, so git simplifies no history away;
-    --no-renames turns a rename into a new path. A merge commit is diffed
-    against all its parents at once (dense-combined), which lists exactly the
-    versions the merge itself produced and none that it only took from a
-    parent. Each raw entry is ":<modes> <object ids> <status>" with one colon
-    per parent; the last object id is the version the commit left, all zeros
-    where it deleted the file.
+    --no-renames turns a rename into a new path, and --root lists what a root
+    commit added even where log.showRoot is false (an unrelated history merged
+    into the branch starts with one). A merge commit is diffed against all its
+    parents at once (dense-combined), which lists exactly the versions the
+    merge itself produced and none that it only took from a parent. Each raw
+    entry is ":<modes> <object ids> <status>" with one colon per parent; the
+    last object id is the version the commit left, all zeros where it deleted
+    the file.
     """
     raw = _git(
         repo,
         "-c",
         "log.showSignature=false",
         "log",
+        "--root",
         "--diff-merges=dense-combined",
         "--no-renames",
         "--raw",
