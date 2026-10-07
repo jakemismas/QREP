@@ -12,10 +12,13 @@
 #
 # Usage: scripts/worker_bootstrap.sh <ticket> <branch> [base-ref]
 #   ticket    worktree folder name, for example 105 (letters, digits, . _ -)
-#   branch    branch to check out; created from base-ref if it does not exist
+#   branch    branch to check out; created from base-ref if it exists on
+#             neither side, resumed from origin/<branch> if only pushed
 #   base-ref  start point for a new branch (default origin/main, fetched first)
 # Re-running on an existing worktree repairs it instead of failing. Any failed
-# step stops the script with a message; nothing is forced or deleted.
+# step stops the script with a message. No git operation is ever forced; the
+# only things rebuilt from scratch are node_modules (npm ci), the qrep wheel,
+# and a venv whose interpreter no longer runs.
 # Env: QREP_WT_ROOT (default: the main checkout's parent folder + /qrep-wt),
 #      QREP_BASE_PYTHON (default: python) creates the venv.
 set -euo pipefail
