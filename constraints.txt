@@ -1,0 +1,35 @@
+# Exact versions of every runtime and dev dependency of qrep[dev], taken from
+# the main dev venv's pip freeze on 2026-10-07 (the environment the current
+# tests, goldens and frozen pins pass under). Unrelated research packages in
+# that venv are left out because qrep never imports them.
+#
+# Install with: python -m pip install -e ".[dev]" -c constraints.txt
+# CI, scripts/worker_bootstrap.sh and web/scripts/pytest-pyodide.mjs all read
+# this file, so a fresh venv, a worker worktree and the Pyodide test run cannot
+# drift from the frozen environment. Move a pin only in a PR that re-runs the
+# full native and Pyodide suites; opencv moves to 4.11 inside the re-baseline.
+annotated-doc==0.0.4
+annotated-types==0.7.0
+charset-normalizer==3.4.9
+colorama==0.4.6
+iniconfig==2.3.0
+markdown-it-py==4.2.0
+mdurl==0.1.2
+numpy==2.5.1
+opencv-python-headless==5.0.0.93
+packaging==26.2
+pillow==12.3.0
+pluggy==1.6.0
+pydantic==2.13.4
+pydantic_core==2.46.4
+Pygments==2.20.0
+pypdf==6.14.2
+pytest==9.1.1
+reportlab==5.0.0
+rich==15.0.0
+ruff==0.15.20
+shellingham==1.5.4
+svgwrite==1.4.3
+typer==0.26.8
+typing-inspection==0.4.2
+typing_extensions==4.16.0
