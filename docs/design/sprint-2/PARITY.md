@@ -1,5 +1,59 @@
 # UI parity annex (binding)
 
+> **Sprint 5 note (2026-10-07, issue #106): partly suspended.** Sprint 5
+> removes editing from the web app. The editor is archived at tag
+> `archive/editor-v0.3` (commit 834d8be); bringing it back is a re-port from
+> that tag, not a revert. [docs/SPEC.md](../../SPEC.md) is the binding
+> product contract and wins wherever this annex disagrees with it. Nothing
+> below is deleted; it records the shipped 0.3.0 behavior. Row-by-row
+> verdicts for this annex and its two amendments are in
+> [docs/sprint-5/REBASELINE.md](../../sprint-5/REBASELINE.md).
+>
+> - Suspended, because editing is removed: the Open-project modal and Sizing
+>   panel rows; the editing parts of the App shell row (project rename,
+>   Open/Save, autosave dot), the Start screen row (blank grid, resume
+>   banner), the Editor canvas row (Paint and Seams modes, fabric quick
+>   swatches, undo and redo) and the Fabrics panel row (recolor, rename, add
+>   fabric); decisions 2 (seams preview), 4 (locked resize and its clamps),
+>   5 (project file wrapper and autosave) and 15 (blank grid start); Ctrl+Z
+>   and Ctrl+Y; auto-zoom-to-paint in decision 10.
+> - Superseded by docs/SPEC.md (confirmed read, one pattern outcome,
+>   separate strip and backing widths): the Pattern panel and Print sheet
+>   rows, where one method with its reason and one Download pattern (PDF)
+>   action replace the strategy cards, hand-tweaked badge, yardage table,
+>   five downloads, print sheet and Copy my settings; the demo quilt in the
+>   Start screen row, which becomes See a sample pattern and opens Your
+>   pattern without a read; in the Photo flow row, the results screen,
+>   confidence pill, uncertain toggle and corner-pins screen, replaced by
+>   the confirm screen, Your pattern, grid-fit flags and the region re-read;
+>   the Sizing tab in the Phone layout row; the stage and strategy names in
+>   Vocabulary; decisions 3 (PDF split), 6 (uncertain squares), the usable
+>   fabric width bullet of 8 (copy now states 40 in for strip cutting and
+>   the separate backing width, default 42 in), 9 (batting row; the engine
+>   now supplies the batting line, shown on Your pattern and in the PDF), 11
+>   (downloads and filenames), 12 (Copy my settings) and the confidence
+>   words and pill tiers of 14. Decision 17 (idle vision prefetch once the
+>   engine is ready) stays binding: the sprint-5 plan keeps the prefetch
+>   (section 4.5 and ticket C8b; REBASELINE.md row P24), and C8b adds byte
+>   progress and the full first-run size to the loading copy.
+> - Still binding: decisions 1 (engine-authoritative numbers), 7
+>   (session-only photo), the other three bullets of 8 (measured vision
+>   size, engine backing shown as-is, loading language), 10 (phone layout),
+>   13 (fraction input) and 16 (theme); in 14, progress rows map to real
+>   steps and cancel returns to the dropzone; the cell-to-square mapping and
+>   banned words in Vocabulary; the dropzone, staged loading and lightbox in
+>   the Photo flow row; toast, tooltip and Escape; Design-system adoption.
+>   From the Editor canvas row, the rulers, zoom, pan, scale line and
+>   finished-size line stay binding wherever Your pattern shows the
+>   recovered quilt.
+>
+> The sprint-3 and sprint-4 amendments to this annex follow the same split:
+> their editor entries are suspended, their verdict, pill and detection
+> entries are superseded, and their size block, chip, lightbox and
+> vocabulary rules stay binding. The notes atop
+> docs/design/sprint-3/UI-SPEC.md and docs/design/sprint-4/UI-SPEC.md give
+> the detail.
+
 Sprint 3 note: this annex is amended by docs/design/sprint-3/
 PARITY-AMENDMENT.md (crop screen, size block, verdict panels, pill failure
 tier, progress-row failure states), whose design authority is

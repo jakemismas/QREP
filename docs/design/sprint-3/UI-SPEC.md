@@ -1,5 +1,35 @@
 # Sprint 3 UI specification (binding)
 
+> **Sprint 5 note (2026-10-07, issue #106): partly superseded.** Sprint 5
+> replaces automatic detection with a confirmed read and removes editing,
+> which is archived at tag `archive/editor-v0.3` (commit 834d8be; bringing
+> it back is a re-port, not a revert). [docs/SPEC.md](../../SPEC.md) is the
+> binding product contract and wins wherever this spec disagrees with it.
+> Nothing below is deleted. Item-level verdicts are in
+> [docs/sprint-5/REBASELINE.md](../../sprint-5/REBASELINE.md).
+>
+> - Suspended, because editing is removed: the "Start in the editor" action
+>   and its startBlankWithPalette entry in section 3.1, with the blank-grid
+>   escape gate behind them (docs/design/sprint-3/PARITY-AMENDMENT.md).
+> - Superseded by the confirmed read: in section 1, the crop screen's layout
+>   and copy, the cold-start contract (detect_quad snap-in, "Finding your
+>   quilt...", "Reset to auto"), corners riding along only when a pin moved,
+>   a second photo starting from its own detection, and the sample bypass.
+>   Corners and counts now share one confirm screen, confirmed corners always
+>   reach the engine, and a new photo starts from default pins and empty
+>   counts. Sections 3 (verdict panels), 4 (pill failure tier) and 5
+>   (progress-row failure states) are superseded too: there is no verdict,
+>   the scope picker turns out-of-scope quilts away before any read, and the
+>   grid-fit check flags suspect regions.
+> - Still binding: section 1's pin rules (44 px targets, accent handles with
+>   a contrast ring, the 40 percent scrim, clamping, a pure-JS overlay that
+>   never waits on the engine), its phone keyboard-collapse rule, Back and
+>   Cancel returning to the dropzone, and vision prefetch on flow entry, all
+>   applied to the confirm screen; all of section 2 (size block), with the
+>   preset suggestion reading its aspect from the confirmed counts, its
+>   placement following the sprint-5 screens, and the results size story
+>   moving to Your pattern; the vocabulary rules below.
+
 Status: BINDING from S0 (issue #66). No sprint 3 mocks exist: the
 "UI from Claude Design.zip" at the repo root was verified as a
 byte-identical duplicate of the committed sprint 2 mocks (cmp on all three
