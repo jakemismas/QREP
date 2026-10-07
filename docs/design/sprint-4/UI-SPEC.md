@@ -1,5 +1,34 @@
 # Sprint 4 UI specification (binding)
 
+> **Sprint 5 note (2026-10-07, issue #106): partly superseded.** Sprint 5
+> replaces automatic detection with a confirmed read, makes the pattern one
+> outcome, and removes editing, which is archived at tag
+> `archive/editor-v0.3` (commit 834d8be; bringing it back is a re-port, not
+> a revert). [docs/SPEC.md](../../SPEC.md) is the binding product contract
+> and wins wherever this spec disagrees with it. Nothing below is deleted.
+> Sections 1, 2 and 4 were never built: at 834d8be there is no
+> export_document, naming module, scroll-lock hook or download-document
+> control. Item-level verdicts are in
+> [docs/sprint-5/REBASELINE.md](../../sprint-5/REBASELINE.md).
+>
+> - Suspended, because editing is removed: in section 4, editing the name in
+>   the editor and the collision suffix in the web save layer.
+> - Superseded: in section 1, the strategy cards, yardage table and
+>   hand-tweaked badge that were to stay, the secondary Print and Copy my
+>   settings controls, and the export inputs (active seam strategy, verdict
+>   diagnostics) and section list; section 3 (non_square_content copy),
+>   which retires with the verdict now that triangles are in scope. One
+>   Download pattern (PDF) action on Your pattern replaces the panel, the
+>   engine picks the method, and the document follows
+>   docs/sprint-5/PATTERN-SPEC.md.
+> - Still binding: section 1's retirement of the five per-artifact downloads
+>   (the engine exporters and CLI stay), the session-only photo, the loading
+>   spinner and inline build error, and the absence assertions for the five
+>   retired testids; all of section 2 (mobile lightbox and compare, fixes
+>   #90); section 4's generated name, now also bound by the pattern-name rule
+>   in PATTERN-SPEC.md, and its filename rule (the name in kebab case plus
+>   .pdf).
+
 Status: SKELETON written in S0 (issue #92), BINDING from S0 onward; the
 individual sections FINALIZE in their slices (S2 copy, S3/S4 document panel,
 S5 lightbox). No sprint 4 mocks exist; this document is the design authority
