@@ -2,8 +2,19 @@ name: Pages
 
 # The product site changes only on a release tag or a manual dispatch, never
 # on an ordinary merge to main, so the live app stays at the last release
-# while a sprint lands work. Roll back by dispatching this workflow on the
-# previous tag (force-pushing is banned, so redeploying is the undo).
+# while a sprint lands work.
+#
+# Repository settings must agree with this file. The github-pages
+# environment admits only the refs its deployment rules list (Settings >
+# Environments > github-pages), so it needs the tag pattern v* next to main,
+# or a tag run fails at the deploy job after the whole CI run. A v* rule
+# admits a tag on any commit, so release-ref below refuses a commit that is
+# not on main.
+#
+# Roll back by dispatching this workflow on an earlier release tag
+# (force-pushing is banned, so redeploying is the undo). A dispatch needs this
+# file in the chosen ref: v0.1.0 to v0.3.0 predate it, so they cannot be
+# redeployed this way.
 on:
   push:
     tags: ["v*"]
@@ -17,9 +28,26 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # The full CI workflow, including every required check, runs first on the
+  release-ref:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Deploy only commits that are on main
+        run: |
+          if git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "$GITHUB_REF ($GITHUB_SHA) is on main"
+          else
+            echo "::error::$GITHUB_REF ($GITHUB_SHA) is not on main; Pages deploys only commits that are on main"
+            exit 1
+          fi
+
+  # The full CI workflow, including every required check, runs next on the
   # exact commit being deployed and uploads the composed site artifact.
   ci:
+    needs: release-ref
     uses: ./.github/workflows/ci.yml
     with:
       publish: true
@@ -55,7 +83,7 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - name: Install python deps (pinned by constraints.txt)
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install pip==25.0.1
           pip install -e ".[dev]" -c constraints.txt
       - name: Install web deps
         run: npm ci

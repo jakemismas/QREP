@@ -1,5 +1,6 @@
 [build-system]
-requires = ["hatchling"]
+# Pinned: this backend builds the qrep wheel the web app ships.
+requires = ["hatchling==1.32.4"]
 build-backend = "hatchling.build"
 
 [project]

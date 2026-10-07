@@ -11,7 +11,8 @@
 # source-stamped wheel, and its own Playwright port.
 #
 # Usage: scripts/worker_bootstrap.sh <ticket> <branch> [base-ref]
-#   ticket    worktree folder name, for example 105 (letters, digits, . _ -)
+#   ticket    worktree folder name, for example 105 (letters, digits, . _ -;
+#             no leading dot, which teardown reserves for its parked folders)
 #   branch    branch to check out; created from base-ref if it exists on
 #             neither side, resumed from origin/<branch> if only pushed
 #   base-ref  start point for a new branch (default origin/main, fetched first)
@@ -30,7 +31,8 @@ step() { echo "==> $*"; }
 ticket=$1
 branch=$2
 base=${3:-origin/main}
-[[ $ticket =~ ^[A-Za-z0-9._-]+$ ]] || die "ticket may use only letters, digits, '.', '_' and '-': $ticket"
+[[ $ticket =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] \
+  || die "ticket must start with a letter or digit and use only letters, digits, '.', '_' and '-': $ticket"
 git check-ref-format --branch "$branch" >/dev/null 2>&1 || die "invalid branch name: $branch"
 
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -40,6 +42,9 @@ wt_root=${QREP_WT_ROOT:-"$(dirname "$main_root")/qrep-wt"}
 if command -v cygpath >/dev/null 2>&1; then
   wt_root=$(cygpath -m "$wt_root")
 fi
+# git lists worktree paths without a trailing slash, and the lookups below
+# compare exact strings.
+while [ "${#wt_root}" -gt 1 ] && [ "${wt_root%/}" != "$wt_root" ]; do wt_root=${wt_root%/}; done
 wt="$wt_root/$ticket"
 env_file="$wt/.qrep-worker.env"
 
