@@ -20,7 +20,10 @@ commit, so one bless cannot excuse another commit's edit:
     that touch tests/golden/ are judged, so a body elsewhere in the branch
     that mentions the marker in passing excuses nothing. git's
     'Revert "... [bless]"' and 'Reapply "... [bless]"' subjects do not count
-    by their quoted part: undoing a bless is not a bless;
+    by their quoted part, and neither does the reference that
+    `git revert --reference` (or revert.reference=true) writes, 'This reverts
+    commit <sha> (... [bless], <date>)', in the subject or the body: undoing a
+    bless is not a bless;
   - every golden file the merge changes must end with the content (blob and
     mode) that one of those commits wrote. A merge commit therefore cannot
     leave golden content that no commit in the range produced: a hand-resolved
@@ -35,6 +38,7 @@ that conflicts with <base>, which leaves no merge result to judge).
 from __future__ import annotations
 
 import io
+import re
 import subprocess
 import sys
 from collections.abc import Mapping
@@ -45,6 +49,13 @@ GUARDED_PATHS = ("tests/golden/",)
 BLESS_MARKER = "[bless]"
 # git's own subjects for undoing or redoing a commit quote the original one.
 REWRAP_PREFIXES = ('Revert "', 'Reapply "')
+# git revert --reference names the undone commit as "<short sha> (<subject>,
+# <date>)", and a merge revert names the mainline parent the same way after
+# "changes made to". Without --edit the reference is in the body; with --edit
+# and an untouched message, cleanup drops git's '#' title and the reference
+# becomes the subject. The match runs to the last ")" on its line, so an undone
+# subject that holds its own parentheses goes with it.
+REVERT_REFERENCE = re.compile(r"(?:This reverts commit|changes made to) [0-9a-f]{4,} \(.*\)")
 
 
 @dataclass(frozen=True)
@@ -66,7 +77,7 @@ def is_bless_subject(subject: str) -> bool:
         # marker outside the quotes makes this commit a bless.
         opening, closing = text.find('"'), text.rfind('"')
         text = text[closing + 1 :] if closing > opening else ""
-    return BLESS_MARKER in text
+    return BLESS_MARKER in REVERT_REFERENCE.sub("", text)
 
 
 def message_body(message: str) -> str:
@@ -76,7 +87,8 @@ def message_body(message: str) -> str:
 
 
 def is_bless(commit: GoldenCommit) -> bool:
-    return is_bless_subject(commit.subject) or BLESS_MARKER in message_body(commit.message)
+    body = REVERT_REFERENCE.sub("", message_body(commit.message))
+    return is_bless_subject(commit.subject) or BLESS_MARKER in body
 
 
 def _wrote_final(commit: GoldenCommit, path: str, final: Mapping[str, str | None] | None) -> bool:
