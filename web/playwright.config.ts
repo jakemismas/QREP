@@ -9,8 +9,10 @@ const externalBase = process.env.SPIKE_BASE_URL;
 
 // Parallel sprint workers each own a port: scripts/worker_bootstrap.sh writes
 // QREP_E2E_PORT to the worktree's .qrep-worker.env (an exported QREP_E2E_PORT
-// wins). With a worker port the run never reuses a server already listening,
-// so it cannot test another worktree's build.
+// wins). A run never reuses a server that already listens unless
+// QREP_E2E_REUSE=1 asks for it outside CI and without a worker port, because
+// whatever listens there may serve another checkout's build; without a port
+// the run takes 4173 and fails loudly if something already holds it.
 function readWorkerEnv(): Record<string, string> {
   const file = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".qrep-worker.env");
   if (!existsSync(file)) return {};
@@ -54,7 +56,8 @@ export default defineConfig({
     : {
         command: `npm run preview -- --host 127.0.0.1 --port ${localPort} --strictPort`,
         url: localBase,
-        reuseExistingServer: port === undefined && !process.env.CI,
+        reuseExistingServer:
+          port === undefined && process.env.QREP_E2E_REUSE === "1" && !process.env.CI,
         timeout: 60_000,
       },
 });

@@ -9,9 +9,14 @@
 #   - ignored files that no build recreates (anything regenerable() does not
 #     list). `git worktree remove` deletes ignored files without asking, and
 #     .gitignore covers the private corpus tiers and the overnight report;
-#   - a held file. The worktree is first renamed aside, which fails cleanly
-#     while any process (a preview server, a shell, an editor) holds a file in
-#     it, where a direct removal would delete part of the tree and then stop.
+#   - a file in use. A direct removal would delete part of the tree and then
+#     stop, and git unregisters the worktree even then. A program or library
+#     running from the tree (the venv's python.exe, a .pyd, a node addon) is
+#     found first: Windows refuses to open such a mapped image for writing,
+#     so every .exe, .dll, .pyd and .node file is opened that way, which
+#     changes nothing. Then the worktree is renamed aside, which fails cleanly
+#     while a process holds any other file open in it (a preview server's
+#     cwd, a shell, an editor).
 # It deletes the branch with `git branch -d`, which refuses unmerged work too,
 # and uses only git's own removal commands: the machine's hooks forbid raw
 # deletes, and git knows which files belong to the worktree.
@@ -114,6 +119,16 @@ $dirty"
   if [ "${#keep[@]}" -gt 0 ]; then
     printf '  %s\n' "${keep[@]}" >&2
     die "$wt holds the ignored files above, which git worktree remove would delete without asking and no build recreates; move them out of the worktree and re-run; nothing was removed"
+  fi
+
+  step "checking that no process runs a program or library from $wt"
+  busy=()
+  while IFS= read -r -d '' image; do
+    { true 3<>"$image"; } 2>/dev/null || busy+=("${image#"$wt"/}")
+  done < <(find "$wt" -type f -writable \( -iname '*.exe' -o -iname '*.dll' -o -iname '*.pyd' -o -iname '*.node' \) -print0)
+  if [ "${#busy[@]}" -gt 0 ]; then
+    printf '  %s\n' "${busy[@]}" >&2
+    die "a process runs or has loaded the files above from $wt (a python, node or preview process started from this worktree); stop it and re-run; nothing was removed"
   fi
 
   step "moving worktree $wt aside to $parked"

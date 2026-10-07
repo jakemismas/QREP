@@ -4,11 +4,12 @@
 # Why: parallel workers must never measure each other's code. The main venv's
 # editable install resolves qrep to the main checkout, a fresh worktree has no
 # node_modules, vendored Pyodide or qrep wheel, and every local Playwright run
-# would otherwise share port 4173 and reuse whatever server already listens
-# there. So each ticket gets its own worktree outside the repo, its own venv
-# installed editable from that worktree and pinned by constraints.txt (with an
-# assertion that qrep really imports from there), its own web toolchain and
-# source-stamped wheel, and its own Playwright port.
+# would otherwise want port 4173. So each ticket gets its own worktree outside
+# the repo, its own venv installed editable from that worktree and pinned by
+# constraints.txt (with an assertion that qrep really imports from there), its
+# own web toolchain and source-stamped wheel, and its own Playwright port. The
+# port goes into .qrep-worker.env as soon as the venv exists, before the long
+# steps, so a run that stops early still leaves its port behind.
 #
 # Usage: scripts/worker_bootstrap.sh <ticket> <branch> [base-ref]
 #   ticket    worktree folder name, for example 105 (letters, digits, . _ -;
@@ -93,7 +94,7 @@ else
 fi
 [ -f "$wt/constraints.txt" ] || die "$wt/constraints.txt is missing: the branch predates the pinned toolchain; merge origin/main into it first"
 
-# 2. Venv, installed editable from the worktree
+# 2. Venv
 venv_python() {
   if [ -x "$wt/.venv/Scripts/python.exe" ]; then echo "$wt/.venv/Scripts/python.exe"
   elif [ -x "$wt/.venv/bin/python" ]; then echo "$wt/.venv/bin/python"
@@ -109,59 +110,8 @@ elif ! "$py" -c "import sys" >/dev/null 2>&1; then
 fi
 py=$(venv_python)
 [ -n "$py" ] || die "no venv interpreter under $wt/.venv"
-step "installing qrep[dev] editable from the worktree, pinned by constraints.txt"
-"$py" -m pip install --disable-pip-version-check --quiet -e "${wt}[dev]" -c "$wt/constraints.txt"
 
-step "asserting qrep imports from the worktree"
-# -I keeps the current directory off sys.path, so only the editable install
-# can satisfy the import.
-(cd "$wt_root" && "$py" -I -c '
-import importlib.metadata
-import os
-import sys
-import tomllib
-
-root = os.path.normcase(os.path.realpath(sys.argv[1]))
-import qrep
-
-found = os.path.normcase(os.path.realpath(qrep.__file__))
-try:
-    inside = os.path.commonpath([root, found]) == root
-except ValueError:
-    inside = False
-if not inside:
-    sys.exit(f"FAIL: qrep imports from {qrep.__file__}, outside the worktree {sys.argv[1]}")
-with open(os.path.join(sys.argv[1], "pyproject.toml"), "rb") as f:
-    wanted = tomllib.load(f)["project"]["version"]
-installed = importlib.metadata.version("qrep")
-if installed != wanted:
-    sys.exit(f"FAIL: installed qrep metadata is {installed}, pyproject says {wanted}")
-print(f"qrep {installed} imports from {qrep.__file__}")
-' "$wt") || die "qrep import assertion failed; this worktree would test the wrong code"
-
-# 3. Web toolchain: npm ci, vendored runtime, fresh stamped wheel
-step "npm ci"
-(cd "$wt/web" && npm ci --no-audit --no-fund) \
-  || die "npm ci failed (on Windows, a running preview server or editor can lock node_modules)"
-
-main_cache="$main_root/web/.vendor-cache"
-if [ "$wt" != "$main_root" ] && [ -d "$main_cache" ]; then
-  # vendor.mjs re-verifies every cached file's sha256 and refetches a
-  # mismatch, so seeding from the main checkout cannot poison the build.
-  mkdir -p "$wt/web/.vendor-cache"
-  for cached in "$main_cache"/*.whl; do
-    [ -f "$cached" ] || continue
-    [ -e "$wt/web/.vendor-cache/$(basename "$cached")" ] || cp "$cached" "$wt/web/.vendor-cache/"
-  done
-fi
-step "vendoring the pinned Pyodide runtime and wheels"
-(cd "$wt/web" && QREP_PYTHON="$py" node scripts/vendor.mjs)
-step "building the qrep wheel from the worktree"
-(cd "$wt/web" && QREP_PYTHON="$py" node scripts/wheel.mjs)
-step "checking wheel freshness against the qrep sources"
-(cd "$wt/web" && node scripts/wheel-hash.mjs)
-
-# 4. Playwright port: stable per ticket, never shared with a sibling worktree
+# 3. Playwright port: stable per ticket, never shared with a sibling worktree
 port_base=4200
 port_span=800
 port=""
@@ -198,6 +148,60 @@ QREP_WORKTREE="$wt"
 QREP_PYTHON="$py"
 QREP_E2E_PORT="$port"
 EOF
+step "Playwright port $port written to $env_file"
+
+# 4. qrep installed editable from the worktree
+step "installing qrep[dev] editable from the worktree, pinned by constraints.txt"
+"$py" -m pip install --disable-pip-version-check --quiet -e "${wt}[dev]" -c "$wt/constraints.txt"
+
+step "asserting qrep imports from the worktree"
+# -I keeps the current directory off sys.path, so only the editable install
+# can satisfy the import.
+(cd "$wt_root" && "$py" -I -c '
+import importlib.metadata
+import os
+import sys
+import tomllib
+
+root = os.path.normcase(os.path.realpath(sys.argv[1]))
+import qrep
+
+found = os.path.normcase(os.path.realpath(qrep.__file__))
+try:
+    inside = os.path.commonpath([root, found]) == root
+except ValueError:
+    inside = False
+if not inside:
+    sys.exit(f"FAIL: qrep imports from {qrep.__file__}, outside the worktree {sys.argv[1]}")
+with open(os.path.join(sys.argv[1], "pyproject.toml"), "rb") as f:
+    wanted = tomllib.load(f)["project"]["version"]
+installed = importlib.metadata.version("qrep")
+if installed != wanted:
+    sys.exit(f"FAIL: installed qrep metadata is {installed}, pyproject says {wanted}")
+print(f"qrep {installed} imports from {qrep.__file__}")
+' "$wt") || die "qrep import assertion failed; this worktree would test the wrong code"
+
+# 5. Web toolchain: npm ci, vendored runtime, fresh stamped wheel
+step "npm ci"
+(cd "$wt/web" && npm ci --no-audit --no-fund) \
+  || die "npm ci failed (on Windows, a running preview server or editor can lock node_modules)"
+
+main_cache="$main_root/web/.vendor-cache"
+if [ "$wt" != "$main_root" ] && [ -d "$main_cache" ]; then
+  # vendor.mjs re-verifies every cached file's sha256 and refetches a
+  # mismatch, so seeding from the main checkout cannot poison the build.
+  mkdir -p "$wt/web/.vendor-cache"
+  for cached in "$main_cache"/*.whl; do
+    [ -f "$cached" ] || continue
+    [ -e "$wt/web/.vendor-cache/$(basename "$cached")" ] || cp "$cached" "$wt/web/.vendor-cache/"
+  done
+fi
+step "vendoring the pinned Pyodide runtime and wheels"
+(cd "$wt/web" && QREP_PYTHON="$py" node scripts/vendor.mjs)
+step "building the qrep wheel from the worktree"
+(cd "$wt/web" && QREP_PYTHON="$py" node scripts/wheel.mjs)
+step "checking wheel freshness against the qrep sources"
+(cd "$wt/web" && node scripts/wheel-hash.mjs)
 
 step "ready"
 echo "  worktree   $wt"

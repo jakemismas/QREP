@@ -1,6 +1,8 @@
 """The CI guards in scripts/: golden_guard (every commit that edits
-tests/golden is a [bless] commit) and corpus_guard (no private-tier paths
-and no unlicensed corpus files, in the tree or anywhere in a change range).
+tests/golden is a [bless] commit, and a merge leaves no golden content that
+no commit wrote) and corpus_guard (no private-tier paths and no unlicensed
+corpus files, in the tree or anywhere in a change range), plus the shape of
+the workflow that runs them.
 
 Expected outcomes come from the rules the scripts enforce (CLAUDE.md's bless
 protocol and the documented corpus contract), never from observed output.
@@ -11,8 +13,10 @@ under Pyodide, which cannot spawn git.
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -204,6 +208,148 @@ def test_a_path_both_tracked_and_added_is_reported_once():
     assert len(corpus_guard.violations([path], None, added=[path])) == 1
 
 
+@pytest.mark.parametrize(
+    "path",
+    [
+        "corpus/patterns/rk_kona_cubic.txt",
+        "corpus/truth/IMG_4461.json",
+        "corpus/eval/results.csv",
+        "corpus/notes/settings.yaml",
+    ],
+)
+def test_text_files_outside_the_annotation_folder_need_a_row(path):
+    # A commercial pattern's text or a private truth file is still content.
+    assert corpus_guard.violations([path], None) == [f"{path}: corpus/manifest.csv is missing"]
+
+
+def test_annotations_markdown_notes_and_the_manifest_need_no_row():
+    tracked = [
+        "corpus/manifest.csv",
+        "corpus/annotations/truth/met-1.json",
+        "corpus/annotations/notes.txt",
+        "corpus/museum/README.md",
+    ]
+    assert corpus_guard.violations(tracked, "file,license\n") == []
+
+
+def test_rows_for_one_file_that_disagree_fail():
+    manifest = "file,license\nimages/a.jpg,not cleared\nimages/a.jpg,CC0-1.0\n"
+    problems = corpus_guard.violations(["corpus/images/a.jpg"], manifest)
+    assert len(problems) == 1
+    assert problems[0].startswith("corpus/images/a.jpg: 2 manifest rows")
+    assert "disagree" in problems[0]
+
+
+def test_identical_duplicate_rows_pass():
+    manifest = "file,license\nimages/a.jpg,CC0-1.0\nimages/a.jpg,CC0-1.0\n"
+    assert corpus_guard.violations(["corpus/images/a.jpg"], manifest) == []
+
+
+def _sha(text: str) -> str:
+    return hashlib.sha256(text.encode()).hexdigest()
+
+
+CONTENT = {"corpus/jake/IMG_1234.jpg": "jake's cc0 photo", "corpus/mom/IMG_1234.jpg": "mom's"}
+
+
+def _digest(path: str) -> str | None:
+    return _sha(CONTENT[path]) if path in CONTENT else None
+
+
+JAKE_SHA = _sha(CONTENT["corpus/jake/IMG_1234.jpg"])
+JAKE_ROW = f"file,license,sha256\nIMG_1234.jpg,CC0-1.0,{JAKE_SHA}\n"
+
+
+def test_a_bare_name_row_licenses_only_the_content_its_sha256_names():
+    manifest = JAKE_ROW
+    assert corpus_guard.violations(["corpus/jake/IMG_1234.jpg"], manifest, digest=_digest) == []
+    problems = corpus_guard.violations(["corpus/mom/IMG_1234.jpg"], manifest, digest=_digest)
+    assert len(problems) == 1
+    assert problems[0].startswith("corpus/mom/IMG_1234.jpg: manifest row 'IMG_1234.jpg'")
+    assert "another file" in problems[0]
+
+
+def test_a_sha256_row_needs_no_unique_name():
+    # Content, not the name, says which file the row means.
+    problems = corpus_guard.violations(sorted(CONTENT), JAKE_ROW, digest=_digest)
+    assert len(problems) == 1
+    assert problems[0].startswith("corpus/mom/IMG_1234.jpg")
+
+
+def test_a_path_row_whose_sha256_differs_from_the_file_fails():
+    manifest = f"file,license,sha256\nmom/IMG_1234.jpg,CC0-1.0,{_sha('other bytes')}\n"
+    problems = corpus_guard.violations(["corpus/mom/IMG_1234.jpg"], manifest, digest=_digest)
+    assert len(problems) == 1
+    assert "update the row" in problems[0]
+
+
+def test_a_malformed_sha256_fails():
+    manifest = "file,license,sha256\nmom/IMG_1234.jpg,CC0-1.0,abc123\n"
+    problems = corpus_guard.violations(["corpus/mom/IMG_1234.jpg"], manifest, digest=_digest)
+    assert len(problems) == 1
+    assert "malformed sha256" in problems[0]
+
+
+def test_an_empty_sha256_cell_keeps_the_name_rule():
+    manifest = "file,license,sha256\na.jpg,CC0-1.0,\n"
+    assert corpus_guard.violations(["corpus/images/a.jpg"], manifest) == []
+
+
+def test_a_removed_file_licensed_by_an_earlier_manifest_passes():
+    tracked = ["corpus/manifest.csv"]
+    history = ["file,license\n", "file,license\nmuseum/a.jpg,CC0-1.0\n"]
+    problems = corpus_guard.violations(
+        tracked, "file,license\n", added=["corpus/museum/a.jpg"], history=history
+    )
+    assert problems == []
+
+
+def test_a_removed_file_is_judged_by_its_newest_row():
+    # Newest first: the license was withdrawn before the file was dropped.
+    history = ["file,license\nmuseum/a.jpg,not cleared\n", "file,license\nmuseum/a.jpg,CC0-1.0\n"]
+    problems = corpus_guard.violations(
+        ["corpus/manifest.csv"], "file,license\n", added=["corpus/museum/a.jpg"], history=history
+    )
+    assert len(problems) == 1
+    assert "not cleared" in problems[0]
+    assert "then removed" in problems[0]
+
+
+def test_a_removed_file_that_no_manifest_named_fails():
+    history = ["file,license\n", None]
+    problems = corpus_guard.violations(
+        ["corpus/manifest.csv"], "file,license\n", added=["corpus/museum/a.jpg"], history=history
+    )
+    assert len(problems) == 1
+    assert "no row in corpus/manifest.csv" in problems[0]
+
+
+def test_a_moved_file_keeps_its_bare_name_row():
+    # The removed old path and the tracked new path share a name; each group
+    # counts names on its own, so neither makes the other ambiguous.
+    tracked = ["corpus/manifest.csv", "corpus/museum/a.jpg"]
+    manifest = "file,license\na.jpg,CC0-1.0\n"
+    assert corpus_guard.violations(tracked, manifest, added=["corpus/incoming/a.jpg"]) == []
+
+
+def test_a_removed_file_skips_rows_that_record_other_content():
+    # A later commit re-encoded the file (a new sha256 row) and then dropped
+    # it; the version that was added matches the older row.
+    content = {"corpus/m/a.jpg": "first encoding"}
+    history = [
+        f"file,license,sha256\nm/a.jpg,CC0-1.0,{_sha('second encoding')}\n",
+        f"file,license,sha256\nm/a.jpg,CC0-1.0,{_sha('first encoding')}\n",
+    ]
+    problems = corpus_guard.violations(
+        ["corpus/manifest.csv"],
+        "file,license,sha256\n",
+        added=["corpus/m/a.jpg"],
+        history=history,
+        digest=lambda path: _sha(content[path]),
+    )
+    assert problems == []
+
+
 # golden_guard rules
 
 
@@ -257,6 +403,50 @@ def test_a_golden_change_no_commit_explains_fails():
 )
 def test_only_a_subject_of_its_own_marks_a_bless(subject, blessed):
     assert golden_guard.is_bless_subject(subject) is blessed
+
+
+@pytest.mark.parametrize(
+    ("message", "blessed"),
+    [
+        ("Re-render top diagram\n\n[bless]\n", True),
+        ("Re-render top diagram\n\nApproved in #91.\n  [bless]  \n", True),
+        ("Re-render top diagram\n\n[bless] approved by Jake\n", False),
+        ("Re-render top diagram\n\nThe golden lands in the next [bless] commit.\n", False),
+        ('Revert "Re-render top diagram [bless]"\n\nThis reverts commit 0123abcd.\n', False),
+    ],
+)
+def test_a_marker_line_of_its_own_also_marks_a_bless(message, blessed):
+    subject = message.splitlines()[0]
+    commit = golden_guard.GoldenCommit("0" * 40, subject, (TOP,), message)
+    assert golden_guard.is_bless(commit) is blessed
+    assert golden_guard.verdict([TOP], [commit])[0] is blessed
+
+
+BLESSED_BLOB = "100644 " + "a" * 40
+MERGED_BLOB = "100644 " + "b" * 40
+
+
+def test_merged_golden_content_that_no_commit_wrote_fails():
+    commit = golden_guard.GoldenCommit(
+        "0" * 40, "Re-render top diagram [bless]", (TOP,), wrote={TOP: BLESSED_BLOB}
+    )
+    ok, message = golden_guard.verdict([TOP], [commit], final={TOP: MERGED_BLOB})
+    assert not ok
+    assert "merge commit" in message
+
+
+def test_merged_golden_content_that_a_bless_commit_wrote_passes():
+    commit = golden_guard.GoldenCommit(
+        "0" * 40, "Re-render top diagram [bless]", (TOP,), wrote={TOP: BLESSED_BLOB}
+    )
+    assert golden_guard.verdict([TOP], [commit], final={TOP: BLESSED_BLOB})[0]
+
+
+def test_a_golden_deletion_by_a_bless_commit_passes():
+    commit = golden_guard.GoldenCommit(
+        "0" * 40, "Retire cut list [bless]", (CUT,), wrote={CUT: None}
+    )
+    assert golden_guard.verdict([CUT], [commit], final={CUT: None})[0]
 
 
 # git-backed runs of the real scripts
@@ -410,6 +600,114 @@ def test_golden_guard_script_reports_git_errors_as_exit_2(repo):
 
 
 @needs_git
+def test_golden_guard_script_accepts_a_marker_line_in_the_body(repo):
+    base = _start_branch(repo)
+    head = _commit(repo, "Re-render cut list\n\n[bless]", {CUT: "a,b,c\n"})
+    result = _run(repo, "golden_guard.py", base, head)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def _bless_then_start_merging_other_work(repo: Path) -> str:
+    """work blesses the cut list, main gains unrelated work, and work starts
+    merging main without committing. Returns main's tip, the base."""
+    _start_branch(repo)
+    _commit(repo, "Re-render cut list [bless]", {CUT: "blessed\n"})
+    _git(repo, "checkout", "-q", "main")
+    base = _commit(repo, "Other work", {"other.txt": "o\n"})
+    _git(repo, "checkout", "-q", "work")
+    _git(repo, "merge", "-q", "--no-ff", "--no-commit", "main")
+    return base
+
+
+@needs_git
+def test_golden_guard_script_fails_a_merge_that_rewrites_a_blessed_golden(repo):
+    base = _bless_then_start_merging_other_work(repo)
+    head = _commit(repo, "Merge main into work", {CUT: "rewritten inside the merge\n"})
+    result = _run(repo, "golden_guard.py", base, head)
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "merge commit" in result.stdout
+
+
+@needs_git
+def test_golden_guard_script_passes_a_merge_that_keeps_the_blessed_golden(repo):
+    base = _bless_then_start_merging_other_work(repo)
+    head = _commit(repo, "Merge main into work")
+    result = _run(repo, "golden_guard.py", base, head)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+@needs_git
+def test_golden_guard_script_fails_two_blesses_merged_as_text(repo):
+    lines = [f"l{i}" for i in range(1, 9)]
+    _commit(repo, "Bless eight lines [bless]", {TOP: "\n".join(lines) + "\n"})
+    _start_branch(repo)
+    _commit(repo, "Branch re-render [bless]", {TOP: "\n".join(["L1", *lines[1:]]) + "\n"})
+    _git(repo, "checkout", "-q", "main")
+    base = _commit(repo, "Upstream re-render [bless]", {TOP: "\n".join([*lines[:-1], "L8"]) + "\n"})
+    _git(repo, "checkout", "-q", "work")
+    _git(repo, "merge", "-q", "--no-ff", "-m", "Merge main into work", "main")
+    head = _git(repo, "rev-parse", "HEAD")
+    # The clean textual merge holds both edits: a file that neither bless wrote.
+    assert (repo / TOP).read_text(encoding="utf-8").splitlines()[::7] == ["L1", "L8"]
+    result = _run(repo, "golden_guard.py", base, head)
+    assert result.returncode == 1, result.stdout + result.stderr
+
+
+@needs_git
+def test_golden_guard_script_fails_a_criss_cross_merge_that_restores_an_old_golden(repo):
+    root = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "checkout", "-q", "-b", "w1")
+    _commit(repo, "w1 work", {"a.txt": "a\n"})
+    _git(repo, "checkout", "-q", "-b", "w2", root)
+    _commit(repo, "Bless the cut list [bless]", {CUT: "blessed\n"})
+    _git(repo, "checkout", "-q", "main")
+    _git(repo, "merge", "-q", "--no-ff", "-m", "Merge w1", "w1")
+    _git(repo, "merge", "-q", "--no-ff", "-m", "Merge w2", "w2")
+    base = _git(repo, "rev-parse", "HEAD")
+    # h starts from w1 and merges w2 but keeps the old cut list, so h and main
+    # have two merge bases and merging h would undo the bless.
+    _git(repo, "checkout", "-q", "-b", "h", "w1")
+    _git(repo, "merge", "-q", "--no-ff", "--no-commit", "w2")
+    _git(repo, "checkout", root, "--", CUT)
+    _commit(repo, "Merge w2 into h")
+    head = _commit(repo, "h work", {"h.txt": "h\n"})
+    assert len(_git(repo, "merge-base", "--all", base, head).split()) == 2
+    result = _run(repo, "golden_guard.py", base, head)
+    assert result.returncode == 1, result.stdout + result.stderr
+
+
+@needs_git
+def test_golden_guard_script_judges_a_stacked_branch_by_its_merge_result(repo):
+    _git(repo, "checkout", "-q", "-b", "w1")
+    _commit(repo, "w1 work", {"w1.txt": "w\n"})
+    _git(repo, "checkout", "-q", "-b", "h")
+    _commit(repo, "h work", {"h.txt": "h\n"})
+    _git(repo, "checkout", "-q", "main")
+    _commit(repo, "Bless the cut list [bless]", {CUT: "blessed\n"})
+    _git(repo, "checkout", "-q", "h")
+    _git(repo, "merge", "-q", "--no-ff", "-m", "Merge main into h", "main")
+    _git(repo, "checkout", "-q", "main")
+    _git(repo, "merge", "-q", "--no-ff", "-m", "Merge w1", "w1")
+    base = _git(repo, "rev-parse", "HEAD")
+    head = _git(repo, "rev-parse", "h")
+    assert len(_git(repo, "merge-base", "--all", base, head).split()) == 2
+    # Merging h now adds only h.txt; the bless is already on main.
+    result = _run(repo, "golden_guard.py", base, head)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+@needs_git
+def test_golden_guard_script_reports_a_head_that_conflicts_with_the_base_as_exit_2(repo):
+    _start_branch(repo)
+    head = _commit(repo, "Re-render cut list [bless]", {CUT: "branch\n"})
+    _git(repo, "checkout", "-q", "main")
+    base = _commit(repo, "Upstream re-render [bless]", {CUT: "upstream\n"})
+    result = _run(repo, "golden_guard.py", base, head)
+    assert result.returncode == 2, result.stdout + result.stderr
+    assert "does not merge cleanly" in result.stderr
+
+
+@needs_git
 def test_corpus_guard_script_fails_on_a_tracked_private_tier(repo):
     assert _run(repo, "corpus_guard.py").returncode == 0
     _commit(repo, "oops", {"corpus/private/shop.jpg": "not really a jpeg\n"})
@@ -447,3 +745,115 @@ def test_corpus_guard_script_checks_its_own_checkout_from_anywhere(repo, tmp_pat
 @needs_git
 def test_corpus_guard_script_rejects_unknown_arguments(repo):
     assert _run(repo, "corpus_guard.py", "--range", "HEAD").returncode == 2
+
+
+@needs_git
+def test_corpus_guard_range_catches_a_private_file_added_inside_a_merge(repo):
+    _start_branch(repo)
+    _commit(repo, "Work", {"w.txt": "w\n"})
+    _git(repo, "checkout", "-q", "main")
+    base = _commit(repo, "Other work", {"other.txt": "o\n"})
+    _git(repo, "checkout", "-q", "work")
+    _git(repo, "merge", "-q", "--no-ff", "--no-commit", "main")
+    _commit(repo, "Merge main into work", {"local-photos/IMG_4461.png": "not really a png\n"})
+    _git(repo, "rm", "-q", "local-photos/IMG_4461.png")
+    head = _commit(repo, "Remove the stray photo")
+    result = _run(repo, "corpus_guard.py", "--range", base, head)
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "local-photos/IMG_4461.png" in result.stdout
+
+
+@needs_git
+def test_corpus_guard_range_passes_licensed_images_that_were_moved_or_dropped(repo):
+    base = _start_branch(repo)
+    _commit(
+        repo,
+        "Add two museum images (CC0)",
+        {
+            "corpus/manifest.csv": "file,license\nmet-1.jpg,CC0-1.0\nmet-2.jpg,CC0-1.0\n",
+            "corpus/met-1.jpg": "one\n",
+            "corpus/met-2.jpg": "two\n",
+        },
+    )
+    (repo / "corpus" / "museum").mkdir()
+    _git(repo, "mv", "corpus/met-1.jpg", "corpus/museum/met-1.jpg")
+    _git(repo, "rm", "-q", "corpus/met-2.jpg")
+    head = _commit(
+        repo,
+        "Move met-1 into the museum tier; drop met-2 and its row",
+        {"corpus/manifest.csv": "file,license\nmet-1.jpg,CC0-1.0\n"},
+    )
+    result = _run(repo, "corpus_guard.py", "--range", base, head)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+@needs_git
+def test_corpus_guard_range_reads_rows_from_the_range_history(repo):
+    base = _start_branch(repo)
+    manifest = "corpus/manifest.csv"
+    _commit(repo, "Add a, row next", {manifest: "file,license\n", "corpus/museum/a.jpg": "a\n"})
+    _commit(repo, "Record a's license", {manifest: "file,license\nmuseum/a.jpg,CC0-1.0\n"})
+    _git(repo, "rm", "-q", "corpus/museum/a.jpg")
+    head = _commit(repo, "Drop a and its row", {manifest: "file,license\n"})
+    passed = _run(repo, "corpus_guard.py", "--range", base, head)
+    assert passed.returncode == 0, passed.stdout + passed.stderr
+
+    b_row = "file,license\nmuseum/b.jpg,CC0-1.0\n"
+    _commit(repo, "Add b (CC0)", {manifest: b_row, "corpus/museum/b.jpg": "b\n"})
+    _commit(repo, "Rights unclear after all", {manifest: b_row.replace("CC0-1.0", "not cleared")})
+    _git(repo, "rm", "-q", "corpus/museum/b.jpg")
+    head = _commit(repo, "Drop b and its row", {manifest: "file,license\n"})
+    failed = _run(repo, "corpus_guard.py", "--range", base, head)
+    assert failed.returncode == 1, failed.stdout + failed.stderr
+    assert "corpus/museum/b.jpg" in failed.stdout
+    assert "not cleared" in failed.stdout
+
+
+@needs_git
+def test_corpus_guard_range_judges_the_heads_tree_not_the_index(repo):
+    # CI never checks out the pull request: the checkout stays on main, whose
+    # manifest still licenses the image that the pull request un-licenses.
+    manifest = "corpus/manifest.csv"
+    _commit(repo, "Add a licensed image", {manifest: LICENSED, "corpus/images/a.jpg": "a\n"})
+    base = _start_branch(repo)
+    head = _commit(repo, "Rights unclear", {manifest: LICENSED.replace("CC0-1.0", "UNVERIFIED")})
+    _git(repo, "checkout", "-q", "main")
+    assert _run(repo, "corpus_guard.py").returncode == 0
+    result = _run(repo, "corpus_guard.py", "--range", base, head)
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "UNVERIFIED" in result.stdout
+
+
+# The guard workflow itself
+
+WORKFLOWS = Path(__file__).resolve().parents[1] / ".github" / "workflows"
+
+
+def _top_level_block(text: str, key: str) -> list[str]:
+    lines = text.splitlines()
+    start = lines.index(f"{key}:")
+    block = []
+    for line in lines[start + 1 :]:
+        if line and not line.startswith((" ", "#")):
+            break
+        block.append(line)
+    return block
+
+
+def test_the_guards_run_main_copies_and_treat_the_pull_request_as_data():
+    text = (WORKFLOWS / "guards.yml").read_text(encoding="utf-8")
+    triggers = [line.strip() for line in _top_level_block(text, "on")]
+    assert "pull_request_target:" in triggers
+    # pull_request would run the PR's own workflow copy; a dispatch could run
+    # a branch's copy and replace a failing check on that branch's tip.
+    assert not any(t.startswith(("pull_request:", "workflow_dispatch")) for t in triggers)
+    # No checkout of the PR and nothing installed from it.
+    assert not re.search(r"^\s*ref:", text, re.MULTILINE)
+    assert not re.search(r"setup-python|setup-node|pip install|npm ", text)
+    assert "python3 scripts/golden_guard.py" in text
+    assert "python3 scripts/corpus_guard.py --range" in text
+    # A required check matches by name, so no other workflow may reuse one.
+    for path in WORKFLOWS.glob("*.yml"):
+        if path.name != "guards.yml":
+            other = path.read_text(encoding="utf-8")
+            assert "golden-guard" not in other and "corpus-guard" not in other, path.name

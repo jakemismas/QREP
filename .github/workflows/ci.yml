@@ -2,7 +2,9 @@ name: CI
 
 # Job names are the required status checks on main; keep them stable. No job
 # may get a path filter: a required check that never runs stays pending and
-# blocks every merge.
+# blocks every merge. The golden and corpus guards live in guards.yml, which
+# runs main's copy of them so that a pull request cannot switch its own guard
+# off; the test job still runs their unit tests here.
 on:
   push:
     branches: [main]
@@ -159,58 +161,3 @@ jobs:
         run: node scripts/pytest-pyodide.mjs
         working-directory: web
 
-  golden-guard:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: tests/golden changes only through a [bless] commit
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          PR_BASE: ${{ github.event.pull_request.base.sha }}
-          PR_HEAD: ${{ github.event.pull_request.head.sha }}
-          PUSH_BEFORE: ${{ github.event.before }}
-        run: |
-          case "$EVENT_NAME" in
-            pull_request)
-              python3 scripts/golden_guard.py "$PR_BASE" "$PR_HEAD" ;;
-            push)
-              if [ -z "$PUSH_BEFORE" ] || [ "$PUSH_BEFORE" = "0000000000000000000000000000000000000000" ]; then
-                echo "golden_guard: no earlier commit to compare (new ref); nothing to check"
-              else
-                python3 scripts/golden_guard.py "$PUSH_BEFORE" "$GITHUB_SHA"
-              fi ;;
-            *)
-              echo "golden_guard: $EVENT_NAME has no change range; nothing to check" ;;
-          esac
-
-  corpus-guard:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      # A file added and then removed inside a PR is gone from the tree but
-      # stays in main's history after the merge, so the range is checked too.
-      - name: No private-tier or unlicensed corpus files in the tree or the change range
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          PR_BASE: ${{ github.event.pull_request.base.sha }}
-          PR_HEAD: ${{ github.event.pull_request.head.sha }}
-          PUSH_BEFORE: ${{ github.event.before }}
-        run: |
-          case "$EVENT_NAME" in
-            pull_request)
-              python3 scripts/corpus_guard.py --range "$PR_BASE" "$PR_HEAD" ;;
-            push)
-              if [ -z "$PUSH_BEFORE" ] || [ "$PUSH_BEFORE" = "0000000000000000000000000000000000000000" ]; then
-                python3 scripts/corpus_guard.py
-              else
-                python3 scripts/corpus_guard.py --range "$PUSH_BEFORE" "$GITHUB_SHA"
-              fi ;;
-            *)
-              python3 scripts/corpus_guard.py ;;
-          esac
