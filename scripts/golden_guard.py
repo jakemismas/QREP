@@ -50,12 +50,16 @@ BLESS_MARKER = "[bless]"
 # git's own subjects for undoing or redoing a commit quote the original one.
 REWRAP_PREFIXES = ('Revert "', 'Reapply "')
 # git revert --reference names the undone commit as "<short sha> (<subject>,
-# <date>)", and a merge revert names the mainline parent the same way after
-# "changes made to". Without --edit the reference is in the body; with --edit
-# and an untouched message, cleanup drops git's '#' title and the reference
-# becomes the subject. The match runs to the last ")" on its line, so an undone
-# subject that holds its own parentheses goes with it.
-REVERT_REFERENCE = re.compile(r"(?:This reverts commit|changes made to) [0-9a-f]{4,} \(.*\)")
+# <date>)", always with a short date, and a merge revert names the mainline
+# parent the same way after ", reversing changes made to". Without --edit the
+# reference is in the body; with --edit and an untouched message, cleanup drops
+# git's '#' title and the reference becomes the subject. The match runs to the
+# last such date in its paragraph, so it takes an undone subject that holds its
+# own parentheses and a merge revert's second reference, and it stops at git's
+# closing date, so a marker the revert adds after it still counts.
+REVERT_REFERENCE = re.compile(
+    r"This\s+reverts\s+commit\s+[0-9a-f]{4,}\s+\(.*,\s+\d{4}-\d{2}-\d{2}\)"
+)
 
 
 @dataclass(frozen=True)
@@ -77,7 +81,18 @@ def is_bless_subject(subject: str) -> bool:
         # marker outside the quotes makes this commit a bless.
         opening, closing = text.find('"'), text.rfind('"')
         text = text[closing + 1 :] if closing > opening else ""
-    return BLESS_MARKER in REVERT_REFERENCE.sub("", text)
+    return BLESS_MARKER in without_revert_references(text)
+
+
+def without_revert_references(text: str) -> str:
+    """The text with git's revert references cut out, one paragraph at a time.
+
+    An editor may wrap a reference across lines (git's %s rejoins a wrapped
+    subject the same way), so each paragraph's lines are joined first. A space
+    stands in for each reference, so the text around it cannot join into a marker.
+    """
+    paragraphs = text.replace("\r\n", "\n").split("\n\n")
+    return "\n\n".join(REVERT_REFERENCE.sub(" ", " ".join(p.split("\n"))) for p in paragraphs)
 
 
 def message_body(message: str) -> str:
@@ -87,7 +102,7 @@ def message_body(message: str) -> str:
 
 
 def is_bless(commit: GoldenCommit) -> bool:
-    body = REVERT_REFERENCE.sub("", message_body(commit.message))
+    body = without_revert_references(message_body(commit.message))
     return is_bless_subject(commit.subject) or BLESS_MARKER in body
 
 
