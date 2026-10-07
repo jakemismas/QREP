@@ -5,27 +5,30 @@ photo, a commercial pattern or a private truth file stays public for good.
 This check fails when:
   - a tracked path sits in a private tier: any `local-photos/` folder, or any
     folder named `private` under `corpus/` (for example `corpus/private/`);
-  - a tracked file under `corpus/` has no row in `corpus/manifest.csv`, or its
-    row's license is not one this repo accepts (ALLOWED_LICENSES). The rule
-    denies by default: any file type in any folder needs a row, an image
-    under corpus/annotations/ and a Markdown file under corpus/patterns/
-    included. Only these need none: the manifest itself, corpus/README.md,
-    corpus/ATTRIBUTION.md, .gitkeep files, and QREP's own structured data
-    (.json files under corpus/annotations/, corpus/schema/ or corpus/gold/,
-    and corpus/holdout.json). All of them but the manifest must be UTF-8
-    text without NUL bytes, so an image cannot pass under such a name.
-Rows name a file by its path relative to `corpus/` in the `file` column; a
-bare file name also matches a file in a subfolder while no other checked file
-shares the name. A row can also bind content. Its `sha256` is the source
-image's hash (fetch verification and the holdout rule read it), and a
-committed file must match the row's `file_sha256` when the row fills it, else
-its `sha256`. A downsized or re-encoded copy therefore keeps the source's
-sha256 and records its own hash in file_sha256. A row that binds content
-licenses only those bytes, so a bare name cannot license a different photo
-that happens to share it (phone names such as IMG_1234.jpg repeat). Rows for
-one file that disagree fail too. Folder names compare without case: on
-Windows checkouts Corpus/ and corpus/ are one folder. It passes trivially
-while nothing under `corpus/` is tracked.
+  - a tracked file under `corpus/` has no row in `corpus/manifest.csv`, its
+    row's license is not one this repo accepts (ALLOWED_LICENSES), or its row
+    does not bind the file's bytes (below). The rule denies by default: any
+    file type in any folder needs a row, an image under corpus/annotations/
+    and a Markdown file under corpus/patterns/ included. Only these need
+    none: the manifest itself, corpus/README.md, corpus/ATTRIBUTION.md,
+    .gitkeep files, and QREP's own structured data (.json files under
+    corpus/annotations/, corpus/schema/ or corpus/gold/, and
+    corpus/holdout.json). All of them but the manifest must be UTF-8 text
+    without NUL bytes, so an image cannot pass under such a name.
+Rows name a file by its path relative to `corpus/` in the `file` column, or
+by its bare file name. A row licenses only the bytes it binds. Its `sha256`
+is the source image's hash (fetch verification and the holdout rule read it)
+and every row that licenses a committed file needs one; the committed bytes
+must match the row's `file_sha256` when the row fills it, else its `sha256`.
+A downsized or re-encoded copy therefore keeps the source's sha256 and
+records its own hash in file_sha256. A row without a sha256 licenses nothing:
+a license that names only a path would cover whatever bytes sit there,
+including a swapped-in photo and one that a later commit swapped out again,
+and a bare name would cover a different photo that happens to share it
+(phone names such as IMG_1234.jpg repeat). Rows for one file that disagree
+fail too. Folder names compare without case: on Windows checkouts Corpus/
+and corpus/ are one folder. It passes trivially while nothing under
+`corpus/` is tracked.
 
 Usage (from any folder; the script checks the checkout it lives in):
     python scripts/corpus_guard.py                             # the index: stage first
@@ -39,8 +42,10 @@ replaced or removed it: merging keeps those commits in main's history, so a
 fix-forward commit does not undo a leak. Such an earlier version passes when
 its bytes equal a licensed file of the merge result (a move or a copy), or
 when the newest manifest row that names it licenses it (the merge result's
-manifest, then each earlier manifest of the range, then <base>'s), so a
-licensed image may still be moved, re-encoded or dropped.
+manifest, then each earlier manifest of the range, then <base>'s; a row that
+binds other bytes defers to older manifests), so a licensed image may still
+be moved, re-encoded or dropped while each of its versions had a row that
+bound its bytes.
 Exit codes: 0 pass, 1 violations, 2 usage or git error (for example git older
 than 2.38, or a <head> that conflicts with <base>, which leaves no merge
 result to judge).
@@ -55,7 +60,6 @@ import posixpath
 import re
 import subprocess
 import sys
-from collections import Counter
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -82,8 +86,12 @@ POLICY = (
     "Private photos and truth files stay local (corpus/private/, local-photos/); only files "
     f"licensed {' or '.join(ALLOWED_LICENSES)} in {MANIFEST} are committed. If a listed file "
     "really is licensed that way and only its row is missing or wrong (no row, a license "
-    "note, a downsized copy without file_sha256), fix the row. When bytes do not match a "
-    "row, never change the row's sha256 to theirs: sha256 is the source image's hash."
+    "note, no sha256, a downsized copy without file_sha256), fix the row. When bytes do not "
+    "match a row, never change the row's sha256 to theirs: sha256 is the source image's hash."
+)
+UNBOUND = (
+    "records no sha256, so it licenses no particular bytes; a row needs its source image's "
+    "sha256, and a downsized or re-encoded copy also needs its own hash in file_sha256"
 )
 INDEX_HINT = POLICY + (
     " Otherwise unstage the file (git restore --staged <path>) and keep it in a private tier. "
@@ -103,11 +111,11 @@ RANGE_HINT = POLICY + (
 @dataclass(frozen=True)
 class Row:
     license: str
-    sha256: str = ""  # the source image's hash, lowercase hex, or ""
+    sha256: str = ""  # the source image's hash, lowercase hex, or "" (licenses nothing)
     file_sha256: str = ""  # the committed copy's own hash when it differs, or ""
 
     def bound(self) -> tuple[str, str]:
-        """The column, and the hash, that committed bytes must match ("" binds nothing)."""
+        """The column, and the hash, that committed bytes must match."""
         return ("file_sha256", self.file_sha256) if self.file_sha256 else ("sha256", self.sha256)
 
 
@@ -242,12 +250,7 @@ def _mismatch(key: str, column: str, expected: str, actual: str, by_name: bool) 
     )
 
 
-def _lookup(
-    path: str,
-    rows: Rows,
-    name_is_unique: bool,
-    content_sha: Callable[[], str | None],
-) -> Lookup:
+def _lookup(path: str, rows: Rows, content_sha: Callable[[], str | None]) -> Lookup:
     relative, name = _corpus_relative(path), posixpath.basename(path)
     key = relative if relative in rows else name
     if key not in rows:
@@ -257,21 +260,18 @@ def _lookup(
         listed = "; ".join(_describe(r) for r in candidates)
         return Lookup(problem=f"{len(rows[key])} manifest rows for '{key}' disagree ({listed})")
     row = candidates[0]
-    by_name = key != relative
     for column, value in (("sha256", row.sha256), ("file_sha256", row.file_sha256)):
         if value and not SHA256_HEX.fullmatch(value):
             return Lookup(problem=f"manifest row '{key}' has a malformed {column} '{value}'")
+    if not row.sha256:
+        return Lookup(problem=f"manifest row '{key}' {UNBOUND}")
     column, expected = row.bound()
-    if expected:
-        actual = content_sha()
-        if actual is None:
-            return Lookup(problem=f"cannot read the file to check the {column} in row '{key}'")
-        if actual != expected:
-            problem = _mismatch(key, column, expected, actual, by_name)
-            return Lookup(problem=problem, other_content=True)
-        return Lookup(row=row)
-    if by_name and not name_is_unique:
-        return Lookup(problem=f"manifest row '{name}' is ambiguous; name the file as {relative}")
+    actual = content_sha()
+    if actual is None:
+        return Lookup(problem=f"cannot read the file to check the {column} in row '{key}'")
+    if actual != expected:
+        problem = _mismatch(key, column, expected, actual, key != relative)
+        return Lookup(problem=problem, other_content=True)
     return Lookup(row=row)
 
 
@@ -359,14 +359,12 @@ def violations(
             return problems + [f"{MANIFEST}: missing required column(s) {', '.join(missing)}"]
         current = parse_manifest(manifest_text)
 
-    tracked_names = Counter(posixpath.basename(path) for path in files)
     licensed: list[str] = []
     for path in files:
         if current is None:
             problems.append(f"{path}: {MANIFEST} is missing")
             continue
-        unique = tracked_names[posixpath.basename(path)] == 1
-        found = _lookup(path, current, unique, lambda key=keys[path]: sha(key))
+        found = _lookup(path, current, lambda key=keys[path]: sha(key))
         problem = found.problem
         if problem is None and found.row is None:
             problem = f"no row in {MANIFEST}"
@@ -379,28 +377,20 @@ def violations(
         else:
             licensed.append(path)
 
-    # An earlier version may borrow a bare-name row only while no other path in
-    # the tree or the range shares the name: a removed shop capture must not
-    # pass on the row of a tracked photo with the same phone file name.
-    all_names = Counter(posixpath.basename(p) for p in {*files, *(v.path for v in gone)})
     row_sets = [current] if current is not None else []
     row_sets += [rows for rows in (parse_manifest(t) for t in history if t is not None) if rows]
     for version in gone:
         actual = sha(version.key)
         if actual is not None and any(sha(keys[path]) == actual for path in licensed):
             continue  # the same bytes as a licensed file of the tree: a move or a copy
-        unique = all_names[posixpath.basename(version.path)] == 1
-        problem = _version_problem(version, row_sets, unique, sha)
+        problem = _version_problem(version, row_sets, sha)
         if problem:
             problems.append(problem)
     return problems
 
 
 def _version_problem(
-    version: Version,
-    row_sets: list[Rows],
-    name_is_unique: bool,
-    sha: Callable[[str], str | None],
+    version: Version, row_sets: list[Rows], sha: Callable[[str], str | None]
 ) -> str | None:
     # row_sets runs newest first, and the newest manifest whose rows name the
     # file decides. A row that binds other content (say the version a later
@@ -408,7 +398,7 @@ def _version_problem(
     label = _label(version)
     mismatch = None
     for rows in row_sets:
-        found = _lookup(version.path, rows, name_is_unique, lambda: sha(version.key))
+        found = _lookup(version.path, rows, lambda: sha(version.key))
         if found.row is not None:
             return _license_problem(version.path, label, found.row.license)
         if found.other_content:

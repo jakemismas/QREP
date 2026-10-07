@@ -45,7 +45,18 @@ needs_git = pytest.mark.skipif(
     reason="needs a git executable and subprocesses",
 )
 
-LICENSED = "file,source,license\nimages/a.jpg,met,CC0-1.0\n"
+
+def _sha(text: str) -> str:
+    return hashlib.sha256(text.encode()).hexdigest()
+
+
+def _stand_in(key: str) -> str:
+    """The sha256 of the bytes that a unit test's file holds; each key stands for its own."""
+    return _sha(f"bytes of {key}")
+
+
+A_SHA = _stand_in("corpus/images/a.jpg")
+LICENSED = f"file,source,license,sha256\nimages/a.jpg,met,CC0-1.0,{A_SHA}\n"
 TOP = "tests/golden/top.svg"
 CUT = "tests/golden/cut.csv"
 
@@ -79,23 +90,24 @@ def test_a_file_merely_named_private_is_not_a_tier():
 
 def test_licensed_corpus_image_passes():
     tracked = ["corpus/manifest.csv", "corpus/images/a.jpg"]
-    assert corpus_guard.violations(tracked, LICENSED) == []
+    assert corpus_guard.violations(tracked, LICENSED, digest=_stand_in) == []
 
 
 def test_corpus_image_without_a_row_fails():
     tracked = ["corpus/manifest.csv", "corpus/images/a.jpg", "corpus/images/b.png"]
-    problems = corpus_guard.violations(tracked, LICENSED)
+    problems = corpus_guard.violations(tracked, LICENSED, digest=_stand_in)
     assert problems == ["corpus/images/b.png: no row in corpus/manifest.csv"]
 
 
 def test_uppercase_extension_still_counts_as_an_image():
     tracked = ["corpus/manifest.csv", "corpus/images/a.jpg", "corpus/images/C.JPG"]
-    assert len(corpus_guard.violations(tracked, LICENSED)) == 1
+    assert len(corpus_guard.violations(tracked, LICENSED, digest=_stand_in)) == 1
 
 
 def test_empty_license_fails():
-    manifest = "file,license\nimages/a.jpg,   \n"
-    problems = corpus_guard.violations(["corpus/manifest.csv", "corpus/images/a.jpg"], manifest)
+    manifest = f"file,license,sha256\nimages/a.jpg,   ,{A_SHA}\n"
+    tracked = ["corpus/manifest.csv", "corpus/images/a.jpg"]
+    problems = corpus_guard.violations(tracked, manifest, digest=_stand_in)
     assert problems == ["corpus/images/a.jpg: manifest row has an empty license"]
 
 
@@ -111,8 +123,9 @@ def test_empty_license_fails():
     ],
 )
 def test_a_license_outside_the_allowlist_fails(license_text):
-    manifest = f"file,license\nimages/a.jpg,{license_text}\n"
-    problems = corpus_guard.violations(["corpus/manifest.csv", "corpus/images/a.jpg"], manifest)
+    manifest = f"file,license,sha256\nimages/a.jpg,{license_text},{A_SHA}\n"
+    tracked = ["corpus/manifest.csv", "corpus/images/a.jpg"]
+    problems = corpus_guard.violations(tracked, manifest, digest=_stand_in)
     assert len(problems) == 1
     assert "corpus/images/a.jpg" in problems[0]
     assert "is not one of" in problems[0]
@@ -120,8 +133,8 @@ def test_a_license_outside_the_allowlist_fails(license_text):
 
 @pytest.mark.parametrize("license_text", ["CC0-1.0", "cc0-1.0", "PDM-1.0", " CC0-1.0 "])
 def test_allowlisted_licenses_pass_in_any_case(license_text):
-    manifest = f"file,license\nimages/a.jpg,{license_text}\n"
-    assert corpus_guard.violations(["corpus/images/a.jpg"], manifest) == []
+    manifest = f"file,license,sha256\nimages/a.jpg,{license_text},{A_SHA}\n"
+    assert corpus_guard.violations(["corpus/images/a.jpg"], manifest, digest=_stand_in) == []
 
 
 def test_missing_manifest_fails_every_image():
@@ -137,21 +150,23 @@ def test_manifest_without_license_column_fails():
     assert problems == ["corpus/manifest.csv: missing required column(s) license"]
 
 
-def test_bare_file_name_matches_while_unique():
-    manifest = "file,license\na.jpg,CC0-1.0\n"
-    assert corpus_guard.violations(["corpus/images/a.jpg"], manifest) == []
+def test_a_bare_file_name_row_matches_a_file_in_a_subfolder():
+    manifest = f"file,license,sha256\na.jpg,CC0-1.0,{A_SHA}\n"
+    assert corpus_guard.violations(["corpus/images/a.jpg"], manifest, digest=_stand_in) == []
 
 
-def test_bare_file_name_shared_by_two_images_is_ambiguous():
-    manifest = "file,license\na.jpg,CC0-1.0\n"
-    problems = corpus_guard.violations(["corpus/sq/a.jpg", "corpus/neg/a.jpg"], manifest)
-    assert len(problems) == 2
-    assert all("ambiguous" in p for p in problems)
+def test_a_bare_file_name_row_licenses_only_the_namesake_it_binds():
+    manifest = f"file,license,sha256\na.jpg,CC0-1.0,{_stand_in('corpus/sq/a.jpg')}\n"
+    tracked = ["corpus/sq/a.jpg", "corpus/neg/a.jpg"]
+    problems = corpus_guard.violations(tracked, manifest, digest=_stand_in)
+    assert len(problems) == 1
+    assert problems[0].startswith("corpus/neg/a.jpg: manifest row 'a.jpg'")
+    assert "another file" in problems[0]
 
 
 def test_row_paths_tolerate_backslashes_and_a_corpus_prefix():
-    manifest = "file,license\ncorpus\\images\\a.jpg,CC0-1.0\n"
-    assert corpus_guard.violations(["corpus/images/a.jpg"], manifest) == []
+    manifest = f"file,license,sha256\ncorpus\\images\\a.jpg,CC0-1.0,{A_SHA}\n"
+    assert corpus_guard.violations(["corpus/images/a.jpg"], manifest, digest=_stand_in) == []
 
 
 def test_non_image_corpus_files_need_no_row():
@@ -166,7 +181,8 @@ def test_a_capitalized_corpus_folder_is_still_the_corpus():
     # Windows checkouts treat Corpus/ and corpus/ as the same folder.
     problems = corpus_guard.violations(["Corpus/images/shop.jpg"], None)
     assert problems == ["Corpus/images/shop.jpg: corpus/manifest.csv is missing"]
-    assert corpus_guard.violations(["Corpus/images/a.jpg"], LICENSED) == []
+    manifest = f"file,license,sha256\nimages/a.jpg,CC0-1.0,{_stand_in('Corpus/images/a.jpg')}\n"
+    assert corpus_guard.violations(["Corpus/images/a.jpg"], manifest, digest=_stand_in) == []
 
 
 @pytest.mark.parametrize(
@@ -195,7 +211,8 @@ def test_a_private_path_committed_and_removed_in_the_range_fails():
 
 def test_an_unlicensed_file_committed_and_removed_in_the_range_fails():
     tracked = ["corpus/manifest.csv", "corpus/images/a.jpg"]
-    problems = corpus_guard.violations(tracked, LICENSED, added=["corpus/images/b.png"])
+    added = ["corpus/images/b.png"]
+    problems = corpus_guard.violations(tracked, LICENSED, added, digest=_stand_in)
     assert len(problems) == 1
     assert problems[0].startswith("corpus/images/b.png")
     assert "no row in corpus/manifest.csv" in problems[0]
@@ -203,7 +220,8 @@ def test_an_unlicensed_file_committed_and_removed_in_the_range_fails():
 
 def test_a_licensed_file_committed_and_removed_in_the_range_passes():
     tracked = ["corpus/manifest.csv"]
-    assert corpus_guard.violations(tracked, LICENSED, added=["corpus/images/a.jpg"]) == []
+    added = ["corpus/images/a.jpg"]
+    assert corpus_guard.violations(tracked, LICENSED, added, digest=_stand_in) == []
 
 
 def test_a_path_both_tracked_and_added_is_reported_once():
@@ -279,12 +297,9 @@ def test_rows_for_one_file_that_disagree_fail():
 
 
 def test_identical_duplicate_rows_pass():
-    manifest = "file,license\nimages/a.jpg,CC0-1.0\nimages/a.jpg,CC0-1.0\n"
-    assert corpus_guard.violations(["corpus/images/a.jpg"], manifest) == []
-
-
-def _sha(text: str) -> str:
-    return hashlib.sha256(text.encode()).hexdigest()
+    row = f"images/a.jpg,CC0-1.0,{A_SHA}\n"
+    manifest = f"file,license,sha256\n{row}{row}"
+    assert corpus_guard.violations(["corpus/images/a.jpg"], manifest, digest=_stand_in) == []
 
 
 CONTENT = {"corpus/jake/IMG_1234.jpg": "jake's cc0 photo", "corpus/mom/IMG_1234.jpg": "mom's"}
@@ -369,25 +384,59 @@ def test_a_malformed_sha256_fails():
     assert "malformed sha256" in problems[0]
 
 
-def test_an_empty_sha256_cell_keeps_the_name_rule():
-    manifest = "file,license,sha256\na.jpg,CC0-1.0,\n"
-    assert corpus_guard.violations(["corpus/images/a.jpg"], manifest) == []
+D3A_HEADER = (
+    "file,license,source,object_id,title,landing_url,image_url,rights_flag,policy_url,credit,"
+    "dimensions_text,finished_in,sha256,file_sha256,px_w,px_h,tier,class,capture,commit_ok"
+)
+D3A_ROW_WITHOUT_HASHES = "images/a.jpg,CC0-1.0,met,1,t,l,i,yes,p,c,d,f,,,800,600,A,sq,museum,yes"
+
+
+@pytest.mark.parametrize(
+    ("manifest", "key"),
+    [
+        ("file,license\nimages/a.jpg,CC0-1.0\n", "images/a.jpg"),
+        ("file,license,sha256\nimages/a.jpg,CC0-1.0,\n", "images/a.jpg"),
+        ("file,license,sha256\na.jpg,CC0-1.0,\n", "a.jpg"),
+        (f"file,license,sha256,file_sha256\nimages/a.jpg,CC0-1.0,,{A_SHA}\n", "images/a.jpg"),
+        (f"{D3A_HEADER}\n{D3A_ROW_WITHOUT_HASHES}\n", "images/a.jpg"),
+    ],
+    ids=["no-column", "empty-cell", "bare-name", "file-sha256-only", "d3a-header"],
+)
+def test_a_row_without_sha256_licenses_nothing(manifest, key):
+    # A license that names only a path covers whatever bytes sit there, a
+    # swapped-in photo included; D3a's manifest records sha256 on every row.
+    tracked = ["corpus/manifest.csv", "corpus/images/a.jpg"]
+    problems = corpus_guard.violations(tracked, manifest, digest=_stand_in)
+    assert problems == [f"corpus/images/a.jpg: manifest row '{key}' {corpus_guard.UNBOUND}"]
 
 
 def test_a_removed_file_licensed_by_an_earlier_manifest_passes():
     tracked = ["corpus/manifest.csv"]
-    history = ["file,license\n", "file,license\nmuseum/a.jpg,CC0-1.0\n"]
+    row = f"museum/a.jpg,CC0-1.0,{_stand_in('corpus/museum/a.jpg')}\n"
+    history = ["file,license,sha256\n", f"file,license,sha256\n{row}"]
     problems = corpus_guard.violations(
-        tracked, "file,license\n", added=["corpus/museum/a.jpg"], history=history
+        tracked,
+        "file,license,sha256\n",
+        added=["corpus/museum/a.jpg"],
+        history=history,
+        digest=_stand_in,
     )
     assert problems == []
 
 
 def test_a_removed_file_is_judged_by_its_newest_row():
     # Newest first: the license was withdrawn before the file was dropped.
-    history = ["file,license\nmuseum/a.jpg,not cleared\n", "file,license\nmuseum/a.jpg,CC0-1.0\n"]
+    a_sha = _stand_in("corpus/museum/a.jpg")
+    history = [
+        f"file,license,sha256\nmuseum/a.jpg,not cleared,{a_sha}\n",
+        f"file,license,sha256\nmuseum/a.jpg,CC0-1.0,{a_sha}\n",
+    ]
     problems = corpus_guard.violations(
-        ["corpus/manifest.csv"], "file,license\n", added=["corpus/museum/a.jpg"], history=history
+        ["corpus/manifest.csv"],
+        "file,license,sha256\n",
+        added=["corpus/museum/a.jpg"],
+        history=history,
+        digest=_stand_in,
     )
     assert len(problems) == 1
     assert "not cleared" in problems[0]
@@ -405,9 +454,9 @@ def test_a_removed_file_that_no_manifest_named_fails():
 
 def test_a_moved_file_keeps_its_bare_name_row():
     # The removed old path holds the same bytes as the tracked new path, so it
-    # is the licensed file, moved; the shared name makes nothing ambiguous.
+    # is the licensed file, moved.
     tracked = ["corpus/manifest.csv", "corpus/museum/a.jpg"]
-    manifest = "file,license\na.jpg,CC0-1.0\n"
+    manifest = f"file,license,sha256\na.jpg,CC0-1.0,{_sha('a')}\n"
     problems = corpus_guard.violations(
         tracked, manifest, added=["corpus/incoming/a.jpg"], digest=lambda path: _sha("a")
     )
@@ -420,14 +469,15 @@ Version = corpus_guard.Version
 def test_a_removed_file_cannot_borrow_a_tracked_namesakes_bare_name_row():
     # Phone names repeat: a shop capture added and removed in the range must
     # not pass on the row of Jake's tracked photo with the same name.
+    jake = _sha("jake's photo")
     tracked = {"corpus/manifest.csv": "m", "corpus/jake/IMG_1234.jpg": "jake"}
-    manifest = "file,license\nIMG_1234.jpg,CC0-1.0\n"
+    manifest = f"file,license,sha256\nIMG_1234.jpg,CC0-1.0,{jake}\n"
     added = [Version("corpus/shop/IMG_1234.jpg", "shop", "c1")]
-    digest = {"jake": _sha("jake's photo"), "shop": _sha("shop capture")}.get
+    digest = {"jake": jake, "shop": _sha("shop capture")}.get
     problems = corpus_guard.violations(tracked, manifest, added, digest=digest)
     assert len(problems) == 1
     assert problems[0].startswith("corpus/shop/IMG_1234.jpg (committed in this range")
-    assert "ambiguous" in problems[0]
+    assert "another file" in problems[0]
 
 
 def test_an_earlier_version_with_other_bytes_at_a_licensed_path_fails():
@@ -452,7 +502,7 @@ def test_an_earlier_version_with_other_bytes_at_a_licensed_path_fails():
 def test_an_earlier_version_with_a_licensed_files_bytes_passes():
     # Renamed before its row was written: the bytes are the licensed file's.
     tracked = {"corpus/manifest.csv": "m", "corpus/museum/met-1.jpg": "b1"}
-    manifest = "file,license\nmuseum/met-1.jpg,CC0-1.0\n"
+    manifest = f"file,license,sha256\nmuseum/met-1.jpg,CC0-1.0,{_sha('met one')}\n"
     added = [Version("corpus/incoming/download.jpg", "b1", "c1")]
     digest = {"b1": _sha("met one")}.get
     assert corpus_guard.violations(tracked, manifest, added, digest=digest) == []
@@ -938,13 +988,15 @@ def test_corpus_guard_range_sees_a_root_commit_even_when_log_hides_root_diffs(re
 @needs_git
 def test_corpus_guard_range_passes_licensed_images_that_were_moved_or_dropped(repo):
     base = _start_branch(repo)
+    one, two = b"MET-1 BYTES\n", b"MET-2 BYTES\n"
+    row_1 = f"file,license,sha256\nmet-1.jpg,CC0-1.0,{_bsha(one)}\n"
     _commit(
         repo,
         "Add two museum images (CC0)",
         {
-            "corpus/manifest.csv": "file,license\nmet-1.jpg,CC0-1.0\nmet-2.jpg,CC0-1.0\n",
-            "corpus/met-1.jpg": "one\n",
-            "corpus/met-2.jpg": "two\n",
+            "corpus/manifest.csv": f"{row_1}met-2.jpg,CC0-1.0,{_bsha(two)}\n",
+            "corpus/met-1.jpg": one,
+            "corpus/met-2.jpg": two,
         },
     )
     (repo / "corpus" / "museum").mkdir()
@@ -953,7 +1005,7 @@ def test_corpus_guard_range_passes_licensed_images_that_were_moved_or_dropped(re
     head = _commit(
         repo,
         "Move met-1 into the museum tier; drop met-2 and its row",
-        {"corpus/manifest.csv": "file,license\nmet-1.jpg,CC0-1.0\n"},
+        {"corpus/manifest.csv": row_1},
     )
     result = _run(repo, "corpus_guard.py", "--range", base, head)
     assert result.returncode == 0, result.stdout + result.stderr
@@ -962,19 +1014,20 @@ def test_corpus_guard_range_passes_licensed_images_that_were_moved_or_dropped(re
 @needs_git
 def test_corpus_guard_range_reads_rows_from_the_range_history(repo):
     base = _start_branch(repo)
-    manifest = "corpus/manifest.csv"
-    _commit(repo, "Add a, row next", {manifest: "file,license\n", "corpus/museum/a.jpg": "a\n"})
-    _commit(repo, "Record a's license", {manifest: "file,license\nmuseum/a.jpg,CC0-1.0\n"})
+    manifest, header = "corpus/manifest.csv", "file,license,sha256\n"
+    a, b = b"A BYTES\n", b"B BYTES\n"
+    _commit(repo, "Add a, row next", {manifest: header, "corpus/museum/a.jpg": a})
+    _commit(repo, "Record a's license", {manifest: f"{header}museum/a.jpg,CC0-1.0,{_bsha(a)}\n"})
     _git(repo, "rm", "-q", "corpus/museum/a.jpg")
-    head = _commit(repo, "Drop a and its row", {manifest: "file,license\n"})
+    head = _commit(repo, "Drop a and its row", {manifest: header})
     passed = _run(repo, "corpus_guard.py", "--range", base, head)
     assert passed.returncode == 0, passed.stdout + passed.stderr
 
-    b_row = "file,license\nmuseum/b.jpg,CC0-1.0\n"
-    _commit(repo, "Add b (CC0)", {manifest: b_row, "corpus/museum/b.jpg": "b\n"})
+    b_row = f"{header}museum/b.jpg,CC0-1.0,{_bsha(b)}\n"
+    _commit(repo, "Add b (CC0)", {manifest: b_row, "corpus/museum/b.jpg": b})
     _commit(repo, "Rights unclear after all", {manifest: b_row.replace("CC0-1.0", "not cleared")})
     _git(repo, "rm", "-q", "corpus/museum/b.jpg")
-    head = _commit(repo, "Drop b and its row", {manifest: "file,license\n"})
+    head = _commit(repo, "Drop b and its row", {manifest: header})
     failed = _run(repo, "corpus_guard.py", "--range", base, head)
     assert failed.returncode == 1, failed.stdout + failed.stderr
     assert "corpus/museum/b.jpg" in failed.stdout
@@ -985,10 +1038,11 @@ def test_corpus_guard_range_reads_rows_from_the_range_history(repo):
 def test_corpus_guard_range_judges_the_heads_tree_not_the_index(repo):
     # CI never checks out the pull request: the checkout stays on main, whose
     # manifest still licenses the image that the pull request un-licenses.
-    manifest = "corpus/manifest.csv"
-    _commit(repo, "Add a licensed image", {manifest: LICENSED, "corpus/images/a.jpg": "a\n"})
+    manifest, a = "corpus/manifest.csv", b"A BYTES\n"
+    licensed = f"file,source,license,sha256\nimages/a.jpg,met,CC0-1.0,{_bsha(a)}\n"
+    _commit(repo, "Add a licensed image", {manifest: licensed, "corpus/images/a.jpg": a})
     base = _start_branch(repo)
-    head = _commit(repo, "Rights unclear", {manifest: LICENSED.replace("CC0-1.0", "UNVERIFIED")})
+    head = _commit(repo, "Rights unclear", {manifest: licensed.replace("CC0-1.0", "UNVERIFIED")})
     _git(repo, "checkout", "-q", "main")
     assert _run(repo, "corpus_guard.py").returncode == 0
     result = _run(repo, "corpus_guard.py", "--range", base, head)
@@ -1012,15 +1066,20 @@ def test_corpus_guard_range_judges_the_merge_result(repo):
     # main starts relying on an existing row for m.jpg while a branch cut from
     # older main drops that row as a cleanup. Each tip passes on its own, but
     # the merge would land m.jpg without a row, so the branch fails now.
-    rows = "file,license\nimages/a.jpg,CC0-1.0\nimages/k.jpg,CC0-1.0\nimages/m.jpg,CC0-1.0\n"
-    images = {"corpus/images/a.jpg": "a\n", "corpus/images/k.jpg": "k\n"}
+    a, k, m = b"A BYTES\n", b"K BYTES\n", b"M BYTES\n"
+    m_row = f"images/m.jpg,CC0-1.0,{_bsha(m)}\n"
+    rows = (
+        "file,license,sha256\n"
+        f"images/a.jpg,CC0-1.0,{_bsha(a)}\nimages/k.jpg,CC0-1.0,{_bsha(k)}\n{m_row}"
+    )
+    images = {"corpus/images/a.jpg": a, "corpus/images/k.jpg": k}
     _commit(repo, "Corpus", {MANIFEST_PATH: rows, **images})
     _start_branch(repo)
-    without_m = rows.replace("images/m.jpg,CC0-1.0\n", "")
+    without_m = rows.replace(m_row, "")
     head = _commit(repo, "Drop the unused m row", {MANIFEST_PATH: without_m})
     assert _run(repo, "corpus_guard.py").returncode == 0
     _git(repo, "checkout", "-q", "main")
-    base = _commit(repo, "Add m", {"corpus/images/m.jpg": "m\n"})
+    base = _commit(repo, "Add m", {"corpus/images/m.jpg": m})
     assert _run(repo, "corpus_guard.py").returncode == 0
     result = _run(repo, "corpus_guard.py", "--range", base, head)
     assert result.returncode == 1, result.stdout + result.stderr
@@ -1103,10 +1162,67 @@ def test_corpus_guard_range_fails_a_fix_forward_and_never_advises_editing_the_ro
 
 
 @needs_git
+def test_corpus_guard_fails_a_fix_forward_licensed_by_a_row_without_sha256(repo):
+    # A phone photo went in with no row; a later commit swapped in other bytes
+    # under a row that names the path but binds no bytes.
+    _commit(repo, "Manifest", {MANIFEST_PATH: "file,license\n"})
+    base = _start_branch(repo)
+    photo = "corpus/IMG_1234.jpg"
+    _commit(repo, "Add a phone photo", {photo: b"SHOP-SCREENSHOT\n"})
+    head = _commit(
+        repo,
+        "Swap in other bytes and license them by name",
+        {photo: b"OTHER-BYTES\n", MANIFEST_PATH: "file,license\nIMG_1234.jpg,CC0-1.0\n"},
+    )
+    index = _run(repo, "corpus_guard.py")
+    assert index.returncode == 1, index.stdout + index.stderr
+    result = _run(repo, "corpus_guard.py", "--range", base, head)
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert f"{photo} (committed in this range, then removed or replaced" in result.stdout
+    assert "records no sha256" in result.stdout
+
+
+@needs_git
+def test_corpus_guard_range_fails_bytes_swapped_under_a_base_row_without_sha256(repo):
+    # main's row names met_1 but binds no bytes: overwriting the image fails,
+    # and restoring main's bytes leaves the other bytes in history.
+    no_hash = "file,license\nmuseum/met_1.jpg,CC0-1.0\n"
+    _commit(repo, "Museum image", {MANIFEST_PATH: no_hash, MET: MUSEUM})
+    base = _start_branch(repo)
+    head = _commit(repo, "Overwrite met_1", {MET: PRIVATE})
+    swapped = _run(repo, "corpus_guard.py", "--range", base, head)
+    assert swapped.returncode == 1, swapped.stdout + swapped.stderr
+    assert f"{MET}: manifest row 'museum/met_1.jpg' records no sha256" in swapped.stdout
+    _git(repo, "checkout", base, "--", MET)
+    head = _commit(repo, "Restore met_1")
+    restored = _run(repo, "corpus_guard.py", "--range", base, head)
+    assert restored.returncode == 1, restored.stdout + restored.stderr
+    assert f"{MET} (committed in this range, then removed or replaced" in restored.stdout
+
+
+@needs_git
+def test_corpus_guard_range_fails_wrong_bytes_whose_row_gained_a_sha256_later(repo):
+    # The wrong photo went in under a row without sha256, and a correction
+    # bound the row to the right photo; the older row licenses no bytes.
+    header = "file,license,sha256\n"
+    _commit(repo, "Manifest", {MANIFEST_PATH: header})
+    base = _start_branch(repo)
+    _commit(
+        repo, "Add met_1", {MET: PRIVATE, MANIFEST_PATH: f"{header}museum/met_1.jpg,CC0-1.0,\n"}
+    )
+    bound = f"{header}museum/met_1.jpg,CC0-1.0,{_bsha(MUSEUM)}\n"
+    head = _commit(repo, "Bind met_1 to the museum's photo", {MET: MUSEUM, MANIFEST_PATH: bound})
+    result = _run(repo, "corpus_guard.py", "--range", base, head)
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert f"{MET} (committed in this range, then removed or replaced" in result.stdout
+
+
+@needs_git
 def test_corpus_guard_range_fails_a_removed_namesake_of_a_licensed_photo(repo):
+    jake = b"JAKE-CC0\n"
     licensed = {
-        MANIFEST_PATH: "file,license\nIMG_1234.jpg,CC0-1.0\n",
-        "corpus/jake/IMG_1234.jpg": b"JAKE-CC0\n",
+        MANIFEST_PATH: f"file,license,sha256\nIMG_1234.jpg,CC0-1.0,{_bsha(jake)}\n",
+        "corpus/jake/IMG_1234.jpg": jake,
     }
     _commit(repo, "Jake's photo", licensed)
     base = _start_branch(repo)
@@ -1119,7 +1235,7 @@ def test_corpus_guard_range_fails_a_removed_namesake_of_a_licensed_photo(repo):
     removed = _run(repo, "corpus_guard.py", "--range", base, head)
     assert removed.returncode == 1, removed.stdout + removed.stderr
     assert f"{shop} (committed in this range" in removed.stdout
-    assert "ambiguous" in removed.stdout
+    assert "another file" in removed.stdout
 
 
 PLAN_FILES: dict[str, str | bytes] = {
