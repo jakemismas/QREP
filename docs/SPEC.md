@@ -343,12 +343,30 @@ contract (tickets E1a and E1b) keeps these rules:
 - Every v2 result states an explicit outcome, such as pattern-ready or a refusal with its code. A
   missing or unknown outcome is an error, never a success. Why: today a missing verdict renders as
   readable (web/src/model/verdictStory.ts:82), which breaks binding rule 5.
-- A CONTRACT_VERSION, kept equal in Python and TypeScript, is checked by the web worker at boot. A
-  mismatch stops the app with a message that names both versions. E1a and E1b together define
-  version 2, and the plan sets which later changes bump it (plan sections 4.2 and 5.A, rule 6).
+- A CONTRACT_VERSION, kept equal in qrep/contract.py and web/src/engine/contract.ts, is checked by
+  the web worker at boot: it calls bridge.contract_version() after it imports the bridge and before
+  it reports boot-done. A mismatch, or an engine that reports no version, stops the app with a
+  message that names the app's version and the engine's (or says the engine reports none) and
+  tells you to reload. tests/test_bridge.py fails when the two literals differ, and when the
+  worker's method allowlist differs from the bridge's envelope functions. E1a and E1b together
+  define version 2, and the plan sets which later changes bump it (plan sections 4.2 and 5.A,
+  rule 6). Why: a cached wheel from another release must not serve the page.
+- Every call returns a typed envelope whose error kind tells your input errors from engine bugs:
+  validation for a model that fails validation, a call with the wrong number of arguments, or an
+  argument with the wrong type or structure, naming the field (a whole-number argument must be
+  exact: 20.9, true and "600" are wrong types); value for an input the engine cannot use, naming
+  it (an unknown strategy, a preset object without both a width and a height, a level, seed,
+  scale or fabric count out of range, a missing or unreadable image); schema for malformed JSON
+  or an unknown schema_version; not_implemented for a stub; and internal for anything else,
+  including a KeyError, TypeError or AttributeError raised inside the engine. No traceback
+  reaches the app. The worker passes a JavaScript null argument as Python None, because Pyodide
+  would otherwise hand the bridge a jsnull.
+- render() takes a scale from 1 to 20 pixels per inch (RENDER_SCALE_MAX in qrep/bridge.py, which
+  records the arithmetic) and returns kind value outside that range. The bound caps the scale, not
+  the image, which also grows with the quilt (#187).
 
 The request and response shapes live in qrep/contract.py and web/src/engine/contract.ts, which E1a
-creates.
+created; E1b adds the request and response models.
 
 ### 12.2 The CLI
 
