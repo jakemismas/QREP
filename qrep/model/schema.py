@@ -136,8 +136,10 @@ class Settings(BaseModel):
     binding_strip_width: int = Field(default=20, gt=0)
     binding_extra: int = Field(default=80, ge=0, description="binding length beyond perimeter")
     backing_margin: int = Field(default=64, ge=0, description="extra per axis for backing, 8in")
+    # Each backing seam loses 1in (8), so a narrower width could never grow
+    # a pieced backing (qrep/construct/finishing.py, BACKING_SEAM_LOSS).
     backing_width: int = Field(
-        default=336, gt=0, description="backing fabric width, selvages trimmed, 42in"
+        default=336, gt=8, description="backing fabric width, selvages trimmed, 42in"
     )
     wide_back_width: int = Field(default=864, gt=0, description="wide-back fabric width, 108in")
     backing_pieced_allowance: int = Field(

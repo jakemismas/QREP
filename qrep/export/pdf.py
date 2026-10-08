@@ -210,14 +210,14 @@ def _borders(quilt: Quilt, names: dict[str, str]) -> Section:
 
 
 def _binding(quilt: Quilt, names: dict[str, str]) -> Section:
-    strips = quilt_binding_plan(quilt).strips
+    plan = quilt_binding_plan(quilt)
     return Section(
         title="Binding",
         paragraphs=[
             f"Bind with {names[quilt.binding.fabric_id]}. "
             f"Cut {format_inches(quilt.binding.strip_width)} strips and join "
-            f"{strips} widths of fabric for "
-            f"{format_inches(quilt.binding_length)} of binding.",
+            f"{plan.strips} widths of fabric for "
+            f"{format_inches(plan.total_length)} of binding.",
         ],
     )
 
@@ -231,10 +231,15 @@ def _backing_text(quilt: Quilt, purchase) -> list[str]:
     if plan.panels == 1:
         text = f"Backing: cut one piece {length} long from {fabric} wide fabric, with no seams."
     else:
-        direction = "top to bottom" if plan.seams == "vertical" else "side to side"
+        # Vertical-seam panels sit side by side; horizontal-seam panels are
+        # stacked one above the other (MATH.md 1.2).
+        if plan.seams == "vertical":
+            placement, direction = "side by side", "top to bottom"
+        else:
+            placement, direction = "one above the other", "side to side"
         text = (
             f"Backing: cut ({plan.panels}) panels {length} long from {fabric} wide fabric "
-            f"and join them side by side with {format_inches(BACKING_SEAM_LOSS // 2)} seams "
+            f"and join them {placement} with {format_inches(BACKING_SEAM_LOSS // 2)} seams "
             f"pressed open, so the seams run {direction}."
         )
     paragraphs = [f"{text} Buy {yards}."]

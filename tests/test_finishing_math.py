@@ -12,6 +12,7 @@ hand-computed test before any fix.
 """
 
 import pytest
+from pydantic import ValidationError
 
 from qrep.construct import compute_purchase_lines, plan_strip
 from qrep.construct.finishing import (
@@ -550,3 +551,27 @@ def test_pdf_batting_follows_the_backing_margin():
         'Batting: at least 79" by 94", the finished top plus 4" on each dimension; '
         "a full package (90 x 96 in) covers it."
     )
+
+
+def test_pdf_backing_text_stacks_horizontal_seam_panels():
+    # V-BACK-20 at B = 40 (320 e): (3) panels 83 in long, horizontal seams, so the
+    # panels are stacked; qy = 29 -> 7 1/4 yd
+    assert _paragraph(fixture_with(backing_width=320), "Finishing", "Backing:") == (
+        'Backing: cut (3) panels 83" long from 40" wide fabric and join them one above the '
+        'other with 1/2" seams pressed open, so the seams run side to side. Buy 7 1/4 yd.'
+    )
+
+
+def test_pdf_batting_names_no_package_past_the_king():
+    # F12 with 2o = 35 in (280 e): 600 + 280 = 880 (110 in), 720 + 280 = 1000 (125 in);
+    #   king upright no (125 > 120); turned 110 <= 120 but 125 > 124, no -> no package
+    assert _paragraph(fixture_with(backing_margin=280), "Finishing", "Batting:") == (
+        'Batting: at least 110" by 125", the finished top plus 35" on each dimension; '
+        "it is larger than a king package (124 x 120 in)."
+    )
+
+
+def test_settings_refuse_a_backing_width_no_wider_than_a_seam():
+    # B - s must stay positive: at B = 1 in (8 e) no panel count covers the backing
+    with pytest.raises(ValidationError, match="backing_width"):
+        explicit_settings(backing_width=8)
