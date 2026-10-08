@@ -8,6 +8,7 @@ the same quilt always serializes to the same plan.
 from collections import Counter
 from math import ceil, gcd, log10
 
+from qrep.construct.finishing import quilt_binding_plan
 from qrep.construct.plan import (
     AssemblyStep,
     ConstructionPlan,
@@ -130,7 +131,7 @@ def binding_pieces(quilt: Quilt) -> list[CutPiece]:
     """WOF strips; finished dims equal cut dims because binding never counts
     toward the finished-top area."""
     wof = quilt.settings.wof
-    strips = ceil(quilt.binding_length / wof)
+    strips = quilt_binding_plan(quilt).strips
     width = quilt.binding.strip_width
     return [
         CutPiece(
@@ -240,7 +241,7 @@ def _finishing_steps(
         )
         number += 1
         seams += 4
-    strips = ceil(quilt.binding_length / quilt.settings.wof)
+    strips = quilt_binding_plan(quilt).strips
     steps.append(
         AssemblyStep(
             number=number,

@@ -108,10 +108,11 @@ test("yardage table: binding, backing 5 1/2 yd, batting row, engine usable width
   const table = page.getByTestId("yardage-table");
   await expect(table).toBeVisible();
   await expect(page.getByTestId("yardage-row-binding")).toBeVisible();
-  // Backing: design-doc literal 5.5 yd = 22 quarter-yards, mixed fraction.
+  // Backing per MATH.md V-BACK-09: 2 vertical panels x 98" = 1568 eighths,
+  // + 72 pieced allowance = 1640; ceil(1640 / 72) = 23 quarter-yards = 5 3/4 yd.
   const backing = page.getByTestId("yardage-row-backing");
-  await expect(backing).toHaveAttribute("data-quarter-yards", "22");
-  await expect(backing).toContainText("5 1/2");
+  await expect(backing).toHaveAttribute("data-quarter-yards", "23");
+  await expect(backing).toContainText("5 3/4");
   // Batting per PARITY item 9: finished + 8" per axis = 83" x 98".
   const batting = page.getByTestId("yardage-row-batting");
   await expect(batting).toContainText('83"');

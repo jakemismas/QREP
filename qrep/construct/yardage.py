@@ -1,25 +1,26 @@
 """Yardage math: per-fabric quarter-yard purchase lines plus the backing line.
 
-Backing is a dedicated line item ("backing, any 42-inch WOF fabric"), never
-taken from the palette fabrics. One quarter yard = 9" = 72 eighths.
+Backing is a dedicated line item named from the backing width setting, never
+taken from the palette fabrics; its math lives in qrep.construct.finishing.
+One quarter yard = 9" = 72 eighths.
 """
 
 from math import ceil
 
 from pydantic import BaseModel, Field
 
+from qrep.construct.finishing import backing_plan, wide_back_plan
 from qrep.construct.plan import ConstructionPlan, CutPiece, StripSet
 from qrep.model.schema import Quilt
+from qrep.model.units import format_inches
 
 QUARTER_YARD = 72  # eighths of an inch
-
-BACKING_NAME = "backing, any 42-inch WOF fabric"
 
 
 class YardageLine(BaseModel):
     fabric_id: str | None = Field(default=None, description="None for the backing line")
     name: str
-    purpose: str = Field(default="top", description="top | binding | backing")
+    purpose: str = Field(default="top", description="top | binding | backing | wide_back")
     length_needed: int = Field(ge=0, description="fabric length required, eighths")
     quarter_yards: int = Field(ge=0)
 
@@ -31,19 +32,48 @@ class YardageLine(BaseModel):
 class YardageReport(BaseModel):
     strategy: str
     lines: list[YardageLine]
+    wide_back: YardageLine | None = Field(
+        default=None,
+        description="one piece of wide fabric that replaces the pieced backing line; "
+        "set only when MATH.md F11 offers it",
+    )
+
+
+# The line model and format_yards speak quarter yards, so the purchase lines
+# round to QUARTER_YARD; the finishing plans also report increments of
+# settings.purchase_increment.
 
 
 def backing_line(quilt: Quilt) -> YardageLine:
-    """panels = ceil((width + margin) / WOF); length = panels x (height + margin)."""
-    settings = quilt.settings
-    panels = ceil((quilt.finished_width + settings.backing_margin) / settings.wof)
-    length = panels * (quilt.finished_height + settings.backing_margin)
+    plan = backing_plan(quilt.finished_width, quilt.finished_height, quilt.settings)
+    fabric = format_inches(quilt.settings.backing_width)
+    length = format_inches(plan.panel_length)
+    if plan.panels == 1:
+        layout = f"one piece {length} long"
+    else:
+        layout = f"({plan.panels}) panels {length} long, {plan.seams} seams"
     return YardageLine(
         fabric_id=None,
-        name=BACKING_NAME,
+        name=f"backing, {fabric} wide fabric: {layout}",
         purpose="backing",
-        length_needed=length,
-        quarter_yards=ceil(length / QUARTER_YARD),
+        length_needed=plan.length_needed,
+        quarter_yards=-(-plan.purchase // QUARTER_YARD),
+    )
+
+
+def wide_back_line(quilt: Quilt) -> YardageLine | None:
+    plan = wide_back_plan(quilt.finished_width, quilt.finished_height, quilt.settings)
+    if plan is None:
+        return None
+    return YardageLine(
+        fabric_id=None,
+        name=(
+            f"wide backing, {format_inches(plan.fabric_width)} wide fabric: "
+            f"one piece {format_inches(plan.length_needed)} long"
+        ),
+        purpose="wide_back",
+        length_needed=plan.length_needed,
+        quarter_yards=-(-plan.purchase // QUARTER_YARD),
     )
 
 
@@ -91,7 +121,7 @@ def compute_purchase_lines(quilt: Quilt, plan: "ConstructionPlan") -> YardageRep
                 )
             )
     lines.append(backing_line(quilt))
-    return YardageReport(strategy=plan.strategy, lines=lines)
+    return YardageReport(strategy=plan.strategy, lines=lines, wide_back=wide_back_line(quilt))
 
 
 def cut_area_by_fabric(
