@@ -41,7 +41,9 @@ const NUMERIC = /^[\d\s./-]+$/;
 const byName = (key, extra = {}) => ({ key, kind: "auto", sel: [`[name="${key}"]`], ...extra });
 const byId = (key, extra = {}) => ({ key, kind: "auto", inForm: false, sel: [`[id="${key}"]`], ...extra });
 const byPh = (key, ph, stem, extra = {}) => ({ key, kind: "auto", inForm: false, sel: [`input[placeholder="${ph}"]`, `input[placeholder*="${stem}" i]`], ...extra });
-const formi = (key, extra = {}) => ({ key, kind: "auto", inForm: false, sel: [`[name="${key}"]`, `[id^="forminator-field-${key}_"]`, `[id="${key}"]`], ...extra });
+const idAs = (key, id, extra = {}) => ({ key, kind: "auto", inForm: false, sel: [`[id="${id}"]`], ...extra });
+// Forminator wraps each field in a <div id="number-1">, so only the input itself may match.
+const formi = (key, extra = {}) => ({ key, kind: "auto", inForm: false, sel: [`input[name="${key}"]`, `input[id^="forminator-field-${key}_"]`], ...extra });
 // Field roles for pages whose markup is only known at run time: [match, exclude].
 const ROLE = {
   // A quilt-size caption may say "(before borders)", so only a border's own width is excluded.
@@ -128,23 +130,29 @@ const CALCULATORS = {
   },
   omni_backing: {
     url: "https://www.omnicalculator.com/everyday-life/quilt",
+    // Omni ids name the calculator's variable grid, so they stay put across page loads.
     fields: [
-      byRole("fabric_width", "fabric_width"),
-      byRole("overage", "overage", { set: "4" }),
-      byRole("directional", "directional", { set: /non|^no\b/i }),
-      byRole("width", "width"),
-      byRole("length", "length"),
+      { key: "mode", kind: "radio", radioLabel: /^(backing|batting)$/i },
+      idAs("width", "blockGroups.1.matrices.0.columns.0.0-input"),
+      idAs("length", "blockGroups.1.matrices.1.columns.0.0-input"),
+      idAs("fabric_width", "blockGroups.2.matrices.0.columns.0.0-input"),
+      { key: "directional", kind: "radio", radioLabel: /directional/i, set: /^non/i },
+      // The page already adds 4 in per side ("We automatically add 4 inches"), so any
+      // "Additional overage" stacks on top of that.
+      idAs("overage", "blockGroups.2.matrices.3.columns.0.0-input", { set: "0" }),
     ],
-    submit: { find: true, liveOk: true },
-    region: true,
+    submit: { live: true },
+    // The answer is prose under a "Results" heading; ads and widgets mutate everything else.
+    results: { ids: [], heading: { key: "results_text", match: "^Results$", stop: "^(Share result|Reload calculator|Clear all changes|Did we solve)", after: '[id="blockGroups.2.matrices.0.columns.0.0-input"]' } },
     tab: true,
     inches: true,
   },
   dtq_border: {
     url: "https://designedtoquilt.com/quilt-border-calculator/",
     fields: [formi("number-1"), formi("number-2"), formi("number-4", { set: "40" }), formi("number-5")],
+    // Its CALCULATE and Submit buttons belong to a Forminator form that records entries.
     submit: { live: true },
-    results: { ids: [], pattern: "calculation-" },
+    results: { ids: [], pattern: "^calculation-", controlsOnly: true },
     bands: 1,
     tab: true,
   },
@@ -157,16 +165,29 @@ const CALCULATORS = {
   },
   qc_border: {
     discoverUrl: { from: "https://quiltcalculator.com/", link: /border/i },
-    fields: [byRole("fabric_width", "fabric_width", { set: "40" }), byRole("border_width", "border_width"), byRole("width", "width"), byRole("length", "length")],
+    // Each band has an enable checkbox just before its width; band 2 ships enabled at 6 in.
+    fields: [
+      byRole("fabric_width", "fabric_width", { set: "40" }),
+      ...[1, 2, 3].map((i) => ({ key: `border${i}_width`, kind: "auto", match: new RegExp(`border\\s*${i}\\b`, "i"), not: null, toggle: true })),
+      byRole("width", "width"),
+      byRole("length", "length"),
+    ],
     submit: { find: true, liveOk: true },
     region: true,
-    bands: 1,
+    bands: 3,
     tab: true,
   },
+  qp_piece_count: {
+    url: QP + "Piece%20Count%20Calculator.php",
+    formSel: 'form:has([name="piece_width"])',
+    fields: ["piece_width", "piece_length", "large_piece_width", "large_piece_length"].map((k) => byName(k)),
+    submit: { find: true },
+    results: { ids: [1, 2].flatMap((i) => [`results_num_pieces${i}`, `results_piece_width${i}`, `results_piece_length${i}`]) },
+  },
 };
-const PROBES = { qp_piece_count: QP + "Piece%20Count%20Calculator.php" };
+const PROBES = {};
 
-const USAGE = "usage: node scripts/eval/calculators/drive.mjs --jobs <jobs.json> --out <raw.json> --shots <dir> [--pages <pages.json>] [--probe qp_piece_count] [--url-map <map.json>]";
+const USAGE = "usage: node scripts/eval/calculators/drive.mjs --jobs <jobs.json> --out <raw.json> --shots <dir> [--pages <pages.json>] [--probe <calculator key>] [--url-map <map.json>]";
 
 function parseArgs(argv) {
   const a = { probe: [] };
@@ -182,7 +203,7 @@ function parseArgs(argv) {
     i++;
   }
   if (!a.jobs || !a.out || !a.shots) throw new Error("--jobs, --out and --shots are required");
-  for (const p of a.probe) if (!PROBES[p]) throw new Error(`unknown probe: ${p}`);
+  for (const p of a.probe) if (!PROBES[p] && !(CALCULATORS[p] && CALCULATORS[p].url)) throw new Error(`unknown probe: ${p}`);
   return a;
 }
 
@@ -210,7 +231,7 @@ function siteFor(url) {
 }
 
 function parseQty(s) {
-  const t = String(s).replace(/½/g, " 1/2").replace(/¼/g, " 1/4").replace(/¾/g, " 3/4").replace(/⅛/g, " 1/8").replace(/⅜/g, " 3/8").replace(/⅝/g, " 5/8").replace(/⅞/g, " 7/8");
+  const t = String(s).replace(/\u00bd/g, " 1/2").replace(/\u00bc/g, " 1/4").replace(/\u00be/g, " 3/4").replace(/\u215b/g, " 1/8").replace(/\u215c/g, " 3/8").replace(/\u215d/g, " 5/8").replace(/\u215e/g, " 7/8");
   const m = t.match(/(\d+)[\s-]+(\d+)\/(\d+)|(\d+)\/(\d+)|(\d+(?:\.\d+)?|\.\d+)/);
   if (!m) return NaN;
   if (m[1]) return Number(m[1]) + Number(m[2]) / Number(m[3]);
@@ -343,12 +364,12 @@ const CONTROLS = (sel) => {
     return "";
   };
   const unitNear = (e) => {
-    const re = /^(in|in\.|inch|inches|cm|mm|m|ft|feet|yd|yds|yards?)$/i;
+    const re = /^(in|in\.|inch|inches|cm|dm|mm|m|ft|feet|yd|yds|yards?|ftinch|mcm)$/i;
     for (let row = e.parentElement, d = 0; row && d < 3; row = row.parentElement, d++) {
       if (row.querySelectorAll("input:not([type=hidden])").length > 1) break;
       for (const n of row.querySelectorAll("button, select, span, div, abbr")) {
         if (n === e) continue;
-        const t = n.tagName === "SELECT" ? tx(n.options[n.selectedIndex]) : n.childElementCount === 0 ? tx(n) : "";
+        const t = n.tagName === "SELECT" ? n.value : n.childElementCount === 0 ? tx(n) : "";
         if (re.test(t)) return t;
       }
     }
@@ -379,6 +400,9 @@ const CONTROLS = (sel) => {
 };
 const controlList = (frame) => frame.evaluate(CONTROLS, CTL_SEL);
 const haystack = (c) => [c.label, c.aria, c.placeholder, c.title, c.before, c.name, c.id].filter(Boolean).join(" | ");
+// Exclusions look only at what a person reads: generated ids such as "blockGroups.1..." made
+// "block" exclude Omni's quilt width.
+const visText = (c) => [c.label, c.aria, c.placeholder, c.title, c.before].filter(Boolean).join(" | ");
 
 const PAGE_INFO = () => {
   const tx = (n) => (n ? (n.textContent || "").replace(/\s+/g, " ").trim() : "");
@@ -446,11 +470,11 @@ async function lcaHandle(frame, a, b) {
 async function resolveContext(page, calc, meta) {
   let frame = page.mainFrame();
   let form = null;
-  if (calc.form) {
-    const fsel = `form[name="${calc.form}" i], form#${calc.form}`;
+  if (calc.form || calc.formSel) {
+    const fsel = calc.formSel ?? `form[name="${calc.form}" i], form#${calc.form}`;
     frame = null;
     for (const fr of page.frames()) if (await fr.locator(fsel).count()) { frame = fr; break; }
-    if (!frame) throw new Error(`form "${calc.form}" not found`);
+    if (!frame) throw new Error(`form "${fsel}" not found`);
     form = frame.locator(fsel).first();
   }
   const scopeOf = (f) => (f.inForm === false || !form ? frame : form);
@@ -459,12 +483,15 @@ async function resolveContext(page, calc, meta) {
   else await frame.locator("input:visible").first().waitFor({ timeout: 20000 });
   const controls = await controlList(frame);
   const allCtl = frame.locator(CTL_SEL);
-  const ctx = { frame, form, fieldLoc: {}, fieldKind: {}, fieldKeys: new Set(), raw: {}, unitErrors: [], live: false, submit: null };
+  const ctx = { frame, form, fieldLoc: {}, fieldKind: {}, fieldKeys: new Set(), raw: {}, unitErrors: [], unitLoc: {}, toggleLoc: {}, live: false, submit: null };
   meta.fields = {};
   for (const f of calc.fields) {
     let loc = null;
     let info = null;
-    if (f.sel) {
+    if (f.radioLabel) {
+      info = controls.find((c) => c.type === "radio" && c.name && f.radioLabel.test(c.label || c.before || "")) ?? null;
+      if (info) loc = frame.locator(`input[type="radio"][name="${cssq(info.name)}"]`);
+    } else if (f.sel) {
       const all = scopeOf(f).locator(f.sel.join(", "));
       if (f.pickByOption) {
         for (let i = 0, n = await all.count(); i < n; i++) {
@@ -479,7 +506,8 @@ async function resolveContext(page, calc, meta) {
       }
     } else {
       const used = new Set(Object.values(ctx.raw));
-      info = controls.find((c) => c.visible && !c.skip && c.type !== "checkbox" && c.type !== "radio" && !used.has(c.rawIndex) && f.match.test(haystack(c)) && !(f.not && f.not.test(haystack(c)))) ?? null;
+      info = controls.find((c) => c.visible && !c.skip && c.type !== "checkbox" && c.type !== "radio" && !used.has(c.rawIndex)
+        && f.match.test(haystack(c)) && !(f.not && f.not.test(visText(c))) && !(c.tag === "select" && /\bunit\b/i.test(visText(c)))) ?? null;
       if (info) {
         loc = info.id ? frame.locator(`[id="${cssq(info.id)}"]`).first()
           : info.label ? frame.getByLabel(info.label, { exact: true }).first()
@@ -498,6 +526,20 @@ async function resolveContext(page, calc, meta) {
       : { found: !!loc, kind };
     if (loc && kind === "radio") meta.fields[f.key].options = await readOptions(loc, "radio");
     if (loc && kind === "select") meta.fields[f.key].options = await readOptions(loc, "select");
+    if (f.toggle && info) {
+      const prev = controls.find((c) => c.rawIndex === info.rawIndex - 1 && c.type === "checkbox");
+      ctx.toggleLoc[f.key] = prev ? (prev.id ? frame.locator(`[id="${cssq(prev.id)}"]`) : allCtl.nth(prev.rawIndex)) : null;
+      meta.fields[f.key].toggle = prev ? { checked_at_load: prev.checked, label: prev.label || prev.before } : null;
+    }
+    // Unit pickers sit beside their number box; a value typed under the wrong unit is wrong.
+    if (calc.inches && loc && kind === "text") {
+      const u = loc.locator("xpath=ancestor::*[.//select][1]/descendant::select[1]");
+      if ((await u.count()) && (await u.evaluate((sel) => [...sel.options].some((o) => /^inch/i.test(o.value))))) {
+        ctx.unitLoc[f.key] = u;
+        ctx.unitErrors = ctx.unitErrors.filter((m) => !m.startsWith(`unit for ${f.key} `));
+        meta.fields[f.key].unit_select = await readOptions(u, "select").then((o) => o.find((x) => x.selected) ?? null);
+      }
+    }
   }
   // People fill a form top to bottom; the job's key order says nothing about the page.
   ctx.order = calc.fields.slice().sort((x, y) => (ctx.raw[x.key] ?? 1e9) - (ctx.raw[y.key] ?? 1e9));
@@ -556,7 +598,7 @@ async function resolveContext(page, calc, meta) {
 }
 
 async function resolveResults(frame, calc) {
-  return frame.evaluate(({ ids, pattern, exclude }) => {
+  return frame.evaluate(({ ids, pattern, exclude, controlsOnly, heading }) => {
     const out = [];
     const missing = [];
     const seen = new Set();
@@ -566,7 +608,8 @@ async function resolveResults(frame, calc) {
       seen.add(e);
       let k = key;
       for (let n = 2; out.some((o) => o.key === k); n++) k = `${key}#${n}`;
-      out.push({ key: k, id: e.id || null, name: e.getAttribute("name"), tag: e.tagName.toLowerCase(), type: e.getAttribute("type") });
+      const label = e.labels && e.labels.length ? e.labels[0].textContent.replace(/\s+/g, " ").trim() : null;
+      out.push({ key: k, id: e.id || null, name: e.getAttribute("name"), tag: e.tagName.toLowerCase(), type: e.getAttribute("type"), label });
     };
     for (const id of ids) {
       const e = document.getElementById(id) || [...document.querySelectorAll("[id]")].find((x) => x.id.toLowerCase() === id.toLowerCase()) || document.getElementsByName(id)[0];
@@ -579,17 +622,37 @@ async function resolveResults(frame, calc) {
         const name = e.getAttribute("name");
         if (exclude.includes(e.id) || exclude.includes(name)) continue;
         if (e.matches("form, option, script, style, a, meta, input[type=radio], input[type=button], input[type=submit], button")) continue;
+        if (controlsOnly && !isCtl(e)) continue;
         // Form-control results are values, not markup; the prefix keeps that visible to parsers.
         const hit = isCtl(e) ? (re.test(name || "") ? name : re.test(e.id) ? e.id : null) : re.test(e.id) ? e.id : null;
         if (hit) add(e, isCtl(e) ? `value:${hit}` : hit);
       }
     }
+    if (heading) out.push({ key: heading.key, heading });
     return { out, missing };
-  }, { ids: calc.results.ids, pattern: calc.results.pattern ?? null, exclude: calc.fields.map((f) => f.key) });
+  }, { ids: calc.results.ids, pattern: calc.results.pattern ?? null, exclude: calc.fields.map((f) => f.key), controlsOnly: !!calc.results.controlsOnly, heading: calc.results.heading ?? null });
 }
 
 async function readResults(frame, descs) {
   return frame.evaluate((ds) => Object.fromEntries(ds.map((d) => {
+    if (d.heading) {
+      // Read it the way a person does: the rendered lines from the "Results" title to the
+      // first line of page furniture. Element-structure guesses missed Omni's live markup.
+      const re = new RegExp(d.heading.match, "i");
+      const stop = new RegExp(d.heading.stop || "^$^", "i");
+      const lines = (n) => (n.innerText || "").split("\n").map((l) => l.replace(/\s+/g, " ").trim()).filter(Boolean);
+      let box = d.heading.after ? document.querySelector(d.heading.after) : null;
+      box = box ? box.parentElement : document.body;
+      while (box && box !== document.documentElement && !lines(box).some((l) => re.test(l))) box = box.parentElement;
+      if (!box || box === document.documentElement) return [d.key, null];
+      const all = lines(box);
+      const out = [];
+      for (let i = all.findIndex((l) => re.test(l)); i >= 0 && i < all.length && out.length < 30; i++) {
+        if (out.length && stop.test(all[i])) break;
+        out.push(all[i]);
+      }
+      return [d.key, out.length > 1 ? out.join("\n") : null];
+    }
     const e = (d.id && document.getElementById(d.id)) || (d.name && document.getElementsByName(d.name)[0]);
     return [d.key, e ? (/^(INPUT|TEXTAREA|SELECT)$/.test(e.tagName) ? e.value : e.innerHTML) : null];
   })), descs);
@@ -601,7 +664,14 @@ async function waitForChange(frame, descs, baseline, dialogs, maxMs) {
   let last = base;
   let lastChange = t0;
   while (Date.now() - t0 < maxMs) {
-    const s = JSON.stringify(await readResults(frame, descs));
+    let s;
+    try {
+      s = JSON.stringify(await readResults(frame, descs));
+    } catch {
+      // A form that reloads the page on submit tears down the context; read again after it settles.
+      await sleep(500);
+      continue;
+    }
     if (s !== last) { last = s; lastChange = Date.now(); }
     if (s !== base && Date.now() - lastChange >= 600) break;
     if (s === base && dialogs.length && Date.now() - t0 > 1000) break;
@@ -707,7 +777,11 @@ async function snapshot(ctx, st, calc) {
   for (const r of st.regions) out[r.key] = await regionHtml(ctx.frame, r.path);
   if (st.outputCtl.size) {
     const list = await controlList(ctx.frame);
-    for (const k of st.outputCtl.keys()) out[`value:${k}`] = list.find((c) => c.key === k)?.value ?? null;
+    for (const k of st.outputCtl.keys()) {
+      const c = list.find((x) => x.key === k);
+      out[`value:${k}`] = c ? c.value : null;
+      if (c && c.unit) out[`unit:${k}`] = c.unit;
+    }
   }
   return out;
 }
@@ -715,16 +789,16 @@ async function snapshot(ctx, st, calc) {
 async function settle(ctx, st, calc, meta, countBase, baseline, dialogs, ctlStart) {
   if (!calc.region) return waitForChange(ctx.frame, st.descs, baseline, dialogs, 5000);
   await waitQuiet(ctx.frame, countBase);
-  if (!st.regions.length || (await regionHtml(ctx.frame, st.regions[0].path)) === null) {
+  if (calc.outputs !== "controls" && (!st.regions.length || (await regionHtml(ctx.frame, st.regions[0].path)) === null)) {
     st.regions = await discoverRegions(ctx.frame, await ctx.anchor());
     meta.regions = st.regions;
   }
   // Some calculators (React ones especially) show results in read-only inputs, which never
   // show up as DOM mutations; a value that moved without being typed is an output.
   for (const c of await controlList(ctx.frame)) {
-    if (c.skip || c.type === "radio" || c.type === "checkbox" || ctx.fieldKeys.has(c.key) || st.outputCtl.has(c.key)) continue;
+    if (c.skip || c.tag === "select" || c.type === "radio" || c.type === "checkbox" || ctx.fieldKeys.has(c.key) || st.outputCtl.has(c.key)) continue;
     const was = ctlStart.find((x) => x.key === c.key);
-    if (was ? was.value !== c.value : c.value !== "") st.outputCtl.set(c.key, c.label || c.aria || c.placeholder || "");
+    if (was ? was.value !== c.value : c.value !== "") st.outputCtl.set(c.key, { label: c.label || c.aria || c.placeholder || c.before || "", unit: c.unit });
   }
   meta.output_controls = Object.fromEntries(st.outputCtl);
   return snapshot(ctx, st, calc);
@@ -799,6 +873,23 @@ async function runRow(page, st, ctx, calc, key, job, site, meta, out) {
       const kind = ctx.fieldKind[f.key];
       const given = Object.hasOwn(inputs, f.key);
       const want = given ? inputs[f.key] : f.set;
+      // A band is on exactly when the row gives its width; a default-on band would add fabric.
+      const tog = ctx.toggleLoc[f.key];
+      if (tog && (await tog.isChecked()) !== given) {
+        await site.pace();
+        await safeClick(page, tog, meta.notes);
+        site.mark();
+      }
+      const unit = ctx.unitLoc[f.key];
+      if (unit && given) {
+        const uo = await readOptions(unit, "select");
+        const cur = uo.find((o) => o.selected);
+        if (!cur || !/^inch/i.test(cur.value)) {
+          await site.pace();
+          await unit.selectOption({ index: uo.findIndex((o) => /^inch/i.test(o.value)) });
+          site.mark();
+        }
+      }
       if (want === undefined) continue;
       if (!loc) {
         if (given) errors.push(`field ${f.key} not found on page`);
@@ -824,7 +915,9 @@ async function runRow(page, st, ctx, calc, key, job, site, meta, out) {
         const opts = await readOptions(loc, kind);
         const idx = matchOption(opts, want);
         if (idx < 0) {
-          errors.push(`no ${kind} option for ${f.key} matches ${String(want)} (options: ${opts.map((o) => `${o.value}|${o.text}`).join(", ")})`);
+          // A default-only control can vanish with the mode (Omni drops "directional" for batting).
+          if (!given && !opts.length) meta.notes.push(`${job.row_id}: ${f.key} not shown on the page in this state, left as is`);
+          else errors.push(`no ${kind} option for ${f.key} matches ${String(want)} (options: ${opts.map((o) => `${o.value}|${o.text}`).join(", ")})`);
           continue;
         }
         chosen[f.key] = opts[idx];
@@ -837,12 +930,28 @@ async function runRow(page, st, ctx, calc, key, job, site, meta, out) {
       }
     }
     rec.held = await readHeld(ctx);
+    for (const [k, tog] of Object.entries(ctx.toggleLoc)) {
+      if (!tog) continue;
+      const on = await tog.isChecked();
+      rec.held[`${k}_enabled`] = on;
+      if (on !== Object.hasOwn(inputs, k)) errors.push(`band toggle for ${k} is ${on ? "on" : "off"}`);
+    }
+    for (const [k, u] of Object.entries(ctx.unitLoc)) {
+      const o = (await readOptions(u, "select")).find((x) => x.selected);
+      rec.held[`${k}_unit`] = o ? { value: o.value, text: o.text } : null;
+      if (!o || !/^inch/i.test(o.value)) errors.push(`unit for ${k} is ${o ? o.value : "unset"}, not inches`);
+    }
     for (const [k, want] of Object.entries(wants)) {
       const h = rec.held[k];
       const kind = ctx.fieldKind[k];
       if (kind === "text") {
         const given = Object.hasOwn(inputs, k);
         if (given ? h === want : equivalent(h, want)) continue;
+        // Number widgets that pad decimals ("67.500" for "67.5") still hold the typed value.
+        if (given && NUMERIC.test(want) && /^\s*-?[\d.]+\s*$/.test(h) && Number(h) === Number(want)) {
+          meta.notes.push(`${job.row_id}: ${k} reformatted "${want}" as "${h}"`);
+          continue;
+        }
         const ml = await ctx.fieldLoc[k].getAttribute("maxlength");
         const limited = ml !== null && want.startsWith(h) && h.length === Number(ml);
         errors.push(`${limited ? "input limit" : "held value differs"}: ${k} held "${h}" for typed "${want}"${ml !== null ? ` (maxlength ${ml})` : ""}`);
@@ -1068,7 +1177,7 @@ async function main() {
       const calc = CALCULATORS[key];
       await runCalculator(context, key, calc, rows, out, urlMap[key] ?? calc.url ?? calc.discoverUrl.from);
     }
-    for (const key of args.probe) await runProbe(context, key, urlMap[key] ?? PROBES[key], out);
+    for (const key of args.probe) await runProbe(context, key, urlMap[key] ?? PROBES[key] ?? CALCULATORS[key].url, out);
     await context.close();
   } finally {
     await browser.close();
