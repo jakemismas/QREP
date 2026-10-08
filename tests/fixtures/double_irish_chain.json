@@ -2631,7 +2631,12 @@
     "wof": 336,
     "binding_strip_width": 20,
     "binding_extra": 80,
-    "backing_margin": 64
+    "backing_margin": 64,
+    "backing_width": 336,
+    "wide_back_width": 864,
+    "backing_pieced_allowance": 72,
+    "backing_one_piece_allowance": 36,
+    "purchase_increment": 72
   },
   "provenance": {
     "source": "authored",
