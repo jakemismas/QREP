@@ -17,14 +17,17 @@ Fixture geometry (design doc, do not re-derive): 45x55 cells of 12 eighths
 
 import ast
 import base64
+import inspect
 import json
 import re
+import struct
 from pathlib import Path
 
 import pypdf
 import pytest
 
 from qrep import bridge
+from qrep.contract import CONTRACT_VERSION
 from qrep.export.pdf import SECTION_TITLES
 from qrep.export.yardage_report import render_yardage_md
 from qrep.construct.strategies import STRATEGIES
@@ -33,6 +36,9 @@ from qrep.render import save_render
 
 FIXTURE_PATH = Path(__file__).parent / "fixtures" / "double_irish_chain.json"
 GOLDEN_DIR = Path(__file__).parent / "golden"
+# The Pyodide suite mounts the whole checkout at /repo, so the web sources
+# resolve there too.
+ENGINE_TS_DIR = Path(__file__).parent.parent / "web" / "src" / "engine"
 
 
 @pytest.fixture
@@ -552,3 +558,180 @@ def test_resize_unlocked_uniform_grid_moves_by_single_squares():
 
 def test_resize_unlocked_no_target_is_value_kind(model_json):
     assert error_of(bridge.resize_unlocked(model_json, "{}"))["kind"] == "value"
+
+
+# ------------------------------------------------------ contract version (E1a)
+
+
+def test_contract_version_literals_agree():
+    # Plan section 4.2: a contract change bumps CONTRACT_VERSION in Python and
+    # TypeScript together, so the two literals must never differ.
+    source = (ENGINE_TS_DIR / "contract.ts").read_text(encoding="utf-8")
+    found = re.findall(r"^export const CONTRACT_VERSION = (\d+);$", source, re.MULTILINE)
+    assert len(found) == 1, f"expected one CONTRACT_VERSION literal in contract.ts, got {found}"
+    assert int(found[0]) == CONTRACT_VERSION
+    # E1a starts the v2 contract (SPEC.md section 12.1); later bumps only grow it.
+    assert CONTRACT_VERSION >= 2
+
+
+def test_contract_version_reports_the_python_literal():
+    assert ok_result(bridge.contract_version()) == {"contract_version": CONTRACT_VERSION}
+
+
+def _worker_bridge_methods() -> set[str]:
+    source = (ENGINE_TS_DIR / "worker.ts").read_text(encoding="utf-8")
+    block = re.search(r"const BRIDGE_METHODS = new Set\(\[(.*?)\]\);", source, re.DOTALL)
+    assert block is not None, "BRIDGE_METHODS not found in worker.ts"
+    names = set(re.findall(r'"([A-Za-z_]\w*)"', block.group(1)))
+    assert names, "BRIDGE_METHODS parsed to an empty set"
+    return names
+
+
+def test_worker_allowlist_equals_bridge_envelope_functions():
+    # The worker rejects any method outside BRIDGE_METHODS without touching
+    # Python, so a bridge function missing from it is unreachable and a stale
+    # name in it reaches Python as an AttributeError.
+    public = {
+        name
+        for name, fn in inspect.getmembers(bridge, inspect.isfunction)
+        if fn.__module__ == bridge.__name__ and not name.startswith("_")
+    }
+    unwrapped = sorted(name for name in public if not getattr(bridge, name).is_envelope)
+    assert unwrapped == [], f"public bridge functions without the envelope: {unwrapped}"
+    assert _worker_bridge_methods() == public
+
+
+# ------------------------------------------------------ error mapping (E1a)
+#
+# engine-16: validation for a wrong argument type or structure, naming the
+# field; value for a well-formed input the engine rejects, naming the input;
+# internal for an exception that signals an engine bug.
+
+NO_PHOTO = "/no/such/photo.png"
+
+
+@pytest.mark.parametrize(
+    ("call", "field"),
+    [
+        (lambda m: bridge.validate(42), "model_json"),
+        (lambda m: bridge.compare(m, None), "recovered_json"),
+        (lambda m: bridge.plan(m, 7), "strategy"),
+        (lambda m: bridge.export_pdf(m, ["strip"]), "strategy"),
+        (lambda m: bridge.render(m, "abc", 42, 2), "level"),
+        (lambda m: bridge.render(m, 0, 42, None), "scale"),
+        (lambda m: bridge.detect_quad(17), "image_path"),
+        (lambda m: bridge.reverse(17, "{}"), "image_path"),
+        (lambda m: bridge.reverse(NO_PHOTO, 5), "options_json"),
+        (lambda m: bridge.reverse(NO_PHOTO, "[]"), "options_json"),
+        (
+            lambda m: bridge.reverse(NO_PHOTO, json.dumps({"corners": [[0, 0], [9, 0], [9, 9]]})),
+            "options_json.corners",
+        ),
+        (
+            lambda m: bridge.reverse(NO_PHOTO, json.dumps({"corners": [["a", 0]] * 4})),
+            "options_json.corners",
+        ),
+        (
+            lambda m: bridge.reverse(NO_PHOTO, json.dumps({"finished_width": "abc"})),
+            "options_json.finished_width",
+        ),
+        (
+            lambda m: bridge.reverse(NO_PHOTO, json.dumps({"fabrics": "three"})),
+            "options_json.fabrics",
+        ),
+        (lambda m: bridge.apply_finished_size(m, "abc", None), "width"),
+        (lambda m: bridge.apply_finished_size(m, None, [600]), "height"),
+        (lambda m: bridge.resize_locked(m, 5), "target_json"),
+        (lambda m: bridge.resize_locked(m, "[]"), "target_json"),
+        (lambda m: bridge.resize_locked(m, json.dumps({"width": "abc"})), "target_json.width"),
+        (lambda m: bridge.resize_locked(m, json.dumps({"cell": None})), "target_json.cell"),
+        (
+            lambda m: bridge.resize_locked(m, json.dumps({"preset": {"width": "x", "height": 416}})),
+            "target_json.preset.width",
+        ),
+        (lambda m: bridge.resize_unlocked(m, json.dumps({"height": [1]})), "target_json.height"),
+    ],
+    ids=[
+        "validate-model",
+        "compare-recovered",
+        "plan-strategy",
+        "export-pdf-strategy",
+        "render-level",
+        "render-scale",
+        "detect-quad-path",
+        "reverse-path",
+        "reverse-options-number",
+        "reverse-options-array",
+        "reverse-three-corners",
+        "reverse-text-corners",
+        "reverse-finished-width",
+        "reverse-fabrics",
+        "apply-size-width",
+        "apply-size-height",
+        "resize-target-number",
+        "resize-target-array",
+        "resize-width-text",
+        "resize-cell-null",
+        "resize-preset-width-text",
+        "resize-unlocked-height-list",
+    ],
+)
+def test_argument_shape_errors_are_validation_kind_naming_the_field(model_json, call, field):
+    error = error_of(call(model_json))
+    assert error["kind"] == "validation"
+    assert field in error["message"]
+
+
+def test_unknown_strategy_stays_value_kind_naming_it(model_json):
+    error = error_of(bridge.plan(model_json, "no-such-strategy"))
+    assert error["kind"] == "value"
+    assert "no-such-strategy" in error["message"]
+
+
+@pytest.mark.parametrize(
+    ("preset", "named"),
+    [("Queen", "Queen"), ({"width": 288}, "288")],
+    ids=["preset-name", "preset-missing-height"],
+)
+def test_unknown_preset_is_value_kind_naming_it(model_json, preset, named):
+    # resize_locked takes a preset as {width, height} in eighths; anything else
+    # is a preset the bridge does not know.
+    error = error_of(bridge.resize_locked(model_json, json.dumps({"preset": preset})))
+    assert error["kind"] == "value"
+    assert "preset" in error["message"]
+    assert named in error["message"]
+
+
+@pytest.mark.parametrize("exception", [KeyError, TypeError, AttributeError])
+def test_engine_bug_exceptions_are_internal_kind(model_json, monkeypatch, exception):
+    def boom(_quilt):
+        raise exception("secret internals: /home/user/qrep/construct.py line 42")
+
+    monkeypatch.setitem(STRATEGIES, "historical", boom)
+    error = error_of(bridge.plan(model_json, "historical"))
+    assert error["kind"] == "internal"
+    assert "secret internals" not in error["message"]
+
+
+# --------------------------------------------------------- render scale (E1a)
+
+
+@pytest.mark.parametrize("scale", [0, 21])
+def test_render_scale_outside_the_documented_range_is_value_kind(scale):
+    error = error_of(bridge.render(mini_model(), 0, 42, scale))
+    assert error["kind"] == "value"
+    # The message names the documented range, 1 to RENDER_SCALE_MAX = 20.
+    assert "20" in error["message"]
+    assert bridge.RENDER_SCALE_MAX == 20
+
+
+def test_render_scale_at_the_maximum_renders():
+    # Mini model: finished width 7 cols x 20 + 2 x 2 = 144 eighths (18in),
+    # height 5 x 20 + 4 = 104 eighths (13in). At 20 px per inch:
+    # 144 x 20 / 8 = 360 px and 104 x 20 / 8 = 260 px; margin =
+    # round(0.08 x 360) = round(28.8) = 29 px per side (renderer.py
+    # MARGIN_FRACTION). L0 adds nothing else: 360 + 58 = 418 by 260 + 58 = 318.
+    result = ok_result(bridge.render(mini_model(), 0, 42, 20))
+    png = base64.b64decode(result["png_b64"])
+    width, height = struct.unpack(">II", png[16:24])  # IHDR width, height
+    assert (width, height) == (418, 318)

@@ -6,6 +6,7 @@
  * with every call - so the client may terminate and re-boot at any time.
  */
 import type { PyodideInterface } from "pyodide";
+import { contractMismatch, engineContractVersion } from "./contract";
 
 interface InitMessage {
   type: "init";
@@ -28,7 +29,9 @@ type InMessage = InitMessage | CallMessage | LoadVisionMessage;
 type LoadPyodide = (options: { indexURL: string }) => Promise<PyodideInterface>;
 
 // The bridge surface; anything else is rejected without touching Python.
+// tests/test_bridge.py keeps this list equal to the bridge's envelope functions.
 const BRIDGE_METHODS = new Set([
+  "contract_version",
   "validate",
   "plan",
   "export_cutlist_md",
@@ -111,6 +114,14 @@ async function boot(baseUrl: string): Promise<PyodideInterface> {
     "import micropip\nawait micropip.install(list(wheel_urls), deps=False)",
   );
   pyodide.runPython("import qrep.bridge");
+  // A cached wheel from another release must not serve this page, so the
+  // contract check runs before boot-done; throwing here posts boot-failed.
+  // A wheel that predates contract_version() reads as no version.
+  const raw: unknown = pyodide.runPython(
+    "qrep.bridge.contract_version() if hasattr(qrep.bridge, 'contract_version') else None",
+  );
+  const mismatch = contractMismatch(engineContractVersion(raw));
+  if (mismatch !== null) throw new Error(mismatch);
   return pyodide;
 }
 
