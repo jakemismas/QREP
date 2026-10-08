@@ -20,7 +20,10 @@ commit, so one bless cannot excuse another commit's edit:
     that touch tests/golden/ are judged, so a body elsewhere in the branch
     that mentions the marker in passing excuses nothing. git's
     'Revert "... [bless]"' and 'Reapply "... [bless]"' subjects do not count
-    by their quoted part: undoing a bless is not a bless;
+    by their quoted part, and neither does the reference that
+    `git revert --reference` (or revert.reference=true) writes, 'This reverts
+    commit <sha> (... [bless], <date>)', in the subject or the body: undoing a
+    bless is not a bless;
   - every golden file the merge changes must end with the content (blob and
     mode) that one of those commits wrote. A merge commit therefore cannot
     leave golden content that no commit in the range produced: a hand-resolved
@@ -35,6 +38,7 @@ that conflicts with <base>, which leaves no merge result to judge).
 from __future__ import annotations
 
 import io
+import re
 import subprocess
 import sys
 from collections.abc import Mapping
@@ -45,6 +49,22 @@ GUARDED_PATHS = ("tests/golden/",)
 BLESS_MARKER = "[bless]"
 # git's own subjects for undoing or redoing a commit quote the original one.
 REWRAP_PREFIXES = ('Revert "', 'Reapply "')
+# git revert --reference names the undone commit as "<short sha> (<subject>,
+# <date>)", always with a short date, and a merge revert names the mainline
+# parent the same way after ", reversing changes made to". Without --edit the
+# reference is in the body; with --edit and an untouched message, cleanup drops
+# git's '#' title and the reference becomes the subject. A match runs to the
+# last such date in its paragraph, so it takes an undone subject that holds its
+# own parentheses and a merge revert's second reference; a marker after that
+# date still counts, one before a later dated reference in the same paragraph
+# does not. A reference that lost its closing date (cleanup drops a wrapped
+# line that starts with '#') runs to the end of its paragraph instead, so the
+# undone commit's marker never survives a cut.
+REVERT_REFERENCE = re.compile(
+    r"This\s+reverts\s+commit\s+[0-9a-f]{4,}\s+\((?:.*,\s+\d{4,}-\d{2}-\d{2}\)|.*)", re.ASCII
+)
+# git ends a paragraph at a line that holds only spaces or tabs, too.
+PARAGRAPH_BREAK = re.compile(r"\n[ \t]*\n")
 
 
 @dataclass(frozen=True)
@@ -66,7 +86,18 @@ def is_bless_subject(subject: str) -> bool:
         # marker outside the quotes makes this commit a bless.
         opening, closing = text.find('"'), text.rfind('"')
         text = text[closing + 1 :] if closing > opening else ""
-    return BLESS_MARKER in text
+    return BLESS_MARKER in without_revert_references(text)
+
+
+def without_revert_references(text: str) -> str:
+    """The text with git's revert references cut out, one paragraph at a time.
+
+    An editor may wrap a reference across lines (git's %s rejoins a wrapped
+    subject the same way), so each paragraph's lines are joined first. A space
+    stands in for each reference, so the text around it cannot join into a marker.
+    """
+    paragraphs = PARAGRAPH_BREAK.split(text.replace("\r\n", "\n"))
+    return "\n\n".join(REVERT_REFERENCE.sub(" ", " ".join(p.split("\n"))) for p in paragraphs)
 
 
 def message_body(message: str) -> str:
@@ -76,7 +107,8 @@ def message_body(message: str) -> str:
 
 
 def is_bless(commit: GoldenCommit) -> bool:
-    return is_bless_subject(commit.subject) or BLESS_MARKER in message_body(commit.message)
+    body = without_revert_references(message_body(commit.message))
+    return is_bless_subject(commit.subject) or BLESS_MARKER in body
 
 
 def _wrote_final(commit: GoldenCommit, path: str, final: Mapping[str, str | None] | None) -> bool:

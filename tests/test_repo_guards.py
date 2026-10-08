@@ -575,6 +575,30 @@ def test_a_golden_change_no_commit_explains_fails():
         ('Revert "Re-render top diagram [bless]"', False),
         ('Reapply "Re-render top diagram [bless]"', False),
         ('Revert "Re-render top diagram [bless]" [bless]', True),
+        # git revert --reference --edit, message left as written: cleanup drops
+        # the '#' placeholder title and the reference line becomes the subject.
+        # Its parentheses hold the undone commit's subject, and undoing a bless
+        # is not a bless (CLAUDE.md bless rule, #110).
+        ("This reverts commit b3453a7 (Bless v2 [bless], 2026-10-07).", False),
+        (
+            "This reverts commit 5893813ae3cf (Bless v2 (round 2, take 3) [bless], 2026-10-07).",
+            False,
+        ),
+        (
+            "This reverts commit bb12ee2 (Merge side, 2026-10-07), reversing changes made to "
+            "5893813 (Bless v2 [bless], 2026-10-07).",
+            False,
+        ),
+        # A marker after git's closing date is the commit's own (#110, criterion
+        # 3), and a subject that is not a revert keeps the plain rule (Non-goals).
+        (
+            "This reverts commit 1a2b3c4 (Bless v2 [bless], 2026-10-07). "
+            "Restores v1 as approved in #91 [bless] (Jake).",
+            True,
+        ),
+        ("Re-bless changes made to 0f58109 (border [bless], #91)", True),
+        # A reflowed reference that cleanup cut before git's closing date.
+        ("This reverts commit e91f724 (Bless v2 golden [bless] as approved on", False),
     ],
 )
 def test_only_a_subject_of_its_own_marks_a_bless(subject, blessed):
@@ -598,6 +622,68 @@ def test_only_a_subject_of_its_own_marks_a_bless(subject, blessed):
         ("Re-render top diagram\r\n\r\nApproved in #91 as a [bless].\r\n", True),
         ("Re-render top diagram\n\nNo marker here.\n", False),
         ('Revert "Re-render top diagram [bless]"\n\nThis reverts commit 0123abcd.\n', False),
+        # git revert --reference: the reference to the undone commit holds its
+        # subject, and that marker is not this commit's (CLAUDE.md bless rule,
+        # #110), even where an editor wrapped the reference line.
+        (
+            "# *** SAY WHY WE ARE REVERTING ON THE TITLE LINE ***\n\n"
+            "This reverts commit b3453a7 (Bless v2 [bless], 2026-10-07).\n",
+            False,
+        ),
+        (
+            "Undo the top diagram re-render\n\n"
+            "This reverts commit 4eb4605 (Re-render the quilt top diagram after the\n"
+            "border fix [bless], 2026-10-07).\n",
+            False,
+        ),
+        # Cutting a reference out must not join the text around it into a marker.
+        ("Re-render top diagram\n\nOK [blThis reverts commit abcd (x, 2026-10-07)ess]\n", False),
+        # A reflowed reference whose second line started with '#91': commit
+        # cleanup dropped that line, so git's closing date is gone.
+        (
+            "Undo the v2 top golden\n\n"
+            "This reverts commit e91f724 (Bless v2 golden [bless] as approved on\n",
+            False,
+        ),
+        # git prints a year past 9999 with five digits.
+        ("Undo v2\n\nThis reverts commit b89b007 (Bless v2 [bless], 10000-01-01).\n", False),
+        (
+            "Undo the v2 golden\n\nThis reverts commit bb65318 (Bless v2 [bless], 2026-10-07).\n",
+            False,
+        ),
+        (
+            "Undo the merge\n\nThis reverts commit bb12ee2 (Merge side, 2026-10-07), reversing\n"
+            "changes made to 5893813 (Bless v2 [bless], 2026-10-07).\n",
+            False,
+        ),
+        (
+            "Restore the v1 golden [bless]\n\n"
+            "This reverts commit bb65318 (Bless v2 [bless], 2026-10-07).\n",
+            True,
+        ),
+        (
+            "Undo the v2 golden\n\nThis reverts commit bb65318 (Bless v2 [bless], 2026-10-07).\n\n"
+            "Approved in #91 as a [bless].\n",
+            True,
+        ),
+        # The revert's own marker after git's closing date, and a commit that is
+        # not a revert, keep counting (#110, criterion 3 and Non-goals).
+        (
+            "Undo the v2 golden\n\nThis reverts commit bb65318 (Bless v2 [bless], 2026-10-07). "
+            "Approved as a [bless] (#91).\n",
+            True,
+        ),
+        # A line of only spaces ends the reference's paragraph, as it does for git.
+        (
+            "Undo v2\n\nThis reverts commit bb65318 (Bless v2 [bless], 2026-10-07).\n \n"
+            "Re-blessed v1 [bless] (Jake, 2026-10-08).\n",
+            True,
+        ),
+        (
+            "Re-render cut list\n\nRe-rendered after the changes made to 5893813 (cut widths) "
+            "as the one [bless] (REBASELINE item 4).\n",
+            True,
+        ),
     ],
 )
 def test_a_marker_anywhere_in_the_commits_own_message_marks_a_bless(message, blessed):
@@ -637,6 +723,13 @@ def test_a_golden_deletion_by_a_bless_commit_passes():
 # git-backed runs of the real scripts
 
 
+PINNED_GIT_CONFIG = {
+    "core.commentChar": "#",
+    "commit.cleanup": "default",
+    "revert.reference": "false",
+}
+
+
 def _git_env() -> dict[str, str]:
     env = dict(os.environ)
     configured = subprocess.run(["git", "config", "user.email"], capture_output=True, text=True)
@@ -647,12 +740,24 @@ def _git_env() -> dict[str, str]:
             GIT_COMMITTER_NAME="qrep tests",
             GIT_COMMITTER_EMAIL="tests@qrep.invalid",
         )
+    # A developer's own settings would change the messages git revert writes,
+    # and so the forms the revert tests build. A -c option still overrides these.
+    count = int(env.get("GIT_CONFIG_COUNT") or 0)
+    for index, (key, value) in enumerate(PINNED_GIT_CONFIG.items(), start=count):
+        env[f"GIT_CONFIG_KEY_{index}"] = key
+        env[f"GIT_CONFIG_VALUE_{index}"] = value
+    env["GIT_CONFIG_COUNT"] = str(count + len(PINNED_GIT_CONFIG))
     return env
 
 
-def _git(repo: Path, *args: str) -> str:
+def _git(repo: Path, *args: str, **env: str) -> str:
     result = subprocess.run(
-        ["git", *args], cwd=repo, env=_git_env(), capture_output=True, text=True, check=True
+        ["git", *args],
+        cwd=repo,
+        env={**_git_env(), **env},
+        capture_output=True,
+        text=True,
+        check=True,
     )
     return result.stdout.strip()
 
@@ -756,6 +861,84 @@ def test_golden_guard_script_fails_a_revert_of_a_bless(repo):
     head = _git(repo, "rev-parse", "HEAD")
     assert _git(repo, "log", "-1", "--format=%s").startswith('Revert "')
     result = _run(repo, "golden_guard.py", base, head)
+    assert result.returncode == 1, result.stdout + result.stderr
+
+
+# git revert --reference, or revert.reference=true, names the undone commit as
+# "<short sha> (<subject>, <date>)" (git-revert(1), --pretty=reference), so the
+# undone subject's [bless] sits outside any 'Revert "..."' quotes (#110).
+REFERENCED_BLESS = "(Re-render cut list [bless], "
+# Stands in for a person who types a new title over git's placeholder line.
+RETITLE = (
+    "import sys\n"
+    "from pathlib import Path\n"
+    "path = Path(sys.argv[2])\n"
+    "lines = path.read_text(encoding='utf-8').splitlines(keepends=True)\n"
+    "path.write_text(sys.argv[1] + '\\n' + ''.join(lines[1:]), encoding='utf-8', newline='')\n"
+)
+
+
+def _revert_a_bless(repo: Path, *revert: str, **env: str) -> str:
+    """Bless the cut list, branch, and revert the bless with `git <revert> HEAD`.
+    Returns the base."""
+    _commit(repo, "Re-render cut list [bless]", {CUT: "a,b,c\n"})
+    base = _start_branch(repo)
+    _git(repo, *revert, "HEAD", **env)
+    return base
+
+
+@needs_git
+@pytest.mark.parametrize(
+    "revert",
+    [
+        ("revert", "--reference", "--no-edit"),
+        ("-c", "revert.reference=true", "revert", "--no-edit"),
+    ],
+)
+def test_golden_guard_script_fails_a_reference_revert_of_a_bless(repo, revert):
+    base = _revert_a_bless(repo, *revert)
+    # Prove git wrote the reference form, so the exit code below judges it.
+    assert _git(repo, "log", "-1", "--format=%s").startswith("# *** SAY WHY")
+    assert REFERENCED_BLESS in _git(repo, "log", "-1", "--format=%b")
+    # Expected exit 1: the only [bless] is the undone commit's, and undoing a
+    # bless is not a bless (CLAUDE.md bless rule, #110).
+    result = _run(repo, "golden_guard.py", base, "HEAD")
+    assert result.returncode == 1, result.stdout + result.stderr
+
+
+@needs_git
+@pytest.mark.parametrize(
+    ("title", "exit_code"),
+    [
+        # Only the undone commit's marker is in the message: exit 1.
+        ("Undo the cut list re-render", 1),
+        # The revert's own title carries [bless], so it blesses its own edit: exit 0.
+        ("Restore the old cut list [bless]", 0),
+    ],
+)
+def test_golden_guard_script_judges_a_reference_revert_by_its_own_title(
+    repo, tmp_path, title, exit_code
+):
+    retitle = tmp_path / "retitle.py"
+    retitle.write_text(RETITLE, encoding="utf-8")
+    editor = f'"{Path(sys.executable).as_posix()}" "{retitle.as_posix()}" "{title}"'
+    base = _revert_a_bless(repo, "revert", "--reference", "--edit", GIT_EDITOR=editor)
+    assert _git(repo, "log", "-1", "--format=%s") == title
+    assert REFERENCED_BLESS in _git(repo, "log", "-1", "--format=%b")
+    result = _run(repo, "golden_guard.py", base, "HEAD")
+    assert result.returncode == exit_code, result.stdout + result.stderr
+
+
+@needs_git
+def test_golden_guard_script_fails_a_reference_revert_whose_title_git_dropped(repo):
+    # With --edit, commit cleanup drops git's '#' placeholder title, so an
+    # untouched message makes the reference line itself the subject. ':' is
+    # git's no-op editor.
+    base = _revert_a_bless(repo, "revert", "--reference", "--edit", GIT_EDITOR=":")
+    subject = _git(repo, "log", "-1", "--format=%s")
+    assert subject.startswith("This reverts commit ") and REFERENCED_BLESS in subject
+    # Expected exit 1, for the same reason as the --no-edit forms.
+    result = _run(repo, "golden_guard.py", base, "HEAD")
     assert result.returncode == 1, result.stdout + result.stderr
 
 
