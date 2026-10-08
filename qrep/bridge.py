@@ -8,10 +8,11 @@ typed envelope serialized as JSON:
 
 Error kinds (engine-16) tell your input errors from engine bugs:
 schema (malformed JSON or unknown schema_version); validation (a model that
-fails pydantic validation, or a bridge argument with the wrong type or
-structure, with the field named); value (a well-formed input the engine
-rejects: an unknown strategy or preset, an out-of-range level or scale, a
-missing or unreadable image, each named); not_implemented (stubbed
+fails pydantic validation, a call with the wrong number of arguments, or a
+bridge argument with the wrong type or structure, with the field named);
+value (an input the engine cannot use: an unknown strategy or preset, a
+level, seed, scale or fabric count out of range, a missing or unreadable
+image, each named); not_implemented (stubbed
 strategies); internal (anything else, including a KeyError, TypeError or
 AttributeError raised inside the engine, which signals an engine bug;
 generic message, no stringified tracebacks reach the UI).
@@ -46,7 +47,9 @@ when a confidence grid exists).
 """
 
 import base64
+import inspect
 import json
+import math
 import shutil
 import tempfile
 import uuid
@@ -83,11 +86,13 @@ QUARTER = 2  # 1/4" in eighths
 
 # Largest render() scale, in pixels per inch (engine-16). The web renders at
 # 10 (its demo and round-trip panel) and so does the renderer by default, so
-# 20 doubles the headroom. At the bridge's 140" size ceiling (DIM_MAX), scale
-# 20 makes the L0 image 2800 px plus a 224 px margin per side (renderer
-# MARGIN_FRACTION 0.08 x 2800): 3248 x 3248 px, about 10.5 megapixels. Levels
-# 2 and 3 hold float64 copies of it at 3248 x 3248 x 3 x 8 bytes, about 253 MB
-# each, and memory grows with the square of the scale.
+# 20 doubles the headroom. The bound caps the multiplier, not the image: the
+# image also grows with the quilt, which render() does not bound. For scale,
+# a quilt at the 140" resize ceiling (DIM_MAX) renders at 2800 px plus a
+# 224 px margin per side (renderer MARGIN_FRACTION 0.08 x 2800): 3248 x 3248
+# px, about 10.5 megapixels. Levels 1 to 3 build float64 working arrays of
+# that order, 3248 x 3248 x 3 x 8 bytes (about 253 MB) for a full RGB copy,
+# and every one grows with the square of the scale.
 RENDER_SCALE_MAX = 20
 
 
@@ -108,8 +113,16 @@ def _error(kind: str, message: str) -> str:
 
 def _envelope(fn):
     """Wraps a bridge body: exceptions become typed error envelopes."""
+    signature = inspect.signature(fn)
 
     def wrapper(*args, **kwargs) -> str:
+        try:
+            signature.bind(*args, **kwargs)
+        except TypeError as e:
+            # A call with the wrong number of arguments is the request's
+            # shape, not an engine bug; binding first keeps it out of the
+            # catch-all below.
+            return _error("validation", f"argument failed validation: {fn.__name__}: {e}")
         try:
             return _ok(fn(*args, **kwargs))
         except _ArgumentError as e:
@@ -153,15 +166,14 @@ def _json_object(field: str, value) -> dict:
 
 
 def _whole(field: str, value) -> int:
-    # int() as before, so every number the bridge already accepted still works;
-    # only the inputs int() refuses change kind, from value or internal to
-    # validation.
-    try:
+    # Exact whole numbers only: int() would truncate 20.9 to 20 past a range
+    # check and read true or "600" as numbers. The web sends integer eighths,
+    # which Pyodide hands over as int.
+    if isinstance(value, int) and not isinstance(value, bool):
+        return value
+    if isinstance(value, float) and value.is_integer():
         return int(value)
-    except (TypeError, ValueError, OverflowError):
-        raise _ArgumentError(
-            field, f"must be a whole number, got {type(value).__name__}"
-        ) from None
+    raise _ArgumentError(field, f"must be a whole number, got {type(value).__name__}")
 
 
 def _load(model_json: str, field: str = "model_json") -> Quilt:
@@ -297,6 +309,8 @@ def render(model_json: str, level: int, seed: int, scale: int) -> dict:
     scale = _whole("scale", scale)
     if not 0 <= level <= 3:
         raise ValueError(f"level must be 0..3, got {level}")
+    if seed < 0:
+        raise ValueError(f"seed must be 0 or more, got {seed}")
     if not 1 <= scale <= RENDER_SCALE_MAX:
         raise ValueError(f"scale must be 1..{RENDER_SCALE_MAX} pixels per inch, got {scale}")
     quilt = _load(model_json)
@@ -390,13 +404,16 @@ def reverse(image_path: str, options_json: str) -> dict:
     "finished_height": int}, the finished sizes in eighths.
     """
     _text("image_path", image_path)
-    options = _json_object("options_json", options_json) if options_json else {}
+    no_options = options_json is None or options_json == ""
+    options = {} if no_options else _json_object("options_json", options_json)
     corners = options.get("corners")
     if corners is not None:
         corners = _corners(corners)
     fabrics = options.get("fabrics")
-    if fabrics is not None and (isinstance(fabrics, bool) or not isinstance(fabrics, int)):
-        raise _ArgumentError("options_json.fabrics", "must be a whole number or null")
+    if fabrics is not None:
+        fabrics = _whole("options_json.fabrics", fabrics)
+        if fabrics < 1:
+            raise ValueError(f"fabrics must be at least 1, got {fabrics}")
 
     def _size_option(key: str) -> int | None:
         value = options.get(key)
@@ -442,11 +459,19 @@ def _corners(value) -> list[tuple[float, float]]:
     for point in value:
         if not isinstance(point, list) or len(point) != 2:
             raise _ArgumentError(field, shape)
-        try:
-            points.append((float(point[0]), float(point[1])))
-        except (TypeError, ValueError):
-            raise _ArgumentError(field, "each coordinate must be a number") from None
+        points.append((_coordinate(field, point[0]), _coordinate(field, point[1])))
     return points
+
+
+def _coordinate(field: str, value) -> float:
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        try:
+            number = float(value)
+        except OverflowError:
+            number = math.inf
+        if math.isfinite(number):
+            return number
+    raise _ArgumentError(field, "each coordinate must be a finite number")
 
 
 def _jsonable(value):
@@ -547,7 +572,13 @@ def resize_locked(model_json: str, target_json: str) -> dict:
 
     if "preset" in target:
         preset = target["preset"]
-        if not isinstance(preset, dict) or not {"width", "height"} <= preset.keys():
+        if not isinstance(preset, dict):
+            raise _ArgumentError(
+                "target_json.preset", "must be an object with a width and a height in eighths"
+            )
+        # A preset object without both sizes was kind value before the
+        # KeyError mapping went; it stays value, now naming the preset.
+        if not {"width", "height"} <= preset.keys():
             raise ValueError(
                 f"unknown preset {json.dumps(preset)}; a preset target gives a width "
                 "and a height in eighths"

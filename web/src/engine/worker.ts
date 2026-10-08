@@ -6,7 +6,7 @@
  * with every call - so the client may terminate and re-boot at any time.
  */
 import type { PyodideInterface } from "pyodide";
-import { contractMismatch, engineContractVersion } from "./contract";
+import { assertEngineContract, bridgeArgs } from "./contract";
 
 interface InitMessage {
   type: "init";
@@ -116,12 +116,7 @@ async function boot(baseUrl: string): Promise<PyodideInterface> {
   pyodide.runPython("import qrep.bridge");
   // A cached wheel from another release must not serve this page, so the
   // contract check runs before boot-done; throwing here posts boot-failed.
-  // A wheel that predates contract_version() reads as no version.
-  const raw: unknown = pyodide.runPython(
-    "qrep.bridge.contract_version() if hasattr(qrep.bridge, 'contract_version') else None",
-  );
-  const mismatch = contractMismatch(engineContractVersion(raw));
-  if (mismatch !== null) throw new Error(mismatch);
+  assertEngineContract((code) => pyodide.runPython(code));
   return pyodide;
 }
 
@@ -200,7 +195,7 @@ async function serve(message: CallMessage): Promise<void> {
     }
     const bridge = pyodide.pyimport("qrep.bridge");
     try {
-      const raw: string = bridge[method](...args);
+      const raw: string = bridge[method](...bridgeArgs(args));
       scope.postMessage({ type: "result", id: message.id, envelope: JSON.parse(raw) });
     } finally {
       bridge.destroy();

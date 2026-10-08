@@ -596,7 +596,9 @@ def test_worker_allowlist_equals_bridge_envelope_functions():
         for name, fn in inspect.getmembers(bridge, inspect.isfunction)
         if fn.__module__ == bridge.__name__ and not name.startswith("_")
     }
-    unwrapped = sorted(name for name in public if not getattr(bridge, name).is_envelope)
+    unwrapped = sorted(
+        name for name in public if not getattr(getattr(bridge, name), "is_envelope", False)
+    )
     assert unwrapped == [], f"public bridge functions without the envelope: {unwrapped}"
     assert _worker_bridge_methods() == public
 
@@ -618,10 +620,14 @@ NO_PHOTO = "/no/such/photo.png"
         (lambda m: bridge.plan(m, 7), "strategy"),
         (lambda m: bridge.export_pdf(m, ["strip"]), "strategy"),
         (lambda m: bridge.render(m, "abc", 42, 2), "level"),
+        (lambda m: bridge.render(m, True, 42, 2), "level"),
         (lambda m: bridge.render(m, 0, 42, None), "scale"),
+        # 20.9 is not a whole scale; truncating it to 20 would pass the range.
+        (lambda m: bridge.render(m, 0, 42, 20.9), "scale"),
         (lambda m: bridge.detect_quad(17), "image_path"),
         (lambda m: bridge.reverse(17, "{}"), "image_path"),
         (lambda m: bridge.reverse(NO_PHOTO, 5), "options_json"),
+        (lambda m: bridge.reverse(NO_PHOTO, 0), "options_json"),
         (lambda m: bridge.reverse(NO_PHOTO, "[]"), "options_json"),
         (
             lambda m: bridge.reverse(NO_PHOTO, json.dumps({"corners": [[0, 0], [9, 0], [9, 9]]})),
@@ -632,7 +638,15 @@ NO_PHOTO = "/no/such/photo.png"
             "options_json.corners",
         ),
         (
+            lambda m: bridge.reverse(NO_PHOTO, json.dumps({"corners": [["1", "1"]] * 4})),
+            "options_json.corners",
+        ),
+        (
             lambda m: bridge.reverse(NO_PHOTO, json.dumps({"finished_width": "abc"})),
+            "options_json.finished_width",
+        ),
+        (
+            lambda m: bridge.reverse(NO_PHOTO, json.dumps({"finished_width": True})),
             "options_json.finished_width",
         ),
         (
@@ -640,11 +654,14 @@ NO_PHOTO = "/no/such/photo.png"
             "options_json.fabrics",
         ),
         (lambda m: bridge.apply_finished_size(m, "abc", None), "width"),
+        (lambda m: bridge.apply_finished_size(m, True, None), "width"),
         (lambda m: bridge.apply_finished_size(m, None, [600]), "height"),
         (lambda m: bridge.resize_locked(m, 5), "target_json"),
         (lambda m: bridge.resize_locked(m, "[]"), "target_json"),
         (lambda m: bridge.resize_locked(m, json.dumps({"width": "abc"})), "target_json.width"),
+        (lambda m: bridge.resize_locked(m, json.dumps({"width": "600"})), "target_json.width"),
         (lambda m: bridge.resize_locked(m, json.dumps({"cell": None})), "target_json.cell"),
+        (lambda m: bridge.resize_locked(m, json.dumps({"preset": "Queen"})), "target_json.preset"),
         (
             lambda m: bridge.resize_locked(m, json.dumps({"preset": {"width": "x", "height": 416}})),
             "target_json.preset.width",
@@ -657,21 +674,29 @@ NO_PHOTO = "/no/such/photo.png"
         "plan-strategy",
         "export-pdf-strategy",
         "render-level",
+        "render-level-bool",
         "render-scale",
+        "render-scale-fraction",
         "detect-quad-path",
         "reverse-path",
         "reverse-options-number",
+        "reverse-options-zero",
         "reverse-options-array",
         "reverse-three-corners",
         "reverse-text-corners",
+        "reverse-numeric-text-corners",
         "reverse-finished-width",
+        "reverse-finished-width-bool",
         "reverse-fabrics",
         "apply-size-width",
+        "apply-size-width-bool",
         "apply-size-height",
         "resize-target-number",
         "resize-target-array",
         "resize-width-text",
+        "resize-width-numeric-text",
         "resize-cell-null",
+        "resize-preset-name",
         "resize-preset-width-text",
         "resize-unlocked-height-list",
     ],
@@ -679,7 +704,23 @@ NO_PHOTO = "/no/such/photo.png"
 def test_argument_shape_errors_are_validation_kind_naming_the_field(model_json, call, field):
     error = error_of(call(model_json))
     assert error["kind"] == "validation"
-    assert field in error["message"]
+    assert error["message"].startswith(f"argument failed validation: {field}: ")
+
+
+@pytest.mark.parametrize(
+    ("call", "named"),
+    [
+        (lambda m: bridge.plan(m), "strategy"),
+        (lambda m: bridge.render(m, 0, 42), "scale"),
+        (lambda m: bridge.contract_version(1), "too many"),
+        (lambda m: bridge.validate(m, "extra"), "too many"),
+    ],
+    ids=["plan-missing", "render-missing", "contract-version-extra", "validate-extra"],
+)
+def test_wrong_argument_count_is_validation_kind(model_json, call, named):
+    error = error_of(call(model_json))
+    assert error["kind"] == "validation"
+    assert named in error["message"]
 
 
 def test_unknown_strategy_stays_value_kind_naming_it(model_json):
@@ -690,15 +731,29 @@ def test_unknown_strategy_stays_value_kind_naming_it(model_json):
 
 @pytest.mark.parametrize(
     ("preset", "named"),
-    [("Queen", "Queen"), ({"width": 288}, "288")],
-    ids=["preset-name", "preset-missing-height"],
+    [({"width": 288}, '"width": 288'), ({}, "{}")],
+    ids=["preset-missing-height", "preset-empty"],
 )
-def test_unknown_preset_is_value_kind_naming_it(model_json, preset, named):
-    # resize_locked takes a preset as {width, height} in eighths; anything else
-    # is a preset the bridge does not know.
+def test_unknown_preset_stays_value_kind_naming_it(model_json, preset, named):
+    # A preset object without both sizes was kind value through the old
+    # KeyError mapping; it stays value, and the message now quotes the preset.
     error = error_of(bridge.resize_locked(model_json, json.dumps({"preset": preset})))
     assert error["kind"] == "value"
-    assert "preset" in error["message"]
+    assert error["message"].startswith("unknown preset ")
+    assert named in error["message"]
+
+
+@pytest.mark.parametrize(
+    ("call", "named"),
+    [
+        (lambda: bridge.render(mini_model(), 0, -1, 2), "seed"),
+        (lambda: bridge.reverse(NO_PHOTO, json.dumps({"fabrics": 0})), "fabrics"),
+    ],
+    ids=["render-negative-seed", "reverse-zero-fabrics"],
+)
+def test_out_of_range_inputs_are_value_kind_naming_them(call, named):
+    error = error_of(call())
+    assert error["kind"] == "value"
     assert named in error["message"]
 
 
