@@ -12,6 +12,7 @@ from qrep.construct import (
     plan_modern,
     plan_strip,
 )
+from qrep.construct.finishing import backing_plan
 from qrep.model import (
     Binding,
     BorderBand,
@@ -85,12 +86,15 @@ def test_yardage_hand_computed_on_tiny_quilt():
     assert lines["w"].length_needed == 9
     assert lines["w"].quarter_yards == 1
 
-    # backing: panels = ceil((48+64)/336) = 1; length = 48 + 64 = 112;
-    # quarter yards = ceil(112/72) = 2 -> 0.5 yd. Dedicated line, id None.
+    # backing (MATH.md V-TOP-04): Wb = Lb = 6 + 8 = 14 in (112 e) <= 42 -> one
+    # piece either way; tie -> vertical; total = 112 + 36 = 148 e (the 4 1/2 in
+    # one-piece allowance); qy = ceil(148/72) = ceil(2.06) = 3 -> 0.75 yd.
+    # Dedicated line, id None.
     backing = lines[None]
     assert backing.length_needed == 112
-    assert backing.quarter_yards == 2
-    assert backing.yards == 0.5
+    assert backing_plan(48, 48, quilt.settings).purchase == 148
+    assert backing.quarter_yards == 3
+    assert backing.yards == 0.75
     # every value is a whole number of quarter yards by construction
     assert all(line.yards * 4 == line.quarter_yards for line in report.lines)
 
@@ -203,11 +207,13 @@ def test_fixture_backing_line():
     quilt = make_double_irish_chain()
     report = compute_yardage(quilt, plan_historical(quilt))
     backing = next(line for line in report.lines if line.fabric_id is None)
-    # panels = ceil((600+64)/336) = 2; length = 2 x (720+64) = 1568 eighths
-    # = 196 inches; quarter yards = ceil(1568/72) = 22 -> 5.5 yd
+    # MATH.md V-BACK-09: Wb = 83 in (664 e), Lb = 98 in (784 e)
+    # vertical: n(83) = ceil(82/41) = 2 exactly; 2 x 98 = 196 in (1568 e); + 9 = 205 in (1640 e)
+    # horizontal: n(98) = 3; 3 x 83 = 249; + 9 = 258 -> keep vertical
+    # length_needed = 1568 e; quarter yards = ceil(1640/72) = 23 -> 5.75 yd
     assert backing.length_needed == 1568
-    assert backing.quarter_yards == 22
-    assert backing.yards == 5.5
+    assert backing.quarter_yards == 23
+    assert backing.yards == 5.75
 
 
 def test_metrics_carry_heuristic_label_and_zero_bias():

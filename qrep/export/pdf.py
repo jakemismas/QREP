@@ -11,7 +11,6 @@ strings is format_inches / format_yards.
 
 from __future__ import annotations
 
-from math import ceil
 from pathlib import Path
 from xml.sax.saxutils import escape
 
@@ -28,15 +27,18 @@ from reportlab.platypus import (
     TableStyle,
 )
 
+from qrep.construct.finishing import (
+    BACKING_SEAM_LOSS,
+    backing_plan,
+    batting_package_text,
+    batting_plan,
+    quilt_binding_plan,
+)
 from qrep.construct.plan import ConstructionPlan
 from qrep.construct.yardage import compute_purchase_lines
 from qrep.export.yardage_report import format_yards
 from qrep.model.schema import Quilt
 from qrep.model.units import format_inches
-
-# Batting is cut to the finished top plus 8 inches on each dimension (4 inches
-# of overhang per side), the standard long-arm loading allowance.
-BATTING_MARGIN_EIGHTHS = 64
 
 SECTION_TITLES = (
     "Introduction",
@@ -208,7 +210,7 @@ def _borders(quilt: Quilt, names: dict[str, str]) -> Section:
 
 
 def _binding(quilt: Quilt, names: dict[str, str]) -> Section:
-    strips = ceil(quilt.binding_length / quilt.settings.wof)
+    strips = quilt_binding_plan(quilt).strips
     return Section(
         title="Binding",
         paragraphs=[
@@ -220,12 +222,45 @@ def _binding(quilt: Quilt, names: dict[str, str]) -> Section:
     )
 
 
-def _finishing(quilt: Quilt, purchase) -> Section:
+def _backing_text(quilt: Quilt, purchase) -> list[str]:
     backing = next(line for line in purchase.lines if line.purpose == "backing")
+    plan = backing_plan(quilt.finished_width, quilt.finished_height, quilt.settings)
+    fabric = format_inches(quilt.settings.backing_width)
+    length = format_inches(plan.panel_length)
+    yards = format_yards(backing.quarter_yards)
+    if plan.panels == 1:
+        text = f"Backing: cut one piece {length} long from {fabric} wide fabric, with no seams."
+    else:
+        direction = "top to bottom" if plan.seams == "vertical" else "side to side"
+        text = (
+            f"Backing: cut ({plan.panels}) panels {length} long from {fabric} wide fabric "
+            f"and join them side by side with {format_inches(BACKING_SEAM_LOSS // 2)} seams "
+            f"pressed open, so the seams run {direction}."
+        )
+    paragraphs = [f"{text} Buy {yards}."]
+    wide = purchase.wide_back
+    if wide is not None:
+        paragraphs.append(
+            f"Or use one piece of {format_inches(quilt.settings.wide_back_width)} wide fabric, "
+            f"{format_inches(wide.length_needed)} long, with no seams. "
+            f"Buy {format_yards(wide.quarter_yards)}."
+        )
+    return paragraphs
+
+
+def _batting_text(quilt: Quilt) -> str:
     settings = quilt.settings
-    panels = ceil((quilt.finished_width + settings.backing_margin) / settings.wof)
-    batting_w = quilt.finished_width + BATTING_MARGIN_EIGHTHS
-    batting_h = quilt.finished_height + BATTING_MARGIN_EIGHTHS
+    plan = batting_plan(quilt.finished_width, quilt.finished_height, settings)
+    package = batting_package_text(plan)
+    cover = f"a {package} covers it" if plan.package else f"it is {package}"
+    return (
+        f"Batting: at least {format_inches(plan.width)} by {format_inches(plan.height)}, "
+        f"the finished top plus {format_inches(settings.backing_margin)} on each dimension; "
+        f"{cover}."
+    )
+
+
+def _finishing(quilt: Quilt, purchase) -> Section:
     if quilt.quilting.motifs:
         density = quilt.quilting.density
         note = f"Quilting: {len(quilt.quilting.motifs)} authored motif(s)"
@@ -237,13 +272,7 @@ def _finishing(quilt: Quilt, purchase) -> Section:
         )
     return Section(
         title="Finishing",
-        paragraphs=[
-            f"Backing: piece {panels} panel(s) for "
-            f"{format_inches(backing.length_needed)} of 42-inch fabric.",
-            f"Batting: at least {format_inches(batting_w)} by {format_inches(batting_h)}, "
-            f"the finished top plus {format_inches(BATTING_MARGIN_EIGHTHS)} on each dimension.",
-            note,
-        ],
+        paragraphs=[*_backing_text(quilt, purchase), _batting_text(quilt), note],
     )
 
 

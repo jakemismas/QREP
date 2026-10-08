@@ -17,7 +17,6 @@ from qrep.construct.strategies import (
     plan_strip,
 )
 from qrep.construct.yardage import (
-    BACKING_NAME,
     QUARTER_YARD,
     YardageLine,
     YardageReport,
@@ -26,7 +25,6 @@ from qrep.construct.yardage import (
 )
 
 __all__ = [
-    "BACKING_NAME",
     "HEURISTIC_LABEL",
     "QUARTER_YARD",
     "STRATEGIES",
