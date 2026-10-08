@@ -19,12 +19,15 @@ __all__ = [
     "html_text",
     "parse_count",
     "parse_decimal_inches",
+    "parse_dtq_border",
     "parse_mfqs_backing",
     "parse_nqc",
+    "parse_omni_backing",
     "parse_qc_border",
     "parse_qp_backing",
     "parse_qp_binding",
     "parse_qp_border",
+    "parse_qp_piece_count",
     "parse_quiltkeeper_binding",
     "parse_sewbecca_border",
     "parse_stitchdesk_backing",
@@ -712,3 +715,128 @@ def parse_qc_border(html_by_id: dict[str, str]) -> dict:
             }
         )
     return {"borders": borders}
+
+
+# ---------------------------------------------------------------------------------------------
+# Omni Calculator (quilt backing and batting). The driver records the result region's visible
+# text (innerText) under "results_text", so this parser reads lines, not HTML.
+# ---------------------------------------------------------------------------------------------
+
+_OMNI_NEED = _rx(r"You need {Q} yards \({Q} m\) of fabric\.")
+_OMNI_CUT = _rx(r"Cut your fabric into ([0-9]+) pieces, each:")
+_OMNI_ONE = "Your quilt backing is in 1 piece that's:"
+_OMNI_DIM = _rx(r"{Q} inches ?\({Q} cm\) (wide|long) \((W|L)\)(?:, and|\.)")
+_OMNI_ADDED = _rx(
+    r"We automatically add {Q} inches \({Q} cm\) of extra backing/batting to all sides of the"
+    r" quilt top\."
+)
+_OMNI_TOO_MANY = (
+    "You will need more than 5 pieces of fabric. We recommend that you buy a bigger bolt of"
+    " fabric."
+)
+
+
+def parse_omni_backing(html_by_id: dict[str, str]) -> dict:
+    """Omni's quilt calculator result text (backing or batting mode), key "results_text".
+
+    Returns {yards, meters, pieces, piece_width, piece_width_cm, piece_length, piece_length_cm,
+    added_per_side, added_per_side_cm, too_many_pieces}. When the page says it needs more than
+    5 pieces, too_many_pieces is True and every other value is None.
+    """
+    what = "Omni backing"
+    text = _need(html_by_id, "results_text", what)
+    if not isinstance(text, str):
+        raise ValueError(f"{what}: expected text, got {type(text).__name__}")
+    lines = [line for line in (_ascii(part) for part in text.split("\n")) if line]
+    if lines and lines[0] == "Results":
+        lines = lines[1:]
+    if lines == [_OMNI_TOO_MANY]:
+        keys = ("yards", "meters", "pieces", "piece_width", "piece_width_cm", "piece_length",
+                "piece_length_cm", "added_per_side", "added_per_side_cm")  # fmt: skip
+        return {**dict.fromkeys(keys), "too_many_pieces": True}
+    if len(lines) != 5:
+        raise ValueError(f"{what}: unrecognized result {lines!r}")
+    need = _match(_OMNI_NEED, lines[0], what)
+    if lines[1] == _OMNI_ONE:
+        pieces = 1
+    else:
+        pieces = int(_match(_OMNI_CUT, lines[1], what)[1])
+    dims = {}
+    for line in lines[2:4]:
+        m = _match(_OMNI_DIM, line, what)
+        word, letter = m[3].lower(), m[4].upper()
+        if (word, letter) not in (("wide", "W"), ("long", "L")) or word in dims:
+            raise ValueError(f"{what}: unexpected dimension line {line!r}")
+        dims[word] = (_quantity(m[1], what), _quantity(m[2], what))
+    if set(dims) != {"wide", "long"}:
+        raise ValueError(f"{what}: expected one width and one length line, got {lines[2:4]!r}")
+    added = _match(_OMNI_ADDED, lines[4], what)
+    return {
+        "yards": _quantity(need[1], what),
+        "meters": _quantity(need[2], what),
+        "pieces": pieces,
+        "piece_width": dims["wide"][0],
+        "piece_width_cm": dims["wide"][1],
+        "piece_length": dims["long"][0],
+        "piece_length_cm": dims["long"][1],
+        "added_per_side": _quantity(added[1], what),
+        "added_per_side_cm": _quantity(added[2], what),
+        "too_many_pieces": False,
+    }
+
+
+# ---------------------------------------------------------------------------------------------
+# Designed to Quilt (border; a Forminator form whose computed fields calculation-1 to -13 the
+# driver records as "value:calculation-N")
+# ---------------------------------------------------------------------------------------------
+
+_DTQ_LAYOUTS = {
+    "straight": {"top_length": 1, "side_length": 2, "total_length": 5, "strips": 7,
+                 "length": 12, "yards": 8},
+    "mitered": {"top_length": 3, "side_length": 4, "total_length": 6, "strips": 10,
+                "length": 13, "yards": 11},
+}  # fmt: skip
+_DTQ_CUT_WIDTH = 9
+
+
+def parse_dtq_border(html_by_id: dict[str, str]) -> dict:
+    """Designed to Quilt's computed border fields, keyed "value:calculation-N" (or
+    "calculation-N"). Returns {cut_width, straight: {top_length, side_length, total_length,
+    strips, length, yards}, mitered: {...}}; lengths in inches, yards as shown (decimal)."""
+    what = "Designed to Quilt border"
+    fields: dict[str, str] = {}
+    for key, value in html_by_id.items():
+        name = key.removeprefix("value:")
+        if name in fields:
+            raise ValueError(f"{what}: {name!r} appears under two keys")
+        fields[name] = value
+
+    def value(n: int) -> str:
+        return html_text(_need(fields, f"calculation-{n}", what))
+
+    result: dict = {"cut_width": _quantity(value(_DTQ_CUT_WIDTH), what)}
+    for layout, ids in _DTQ_LAYOUTS.items():
+        result[layout] = {
+            key: parse_count(value(n)) if key == "strips" else _quantity(value(n), what)
+            for key, n in ids.items()
+        }
+    return result
+
+
+# ---------------------------------------------------------------------------------------------
+# Quilter's Paradise piece count
+# ---------------------------------------------------------------------------------------------
+
+
+def parse_qp_piece_count(html_by_id: dict[str, str]) -> dict:
+    """The Piece Count page's results_num_pieces{1,2}, results_piece_width{1,2} and
+    results_piece_length{1,2}: 1 cuts the piece as typed (W x L), 2 turned (L x W).
+    Returns {as_typed: {pieces, piece_width, piece_length}, turned: {...}}."""
+    result = {}
+    for name, i in (("as_typed", 1), ("turned", 2)):
+        result[name] = {
+            "pieces": parse_count(_field(html_by_id, f"results_num_pieces{i}")),
+            "piece_width": parse_decimal_inches(_field(html_by_id, f"results_piece_width{i}")),
+            "piece_length": parse_decimal_inches(_field(html_by_id, f"results_piece_length{i}")),
+        }
+    return result

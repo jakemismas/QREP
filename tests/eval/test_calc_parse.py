@@ -1351,3 +1351,249 @@ def test_qc_border_page_default_width():
     assert (band["strips"], band["yards"], band["width_after"], band["length_after"]) == (
         5, F(3, 8), F(36), F(52),
     )  # fmt: skip
+
+
+# ---------------------------------------------------------------------------------------------
+# Omni, Designed to Quilt and the Quilter's Paradise piece count. Fragments are hand-written in
+# each page's shape with numbers chosen and worked here.
+# ---------------------------------------------------------------------------------------------
+
+NBSP = chr(0x00A0)
+
+# Throw 50 x 65 on a 42 in bolt, no extra overage (the page adds 4 in per side itself).
+OMNI_SPLIT = (
+    "Results\n"
+    f"You need 3.23{NBSP}yards (2.96{NBSP}m) of fabric.\n"
+    f"Cut your fabric into 2{NBSP}pieces, each:\n"
+    "36.5 inches (93 cm) wide (W), and\n"
+    f"58{NBSP}inches (147 cm) long (L).{NBSP}\n"
+    f"We automatically add 4{NBSP}inches (10{NBSP}cm) of extra backing/batting to all sides of"
+    " the quilt top."
+)
+
+
+def test_parse_omni_backing_split():
+    # 36.5 = 73/2 in per piece wide; 3.23 = 323/100 yd; 2.96 = 296/100 m.
+    assert cp.parse_omni_backing({"results_text": OMNI_SPLIT}) == {
+        "yards": F(323, 100),
+        "meters": F(296, 100),
+        "pieces": 2,
+        "piece_width": F(73, 2),
+        "piece_width_cm": F(93),
+        "piece_length": F(58),
+        "piece_length_cm": F(147),
+        "added_per_side": F(4),
+        "added_per_side_cm": F(10),
+        "too_many_pieces": False,
+    }
+
+
+def test_parse_omni_backing_one_piece_and_batting_spacing():
+    one_piece = (
+        "Results\nYou need 1.06 yards (0.97 m) of fabric.\n\nYour quilt backing is in 1 piece"
+        " that's:\n38 inches (97 cm) long (L), and\n\n32 inches (81 cm) wide (W).\n"
+        "We automatically add 4 inches (10 cm) of extra backing/batting to all sides of the quilt"
+        " top."
+    )
+    got = cp.parse_omni_backing({"results_text": one_piece})
+    assert (got["pieces"], got["piece_width"], got["piece_length"]) == (1, F(32), F(38))
+    assert got["yards"] == F(106, 100)
+    # The batting line prints no space before its centimetres: "33 inches(84 cm)".
+    batting = OMNI_SPLIT.replace("36.5 inches (93 cm) wide", f"33{NBSP}inches(84{NBSP}cm) wide")
+    assert cp.parse_omni_backing({"results_text": batting})["piece_width"] == F(33)
+
+
+def test_parse_omni_backing_too_many_pieces_and_rejects():
+    unmet = (
+        "Results\nYou will need more than 5 pieces of fabric. We recommend that you buy a bigger"
+        " bolt of fabric."
+    )
+    got = cp.parse_omni_backing({"results_text": unmet})
+    assert got["too_many_pieces"] is True
+    assert got["yards"] is None and got["pieces"] is None
+    with pytest.raises(ValueError):
+        cp.parse_omni_backing({"results_text": ""})
+    with pytest.raises(ValueError):
+        cp.parse_omni_backing({"results_text": OMNI_SPLIT.replace(f"2{NBSP}pieces", "two pieces")})
+
+
+def _dtq(values):
+    return {f"value:calculation-{n}": text for n, text in values.items()}
+
+
+# Center 60 x 72, border 4, fabric 42, the page's fixed-decimal display.
+DTQ_FRAGMENT = _dtq(
+    {
+        1: "69.00", 3: "71.00", 2: "73.00", 4: "83.00", 5: "284.00", 6: "308.00", 9: "4.50",
+        7: "7", 12: "31.50", 8: "0.875", 10: "8", 13: "36.00", 11: "1.000",
+    }
+)  # fmt: skip
+
+
+def test_parse_dtq_border():
+    # 0.875 = 7/8 yd; 31.50 in = 63/2.
+    assert cp.parse_dtq_border(DTQ_FRAGMENT) == {
+        "cut_width": F(9, 2),
+        "straight": {
+            "top_length": F(69),
+            "side_length": F(73),
+            "total_length": F(284),
+            "strips": 7,
+            "length": F(63, 2),
+            "yards": F(7, 8),
+        },
+        "mitered": {
+            "top_length": F(71),
+            "side_length": F(83),
+            "total_length": F(308),
+            "strips": 8,
+            "length": F(36),
+            "yards": F(1),
+        },
+    }
+
+
+def test_parse_dtq_border_rejects():
+    missing = dict(DTQ_FRAGMENT)
+    del missing["value:calculation-7"]
+    with pytest.raises(ValueError):
+        cp.parse_dtq_border(missing)
+    with pytest.raises(ValueError):
+        cp.parse_dtq_border({**DTQ_FRAGMENT, "value:calculation-8": "NaN"})
+    with pytest.raises(ValueError):
+        # The same field under both spellings is ambiguous.
+        cp.parse_dtq_border({**DTQ_FRAGMENT, "calculation-1": "70.00"})
+
+
+def test_parse_qp_piece_count():
+    # 3.5 x 6.5 pieces from a 42 x 6.5 strip: floor(42 / 3.5) x floor(6.5 / 6.5) = 12 x 1 = 12;
+    # turned floor(42 / 6.5) x floor(6.5 / 3.5) = 6 x 1 = 6.
+    html_by_id = {
+        "results_num_pieces1": "12",
+        "results_piece_width1": "3.5",
+        "results_piece_length1": "6.5",
+        "results_num_pieces2": "6",
+        "results_piece_width2": "6.5",
+        "results_piece_length2": "3.5",
+    }
+    assert cp.parse_qp_piece_count(html_by_id) == {
+        "as_typed": {"pieces": 12, "piece_width": F(7, 2), "piece_length": F(13, 2)},
+        "turned": {"pieces": 6, "piece_width": F(13, 2), "piece_length": F(7, 2)},
+    }
+    del html_by_id["results_num_pieces2"]
+    with pytest.raises(ValueError):
+        cp.parse_qp_piece_count(html_by_id)
+
+
+# ---------------------------------------------------------------------------------------------
+# Rules for those three pages
+# ---------------------------------------------------------------------------------------------
+
+
+def test_omni_backing_split_length():
+    # 50 x 65 on 42, overage 0: Wb = 50 + 8 = 58 > 42, Lb = 65 + 8 = 73.
+    # Split the length: 73 is in (42, 84], so 2 pieces, each Wb = 58 long: 2 x 58 = 116 in.
+    # Split the width: 58 in (42, 84], 2 pieces each 73 long: 146 in. 146 >= 116 keeps the
+    # first. yards = ceil(116 / 36 x 100) / 100 = ceil(322.2) / 100 = 3.23; each piece
+    # ceil(73 / 2 x 10) / 10 = 36.5 in wide and 58 in long. No seam loss on either split.
+    got = cr.omni_backing(50, 65, bolt_width=42, overage=0)
+    assert got == {
+        "seams": "horizontal",
+        "pieces": 2,
+        "raw": F(116),
+        "yards": F(323, 100),
+        "piece_width": F(73, 2),
+        "piece_length": F(58),
+        "too_many_pieces": False,
+    }
+
+
+def test_omni_backing_split_width_wins_only_when_smaller():
+    # 76 x 85: Wb 84, Lb 93. Length split: 93 in (84, 126] -> 3 pieces x 84 = 252 in.
+    # Width split: 84 in (42, 84] -> 2 pieces x 93 = 186 in, smaller, so it shows:
+    # ceil(186 / 36 x 100) / 100 = ceil(516.7) / 100 = 5.17 yd; each 93 in wide, 42 in long
+    # (two 42 in pieces exactly cover 84, with nothing for a seam).
+    got = cr.omni_backing(76, 85, bolt_width=42, overage=0)
+    assert (got["seams"], got["pieces"], got["raw"], got["yards"]) == (
+        "vertical", 2, F(186), F(517, 100),
+    )  # fmt: skip
+    assert (got["piece_width"], got["piece_length"]) == (F(93), F(42))
+
+
+def test_omni_backing_one_piece_directional_batting_and_too_many():
+    # 24 x 30: Wb 32 <= 42, one piece of Lb = 38 in; ceil(38 / 36 x 100) / 100 = 1.06 yd.
+    got = cr.omni_backing(24, 30, bolt_width=42, overage=0)
+    assert (got["seams"], got["pieces"], got["yards"]) == ("none", 1, F(106, 100))
+    assert (got["piece_width"], got["piece_length"]) == (F(32), F(38))
+    # Directional 50 x 65: always splits the width, 58 in (42, 84] -> 2 x 73 = 146 in;
+    # ceil(405.6) / 100 = 4.06 yd; each ceil(58 / 2 x 10) / 10 = 29 in wide, 73 in long.
+    got = cr.omni_backing(50, 65, bolt_width=42, overage=0, directional=True)
+    assert (got["seams"], got["raw"], got["yards"]) == ("vertical", F(146), F(406, 100))
+    assert (got["piece_width"], got["piece_length"]) == (F(29), F(73))
+    # Batting 50 x 65 counts like backing (116 in, 3.23 yd), but its piece width formula reads
+    # the piece length instead of the quilt length: ceil((58 + 8 + 0) / 2 x 10) / 10 = 33 in.
+    got = cr.omni_backing(50, 65, bolt_width=42, overage=0, mode="batting")
+    assert (got["raw"], got["yards"], got["piece_width"]) == (F(116), F(323, 100), F(33))
+    # 210 x 210: Wb = Lb = 218 > 5 x 42 = 210 either way, so neither split exists.
+    got = cr.omni_backing(210, 210, bolt_width=42, overage=0)
+    assert got["too_many_pieces"] is True and got["yards"] is None
+
+
+def test_dtq_border_center_60x72():
+    # Top/bottom 60 + 2 x 4 + 1 = 69; sides 72 + 1 = 73; total 2 x 69 + 2 x 73 = 284.
+    # strips = ceil((284 / 42 + 284) / 42) = ceil(290.76 / 42) = ceil(6.92) = 7 (about 1 in
+    # added per strip); cut 4 + 0.5 = 4.5 in; 7 x 4.5 = 31.5 in; 31.5 / 36 = 0.875 exactly,
+    # x 8 = 7 -> 7/8 yd. Mitered: 69 + 2 = 71; 73 + 2 x (4 + 1) = 83; 2 x 71 + 2 x 83 = 308;
+    # ceil((308 / 42 + 308) / 42) = ceil(315.33 / 42) = ceil(7.51) = 8; 8 x 4.5 = 36 in = 1 yd.
+    got = cr.dtq_border(60, 72, 4, fabric_width=42)
+    assert got["cut_width"] == F(9, 2)
+    assert got["straight"] == {
+        "top_length": F(69), "side_length": F(73), "total_length": F(284), "strips": 7,
+        "length": F(63, 2), "yards": F(7, 8),
+    }  # fmt: skip
+    assert got["mitered"] == {
+        "top_length": F(71), "side_length": F(83), "total_length": F(308), "strips": 8,
+        "length": F(36), "yards": F(1),
+    }  # fmt: skip
+
+
+def test_dtq_border_v_bord_02_center():
+    # V-BORD-02's center 32 x 48, border 2, fabric 40: 32 + 4 + 1 = 37; 48 + 1 = 49;
+    # 2 x 37 + 2 x 49 = 172; ceil((172 / 40 + 172) / 40) = ceil(176.3 / 40) = ceil(4.41) = 5
+    # strips of 2.5 in = 12.5 in; 12.5 / 36 x 8 = 2.78 -> 3/8 yd (MATH.md's per-piece rule buys
+    # 6 strips, V-BORD-02 line 632).
+    got = cr.dtq_border(32, 48, 2, fabric_width=40)["straight"]
+    assert (got["strips"], got["length"], got["yards"]) == (5, F(25, 2), F(3, 8))
+
+
+@pytest.mark.parametrize(
+    ("piece_w", "piece_l", "strip_w", "expected"),
+    [
+        # V-YIELD-01, MATH.md line 574: 2 1/2 in squares, per = floor(40 / 2.5) = 16.
+        ("2.5", "2.5", "40", 16),
+        # V-YIELD-02, MATH.md line 589: U = 40, 4 1/2 in strips subcut 2 1/2, per 16.
+        ("2.5", "4.5", "40", 16),
+        # V-YIELD-02, MATH.md line 588: U = 40, 2 1/2 in strips subcut 4 1/2, per 8.
+        ("4.5", "2.5", "40", 8),
+        # V-YIELD-02, MATH.md line 583: U = 42, 4 1/2 in strips subcut 2 1/2, per 16.
+        ("2.5", "4.5", "42", 16),
+        # V-YIELD-02, MATH.md line 581: U = 42, 2 1/2 in strips subcut 4 1/2, per 9.
+        ("4.5", "2.5", "42", 9),
+    ],
+)
+def test_qp_piece_count_matches_v_yield(piece_w, piece_l, strip_w, expected):
+    # One WOF strip as the large piece, as wide as the piece's length: as typed the piece's width
+    # runs along the strip, floor(U / w) x floor(l / l) = floor(U / w).
+    got = cr.qp_piece_count(piece_w, piece_l, strip_w, piece_l)
+    assert got["as_typed"]["pieces"] == expected
+
+
+def test_qp_piece_count_turned_and_float_order():
+    # Turned, 2.5 x 4.5 pieces from a 40 x 4.5 strip: floor(40 / 4.5) x floor(4.5 / 2.5) = 8 x 1
+    # = 8, the same count as V-YIELD-02's 2 1/2 in strips but using 4 1/2 in of strip.
+    got = cr.qp_piece_count("2.5", "4.5", "40", "4.5")
+    assert got["turned"] == {"pieces": 8, "piece_width": F(9, 2), "piece_length": F(5, 2)}
+    # The page divides typed decimals in doubles: 0.3 is stored as 0.29999999999999998890 and
+    # 0.1 as 0.10000000000000000555, their quotient rounds to 2.9999999999999996, below 3,
+    # so floor gives 2 pieces where exact arithmetic gives 3.
+    assert cr.qp_piece_count("0.1", "1", "0.3", "1")["as_typed"]["pieces"] == 2

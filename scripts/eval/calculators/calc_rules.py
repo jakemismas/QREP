@@ -34,12 +34,15 @@ __all__ = [
     "border_join_count",
     "border_pair_strips",
     "ceil_div",
+    "dtq_border",
     "from_eighths",
     "mfqs_backing",
+    "omni_backing",
     "panels",
     "purchase_yards",
     "qc_border",
     "qp_backing_display",
+    "qp_piece_count",
     "qp_strip_yards",
     "sewbecca_border",
     "stitchdesk_backing",
@@ -636,6 +639,11 @@ SOURCES = MappingProxyType(
         ),
         "sewbecca_border": "https://sewbecca.com/border-calc",
         "qc_border": "https://quiltcalculator.com/_next/static/chunks/277-b1b795edf50fbbec.js",
+        # Omni and Designed to Quilt carry their formulas in the page itself (Omni's customJs and
+        # calculator definition; Forminator data-formula attributes).
+        "omni_backing": "https://www.omnicalculator.com/everyday-life/quilt",
+        "dtq_border": "https://designedtoquilt.com/quilt-border-calculator/",
+        "qp_piece_count": "https://www.quiltersparadiseesc.com/Calculators/Calculators.js",
     }
 )
 
@@ -944,3 +952,193 @@ def qc_border(
             }
         )
     return {"borders": out}
+
+
+# Omni Calculator: the result_* and pieces_* functions in the page's customJs, and the yardage,
+# piece width and piece length formulas in its calculator definition. Its expression engine was
+# not read, so these use exact rationals; with whole or half inch inputs a double gives the same.
+_OMNI_ADDED_E = 8 * E_PER_INCH  # the page adds 4 in per side before any extra overage
+_OMNI_MAX_PIECES = 5
+
+
+def _omni_split(side_e: int, bolt_e: int) -> int | None:
+    """Pieces across a side longer than the bolt: the k in 2..5 with side <= k x bolt, with no
+    seam loss; None past 5 bolts."""
+    for k in range(2, _OMNI_MAX_PIECES + 1):
+        if side_e <= k * bolt_e:
+            return k
+    return None
+
+
+def _ceil_tenth(value: Fraction) -> Fraction:
+    return Fraction(math.ceil(value * 10), 10)
+
+
+def _omni_result(seams, pieces, raw_e, piece_width, piece_length) -> dict:
+    return {
+        "seams": seams,
+        "pieces": pieces,
+        "raw": from_eighths(raw_e),
+        # ceil(result / 36 x 100) / 100: yards up to the next hundredth.
+        "yards": Fraction(ceil_div(raw_e * 100, 36 * E_PER_INCH), 100),
+        "piece_width": piece_width,
+        "piece_length": piece_length,
+        "too_many_pieces": False,
+    }
+
+
+def omni_backing(
+    W: int | Fraction,
+    L: int | Fraction,
+    *,
+    bolt_width: int | Fraction = 42,
+    overage: int | Fraction = 0,
+    mode: str = "backing",
+    directional: bool = False,
+) -> dict:
+    """Omni's quilt calculator, backing or batting mode.
+
+    Wb = W + 8 + 2 overage, Lb = L + 8 + 2 overage. One piece of Lb when Wb fits the bolt.
+    Otherwise (non-directional backing and batting) it splits Lb into k pieces each Wb long
+    (k from 2 to 5, no seam loss) or Wb into k pieces each Lb long, and shows the second only
+    when it is strictly smaller; directional backing always splits Wb. Yards round up to the
+    hundredth and piece sizes to the tenth. In batting mode the length-split piece width reads
+    (piece length + 8 + 2 overage) / k, not Lb / k, as the page's formula does.
+
+    Returns {seams, pieces, raw, yards, piece_width, piece_length, too_many_pieces}; seams is
+    "none", "horizontal" (Lb split) or "vertical" (Wb split); past 5 pieces too_many_pieces is
+    True and the rest None.
+    """
+    if mode not in ("backing", "batting"):
+        raise ValueError(f"unknown Omni mode {mode!r}; expected 'backing' or 'batting'")
+    if directional and mode == "batting":
+        raise ValueError("Omni's batting mode has no fabric direction")
+    o2_e = 2 * to_eighths(overage)
+    wb_e = to_eighths(W) + _OMNI_ADDED_E + o2_e
+    lb_e = to_eighths(L) + _OMNI_ADDED_E + o2_e
+    bolt_e = to_eighths(bolt_width)
+    if bolt_e <= 0:
+        raise ValueError(f"bolt width must be positive, got {bolt_width}")
+    if wb_e <= bolt_e:
+        return _omni_result(
+            "none", 1, lb_e, _ceil_tenth(from_eighths(wb_e)), _ceil_tenth(from_eighths(lb_e))
+        )
+    too_many = {
+        **dict.fromkeys(("seams", "pieces", "raw", "yards", "piece_width", "piece_length")),
+        "too_many_pieces": True,
+    }
+    if directional:
+        k = _omni_split(wb_e, bolt_e)
+        if k is None:
+            return too_many
+        raw_e = k * lb_e
+        return _omni_result(
+            "vertical", k, raw_e, _ceil_tenth(from_eighths(wb_e) / k),
+            _ceil_tenth(from_eighths(raw_e) / k),
+        )  # fmt: skip
+    k_len = _omni_split(lb_e, bolt_e) if lb_e > bolt_e else None
+    k_wid = _omni_split(wb_e, bolt_e)
+    raw_len = None if k_len is None else k_len * wb_e
+    raw_wid = None if k_wid is None else k_wid * lb_e
+    if raw_len is not None and (raw_wid is None or raw_wid >= raw_len):
+        piece_length = _ceil_tenth(from_eighths(raw_len) / k_len)
+        if mode == "batting":
+            added = from_eighths(_OMNI_ADDED_E + o2_e)
+            piece_width = _ceil_tenth((piece_length + added) / k_len)
+        else:
+            piece_width = _ceil_tenth(from_eighths(lb_e) / k_len)
+        return _omni_result("horizontal", k_len, raw_len, piece_width, piece_length)
+    if raw_wid is not None:
+        return _omni_result(
+            "vertical", k_wid, raw_wid, _ceil_tenth(from_eighths(raw_wid) / k_wid),
+            _ceil_tenth(from_eighths(wb_e) / k_wid),
+        )  # fmt: skip
+    return too_many
+
+
+def _typed(value: int | Fraction | str) -> tuple[Fraction, float]:
+    """A form value as an exact Fraction and as the double JS reads from it."""
+    double = _js_number(value)
+    if isinstance(value, str):
+        return Fraction(value.strip()), double
+    return from_eighths(to_eighths(value)), double
+
+
+def dtq_border(
+    W: int | Fraction | str,
+    L: int | Fraction | str,
+    border_width: int | Fraction | str,
+    *,
+    fabric_width: int | Fraction | str = 42,
+) -> dict:
+    """Designed to Quilt's border form (its data-formula fields; 42 in is the page's default).
+
+    Straight: top and bottom W + 2b + 1, sides L + 1, total 2 (top + side). Mitered: top + 2,
+    side + 2 (b + 1). Cut width b + 1/2. strips = ceil((total / fw + total) / fw), about 1 in
+    added per strip, in the form's float order; length = strips x cut width; yards =
+    ceil(length / 36 x 8) / 8.
+
+    Returns {cut_width, straight: {top_length, side_length, total_length, strips, length,
+    yards}, mitered: {...}}. The page prints these with fixed decimals (2, 0 or 3).
+    """
+    (w, w_f), (ln, ln_f), (b, b_f), (_fw, fw) = (
+        _typed(v) for v in (W, L, border_width, fabric_width)
+    )
+    if fw <= 0:
+        raise ValueError(f"fabric width must be positive, got {fabric_width!r}")
+    cut = b + Fraction(1, 2)
+    cut_f = b_f + 0.5
+    # Exact lengths for the result; the same steps in doubles feed the ceilings, as the form
+    # evaluates them.
+    top, top_f = w + 2 * b + 1, w_f + 2 * b_f + 2 * 0.5
+    side, side_f = ln + 1, ln_f + 2 * 0.5
+    layouts = {
+        "straight": (top, side, top_f, side_f),
+        "mitered": (top + 2, side + 2 * (b + 1), top_f + 2, side_f + 2 * (b_f + 1)),
+    }
+    result: dict = {"cut_width": cut}
+    for name, (top_len, side_len, top_len_f, side_len_f) in layouts.items():
+        total = 2 * top_len + 2 * side_len
+        total_f = 2 * top_len_f + 2 * side_len_f
+        strips = math.ceil(((total_f / fw * 1) + total_f) / fw)
+        length_f = strips * cut_f
+        result[name] = {
+            "top_length": top_len,
+            "side_length": side_len,
+            "total_length": total,
+            "strips": strips,
+            "length": strips * cut,
+            "yards": Fraction(math.ceil((length_f / 36) * 8), 8),
+        }
+    return result
+
+
+def qp_piece_count(
+    piece_width: int | Fraction | str,
+    piece_length: int | Fraction | str,
+    large_width: int | Fraction | str,
+    large_length: int | Fraction | str,
+) -> dict:
+    """Quilter's Paradise Piece Count (ValPieceCountForm), in doubles as the page divides:
+    as typed floor(LW / w) x floor(LL / l); turned floor(LW / l) x floor(LL / w).
+
+    Returns {as_typed: {pieces, piece_width, piece_length}, turned: {...}}, sizes echoed as the
+    page does (turned swaps them).
+    """
+    (pw, pw_f), (pl, pl_f), (_lw, lw_f), (_ll, ll_f) = (
+        _typed(v) for v in (piece_width, piece_length, large_width, large_length)
+    )
+    if 0 in (pw_f, pl_f, lw_f, ll_f):
+        raise ValueError("the page refuses zero sizes")
+    return {
+        "as_typed": {
+            "pieces": math.floor(lw_f / pw_f) * math.floor(ll_f / pl_f),
+            "piece_width": pw,
+            "piece_length": pl,
+        },
+        "turned": {
+            "pieces": math.floor(lw_f / pl_f) * math.floor(ll_f / pw_f),
+            "piece_width": pl,
+            "piece_length": pw,
+        },
+    }
