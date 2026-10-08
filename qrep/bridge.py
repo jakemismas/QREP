@@ -6,11 +6,19 @@ typed envelope serialized as JSON:
     {"ok": true, "result": ...}
     {"ok": false, "error": {"kind": "...", "message": "..."}}
 
-Error kinds map the exception taxonomy the CLI already handles:
-schema (malformed JSON or unknown schema_version), validation (pydantic),
-value (bad arguments, unknown strategy, unreadable image), not_implemented
-(stubbed strategies), internal (anything else; generic message, no
-stringified tracebacks reach the UI).
+Error kinds (engine-16) tell your input errors from engine bugs:
+schema (malformed JSON or unknown schema_version); validation (a model that
+fails pydantic validation, a call with the wrong number of arguments, or a
+bridge argument with the wrong type or structure, with the field named);
+value (an input the engine cannot use: an unknown strategy or preset, a
+level, seed, scale or fabric count out of range, a missing or unreadable
+image, each named); not_implemented (stubbed
+strategies); internal (anything else, including a KeyError, TypeError or
+AttributeError raised inside the engine, which signals an engine bug;
+generic message, no stringified tracebacks reach the UI).
+
+contract_version() reports CONTRACT_VERSION (qrep/contract.py), which the
+web worker checks at boot before it serves any call.
 
 Byte payloads (PDF, PNG) ride inside the envelope base64-encoded so byte
 producers still return typed envelopes; the UI's RPC layer decodes them to
@@ -39,7 +47,9 @@ when a confidence grid exists).
 """
 
 import base64
+import inspect
 import json
+import math
 import shutil
 import tempfile
 import uuid
@@ -49,7 +59,8 @@ from pydantic import ValidationError
 
 from qrep.construct import get_strategy
 from qrep.construct.yardage import compute_purchase_lines
-from qrep.construct.strategies import infer_block_structure
+from qrep.construct.strategies import STRATEGIES, infer_block_structure
+from qrep.contract import CONTRACT_VERSION
 from qrep.export.cutlist import render_cutlist_csv, render_cutlist_md
 from qrep.export.pdf import render_booklet
 from qrep.export.svg import render_top_svg
@@ -73,6 +84,29 @@ BAND_MIN = 2  # 1/4"
 BAND_MAX = 112  # 14"
 QUARTER = 2  # 1/4" in eighths
 
+# Largest render() scale, in pixels per inch (engine-16). The web renders at
+# 10 (its demo and round-trip panel) and so does the renderer by default, so
+# 20 doubles the headroom. The bound caps the multiplier, not the image: the
+# image also grows with the quilt, which render() does not bound. For scale,
+# a quilt at the 140" resize ceiling (DIM_MAX) renders at 2800 px plus a
+# 224 px margin per side (renderer MARGIN_FRACTION 0.08 x 2800): 3248 x 3248
+# px, about 10.5 megapixels. Levels 1 to 3 build float64 working arrays of
+# that order, 3248 x 3248 x 3 x 8 bytes (about 253 MB) for a full RGB copy,
+# and every one grows with the square of the scale.
+RENDER_SCALE_MAX = 20
+
+# Largest forced fabric count for reverse(): SPEC.md section 12.1 caps the
+# read's fabric count at 12. Above it, k-means only stalls or fails inside
+# OpenCV, which would report your input as an engine bug.
+FABRICS_MAX = 12
+
+
+class _ArgumentError(Exception):
+    """A bridge argument has the wrong type or structure (kind validation)."""
+
+    def __init__(self, field: str, problem: str):
+        super().__init__(f"{field}: {problem}")
+
 
 def _ok(result) -> str:
     return json.dumps({"ok": True, "result": result})
@@ -84,10 +118,20 @@ def _error(kind: str, message: str) -> str:
 
 def _envelope(fn):
     """Wraps a bridge body: exceptions become typed error envelopes."""
+    signature = inspect.signature(fn)
 
     def wrapper(*args, **kwargs) -> str:
         try:
+            signature.bind(*args, **kwargs)
+        except TypeError as e:
+            # A call with the wrong number of arguments is the request's
+            # shape, not an engine bug; binding first keeps it out of the
+            # catch-all below.
+            return _error("validation", f"argument failed validation: {fn.__name__}: {e}")
+        try:
             return _ok(fn(*args, **kwargs))
+        except _ArgumentError as e:
+            return _error("validation", f"argument failed validation: {e}")
         except json.JSONDecodeError as e:
             return _error("schema", f"malformed JSON: {e.msg} (line {e.lineno})")
         except QrepSchemaError as e:
@@ -99,22 +143,54 @@ def _envelope(fn):
             return _error("validation", f"model failed validation: {problems}")
         except NotImplementedError as e:
             return _error("not_implemented", str(e))
-        except KeyError as e:
-            return _error("value", str(e.args[0]) if e.args else "unknown key")
         except (ValueError, FileNotFoundError) as e:
             return _error("value", str(e))
         except Exception:  # noqa: BLE001 - the seam must never leak internals
+            # A KeyError lands here too: known input errors raise ValueError
+            # at entry, so a KeyError from the engine is a bug, not your input.
             return _error("internal", "internal engine error; see the browser console log")
 
     wrapper.__name__ = fn.__name__
     wrapper.__doc__ = fn.__doc__
+    # Marks the RPC surface; test_bridge keeps worker.ts's allowlist equal to it.
+    wrapper.is_envelope = True
     return wrapper
 
 
-def _load(model_json: str) -> Quilt:
-    if not isinstance(model_json, str):
-        raise ValueError("model_json must be a JSON string")
-    return loads(model_json)
+def _text(field: str, value) -> str:
+    if not isinstance(value, str):
+        raise _ArgumentError(field, f"must be a string, got {type(value).__name__}")
+    return value
+
+
+def _json_object(field: str, value) -> dict:
+    data = json.loads(_text(field, value))
+    if not isinstance(data, dict):
+        raise _ArgumentError(field, f"must be a JSON object, got {type(data).__name__}")
+    return data
+
+
+def _whole(field: str, value) -> int:
+    # Exact whole numbers only: int() would truncate 20.9 to 20 past a range
+    # check and read true or "600" as numbers. The web sends integer eighths,
+    # which Pyodide hands over as int.
+    if isinstance(value, int) and not isinstance(value, bool):
+        return value
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    raise _ArgumentError(field, f"must be a whole number, got {type(value).__name__}")
+
+
+def _load(model_json: str, field: str = "model_json") -> Quilt:
+    return loads(_text(field, model_json))
+
+
+def _strategy(name):
+    """Resolves a strategy name; an unknown name is your input error (kind value)."""
+    _text("strategy", name)
+    if name not in STRATEGIES:
+        raise ValueError(f"unknown strategy {name!r}; available: {', '.join(STRATEGIES)}")
+    return get_strategy(name)
 
 
 def _summary(quilt: Quilt) -> dict:
@@ -147,6 +223,13 @@ def _summary(quilt: Quilt) -> dict:
 
 
 @_envelope
+def contract_version() -> dict:
+    """The bridge contract this engine speaks; the web worker refuses to
+    boot when it differs from the app's (web/src/engine/contract.ts)."""
+    return {"contract_version": CONTRACT_VERSION}
+
+
+@_envelope
 def validate(model_json: str) -> dict:
     """Validate a model document and return its UI summary."""
     return _summary(_load(model_json))
@@ -156,7 +239,7 @@ def validate(model_json: str) -> dict:
 def plan(model_json: str, strategy: str) -> dict:
     """Compute a construction plan plus yardage and the UI summary."""
     quilt = _load(model_json)
-    result = get_strategy(strategy)(quilt)
+    result = _strategy(strategy)(quilt)
     # The human-facing purchase table (per-fabric top lines, binding lines,
     # backing) - the same source the yardage export and PDF booklet use.
     yardage = compute_purchase_lines(quilt, result)
@@ -170,13 +253,13 @@ def plan(model_json: str, strategy: str) -> dict:
 @_envelope
 def export_cutlist_md(model_json: str, strategy: str) -> dict:
     quilt = _load(model_json)
-    return {"text": render_cutlist_md(quilt, get_strategy(strategy)(quilt))}
+    return {"text": render_cutlist_md(quilt, _strategy(strategy)(quilt))}
 
 
 @_envelope
 def export_cutlist_csv(model_json: str, strategy: str) -> dict:
     quilt = _load(model_json)
-    return {"text": render_cutlist_csv(quilt, get_strategy(strategy)(quilt))}
+    return {"text": render_cutlist_csv(quilt, _strategy(strategy)(quilt))}
 
 
 @_envelope
@@ -184,7 +267,7 @@ def export_yardage(model_json: str, strategy: str) -> dict:
     from qrep.construct.yardage import compute_purchase_lines
 
     quilt = _load(model_json)
-    report = compute_purchase_lines(quilt, get_strategy(strategy)(quilt))
+    report = compute_purchase_lines(quilt, _strategy(strategy)(quilt))
     return {"text": render_yardage_md(report)}
 
 
@@ -202,7 +285,7 @@ def export_pdf(model_json: str, strategy: str) -> dict:
     behavior is untouched elsewhere.
     """
     quilt = _load(model_json)
-    result = get_strategy(strategy)(quilt)
+    result = _strategy(strategy)(quilt)
     from reportlab import rl_config
 
     scratch = _scratch_dir()
@@ -220,16 +303,26 @@ def export_pdf(model_json: str, strategy: str) -> dict:
 
 @_envelope
 def render(model_json: str, level: int, seed: int, scale: int) -> dict:
-    """Render the synthetic PNG; returns PNG bytes plus the sidecar dict."""
+    """Render the synthetic PNG; returns PNG bytes plus the sidecar dict.
+
+    scale is pixels per inch, from 1 to RENDER_SCALE_MAX.
+    """
     from qrep.render import save_render
 
-    if not 0 <= int(level) <= 3:
+    level = _whole("level", level)
+    seed = _whole("seed", seed)
+    scale = _whole("scale", scale)
+    if not 0 <= level <= 3:
         raise ValueError(f"level must be 0..3, got {level}")
+    if seed < 0:
+        raise ValueError(f"seed must be 0 or more, got {seed}")
+    if not 1 <= scale <= RENDER_SCALE_MAX:
+        raise ValueError(f"scale must be 1..{RENDER_SCALE_MAX} pixels per inch, got {scale}")
     quilt = _load(model_json)
     scratch = _scratch_dir()
     try:
         png_path, sidecar_path = save_render(
-            quilt, scratch / "render.png", level=int(level), seed=int(seed), scale=int(scale)
+            quilt, scratch / "render.png", level=level, seed=seed, scale=scale
         )
         png_bytes = Path(png_path).read_bytes()
         sidecar = json.loads(Path(sidecar_path).read_text(encoding="utf-8"))
@@ -244,13 +337,15 @@ def detect_quad(image_path: str) -> dict:
 
     Runs the S1 tiered detector on a staged image and returns the quad in
     NORMALIZED [0,1] image coordinates plus tier, confidence, and the
-    predicted_size field ({width_px, height_px, aspect, preset}). S6 owns
-    the preset suggestion logic; until it lands, preset is always null.
+    predicted_size field ({width_px, height_px, aspect, preset}). preset is
+    the one standard size whose aspect matches the quad's
+    (qrep.model.finished_size.suggest_preset), or null when no preset or
+    more than one matches, or the quad has no area.
     An unreadable all-background image answers with the honest tier-3 full
     frame at low confidence, never an error: the crop screen makes that
     visible and fixable.
     """
-    path = Path(image_path)
+    path = Path(_text("image_path", image_path))
     if not path.exists():
         raise ValueError(f"image file not found: {image_path}")
     import cv2
@@ -309,27 +404,39 @@ def reverse(image_path: str, options_json: str) -> dict:
     """Reverse a staged image path into a recovered model.
 
     The caller stages the bytes (MEMFS in wasm) and owns the file; the
-    bridge only reads it. options: {"corners": [[x,y]*4]?, "fabrics": int?}.
+    bridge only reads it. options, every key optional: {"corners":
+    [[x, y]] * 4 in image pixels, "fabrics": int, "finished_width": int,
+    "finished_height": int}, the finished sizes in eighths.
     """
-    options = json.loads(options_json) if options_json else {}
-    path = Path(image_path)
-    if not path.exists():
-        raise ValueError(f"image file not found: {image_path}")
+    _text("image_path", image_path)
+    no_options = options_json is None or options_json == ""
+    options = {} if no_options else _json_object("options_json", options_json)
     corners = options.get("corners")
     if corners is not None:
-        corners = [(float(x), float(y)) for x, y in corners]
-    from qrep.vision import reverse as reverse_pipeline
+        corners = _corners(corners)
+    fabrics = options.get("fabrics")
+    if fabrics is not None:
+        fabrics = _whole("options_json.fabrics", fabrics)
+        if not 1 <= fabrics <= FABRICS_MAX:
+            raise ValueError(f"fabrics must be 1..{FABRICS_MAX}, got {fabrics}")
 
     def _size_option(key: str) -> int | None:
         value = options.get(key)
-        return int(value) if value is not None else None
+        return _whole(f"options_json.{key}", value) if value is not None else None
+
+    finished_width = _size_option("finished_width")
+    finished_height = _size_option("finished_height")
+    path = Path(image_path)
+    if not path.exists():
+        raise ValueError(f"image file not found: {image_path}")
+    from qrep.vision import reverse as reverse_pipeline
 
     result = reverse_pipeline(
         path,
         corners=corners,
-        fabrics=options.get("fabrics"),
-        finished_width=_size_option("finished_width"),
-        finished_height=_size_option("finished_height"),
+        fabrics=fabrics,
+        finished_width=finished_width,
+        finished_height=finished_height,
     )
     diagnostics = _jsonable(result.diagnostics)
     # S4 (issue #70): the envelope grows additively from {"model"} to
@@ -343,6 +450,33 @@ def reverse(image_path: str, options_json: str) -> dict:
         envelope["requested"] = diagnostics.get("size_requested")
         envelope["achieved"] = diagnostics.get("size_achieved")
     return envelope
+
+
+def _corners(value) -> list[tuple[float, float]]:
+    # Exactly four points: rectify's corner ordering silently keeps four
+    # extremes of any longer list, so a malformed request would read a
+    # different quad than the one you sent.
+    field = "options_json.corners"
+    shape = "must be four [x, y] points"
+    if not isinstance(value, list) or len(value) != 4:
+        raise _ArgumentError(field, shape)
+    points = []
+    for point in value:
+        if not isinstance(point, list) or len(point) != 2:
+            raise _ArgumentError(field, shape)
+        points.append((_coordinate(field, point[0]), _coordinate(field, point[1])))
+    return points
+
+
+def _coordinate(field: str, value) -> float:
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        try:
+            number = float(value)
+        except OverflowError:
+            number = math.inf
+        if math.isfinite(number):
+            return number
+    raise _ArgumentError(field, "each coordinate must be a finite number")
 
 
 def _jsonable(value):
@@ -375,8 +509,8 @@ def apply_finished_size(model_json: str, width, height) -> dict:
     from qrep.model.finished_size import apply_finished_size as apply_size
 
     quilt = _load(model_json)
-    w = int(width) if width is not None else None
-    h = int(height) if height is not None else None
+    w = _whole("width", width) if width is not None else None
+    h = _whole("height", height) if height is not None else None
     if w is None and h is None:
         raise ValueError("apply_finished_size needs a width or a height")
     updated, requested, achieved = apply_size(quilt, w, h)
@@ -396,7 +530,7 @@ def apply_finished_size(model_json: str, width, height) -> dict:
 def compare(truth_json: str, recovered_json: str) -> dict:
     from qrep.vision import compare_models
 
-    report = compare_models(_load(truth_json), _load(recovered_json))
+    report = compare_models(_load(truth_json, "truth_json"), _load(recovered_json, "recovered_json"))
     return report.model_dump(mode="json")
 
 
@@ -410,17 +544,14 @@ def _clamp(value: int, low: int, high: int) -> int:
     return max(low, min(high, value))
 
 
-def _normalized_dim(value) -> int:
+def _normalized_dim(value, field: str) -> int:
     """Requested dims round to the nearest 1/4in then clamp to [20in, 140in]."""
-    rounded = round_div(int(value), QUARTER) * QUARTER
+    rounded = round_div(_whole(field, value), QUARTER) * QUARTER
     return _clamp(rounded, DIM_MIN, DIM_MAX)
 
 
 def _parse_targets(target_json: str) -> dict:
-    target = json.loads(target_json)
-    if not isinstance(target, dict):
-        raise ValueError("resize target must be a JSON object")
-    return target
+    return _json_object("target_json", target_json)
 
 
 def _achieved(quilt: Quilt) -> dict:
@@ -446,25 +577,36 @@ def resize_locked(model_json: str, target_json: str) -> dict:
 
     if "preset" in target:
         preset = target["preset"]
-        width = _normalized_dim(preset["width"])
-        height = _normalized_dim(preset["height"])
+        if not isinstance(preset, dict):
+            raise _ArgumentError(
+                "target_json.preset", "must be an object with a width and a height in eighths"
+            )
+        # A preset object without both sizes was kind value before the
+        # KeyError mapping went; it stays value, now naming the preset.
+        if not {"width", "height"} <= preset.keys():
+            raise ValueError(
+                f"unknown preset {json.dumps(preset)}; a preset target gives a width "
+                "and a height in eighths"
+            )
+        width = _normalized_dim(preset["width"], "target_json.preset.width")
+        height = _normalized_dim(preset["height"], "target_json.preset.height")
         requested = {"width": width, "height": height}
         by_width = locked_resize(rows, cols, old_cell, border_total, target_width=width)
         by_height = locked_resize(rows, cols, old_cell, border_total, target_height=height)
         new_cell = min(by_width.cell_size, by_height.cell_size)
     elif "width" in target:
-        width = _normalized_dim(target["width"])
+        width = _normalized_dim(target["width"], "target_json.width")
         requested = {"width": width}
         new_cell = locked_resize(rows, cols, old_cell, border_total, target_width=width).cell_size
     elif "height" in target:
-        height = _normalized_dim(target["height"])
+        height = _normalized_dim(target["height"], "target_json.height")
         requested = {"height": height}
         new_cell = locked_resize(
             rows, cols, old_cell, border_total, target_height=height
         ).cell_size
     elif "cell" in target:
-        requested = {"cell": int(target["cell"])}
-        new_cell = int(target["cell"])
+        new_cell = _whole("target_json.cell", target["cell"])
+        requested = {"cell": new_cell}
     else:
         raise ValueError("resize target needs width, height, cell, or preset")
 
@@ -521,10 +663,10 @@ def resize_unlocked(model_json: str, target_json: str) -> dict:
     requested: dict = {}
     width = height = None
     if "width" in target:
-        width = _normalized_dim(target["width"])
+        width = _normalized_dim(target["width"], "target_json.width")
         requested["width"] = width
     if "height" in target:
-        height = _normalized_dim(target["height"])
+        height = _normalized_dim(target["height"], "target_json.height")
         requested["height"] = height
 
     sized = unlocked_resize(
