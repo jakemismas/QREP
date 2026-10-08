@@ -642,6 +642,19 @@ NO_PHOTO = "/no/such/photo.png"
             "options_json.corners",
         ),
         (
+            lambda m: bridge.reverse(NO_PHOTO, json.dumps({"corners": [[float("nan"), 0]] * 4})),
+            "options_json.corners",
+        ),
+        (
+            lambda m: bridge.reverse(NO_PHOTO, json.dumps({"corners": [[float("inf"), 0]] * 4})),
+            "options_json.corners",
+        ),
+        (
+            # 10**400 overflows float, so it is no finite coordinate.
+            lambda m: bridge.reverse(NO_PHOTO, json.dumps({"corners": [[10**400, 0]] * 4})),
+            "options_json.corners",
+        ),
+        (
             lambda m: bridge.reverse(NO_PHOTO, json.dumps({"finished_width": "abc"})),
             "options_json.finished_width",
         ),
@@ -685,6 +698,9 @@ NO_PHOTO = "/no/such/photo.png"
         "reverse-three-corners",
         "reverse-text-corners",
         "reverse-numeric-text-corners",
+        "reverse-nan-corners",
+        "reverse-infinite-corners",
+        "reverse-overflowing-corners",
         "reverse-finished-width",
         "reverse-finished-width-bool",
         "reverse-fabrics",
@@ -748,13 +764,30 @@ def test_unknown_preset_stays_value_kind_naming_it(model_json, preset, named):
     [
         (lambda: bridge.render(mini_model(), 0, -1, 2), "seed"),
         (lambda: bridge.reverse(NO_PHOTO, json.dumps({"fabrics": 0})), "fabrics"),
+        # 13 is one past FABRICS_MAX = 12 (SPEC.md section 12.1).
+        (lambda: bridge.reverse(NO_PHOTO, json.dumps({"fabrics": 13})), "fabrics"),
     ],
-    ids=["render-negative-seed", "reverse-zero-fabrics"],
+    ids=["render-negative-seed", "reverse-zero-fabrics", "reverse-thirteen-fabrics"],
 )
 def test_out_of_range_inputs_are_value_kind_naming_them(call, named):
     error = error_of(call())
     assert error["kind"] == "value"
     assert named in error["message"]
+
+
+@pytest.mark.parametrize("options_json", [None, ""], ids=["none", "empty"])
+def test_reverse_without_options_reaches_the_image_check(options_json):
+    # No options is a valid request: the call gets past option parsing and
+    # stops at the missing image, the first check after it.
+    error = error_of(bridge.reverse(NO_PHOTO, options_json))
+    assert error["kind"] == "value"
+    assert error["message"] == f"image file not found: {NO_PHOTO}"
+
+
+def test_render_accepts_integral_floats():
+    # 0.0, 42.0 and 2.0 are whole numbers; the sidecar records scale 2.
+    result = ok_result(bridge.render(mini_model(), 0.0, 42.0, 2.0))
+    assert result["sidecar"]["scale"] == 2
 
 
 @pytest.mark.parametrize("exception", [KeyError, TypeError, AttributeError])

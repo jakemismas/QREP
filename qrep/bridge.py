@@ -95,6 +95,11 @@ QUARTER = 2  # 1/4" in eighths
 # and every one grows with the square of the scale.
 RENDER_SCALE_MAX = 20
 
+# Largest forced fabric count for reverse(): SPEC.md section 12.1 caps the
+# read's fabric count at 12. Above it, k-means only stalls or fails inside
+# OpenCV, which would report your input as an engine bug.
+FABRICS_MAX = 12
+
 
 class _ArgumentError(Exception):
     """A bridge argument has the wrong type or structure (kind validation)."""
@@ -412,8 +417,8 @@ def reverse(image_path: str, options_json: str) -> dict:
     fabrics = options.get("fabrics")
     if fabrics is not None:
         fabrics = _whole("options_json.fabrics", fabrics)
-        if fabrics < 1:
-            raise ValueError(f"fabrics must be at least 1, got {fabrics}")
+        if not 1 <= fabrics <= FABRICS_MAX:
+            raise ValueError(f"fabrics must be 1..{FABRICS_MAX}, got {fabrics}")
 
     def _size_option(key: str) -> int | None:
         value = options.get(key)
