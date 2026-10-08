@@ -25,6 +25,7 @@ __all__ = [
     "BORDER_SETS",
     "NO_PACKAGE_LABEL",
     "PACKAGES",
+    "SOURCES",
     "WIDE_SETS",
     "backing",
     "batting",
@@ -34,10 +35,15 @@ __all__ = [
     "border_pair_strips",
     "ceil_div",
     "from_eighths",
+    "mfqs_backing",
     "panels",
     "purchase_yards",
+    "qc_border",
     "qp_backing_display",
     "qp_strip_yards",
+    "sewbecca_border",
+    "stitchdesk_backing",
+    "stitchdesk_binding",
     "to_eighths",
     "wide_back",
 ]
@@ -582,6 +588,12 @@ BINDING_SETS = MappingProxyType(
         "nqc": MappingProxyType(
             {"U": 40, "w": Fraction(5, 2), "extra": 12, "join_aware": False, "increment": "quarter"}
         ),
+        # QuiltKeeper Studio, from its page script (SOURCES["quiltkeeper_binding"]): strips =
+        # ceil((2 (W + H) + overage) / fabric width), yards = strips x width / 36 rounded up to
+        # 1/8. U is the 40 in the D2 run types; the page defaults to 42.
+        "quiltkeeper": MappingProxyType(
+            {"U": 40, "w": Fraction(5, 2), "extra": 10, "join_aware": False, "increment": "eighth"}
+        ),
     }
 )
 
@@ -604,3 +616,331 @@ BORDER_SETS = MappingProxyType(
         "qp": MappingProxyType({"U": 40, "rule": "qp_pooled"}),
     }
 )
+
+
+# ---------------------------------------------------------------------------------------------
+# Calculators added by the D2 search, each modeled from its page's own script (read 2026-10-08).
+# They count in exact eighths where that equals the page's floats: their quotients and yard
+# values have small denominators, so a double never lands on the wrong side of a ceil. Sew Becca
+# divides by the fabric width and is emulated in floats instead.
+# ---------------------------------------------------------------------------------------------
+
+SOURCES = MappingProxyType(
+    {
+        "mfqs_backing": "https://myfavoritequiltstore.com/assets/chunks/chunk-B-7na-F7.js",
+        "stitchdesk_backing": "https://thestitchdesk.com/assets/calc.js",
+        "stitchdesk_binding": "https://thestitchdesk.com/assets/calc.js",
+        "quiltkeeper_binding": (
+            "https://quiltkeeperstudio.com/_next/static/chunks/app/calculators/binding/"
+            "page-de20c3006a96819f.js"
+        ),
+        "sewbecca_border": "https://sewbecca.com/border-calc",
+        "qc_border": "https://quiltcalculator.com/_next/static/chunks/277-b1b795edf50fbbec.js",
+    }
+)
+
+
+def _fits_package(width_e: int, length_e: int, packages, *, sorted_sides: bool) -> str | None:
+    for name, pw, ph in packages:
+        pw_e, ph_e = pw * E_PER_INCH, ph * E_PER_INCH
+        if sorted_sides:
+            fits = min(pw_e, ph_e) >= min(width_e, length_e) and max(pw_e, ph_e) >= max(
+                width_e, length_e
+            )
+        else:
+            fits = (width_e <= pw_e and length_e <= ph_e) or (
+                width_e <= ph_e and length_e <= pw_e
+            )
+        if fits:
+            return name
+    return None
+
+
+def _js_to_fixed(value: float, digits: int) -> Fraction:
+    """JS Number.prototype.toFixed for value >= 0: the n nearest value x 10^digits, the larger n
+    on a tie, read from the double's exact binary value."""
+    if value < 0:
+        raise ValueError(f"toFixed emulation covers values >= 0, got {value}")
+    scale = 10**digits
+    return Fraction(math.floor(Fraction(value) * scale + Fraction(1, 2)), scale)
+
+
+# My Favorite Quilt Store: qx (backing) and xe (batting) in its shared chunk.
+_MFQS_WIDE_E = 108 * E_PER_INCH
+_MFQS_PACKAGES = (
+    ("Crib", 45, 60),
+    ("Twin", 72, 90),
+    ("Full", 81, 96),
+    ("Queen", 90, 108),
+    ("King", 120, 120),
+)
+_MFQS_SHRINKAGE = {
+    "Cotton": 0.04,
+    "Polyester": 0.005,
+    "Cotton/Poly Blend": 0.02,
+    "Wool": 0.04,
+    "Bamboo": 0.03,
+}
+
+
+def _mfqs_layout(fabric_e: int, wb_e: int, lb_e: int) -> dict:
+    fits = []
+    if wb_e <= fabric_e:
+        fits.append(lb_e)
+    if lb_e <= fabric_e:
+        fits.append(wb_e)
+    if fits:
+        raw_e = min(fits)
+        return {
+            "panels": 1,
+            "seams": "none",
+            "raw": from_eighths(raw_e),
+            "yards": purchase_yards(raw_e, "eighth"),
+        }
+    usable_e = fabric_e - E_PER_INCH  # 1 in off every panel, not every seam
+    across_l = ceil_div(lb_e, usable_e)
+    across_w = ceil_div(wb_e, usable_e)
+    horizontal_e, vertical_e = across_l * wb_e, across_w * lb_e
+    if horizontal_e <= vertical_e:
+        n, seams, raw_e = across_l, "horizontal", horizontal_e
+    else:
+        n, seams, raw_e = across_w, "vertical", vertical_e
+    return {
+        "panels": n,
+        "seams": seams,
+        "raw": from_eighths(raw_e),
+        "yards": purchase_yards(raw_e, "eighth"),
+    }
+
+
+def mfqs_backing(
+    W: int | Fraction,
+    L: int | Fraction,
+    *,
+    fabric_width: int | Fraction = 42,
+    overage: int | Fraction = 4,
+    batting: str = "Cotton",
+) -> dict:
+    """My Favorite Quilt Store backing and batting (defaults are the page's).
+
+    Backing (Wb = W + 2 overage, Lb = L + 2 overage): one piece when either side fits the fabric
+    width, cut the shorter qualifying length; otherwise panels = ceil(side / (fabric width - 1))
+    both ways, horizontal (ceil(Lb / (fw - 1)) panels of Wb) kept unless vertical is shorter;
+    yards rounded up to 1/8. The 108 in line is the same rule at 108 in, absent when the typed
+    fabric is 108. Batting is Wb x Lb, the first package covering it, and the shrinkage line.
+
+    Returns {backing: {panels, seams, raw, yards}, wide: {...} or None, batting: {width, length,
+    package, shrink_width, shrink_length, washed_width, washed_length}}.
+    """
+    if batting not in _MFQS_SHRINKAGE:
+        raise ValueError(
+            f"unknown MFQS batting {batting!r}; expected one of {list(_MFQS_SHRINKAGE)}"
+        )
+    o_e = max(to_eighths(overage), 0)  # the page treats a missing or negative overage as 0
+    wb_e = to_eighths(W) + 2 * o_e
+    lb_e = to_eighths(L) + 2 * o_e
+    fabric_e = to_eighths(fabric_width)
+    if fabric_e <= E_PER_INCH:
+        raise ValueError(f"fabric width {fabric_width} must exceed the 1 in panel loss")
+    rate = _MFQS_SHRINKAGE[batting]
+    # The shrinkage line is JS float arithmetic printed with toFixed(1).
+    shrink_w, shrink_l = float(from_eighths(wb_e)) * rate, float(from_eighths(lb_e)) * rate
+    return {
+        "backing": _mfqs_layout(fabric_e, wb_e, lb_e),
+        "wide": None if fabric_e == _MFQS_WIDE_E else _mfqs_layout(_MFQS_WIDE_E, wb_e, lb_e),
+        "batting": {
+            "width": from_eighths(wb_e),
+            "length": from_eighths(lb_e),
+            "package": _fits_package(wb_e, lb_e, _MFQS_PACKAGES, sorted_sides=True),
+            "shrink_width": _js_to_fixed(shrink_w, 1),
+            "shrink_length": _js_to_fixed(shrink_l, 1),
+            "washed_width": _js_to_fixed(float(from_eighths(wb_e)) - shrink_w, 1),
+            "washed_length": _js_to_fixed(float(from_eighths(lb_e)) - shrink_l, 1),
+        },
+    }
+
+
+# The Stitch Desk: plan, nearestBatting and bindingStraight in calc.js.
+STITCHDESK_SELVAGE = 2
+_STITCHDESK_PRECUTS = (
+    ("Craft", 36, 45),
+    ("Crib", 45, 60),
+    ("Throw", 60, 60),
+    ("Twin", 72, 90),
+    ("Full", 81, 96),
+    ("Queen", 90, 108),
+    ("King", 120, 120),
+)
+
+
+def _stitchdesk_plan(wb_e: int, lb_e: int, usable_e: int, sa_e: int) -> dict:
+    eff_e = usable_e - 2 * sa_e
+    if eff_e <= 0:
+        raise ValueError("seam allowance leaves no usable panel width")
+    pv = 1 if wb_e <= usable_e else ceil_div(wb_e, eff_e)
+    ph = 1 if lb_e <= usable_e else ceil_div(lb_e, eff_e)
+    layouts = {
+        "vertical": {"panels": pv, "panel_length": from_eighths(lb_e), "raw": pv * lb_e},
+        "horizontal": {"panels": ph, "panel_length": from_eighths(wb_e), "raw": ph * wb_e},
+    }
+    # Its yV <= yH compares pV x Lb / 36 with pH x Wb / 36, so vertical wins ties.
+    vertical_wins = layouts["vertical"]["raw"] <= layouts["horizontal"]["raw"]
+    kept = "vertical" if vertical_wins else "horizontal"
+    raw_e = layouts[kept]["raw"]
+    for layout in layouts.values():
+        layout["raw"] = from_eighths(layout["raw"])
+    return {
+        **layouts,
+        "kept": kept,
+        "panels": layouts[kept]["panels"],
+        "cut_length": layouts[kept]["panel_length"],
+        "raw": from_eighths(raw_e),
+        "yards": purchase_yards(raw_e, "eighth"),
+    }
+
+
+def stitchdesk_backing(
+    W: int | Fraction,
+    L: int | Fraction,
+    *,
+    fabric_width: int | Fraction = 42,
+    overhang_per_side: int | Fraction = 4,
+    batting_overhang_per_side: int | Fraction = 4,
+    seam_allowance: int | Fraction = Fraction(1, 2),
+) -> dict:
+    """The Stitch Desk backing and batting (defaults are the page's).
+
+    usable = fabric width - 2 (selvage); eff = usable - 2 x seam allowance; each side needs 1
+    panel when it fits usable, else ceil(side / eff). Vertical is panels(Wb) x Lb, horizontal
+    panels(Lb) x Wb; the smaller wins, vertical on a tie; yards rounded up to 1/8. Below 108 in
+    it also plans 108 in (usable 106) and shows that line only when cheaper.
+
+    Returns {backing_width, backing_length, usable, vertical, horizontal (each {panels,
+    panel_length, raw}), kept, panels, cut_length, raw, yards, wide: {yards, cheaper, saves} or
+    None on 108 in or wider, batting: {width, length, precut}}; precut None means "Buy off the
+    roll".
+    """
+    o_e, bo_e = to_eighths(overhang_per_side), to_eighths(batting_overhang_per_side)
+    wb_e, lb_e = to_eighths(W) + 2 * o_e, to_eighths(L) + 2 * o_e
+    fabric_e = to_eighths(fabric_width)
+    sa_e = to_eighths(seam_allowance)
+    usable_e = fabric_e - STITCHDESK_SELVAGE * E_PER_INCH
+    plan = _stitchdesk_plan(wb_e, lb_e, usable_e, sa_e)
+    wide = None
+    if fabric_e < 108 * E_PER_INCH:
+        alt = _stitchdesk_plan(wb_e, lb_e, (108 - STITCHDESK_SELVAGE) * E_PER_INCH, sa_e)
+        cheaper = alt["yards"] < plan["yards"]
+        wide = {
+            "yards": alt["yards"],
+            "cheaper": cheaper,
+            "saves": plan["yards"] - alt["yards"] if cheaper else None,
+        }
+    bw_e, bl_e = to_eighths(W) + 2 * bo_e, to_eighths(L) + 2 * bo_e
+    return {
+        "backing_width": from_eighths(wb_e),
+        "backing_length": from_eighths(lb_e),
+        "usable": from_eighths(usable_e),
+        **plan,
+        "wide": wide,
+        "batting": {
+            "width": from_eighths(bw_e),
+            "length": from_eighths(bl_e),
+            "precut": _fits_package(bw_e, bl_e, _STITCHDESK_PRECUTS, sorted_sides=False),
+        },
+    }
+
+
+def stitchdesk_binding(
+    W: int | Fraction,
+    L: int | Fraction,
+    *,
+    strip_width: int | Fraction = Fraction(5, 2),
+    fabric_width: int | Fraction = 42,
+) -> dict:
+    """The Stitch Desk straight-grain binding (defaults are the page's; bias is not modeled).
+
+    total = 2 (W + L) + 4 x strip width + 10; usable = fabric width - 2; strips start at
+    ceil(total / usable) and are recounted as ceil((total + (strips - 1) (strip width + 1/2)) /
+    usable) until stable, at most ten passes as the page does; yards = strips x strip width / 36
+    rounded up to 1/8.
+
+    Returns {perimeter, extra, total, strips, joins, yards}.
+    """
+    w_e = to_eighths(strip_width)
+    usable_e = to_eighths(fabric_width) - STITCHDESK_SELVAGE * E_PER_INCH
+    if w_e <= 0 or usable_e <= 0:
+        raise ValueError("strip width and usable fabric width must be positive")
+    perimeter_e = 2 * (to_eighths(W) + to_eighths(L))
+    extra_e = 4 * w_e + 10 * E_PER_INCH
+    total_e = perimeter_e + extra_e
+    join_e = w_e + HALF_INCH_E
+    strips = ceil_div(total_e, usable_e)
+    for _ in range(10):
+        recount = ceil_div(total_e + (strips - 1) * join_e, usable_e)
+        if recount == strips:
+            break
+        strips = recount
+    return {
+        "perimeter": from_eighths(perimeter_e),
+        "extra": from_eighths(extra_e),
+        "total": from_eighths(total_e),
+        "strips": strips,
+        "joins": strips - 1,
+        "yards": purchase_yards(strips * w_e, "eighth"),
+    }
+
+
+def sewbecca_border(
+    W: int | Fraction | str,
+    L: int | Fraction | str,
+    border_width: int | Fraction | str,
+    *,
+    fabric_width: int | Fraction | str = 42,
+) -> dict:
+    """Sew Becca's border (calculateFabric), in the page's float order:
+    strips = ceil(2 L / fw + 2 (W + b) / fw); yards = strips x b / fw (its divisor is the fabric
+    width, not 36) rounded up to 1/8. Returns {strips, yards}."""
+    w, ln, b, fw = (_js_number(v) for v in (W, L, border_width, fabric_width))
+    if fw <= 0:
+        raise ValueError(f"fabric width must be positive, got {fabric_width!r}")
+    strips = math.ceil(((ln * 2) / fw) + (((w + b) * 2) / fw))
+    yards = (strips * b) / fw
+    return {"strips": strips, "yards": Fraction(math.ceil(yards * 8), 8)}
+
+
+def qc_border(
+    W: int | Fraction,
+    L: int | Fraction,
+    borders: list[int | Fraction] | tuple[int | Fraction, ...],
+    *,
+    fabric_width: int | Fraction = 44,
+) -> dict:
+    """Quilt Calculator's border (default width is the page's 44 in), one result per enabled
+    border in order: strips = ceil((2 W + 2 L + 4 b + 12) / (fabric width - 1/2)); yards =
+    strips x (b + 1/2) / 36 rounded up to 1/8; then W and L grow by 2 b.
+
+    Returns {borders: [{index, width, strips, yards, width_after, length_after}]}.
+    """
+    w_e, l_e = to_eighths(W), to_eighths(L)
+    usable_e = to_eighths(fabric_width) - HALF_INCH_E
+    if usable_e <= 0:
+        raise ValueError(f"fabric width {fabric_width} leaves no usable width")
+    out = []
+    for index, b in enumerate(borders, start=1):
+        b_e = to_eighths(b)
+        if b_e <= 0:
+            raise ValueError(f"border width must be positive, got {b}")
+        strips = ceil_div(2 * w_e + 2 * l_e + 4 * b_e + 12 * E_PER_INCH, usable_e)
+        w_e += 2 * b_e
+        l_e += 2 * b_e
+        out.append(
+            {
+                "index": index,
+                "width": from_eighths(b_e),
+                "strips": strips,
+                "yards": purchase_yards(strips * (b_e + HALF_INCH_E), "eighth"),
+                "width_after": from_eighths(w_e),
+                "length_after": from_eighths(l_e),
+            }
+        )
+    return {"borders": out}

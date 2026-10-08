@@ -858,3 +858,496 @@ def test_per_piece_border_yards_fixture():
     assert got["bands"][0]["yards"] == F(5, 4)
     with pytest.raises(ValueError):
         cr.border(60, 72, [2], U=40, rule="qp_pooled", margin_percent=10)
+
+
+# ---------------------------------------------------------------------------------------------
+# Calculators added by the D2 search. Each fragment is hand-written in the shape and labels the
+# page writes, with numbers chosen here and worked in the comments. Glyphs the pages print are
+# named by code point so this file stays ASCII.
+# ---------------------------------------------------------------------------------------------
+
+INCH = chr(0x2033)  # double prime, The Stitch Desk's and QuiltKeeper's inch mark
+TIMES = chr(0x00D7)
+DASH = chr(0x2014)
+ARROW = chr(0x2192)
+STAR = chr(0x2726)
+EIGHTH = chr(0x215B)
+QUARTER = chr(0x00BC)
+HALF = chr(0x00BD)
+FIVE_EIGHTHS = chr(0x215D)
+SEVEN_EIGHTHS = chr(0x215E)
+
+# Throw 50 x 65 on 42 in fabric, 4 in overage, cotton batting.
+MFQS_RESULTS_1 = (
+    '<p class="mb-2 font-bold text-red">Backing</p>'
+    f'<div class="rounded-md"><p class="mb-1">42" fabric</p><p class="text-lg">3{QUARTER} yards</p>'
+    '<p class="mt-1">2 panels, pieced with horizontal seam.</p></div>'
+    '<div class="mt-3 rounded-md"><p class="mb-1">108" wide backing</p>'
+    f'<p class="text-lg">1{FIVE_EIGHTHS} yards</p>'
+    f'<p class="mt-1">Fits in one piece {DASH} no seam needed.</p></div>'
+)
+MFQS_RESULTS_2 = (
+    '<p class="mb-2 font-bold text-red">Batting</p>'
+    f'<p class="text-lg"><span class="font-medium">Size needed:</span> 58" {TIMES} 73"</p>'
+    '<p class="mt-1"><span class="font-medium">Recommended package:</span> Twin</p>'
+    f'<p class="mt-1">Estimated shrinkage 2.3" {TIMES} 2.9" {ARROW} about 55.7" {TIMES} 70.1"'
+    " after the first wash.</p>"
+)
+
+
+def test_parse_mfqs_backing():
+    # 3 + 1/4 = 13/4 yd; 1 + 5/8 = 13/8 yd; 55.7 = 557/10, 70.1 = 701/10.
+    got = cp.parse_mfqs_backing({"results_1": MFQS_RESULTS_1, "results_2": MFQS_RESULTS_2})
+    assert got == {
+        "backing": {"fabric_width": F(42), "yards": F(13, 4), "panels": 2, "seams": "horizontal"},
+        "wide": {"fabric_width": F(108), "yards": F(13, 8), "panels": 1, "seams": "none"},
+        "batting": {
+            "width": F(58),
+            "length": F(73),
+            "package": "Twin",
+            "shrink_width": F(23, 10),
+            "shrink_length": F(29, 10),
+            "washed_width": F(557, 10),
+            "washed_length": F(701, 10),
+        },
+    }
+
+
+def test_parse_mfqs_backing_wide_fabric_and_no_package():
+    # On 108 in fabric the page shows one block and no wide line; a lone 7/8 glyph reads 7/8 yd
+    # (singular "yard" below one). 128 x 136 in batting fits no package.
+    results_1 = (
+        f'<p>Backing</p><div><p>108" fabric</p><p>{SEVEN_EIGHTHS} yard</p>'
+        "<p>3 panels, pieced with vertical seams.</p></div>"
+    )
+    results_2 = (
+        f'<p>Batting</p><p><span>Size needed:</span> 128" {TIMES} 136"</p>'
+        f"<p><span>Recommended package:</span> Larger than King {DASH} consider batting by the"
+        " roll</p>"
+        f'<p>Estimated shrinkage 5.1" {TIMES} 5.4" {ARROW} about 122.9" {TIMES} 130.6" after'
+        " the first wash.</p>"
+    )
+    got = cp.parse_mfqs_backing({"results_1": results_1, "results_2": results_2})
+    assert got["backing"] == {
+        "fabric_width": F(108), "yards": F(7, 8), "panels": 3, "seams": "vertical",
+    }  # fmt: skip
+    assert got["wide"] is None
+    assert got["batting"]["package"] is None
+    assert got["batting"]["washed_width"] == F(1229, 10)  # 122.9
+
+
+@pytest.mark.parametrize(
+    ("key", "old", "new"),
+    [
+        ("results_2", "Twin", "Twin XL"),  # not one of the page's five packages
+        ("results_1", "Backing", "Batting"),  # wrong block
+        ("results_1", "2 panels, pieced", "two panels, pieced"),
+        ("results_1", f"3{QUARTER} yards", "N/A yards"),
+    ],
+)
+def test_parse_mfqs_backing_rejects(key, old, new):
+    html_by_id = {"results_1": MFQS_RESULTS_1, "results_2": MFQS_RESULTS_2}
+    html_by_id[key] = html_by_id[key].replace(old, new, 1)
+    with pytest.raises(ValueError):
+        cp.parse_mfqs_backing(html_by_id)
+
+
+def test_parse_mfqs_backing_needs_both_blocks():
+    with pytest.raises(ValueError):
+        cp.parse_mfqs_backing({"results_1": MFQS_RESULTS_1})
+
+
+# Throw 50 x 65 on 42 in fabric, 4 in overhang, 4 in batting overhang, 1/2 in seams.
+STITCHDESK_BACKING = (
+    f'<p class="result__headline" id="rHead">You need <b>3 1/4 yd</b> of 42{INCH} backing.</p>'
+    f'<p class="result__sub" id="rSub">Backing finishes at 58{INCH} {TIMES} 73{INCH}, giving'
+    f" 4{INCH} overhang on every side.</p>"
+    '<dl class="result__panels">'
+    f'<div class="stat"><dt>Cutting plan</dt><dd id="rCut">Cut 2 panels, each 58{INCH} long.'
+    " Join with horizontal seams.</dd></div>"
+    f'<div class="stat"><dt>Batting needed</dt><dd id="rBat">58{INCH} {TIMES} 73{INCH} at'
+    f" 4{INCH} overhang. Nearest precut: Twin</dd></div>"
+    '<div class="stat stat--gold"><dt>Cheaper alternative</dt><dd id="rAlt">1 5/8 yd of'
+    f" 108{INCH} wide back saves 1 5/8 yd</dd></div>"
+    '<div class="stat stat--gold"><dt>Estimated cost</dt><dd id="rCost">Add a price per yard'
+    " to see this</dd></div></dl>"
+    f'<div class="diagram"><svg id="svg"><text>58{INCH} backing</text></svg></div>'
+)
+
+
+def test_parse_stitchdesk_backing():
+    # 3 1/4 yd = 13/4; 1 5/8 yd = 13/8, and 13/4 - 13/8 = 13/8 saved.
+    got = cp.parse_stitchdesk_backing({"results": STITCHDESK_BACKING})
+    assert got == {
+        "backing": {
+            "fabric_width": F(42),
+            "yards": F(13, 4),
+            "backing_width": F(58),
+            "backing_length": F(73),
+            "overhang": F(4),
+            "panels": 2,
+            "cut_length": F(58),
+            "seams": "horizontal",
+        },
+        "batting": {"width": F(58), "length": F(73), "overhang": F(4), "precut": "Twin"},
+        "wide": {"fabric_width": F(108), "yards": F(13, 8), "saves": F(13, 8)},
+        "wide_note": None,
+        "cost": None,
+    }
+
+
+def test_parse_stitchdesk_backing_one_panel_with_price():
+    html = (
+        f'<p id="rHead">You need <b>1 yd</b> of 42{INCH} backing.</p>'
+        f'<p id="rSub">Backing finishes at 32{INCH} {TIMES} 38{INCH}, giving 4{INCH} overhang'
+        " on every side.</p>"
+        f'<dd id="rCut">One panel, cut 32{INCH} long. No seam needed.</dd>'
+        f'<dd id="rBat">32{INCH} {TIMES} 38{INCH} at 4{INCH} overhang. Nearest precut: Craft</dd>'
+        f'<dd id="rAlt">42{INCH} is already the cheaper option here</dd>'
+        '<dd id="rCost">$12.50 at $12.50/yd</dd>'
+    )
+    got = cp.parse_stitchdesk_backing({"results": html})
+    assert (got["backing"]["panels"], got["backing"]["seams"]) == (1, "none")
+    assert got["backing"]["cut_length"] == F(32)
+    assert got["batting"]["precut"] == "Craft"
+    assert (got["wide"], got["wide_note"]) == (None, "fabric_cheaper")
+    assert got["cost"] == {"cost": F(25, 2), "price": F(25, 2)}  # 1 yd x $12.50
+
+
+def test_parse_stitchdesk_backing_on_wide_fabric():
+    # Eighth-inch mixed numbers: 100 1/2 = 201/2 in.
+    html = (
+        f'<p id="rHead">You need <b>3 3/8 yd</b> of 108{INCH} backing.</p>'
+        f'<p id="rSub">Backing finishes at 100 1/2{INCH} {TIMES} 123{INCH}, giving 4{INCH}'
+        " overhang on every side.</p>"
+        f'<dd id="rCut">One panel, cut 123{INCH} long. No seam needed.</dd>'
+        f'<dd id="rBat">128{INCH} {TIMES} 136{INCH} at 4{INCH} overhang. Buy off the roll</dd>'
+        '<dd id="rAlt">You are already on wide backing</dd>'
+        '<dd id="rCost">Add a price per yard to see this</dd>'
+    )
+    got = cp.parse_stitchdesk_backing({"results": html})
+    assert got["backing"]["backing_width"] == F(201, 2)
+    assert got["backing"]["yards"] == F(27, 8)  # 3 + 3/8
+    assert got["batting"]["precut"] is None
+    assert (got["wide"], got["wide_note"]) == (None, "already_wide")
+
+
+def test_parse_stitchdesk_backing_rejects():
+    with pytest.raises(ValueError):
+        cp.parse_stitchdesk_backing({"results": STITCHDESK_BACKING.replace(' id="rCut"', "")})
+    with pytest.raises(ValueError):
+        cp.parse_stitchdesk_backing(
+            {"results": STITCHDESK_BACKING.replace("Join with horizontal", "Join with diagonal")}
+        )
+
+
+# Throw 60 x 72, 2 1/2 in straight strips on 42 in fabric.
+STITCHDESK_BINDING = (
+    '<p class="result__headline" id="bHead">You need <b>5/8 yd</b> for binding.</p>'
+    f'<p class="result__sub" id="bSub">Perimeter is 264{INCH}, plus 20{INCH} for mitred corners'
+    " and the closing join.</p>"
+    '<dl class="result__panels">'
+    f'<div class="stat"><dt>Cutting plan</dt><dd id="bStrips">Cut 8 strips at 2 1/2{INCH}'
+    " wide</dd></div>"
+    '<div class="stat"><dt>Joins</dt><dd id="bJoins">7 diagonal joins, pressed open</dd></div>'
+    f'<div class="stat stat--gold"><dt>Finished width</dt><dd id="bFin">About 5/8{INCH} once'
+    " folded and sewn</dd></div>"
+    '<div class="stat stat--gold"><dt>Estimated cost</dt><dd id="bCost">Add a price per yard'
+    " to see this</dd></div></dl>"
+)
+
+
+def test_parse_stitchdesk_binding():
+    # 2 (60 + 72) = 264 in perimeter; 4 x 2 1/2 + 10 = 20 in extra.
+    assert cp.parse_stitchdesk_binding({"results": STITCHDESK_BINDING}) == {
+        "type": "straight",
+        "yards": F(5, 8),
+        "perimeter": F(264),
+        "extra": F(20),
+        "strips": 8,
+        "strip_width": F(5, 2),
+        "joins": 7,
+        "bias_square": None,
+        "finished_width": F(5, 8),
+        "cost": None,
+    }
+
+
+def test_parse_stitchdesk_binding_bias():
+    html = STITCHDESK_BINDING.replace(
+        f"Cut 8 strips at 2 1/2{INCH} wide", f"Continuous bias from one 23{INCH} square"
+    ).replace("7 diagonal joins, pressed open", "None, bias is cut as one continuous strip")
+    got = cp.parse_stitchdesk_binding({"results": html})
+    assert (got["type"], got["strips"], got["joins"], got["bias_square"]) == (
+        "bias", None, None, F(23),
+    )  # fmt: skip
+
+
+def test_parse_stitchdesk_binding_rejects():
+    with pytest.raises(ValueError):
+        cp.parse_stitchdesk_binding(
+            {"results": STITCHDESK_BINDING.replace("7 diagonal joins", "seven diagonal joins")}
+        )
+    with pytest.raises(ValueError):
+        cp.parse_stitchdesk_binding({"results": STITCHDESK_BINDING.replace(' id="bHead"', "")})
+
+
+def _qk_row(label, value):
+    return (
+        '<div class="flex justify-between"><span class="text-body-sm">' + label + "</span>"
+        '<span class="text-body">' + value + "</span></div>"
+    )
+
+
+# Throw 60 x 72, 2.5 in strips, 42 in fabric, 10 in overage.
+QUILTKEEPER_BINDING = (
+    '<div><p class="text-body-sm">Your results</p>'
+    + _qk_row("Yardage to buy", "1/2 yd")
+    + _qk_row("Cutting instruction", f"Cut 7 strips at 2.5{INCH} {TIMES} WOF")
+    + _qk_row("Strips needed", "7")
+    + _qk_row("Binding length", f"274.0{INCH}")
+    + _qk_row("Perimeter", f"264{INCH}")
+    + "</div>"
+)
+
+
+def test_parse_quiltkeeper_binding():
+    # 2 (60 + 72) = 264 in; + 10 = 274 in; 2.5 in = 5/2.
+    assert cp.parse_quiltkeeper_binding({"results": QUILTKEEPER_BINDING}) == {
+        "yards": F(1, 2),
+        "strips": 7,
+        "strip_width": F(5, 2),
+        "binding_length": F(274),
+        "perimeter": F(264),
+    }
+
+
+def test_parse_quiltkeeper_binding_rejects():
+    with pytest.raises(ValueError):
+        # The cutting line and the strip count disagree, so one of them was misread.
+        cp.parse_quiltkeeper_binding(
+            {"results": QUILTKEEPER_BINDING.replace("Cut 7 strips", "Cut 8 strips")}
+        )
+    with pytest.raises(ValueError):
+        cp.parse_quiltkeeper_binding(
+            {"results": QUILTKEEPER_BINDING.replace(_qk_row("Perimeter", f"264{INCH}"), "")}
+        )
+
+
+def test_parse_sewbecca_border():
+    html = (
+        "\n<h2>Results</h2>\n<ul>\n"
+        "<li><strong>Yardage Required:</strong> 3/4 yards</li>\n"
+        "<li><strong>Number of Strips Required:</strong> 7</li>\n</ul>\n"
+    )
+    assert cp.parse_sewbecca_border({"result": html}) == {"yards": F(3, 4), "strips": 7}
+    mixed = html.replace("3/4 yards", "1 1/8 yards").replace("> 7<", "> 12<")
+    assert cp.parse_sewbecca_border({"result": mixed}) == {"yards": F(9, 8), "strips": 12}
+    with pytest.raises(ValueError):
+        cp.parse_sewbecca_border({"result": html.replace("Number of Strips", "Count of Strips")})
+
+
+def _qc_row(label, value):
+    return (
+        '<div style="display: flex;"><span style="color: rgb(122, 86, 64);">' + label + "</span>"
+        '<span style="font-weight: 700;">' + value + "</span></div>"
+    )
+
+
+QC_BORDER_2 = _qc_row(f'Border 2: 5" wide {DASH} yardage', f"1 {QUARTER} yards")
+
+# Center 60 x 72 on 42 in fabric, borders 2 then 5.
+QC_BORDER = (
+    f'<div style="font-size: 10px;">{STAR} Results</div>'
+    + _qc_row(f'Border 1: 2" wide {DASH} yardage', f"{HALF} yard")
+    + _qc_row("Quilt size after border 1", f'64" {TIMES} 76"')
+    + QC_BORDER_2
+    + _qc_row("Quilt size after border 2", f'74" {TIMES} 86"')
+)
+
+
+def test_parse_qc_border():
+    # A lone 1/2 glyph = 1/2 yd; "1" + 1/4 glyph = 5/4 yd; 60 + 2 x 2 = 64, 64 + 2 x 5 = 74.
+    assert cp.parse_qc_border({"results": QC_BORDER}) == {
+        "borders": [
+            {"index": 1, "width": F(2), "yards": F(1, 2), "width_after": F(64),
+             "length_after": F(76)},
+            {"index": 2, "width": F(5), "yards": F(5, 4), "width_after": F(74),
+             "length_after": F(86)},
+        ]
+    }  # fmt: skip
+
+
+def test_parse_qc_border_decimals_and_whole_yards():
+    html = (
+        f"<div>{STAR} Results</div>"
+        + _qc_row(f'Border 1: 3.75" wide {DASH} yardage', f"1 {EIGHTH} yards")
+        + _qc_row("Quilt size after border 1", f'82.5" {TIMES} 97.5"')
+        + _qc_row(f'Border 2: 6" wide {DASH} yardage', "2 yards")
+        + _qc_row("Quilt size after border 2", f'94.5" {TIMES} 109.5"')
+    )
+    got = cp.parse_qc_border({"results": html})["borders"]
+    assert (got[0]["width"], got[0]["yards"]) == (F(15, 4), F(9, 8))  # 3.75; 1 1/8
+    assert (got[0]["width_after"], got[0]["length_after"]) == (F(165, 2), F(195, 2))
+    assert got[1]["yards"] == F(2)
+
+
+def test_parse_qc_border_rejects():
+    nothing = f"<div>{STAR} Results</div>" + _qc_row("Enable at least one border above", DASH)
+    with pytest.raises(ValueError):
+        cp.parse_qc_border({"results": nothing})
+    with pytest.raises(ValueError):
+        # A size row without its border row.
+        cp.parse_qc_border({"results": QC_BORDER.replace(QC_BORDER_2, "")})
+
+
+# ---------------------------------------------------------------------------------------------
+# Rules for those calculators, read from each page's own script
+# ---------------------------------------------------------------------------------------------
+
+
+def test_mfqs_backing_throw_50x65():
+    # Wb = 50 + 8 = 58, Lb = 65 + 8 = 73; neither fits 42, so m = 42 - 1 = 41.
+    # Horizontal: ceil(73 / 41) = 2 panels x 58 = 116 in; vertical: ceil(58 / 41) = 2 x 73 = 146.
+    # 116 <= 146 keeps horizontal; 116 / 36 = 3.22 yd, ceil(25.8) = 26 eighths = 3 1/4 yd.
+    # 108 in: both sides fit, the shorter cut is 58 in; 58 / 36 = 1.61, ceil(12.9) = 13 eighths.
+    # Batting 58 x 73: crib 45 x 60 too small; twin 72 x 90 covers it (58 <= 72, 73 <= 90).
+    # Cotton 4 percent: 58 x 0.04 = 2.32 -> "2.3"; 73 x 0.04 = 2.92 -> "2.9";
+    # 58 - 2.32 = 55.68 -> "55.7"; 73 - 2.92 = 70.08 -> "70.1" (one decimal, none near a tie).
+    got = cr.mfqs_backing(50, 65, fabric_width=42, overage=4, batting="Cotton")
+    assert got["backing"] == {"panels": 2, "seams": "horizontal", "raw": F(116), "yards": F(13, 4)}
+    assert got["wide"] == {"panels": 1, "seams": "none", "raw": F(58), "yards": F(13, 8)}
+    assert got["batting"] == {
+        "width": F(58),
+        "length": F(73),
+        "package": "Twin",
+        "shrink_width": F(23, 10),
+        "shrink_length": F(29, 10),
+        "washed_width": F(557, 10),
+        "washed_length": F(701, 10),
+    }
+
+
+def test_mfqs_backing_loses_an_inch_per_panel():
+    # Fixture 75 x 90 on 42: Wb 83, Lb 98. Its panels cover n x 41 in (1 in off every panel, not
+    # every seam), so two cover 82 < 83: horizontal ceil(98 / 41) = 3 x 83 = 249 in;
+    # vertical ceil(83 / 41) = 3 x 98 = 294 in. 249 / 36 = 6.92, ceil(55.3) = 56 eighths = 7 yd.
+    # (MATH.md F9 seams the same 83 in from two panels, V-BACK-09.)
+    got = cr.mfqs_backing(75, 90, fabric_width=42, overage=4)
+    assert got["backing"] == {"panels": 3, "seams": "horizontal", "raw": F(249), "yards": F(7)}
+
+
+def test_mfqs_backing_one_piece_and_on_wide():
+    # 28 x 28 -> 36 x 36, which fits 42 either way: one piece of 36 in = exactly 1 yd.
+    got = cr.mfqs_backing(28, 28, fabric_width=42, overage=4)
+    assert got["backing"] == {"panels": 1, "seams": "none", "raw": F(36), "yards": F(1)}
+    # Typed as 108 in fabric, the page shows no separate wide line.
+    assert cr.mfqs_backing(28, 28, fabric_width=108, overage=4)["wide"] is None
+
+
+def test_stitchdesk_backing_throw_50x65():
+    # Back 58 x 73; usable 42 - 2 = 40; eff = 40 - 2 x 1/2 = 39.
+    # Vertical: 58 > 40, ceil(58 / 39) = 2 panels of 73 = 146 in; horizontal: 73 > 40,
+    # ceil(73 / 39) = 2 panels of 58 = 116 in. 146 > 116 keeps horizontal; 116 / 36 = 3.22 yd,
+    # ceil(25.8) = 26 eighths = 3 1/4 yd. 108 in (usable 106): one panel either way, 58 in kept,
+    # 13 eighths = 1 5/8 yd, which is less, so it shows "saves 3 1/4 - 1 5/8 = 1 5/8 yd".
+    # Batting 58 x 73: craft, crib and throw (60 x 60) are too small; twin 72 x 90 covers it.
+    got = cr.stitchdesk_backing(
+        50, 65, fabric_width=42, overhang_per_side=4, batting_overhang_per_side=4,
+        seam_allowance=F(1, 2),
+    )  # fmt: skip
+    assert got["vertical"] == {"panels": 2, "panel_length": F(73), "raw": F(146)}
+    assert got["horizontal"] == {"panels": 2, "panel_length": F(58), "raw": F(116)}
+    assert (got["kept"], got["panels"], got["cut_length"], got["yards"]) == (
+        "horizontal", 2, F(58), F(13, 4),
+    )  # fmt: skip
+    assert got["wide"] == {"yards": F(13, 8), "cheaper": True, "saves": F(13, 8)}
+    assert got["batting"] == {"width": F(58), "length": F(73), "precut": "Twin"}
+
+
+def test_stitchdesk_backing_selvage_and_per_panel_loss():
+    # Fixture 75 x 90: back 83 x 98, eff 39. Vertical ceil(83 / 39) = ceil(2.13) = 3 x 98 = 294;
+    # horizontal ceil(98 / 39) = ceil(2.51) = 3 x 83 = 249, kept; 249 / 36 = 6.92 -> 7 yd.
+    got = cr.stitchdesk_backing(75, 90)
+    assert (got["kept"], got["panels"], got["raw"], got["yards"]) == (
+        "horizontal", 3, F(249), F(7),
+    )  # fmt: skip
+
+
+def test_stitchdesk_backing_one_panel_not_cheaper_on_wide():
+    # 24 x 30 -> 32 x 38, both within 40 usable: vertical one panel of 38, horizontal one of 32;
+    # 38 / 36 > 32 / 36 keeps horizontal; 32 / 36 = 0.89, ceil(7.1) = 8 eighths = 1 yd. On 108
+    # the same 1 yd, not less, so no saving. Batting 32 x 38 fits craft 36 x 45.
+    got = cr.stitchdesk_backing(24, 30)
+    assert (got["panels"], got["kept"], got["yards"]) == (1, "horizontal", F(1))
+    assert got["wide"] == {"yards": F(1), "cheaper": False, "saves": None}
+    assert got["batting"]["precut"] == "Craft"
+
+
+def test_stitchdesk_binding_throw_60x72():
+    # Perimeter 2 (60 + 72) = 264; extra 4 x 2.5 + 10 = 20; total 284; usable 42 - 2 = 40;
+    # join loss 2.5 + 0.5 = 3. ceil(284 / 40) = 8; ceil((284 + 7 x 3) / 40) = ceil(7.63) = 8,
+    # unchanged. 8 x 2.5 / 36 = 0.56 yd, ceil(4.4) = 5 eighths = 5/8 yd; 7 joins.
+    got = cr.stitchdesk_binding(60, 72, strip_width=F(5, 2), fabric_width=42)
+    assert got == {
+        "perimeter": F(264),
+        "extra": F(20),
+        "total": F(284),
+        "strips": 8,
+        "joins": 7,
+        "yards": F(5, 8),
+    }
+
+
+def test_stitchdesk_binding_iterates_the_join_loss():
+    # Queen 90 x 108: total 396 + 20 = 416. ceil(416 / 40) = 11; ceil((416 + 10 x 3) / 40)
+    # = ceil(11.15) = 12; ceil((416 + 11 x 3) / 40) = ceil(11.23) = 12, stop. 12 x 2.5 / 36
+    # = 0.83 yd, ceil(6.7) = 7 eighths = 7/8 yd.
+    got = cr.stitchdesk_binding(90, 108)
+    assert (got["strips"], got["joins"], got["yards"]) == (12, 11, F(7, 8))
+
+
+def test_quiltkeeper_binding_parameter_set():
+    # Throw 60 x 72 at 42: T = 264 + 10 = 274; ceil(274 / 42) = ceil(6.52) = 7 strips;
+    # 7 x 2.5 = 17.5 in; 17.5 / 36 = 0.49 yd, ceil(3.9) = 4 eighths = 1/2 yd.
+    got = cr.binding(60, 72, **{**cr.BINDING_SETS["quiltkeeper"], "U": 42})
+    assert (got["strips"], got["length"], got["yards"]) == (7, F(35, 2), F(1, 2))
+    # Queen 90 x 108 at 40 (as D2 drives it): T = 396 + 10 = 406; ceil(406 / 40) = 11;
+    # 27.5 in / 36 = 0.76 yd, ceil(6.1) = 7 eighths = 7/8 yd.
+    got = cr.binding(90, 108, **cr.BINDING_SETS["quiltkeeper"])
+    assert (got["strips"], got["yards"]) == (11, F(7, 8))
+
+
+def test_sewbecca_border():
+    # 60 x 72, border 4, fabric 42: ceil(144 / 42 + (60 + 4) x 2 / 42) = ceil(3.43 + 3.05)
+    # = ceil(6.48) = 7 strips; 7 x 4 / 42 = 0.67 yd (divided by the fabric width, as its script
+    # does), ceil(5.3) = 6 eighths = 3/4 yd.
+    assert cr.sewbecca_border(60, 72, 4, fabric_width=42) == {"strips": 7, "yards": F(3, 4)}
+    # V-BORD-02's center 32 x 48, border 2, fabric 40: ceil(96 / 40 + 68 / 40) = ceil(2.4 + 1.7)
+    # = 5; 5 x 2 / 40 = 0.25 yd exactly -> 2 eighths = 1/4 yd.
+    assert cr.sewbecca_border(32, 48, 2, fabric_width=40) == {"strips": 5, "yards": F(1, 4)}
+
+
+def test_qc_border_two_bands():
+    # Center 60 x 72 on 42 (41.5 in after its 1/2 in loss). Border 2: 2 x 60 + 2 x 72 + 4 x 2 + 12
+    # = 284; ceil(284 / 41.5) = ceil(6.84) = 7 strips of 2.5 in = 17.5 in; 17.5 / 36 = 0.49 yd,
+    # ceil(3.9) = 4 eighths = 1/2 yd; size 64 x 76. Border 5: 128 + 152 + 20 + 12 = 312;
+    # ceil(312 / 41.5) = ceil(7.52) = 8 strips of 5.5 in = 44 in; 44 / 36 = 1.22 yd,
+    # ceil(9.8) = 10 eighths = 1 1/4 yd; size 74 x 86.
+    got = cr.qc_border(60, 72, [2, 5], fabric_width=42)
+    assert got["borders"] == [
+        {"index": 1, "width": F(2), "strips": 7, "yards": F(1, 2), "width_after": F(64),
+         "length_after": F(76)},
+        {"index": 2, "width": F(5), "strips": 8, "yards": F(5, 4), "width_after": F(74),
+         "length_after": F(86)},
+    ]  # fmt: skip
+
+
+def test_qc_border_page_default_width():
+    # V-BORD-02's center 32 x 48, border 2, on the page's default 44 in (43.5 after the loss):
+    # 64 + 96 + 8 + 12 = 180; ceil(180 / 43.5) = ceil(4.14) = 5 strips x 2.5 = 12.5 in;
+    # 12.5 / 36 = 0.35 yd, ceil(2.8) = 3 eighths = 3/8 yd; size 36 x 52.
+    band = cr.qc_border(32, 48, [2])["borders"][0]
+    assert (band["strips"], band["yards"], band["width_after"], band["length_after"]) == (
+        5, F(3, 8), F(36), F(52),
+    )  # fmt: skip
