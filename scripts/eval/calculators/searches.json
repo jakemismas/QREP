@@ -55,6 +55,17 @@
       "how_to_drive": "Four type=number inputs without ids in server HTML; field ids not found. Sibling page /border-calculator also exists and was not inspected."
     },
     {
+      "vendor": "Quilt Calculator (quiltcalculator.com)",
+      "url": "https://quiltcalculator.com/border-calculator",
+      "accessed": "2026-10-09",
+      "line_types": ["borders"],
+      "found_by": "A candidate of the extended border query above and the sibling page named in the backing entry; the driver reaches it from the site's home page link. The access date is that of its driven records (UTC timestamps 2026-10-09T01:39Z to 01:43Z, n = 18, all returning values).",
+      "inputs": ["quilt width (in)", "quilt length (in)", "width of fabric (in)", "up to three borders, each with an enable checkbox and a width (in); border 2 starts enabled at 6 in"],
+      "outputs": "Per enabled border, its yardage and the quilt size after it.",
+      "formula": "As modeled in calc_rules.qc_border, which reproduces all 19 compared values: strips = ceil((2 W + 2 L + 4 b + 12) / (fabric width - 1/2)); yards = strips x (b + 1/2) / 36, rounded up to 1/8 yd; each later border sees W and L grown by 2 b.",
+      "how_to_drive": "drive.mjs finds the URL from the home page's border link and matches fields by role and label; results update live."
+    },
+    {
       "vendor": "QuiltKeeper Studio (quiltkeeperstudio.com)",
       "url": "https://quiltkeeperstudio.com/calculators/binding",
       "accessed": "2026-10-07",
