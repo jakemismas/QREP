@@ -95,3 +95,51 @@ def test_export_unknown_format_raises(fixture_quilt, tmp_path):
     plan = plan_strip(fixture_quilt)
     with pytest.raises(KeyError, match="unknown export format"):
         export_all(fixture_quilt, plan, tmp_path, ["holograph"])
+
+
+def test_format_yards_prints_mixed_fractions_of_the_increment():
+    # F13: yards as mixed fractions of the purchase increment; 1 yd = 288 e
+    # 1/8 yd (36 e): 11 x 36 = 396 e = 288 + 108 -> 1 + 108/288 = 1 3/8 yd
+    assert format_yards(11, 36) == "1 3/8 yd"
+    # 4 x 36 = 144 e = 144/288 = 1/2 yd
+    assert format_yards(4, 36) == "1/2 yd"
+    # 8 x 36 = 288 e = 1 yd
+    assert format_yards(8, 36) == "1 yd"
+    # 5 x 36 = 180 e = 180/288 = 5/8 yd
+    assert format_yards(5, 36) == "5/8 yd"
+    # the default stays quarter yards: 22 x 72 = 1584 e = 5 x 288 + 144 -> 5 1/2 yd
+    assert format_yards(22, 72) == "5 1/2 yd"
+
+
+def test_yardage_report_shows_purchase_lengths_and_allowances(fixture_quilt):
+    report = compute_purchase_lines(fixture_quilt, plan_strip(fixture_quilt))
+    text = render_yardage_md(report)
+    assert "| Fabric | Length needed | Purchase length | Yards |" in text
+    # V-BACK-09: 1568 e = 196 in needed; + 72 e pieced allowance = 1640 e = 205 in;
+    # ceil(1640 / 72) = 23 qy = 5 3/4 yd
+    assert (
+        '| backing, 42" wide fabric: (2) panels 98" long, vertical seams '
+        '| 196" | 205" | 5 3/4 yd |'
+    ) in text
+    # V-WIDE-08: 664 e = 83 in; + 36 e = 700 e = 87 1/2 in; ceil(700 / 72) = 10 qy = 2 1/2 yd
+    wide = next(line for line in text.splitlines() if line.startswith("Or replace"))
+    assert wide == (
+        'Or replace the backing line with wide backing, 108" wide fabric: one piece 83" long '
+        '(83" needed, 87 1/2" with its squaring allowance), 2 1/2 yd.'
+    )
+    assert wide.count(":") == 1
+    # footer: p = 10 percent; the backing allowance 1640 - 1568 = 72 e = 9 in; r = 72 e = 1/4 yd
+    assert "adds a 10 percent margin to each quilt-top fabric" in text
+    assert 'a 9" squaring allowance to the backing' in text
+    assert "Each line rounds up to the nearest 1/4 yd." in text
+
+
+def test_yardage_report_at_an_eighth_yard_increment(fixture_quilt):
+    quilt = fixture_quilt.model_copy(
+        update={"settings": fixture_quilt.settings.model_copy(update={"purchase_increment": 36})}
+    )
+    text = render_yardage_md(compute_purchase_lines(quilt, plan_strip(quilt)))
+    # binding at the stored 42 in: 9 strips x 20 e = 180 e = 22 1/2 in, no allowance;
+    # ceil(180 / 36) = 5 eighths of a yard = 5/8 yd
+    assert '| Binding - Chain blue (b) | 22 1/2" | 22 1/2" | 5/8 yd |' in text
+    assert "Each line rounds up to the nearest 1/8 yd." in text

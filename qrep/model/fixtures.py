@@ -29,6 +29,7 @@ from qrep.model.schema import (
     Palette,
     Quilt,
     QuiltMetadata,
+    Settings,
 )
 
 # 5x5 block rows, top to bottom. Block A: 21 blue, 4 cream. Block B: 4 blue, 21 cream.
@@ -80,4 +81,7 @@ def make_double_irish_chain(
         center=GridRegion(rows=rows, cols=cols, cell_size=cell_size, cells=cells),
         borders=[BorderBand(fabric_id="c", width=border_width)],
         binding=Binding(fabric_id="b", strip_width=20),
+        # The committed fixture and the goldens keep the old 42in usable width
+        # until A6 regenerates them (REBASELINE.md, bless policy item 4).
+        settings=Settings(wof=336),
     )

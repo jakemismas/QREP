@@ -16,11 +16,7 @@ from qrep.construct.plan import (
     PlanMetrics,
     StripSet,
 )
-from qrep.construct.yardage import (
-    QUARTER_YARD,
-    compute_yardage_from_components,
-    cut_area_by_fabric,
-)
+from qrep.construct.yardage import cut_area_by_fabric, purchase_lines
 from qrep.model.schema import Quilt
 from qrep.model.units import format_inches
 
@@ -153,9 +149,10 @@ def _grouped_center_pieces(
     source: str,
 ) -> list[CutPiece]:
     """Group (fabric, finished w, finished h) rectangles into cut-list lines,
-    ordered by palette then descending size."""
+    ordered by palette then descending size. A rectangle and its quarter turn
+    are one line, short side first (PATTERN-SPEC C-10)."""
     add = quilt.settings.cut_add
-    counts = Counter(rects)
+    counts = Counter((fabric_id, min(w, h), max(w, h)) for fabric_id, w, h in rects)
     palette_order = {f.id: i for i, f in enumerate(quilt.palette.fabrics)}
     pieces = []
     for (fabric_id, fw, fh), qty in sorted(
@@ -277,10 +274,10 @@ def _metrics(
 ) -> PlanMetrics:
     piece_count = sum(p.quantity for p in cut_pieces if p.component != "binding")
     total_sets = sum(s.sets_needed for s in strip_sets)
-    yardage = compute_yardage_from_components(quilt, strategy, cut_pieces, strip_sets)
+    yardage = purchase_lines(quilt, strategy, cut_pieces, strip_sets)
     wof = quilt.settings.wof
     purchased = sum(
-        line.quarter_yards * QUARTER_YARD * wof for line in yardage.lines if line.fabric_id
+        line.increments * yardage.increment * wof for line in yardage.lines if line.fabric_id
     )
     cut_area = sum(cut_area_by_fabric(quilt, cut_pieces, strip_sets).values())
     waste = (purchased - cut_area) / purchased if purchased else 0.0

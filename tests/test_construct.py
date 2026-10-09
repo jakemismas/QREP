@@ -2,10 +2,11 @@
 comments next to it; expectations flow one way, hand computation -> assertion."""
 
 import pytest
+from pydantic import ValidationError
 
 from qrep.construct import (
     STRATEGIES,
-    compute_yardage,
+    compute_purchase_lines,
     get_strategy,
     infer_block_structure,
     plan_historical,
@@ -21,8 +22,14 @@ from qrep.model import (
     Palette,
     Quilt,
     QuiltMetadata,
+    Settings,
 )
 from qrep.model.fixtures import make_double_irish_chain
+
+
+def with_settings(quilt: Quilt, **changes: int) -> Quilt:
+    settings = quilt.settings.model_copy(update=changes)
+    return quilt.model_copy(update={"settings": settings})
 
 
 def tiny_quilt() -> Quilt:
@@ -67,30 +74,50 @@ def checker_quilt() -> Quilt:
 
 def test_yardage_hand_computed_on_tiny_quilt():
     quilt = tiny_quilt()
-    report = compute_yardage(quilt, plan_historical(quilt))
-    lines = {line.fabric_id: line for line in report.lines}
+    report = compute_purchase_lines(quilt, plan_historical(quilt))
+    lines = {(line.fabric_id, line.purpose): line for line in report.lines}
+    # MATH.md V-TOP-04 at the defaults: U = 40 in (320 e), top margin 10
+    # percent, increment 1/4 yd (72 e). Binding is its own line (F5).
+    assert list(lines) == [("r", "top"), ("w", "top"), ("r", "binding"), (None, "backing")]
 
-    # red cut area: 2 center squares cut 20x20 = 800, plus binding:
-    #   finished top = 2x16 + 2x8 = 48 square; perimeter = 4x48 = 192;
-    #   binding length = 192 + 80 = 272; strips = ceil(272/336) = 1 WOF strip
-    #   at 20 x 336 = 6720. Total red = 800 + 6720 = 7520.
-    # length = ceil(7520/336) = 23 eighths; quarter yards = ceil(23/72) = 1.
-    assert lines["r"].length_needed == 23
-    assert lines["r"].quarter_yards == 1
-    assert lines["r"].yards == 0.25
+    # red top: 2 squares cut 2 1/2 in (20 e); per strip = 320 // 20 = 16;
+    #   strips = ceil(2 / 16) = 1; length = 1 x 20 = 20 e;
+    #   purchase = ceil(20 x 110 / 100) = 22 e; qy = ceil(22 / 72) = 1 -> 1/4 yd
+    red = lines[("r", "top")]
+    assert red.length_needed == 20
+    assert red.purchase == 22
+    assert red.increments == 1
+    assert red.quarter_yards == 1
+    assert red.yards == 0.25
 
-    # white cut area: 2 center squares cut 20x20 = 800; border sides
-    #   2 x (12 x 36) = 864; border top/bottom 2 x (52 x 12) = 1248.
-    #   Total white = 800 + 864 + 1248 = 2912.
-    # length = ceil(2912/336) = 9; quarter yards = ceil(9/72) = 1.
-    assert lines["w"].length_needed == 9
-    assert lines["w"].quarter_yards == 1
+    # white top: 2 squares -> 1 strip (20 e), plus the border (V-BORD-04):
+    #   cut strip 8 + 4 = 12 e; sides 32 + 4 = 36 e, per = 320 // 36 = 8 ->
+    #   ceil(2 / 8) = 1 strip; top and bottom 32 + 16 + 4 = 52 e,
+    #   per = 320 // 52 = 6 -> 1 strip; 2 strips x 12 = 24 e.
+    #   length = 20 + 24 = 44 e; purchase = ceil(44 x 110 / 100) = ceil(48.4)
+    #   = 49 e; qy = ceil(49 / 72) = 1
+    white = lines[("w", "top")]
+    assert white.length_needed == 44
+    assert white.purchase == 49
+    assert white.increments == 1
+    assert white.quarter_yards == 1
+
+    # binding: T = 2 (48 + 48) + 80 = 272 e; strips = ceil(272 / (320 - 20))
+    #   = 1; length = 1 x 20 = 20 e, no allowance; qy = ceil(20 / 72) = 1
+    binding = lines[("r", "binding")]
+    assert binding.length_needed == 20
+    assert binding.purchase == 20
+    assert binding.increments == 1
+    assert binding.quarter_yards == 1
+
+    # wide back: not shown (one panel)
+    assert report.wide_back is None
 
     # backing (MATH.md V-TOP-04): Wb = Lb = 6 + 8 = 14 in (112 e) <= 42 -> one
     # piece either way; tie -> vertical; total = 112 + 36 = 148 e (the 4 1/2 in
     # one-piece allowance); qy = ceil(148/72) = ceil(2.06) = 3 -> 0.75 yd.
     # Dedicated line, id None.
-    backing = lines[None]
+    backing = lines[(None, "backing")]
     assert backing.length_needed == 112
     assert backing_plan(48, 48, quilt.settings).purchase == 148
     assert backing.quarter_yards == 3
@@ -100,7 +127,8 @@ def test_yardage_hand_computed_on_tiny_quilt():
 
 
 def test_subcut_counts_hand_computed_on_checker_quilt():
-    quilt = checker_quilt()
+    # Pinned to the old 42 in usable width; the 40 in default has its own test.
+    quilt = with_settings(checker_quilt(), wof=336)
     plan = plan_strip(quilt)
 
     # block structure: p=2, types A and B, 2 instances each
@@ -126,6 +154,21 @@ def test_subcut_counts_hand_computed_on_checker_quilt():
 
     # cut ops: WOF strips 2 sets x 2 strips = 4; crosscuts 4 + 4 = 8;
     # binding: perimeter 2x(32+32) = 128, +80 = 208, ceil(208/336) = 1 strip.
+    # total = 4 + 8 + 1 = 13
+    assert plan.metrics.cut_count == 13
+
+
+def test_subcut_counts_at_the_40_in_default():
+    quilt = checker_quilt()
+    plan = plan_strip(quilt)
+    # MATH.md 3.2: segment cut width = cell 8 + seam 4 = 12;
+    # per set = floor(320 / 12) = 26; sets needed = ceil(4 / 26) = 1 each
+    for strip_set in plan.strip_sets:
+        assert strip_set.segment_cut_width == 12
+        assert strip_set.segments_per_set == 26
+        assert strip_set.sets_needed == 1
+    # cut ops: WOF strips 2 sets x 2 strips = 4; crosscuts 4 + 4 = 8;
+    # binding: 2 x (32 + 32) + 80 = 208, ceil(208 / (320 - 20)) = 1 strip.
     # total = 4 + 8 + 1 = 13
     assert plan.metrics.cut_count == 13
 
@@ -205,7 +248,7 @@ def test_get_strategy_unknown_name():
 
 def test_fixture_backing_line():
     quilt = make_double_irish_chain()
-    report = compute_yardage(quilt, plan_historical(quilt))
+    report = compute_purchase_lines(quilt, plan_historical(quilt))
     backing = next(line for line in report.lines if line.fabric_id is None)
     # MATH.md V-BACK-09: Wb = 83 in (664 e), Lb = 98 in (784 e)
     # vertical: n(83) = ceil(82/41) = 2 exactly; 2 x 98 = 196 in (1568 e); + 9 = 205 in (1640 e)
@@ -233,3 +276,124 @@ def test_assembly_is_hierarchical_block_level():
     # + 5 strip sets + 1 crosscut + 2 block-assembly replaces 2 block-piecing
     # = 5 + 1 + 2 + 11 + 1 + 1 + 2 = 23 (roughly 25 per the design doc)
     assert len(strip_plan.assembly) == 23
+
+
+def fixture_at_40_in() -> Quilt:
+    """The benchmark fixture at the 40 in usable width it moves to in A6."""
+    return with_settings(make_double_irish_chain(), wof=320)
+
+
+def test_fixture_historical_purchase_lines_at_40_in():
+    quilt = fixture_at_40_in()
+    report = compute_purchase_lines(quilt, plan_historical(quilt))
+    lines = {(line.fabric_id, line.purpose): line for line in report.lines}
+    # V-TOP-01 blue: 1246 squares cut 2 in (16 e); per = 320 // 16 = 20;
+    #   strips = ceil(1246 / 20) = 63; length = 63 x 16 = 1008 e;
+    #   purchase = ceil(1008 x 110 / 100) = ceil(1108.8) = 1109 e;
+    #   qy = ceil(1109 / 72) = 16 -> 4 yd
+    blue = lines[("b", "top")]
+    assert (blue.length_needed, blue.purchase, blue.increments) == (1008, 1109, 16)
+    # V-TOP-02 cream: 1229 squares -> ceil(1229 / 20) = 62 strips x 16 = 992 e,
+    #   plus the V-BORD-01 band at U = 40: 10 strips x 34 e = 340 e;
+    #   length = 1332 e; purchase = ceil(1332 x 110 / 100) = ceil(1465.2) = 1466 e;
+    #   qy = ceil(1466 / 72) = 21 -> 5 1/4 yd
+    cream = lines[("c", "top")]
+    assert (cream.length_needed, cream.purchase, cream.increments) == (1332, 1466, 21)
+    # V-BIND-01: 10 strips x 20 e = 200 e, no allowance; qy = ceil(200 / 72) = 3
+    binding = lines[("b", "binding")]
+    assert (binding.length_needed, binding.purchase, binding.increments) == (200, 200, 3)
+
+
+def test_fixture_strip_purchase_lines_at_40_in():
+    quilt = fixture_at_40_in()
+    report = compute_purchase_lines(quilt, plan_strip(quilt))
+    top = {line.fabric_id: line for line in report.lines if line.purpose == "top"}
+    # V-TOP-03 blue: V-SET-02 64 strips x 16 e = 1024 e;
+    #   purchase = ceil(1024 x 110 / 100) = ceil(1126.4) = 1127 e; qy = ceil(1127 / 72) = 16
+    assert (top["b"].length_needed, top["b"].purchase, top["b"].increments) == (1024, 1127, 16)
+    # V-TOP-03 cream: V-SET-02 66 strips x 16 e = 1056 e + V-BORD-01 340 e = 1396 e;
+    #   purchase = ceil(1396 x 110 / 100) = ceil(1535.6) = 1536 e; qy = ceil(1536 / 72) = 22
+    assert (top["c"].length_needed, top["c"].purchase, top["c"].increments) == (1396, 1536, 22)
+
+
+def test_purchase_lines_round_to_the_configured_increment():
+    quilt = with_settings(tiny_quilt(), purchase_increment=36)
+    report = compute_purchase_lines(quilt, plan_historical(quilt))
+    # MATH.md 1.4 at a 1/8 yd increment (36 e), from the V-TOP-04 purchases:
+    #   red 22 e -> ceil(22 / 36) = 1; white 49 e -> ceil(49 / 36) = 2;
+    #   binding 20 e -> 1; backing 148 e -> ceil(148 / 36) = 5
+    assert [line.increments for line in report.lines] == [1, 2, 1, 5]
+    assert report.increment == 36
+
+
+def test_purchase_lines_use_the_top_margin_setting():
+    quilt = with_settings(tiny_quilt(), top_margin=0)
+    report = compute_purchase_lines(quilt, plan_historical(quilt))
+    # F5 with p = 0: purchase = ceil(44 x 100 / 100) = 44 e for the V-TOP-04 white top
+    white = next(line for line in report.lines if line.fabric_id == "w")
+    assert (white.length_needed, white.purchase) == (44, 44)
+    assert report.top_margin == 0
+
+
+def test_waste_metric_reads_the_purchase_lines():
+    quilt = tiny_quilt()
+    plan = plan_historical(quilt)
+    # purchased = (red top 1 + white top 1 + binding 1) increments x 72 e x U 320 e
+    #           = 3 x 72 x 320 = 69120 e^2
+    # cut area: red squares 2 x 20 x 20 = 800; binding 1 x 20 x 320 = 6400;
+    #   white squares 800; border sides 2 x 12 x 36 = 864; top and bottom
+    #   2 x 52 x 12 = 1248; total = 10112 e^2
+    # waste = (69120 - 10112) / 69120 = 59008 / 69120
+    assert plan.metrics.waste == pytest.approx(59008 / 69120)
+
+
+def quarter_turn_quilt() -> Quilt:
+    """3x3 cells of 1 in: a 2 x 1 red piece on top and a 1 x 2 red piece on the right."""
+    cells = [["r", "r", "w"], ["w", "w", "r"], ["w", "w", "r"]]
+    return Quilt(
+        metadata=QuiltMetadata(name="turns"),
+        palette=Palette(
+            fabrics=[
+                Fabric(id="r", name="Red", color="#cc3333"),
+                Fabric(id="w", name="White", color="#ffffff"),
+            ]
+        ),
+        center=GridRegion(rows=3, cols=3, cell_size=8, cells=cells),
+        binding=Binding(fabric_id="r"),
+    )
+
+
+def test_rectangle_and_its_quarter_turn_share_one_cut_line():
+    plan = plan_modern(quarter_turn_quilt())
+    red = [p for p in plan.cut_pieces if p.component == "center" and p.fabric_id == "r"]
+    # PATTERN-SPEC C-10: the 16 x 8 and 8 x 16 e pieces are one line of 2,
+    # short side first: finished 8 x 16 e (1 x 2 in), cut 12 x 20 e (1 1/2 x 2 1/2 in)
+    assert len(red) == 1
+    assert red[0].quantity == 2
+    assert (red[0].finished_width, red[0].finished_height) == (8, 16)
+    assert (red[0].cut_width, red[0].cut_height) == (12, 20)
+    assert red[0].label == '1" x 2", cut 1 1/2" x 2 1/2"'
+
+
+def test_settings_default_to_40_in_strips_and_the_fixture_keeps_42():
+    # D-05: U = 40 in = 320 e; MATH.md 1.3: p = 10 percent
+    assert Settings().wof == 320
+    assert Settings().top_margin == 10
+    # bless policy item 4: the fixture keeps 42 in = 336 e until A6
+    assert make_double_irish_chain().settings.wof == 336
+
+
+def test_binding_strip_at_or_above_the_usable_width_fails_validation():
+    data = tiny_quilt().model_dump()
+    # F7 needs w < U: 320 e strips on 320 e fabric leave no length per strip
+    data["binding"]["strip_width"] = 320
+    with pytest.raises(ValidationError, match="binding strip width"):
+        Quilt.model_validate(data)
+    data["binding"]["strip_width"] = 319
+    assert Quilt.model_validate(data).binding.strip_width == 319
+
+
+def test_wide_back_must_be_wider_than_the_backing():
+    with pytest.raises(ValidationError, match="wide_back_width"):
+        Settings(backing_width=336, wide_back_width=336)
+    assert Settings(backing_width=336, wide_back_width=337).wide_back_width == 337

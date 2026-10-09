@@ -1,8 +1,12 @@
 """CLI tests through typer's CliRunner: validate, plan, export."""
 
 import json
+import runpy
+import sys
+import warnings
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from qrep.cli import app
@@ -96,3 +100,36 @@ def test_export_formats_subset(tmp_path):
     assert result.exit_code == 0
     assert (out / "cutlist.md").exists()
     assert not (out / "yardage.md").exists()
+
+
+def test_plan_prints_purchase_lines_and_the_wide_back():
+    result = runner.invoke(app, ["plan", str(FIXTURE_PATH), "--strategy", "strip"])
+    assert result.exit_code == 0
+    # binding at the stored 42 in: 9 strips x 20 e = 180 e; ceil(180 / 72) = 3 qy = 3/4 yd
+    assert "yardage - Binding - Chain blue (b): 3/4 yd" in result.output
+    # V-BACK-09: 1568 + 72 = 1640 e; ceil(1640 / 72) = 23 qy = 5 3/4 yd
+    assert (
+        'yardage - backing, 42" wide fabric: (2) panels 98" long, vertical seams: 5 3/4 yd'
+        in result.output
+    )
+    # V-WIDE-08: 664 + 36 = 700 e; ceil(700 / 72) = 10 qy = 2 1/2 yd
+    assert (
+        'yardage - instead of the backing line, wide backing, 108" wide fabric: '
+        'one piece 83" long: 2 1/2 yd' in result.output
+    )
+
+
+def test_module_entry_point_runs_the_app(monkeypatch, capsys):
+    # engine-20: without a __main__ guard, python -m qrep.cli exits 0 with no
+    # output. runpy runs the module as __main__ in-process, so this also runs
+    # under Pyodide, which has no subprocess.
+    monkeypatch.setattr(sys, "argv", ["qrep", "--help"])
+    with warnings.catch_warnings():
+        # qrep.cli is already imported by this file, and runpy warns about that
+        warnings.simplefilter("ignore", RuntimeWarning)
+        with pytest.raises(SystemExit) as exit_info:
+            runpy.run_module("qrep.cli", run_name="__main__")
+    assert exit_info.value.code == 0
+    output = capsys.readouterr().out
+    assert "validate" in output
+    assert "plan" in output
