@@ -38,10 +38,13 @@ def build_pattern(quilt: Quilt) -> PatternResult:
 
 
 def _method(quilt: Quilt) -> tuple[str, str]:
-    # plan_strip needs a block period and raises without one, so the
-    # choice is exactly whether infer_block_structure finds one.
+    # plan_strip needs a block period and raises without one. A period is not
+    # enough: infer_block_structure also returns a period whose few blocks are
+    # all different (up to its 8 types, the whole grid at worst), and strip
+    # piecing that buys strip sets for every distinct block. So strip only
+    # when some block type appears at least twice.
     structure = infer_block_structure(quilt.center.cells)
-    if structure is None:
+    if structure is None or max(structure.counts) < 2:
         return "historical", "No repeating block was found, so each square is cut and sewn on its own."
     size = structure.size
     return "strip", f"Blocks of {size} x {size} squares repeat across the quilt, so it is strip pieced."
@@ -63,16 +66,6 @@ def _booklet_bytes(quilt: Quilt, plan: ConstructionPlan) -> bytes:
         rl_config.invariant = previous
 
 
-def _letter(index: int) -> str:
-    """A, B, ... Z, then AA, AB, ...: spreadsheet column letters."""
-    letters = ""
-    index += 1
-    while index:
-        index, remainder = divmod(index - 1, 26)
-        letters = chr(ord("A") + remainder) + letters
-    return letters
-
-
 def _summary(quilt: Quilt, method: str, reason: str, purchase: YardageReport) -> PatternSummary:
     top = {line.fabric_id: line.yards for line in purchase.lines if line.purpose == "top"}
     backing = next(line for line in purchase.lines if line.purpose == "backing")
@@ -90,14 +83,17 @@ def _summary(quilt: Quilt, method: str, reason: str, purchase: YardageReport) ->
         size_basis=None,
         method=method,
         method_reason=reason,
+        # The booklet labels each fabric by its model id (its fabric table's
+        # ID column, beside the name, and every strip-set sequence), so the
+        # screen shows the same label; the new document (A4b) prints letters.
         fabrics=[
             FabricLine(
-                letter=_letter(index),
+                letter=fabric.id,
                 fabric_id=fabric.id,
                 name=fabric.name,
                 yards=top.get(fabric.id, 0.0),
             )
-            for index, fabric in enumerate(quilt.palette.fabrics)
+            for fabric in quilt.palette.fabrics
         ],
         binding=[
             PurchaseLine(fabric_id=line.fabric_id, name=line.name, yards=line.yards)

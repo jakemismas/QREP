@@ -11,6 +11,7 @@ tests/test_bridge.py, which the contract lease holders own.
 import base64
 import io
 import json
+import re
 import subprocess
 import sys
 import types
@@ -20,7 +21,7 @@ import pypdf
 import pytest
 
 from qrep import bridge
-from qrep.construct import compute_purchase_lines, get_strategy
+from qrep.construct import compute_purchase_lines, get_strategy, infer_block_structure
 from qrep.construct.yardage import backing_line, wide_back_line
 from qrep.contract import (
     BorderBand,
@@ -77,6 +78,37 @@ def mini_model(cell_confidence=None) -> str:
             "center": center,
             "borders": [{"fabric_id": "c", "width": 2}],
             "binding": {"fabric_id": "b"},
+        }
+    )
+
+
+# 4 x 4 squares in three fabrics whose four 2 x 2 quadrants all differ.
+# gcd(4, 4) = 4, so infer_block_structure tries p = 2 first: (4 / 2) x
+# (4 / 2) = 4 blocks of 4 distinct types, within its 8, so it returns that
+# period with each type counted once. No block repeats.
+NO_REPEAT_CELLS = [
+    ["a", "b", "b", "a"],
+    ["b", "a", "a", "b"],
+    ["c", "a", "a", "c"],
+    ["a", "c", "c", "a"],
+]
+
+
+def grid_model(cells) -> str:
+    colors = {"a": "#f5f0e6", "b": "#7a9cc6", "c": "#c65f4a"}
+    return json.dumps(
+        {
+            "schema_version": "1",
+            "metadata": {"name": "grid"},
+            "palette": {
+                "fabrics": [
+                    {"id": fabric, "name": f"Fabric {fabric}", "color": color}
+                    for fabric, color in colors.items()
+                ]
+            },
+            "center": {"rows": len(cells), "cols": len(cells[0]), "cell_size": 20, "cells": cells},
+            "borders": [{"fabric_id": "a", "width": 16}],
+            "binding": {"fabric_id": "a"},
         }
     )
 
@@ -393,8 +425,7 @@ def test_export_pattern_returns_the_pdf_and_its_summary(model_json):
     assert summary["size_basis"] is None
     assert summary["method"]
     assert summary["method_reason"]
-    # One letter per palette fabric, in palette order.
-    assert [f["letter"] for f in summary["fabrics"]] == ["A", "B"]
+    # One line per palette fabric, in palette order.
     assert [f["name"] for f in summary["fabrics"]] == [f.name for f in quilt.palette.fabrics]
     # The backing and wide-back lines are the purchase-line functions' own,
     # whatever the method (one purchase-line function serves every export).
@@ -417,10 +448,14 @@ def test_export_pattern_returns_the_pdf_and_its_summary(model_json):
     assert (summary["strip_width"], summary["backing_width"]) == (336, 336)
     # Authored data carries confidence 1.0, so no square is uncertain.
     assert summary["uncertain_squares"] == 0
-    # PS-40: the screen's fabric names are the PDF's.
+    # PS-40 and SPEC.md 12.1: the screen and the PDF label each fabric the
+    # same way, so every summary label sits beside its fabric's name in the
+    # PDF (its fabric table extracts one cell per line), on either side.
     text = "".join(page.extract_text() for page in pypdf.PdfReader(io.BytesIO(pdf)).pages)
     for fabric in summary["fabrics"]:
-        assert fabric["name"] in text
+        name, label = re.escape(fabric["name"]), re.escape(fabric["letter"])
+        beside = rf"(?<!\w){name}\s+{label}(?!\w)|(?<!\w){label}\s+{name}(?!\w)"
+        assert re.search(beside, text), fabric
 
 
 def test_export_pattern_is_reproducible(model_json):
@@ -442,10 +477,18 @@ def test_export_pattern_counts_squares_below_0_9_confidence_as_uncertain():
 
 def test_interim_pattern_picks_strip_or_historical(model_json):
     # Interim only (E1b): A4d switches build_pattern to the new document, and
-    # this test goes with the interim. The engine picks strip when
-    # infer_block_structure finds blocks and historical otherwise, and the
-    # summary's lines are that method's purchase lines.
-    for raw, method in [(model_json, "strip"), (mini_model(), "historical")]:
+    # this test goes with the interim. The engine picks strip when a block
+    # repeats and historical otherwise, and the summary's lines are that
+    # method's purchase lines. NO_REPEAT_CELLS has a block period (2) whose
+    # 4 blocks all differ, so it takes historical despite the period.
+    structure = infer_block_structure(NO_REPEAT_CELLS)
+    assert (structure.size, structure.counts) == (2, [1, 1, 1, 1])
+    cases = [
+        (model_json, "strip"),
+        (mini_model(), "historical"),
+        (grid_model(NO_REPEAT_CELLS), "historical"),
+    ]
+    for raw, method in cases:
         quilt = loads(raw)
         summary = ok_result(bridge.export_pattern(raw))["summary"]
         assert summary["method"] == method
@@ -454,7 +497,7 @@ def test_interim_pattern_picks_strip_or_historical(model_json):
             (line.purpose, line.fabric_id): line.quarter_yards / 4 for line in report.lines
         }
         for fabric in summary["fabrics"]:
-            assert fabric["yards"] == quarters.get(("top", fabric["fabric_id"]), 0)
+            assert fabric["yards"] == quarters[("top", fabric["fabric_id"])]
         assert [(b["fabric_id"], b["yards"]) for b in summary["binding"]] == [
             (fabric_id, yards) for (purpose, fabric_id), yards in quarters.items()
             if purpose == "binding"

@@ -116,7 +116,7 @@ export interface SizeResult {
   basis: SizeBasis;
 }
 
-/** A palette fabric: its letter, name and the yards the top needs. */
+/** A palette fabric: the letter the PDF labels it with, its name and the yards the top needs. */
 export interface FabricLine {
   letter: string;
   fabric_id: string;

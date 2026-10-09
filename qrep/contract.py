@@ -174,7 +174,9 @@ class SizeResult(_Shape):
 
 
 class FabricLine(_Shape):
-    """A palette fabric: its letter, name and the yards the top needs."""
+    """A palette fabric: the letter the PDF labels it with, its name and the
+    yards the top needs. The interim booklet's label is the model's fabric
+    id, so the screen and the PDF name the same fabric."""
 
     letter: str = Field(min_length=1)
     fabric_id: str
