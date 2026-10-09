@@ -344,8 +344,8 @@ contract (tickets E1a and E1b) keeps these rules:
   binding, backing, wide-back and batting lines, both width assumptions and the uncertain-square
   count. Until A4d switches it to the new document, the interim build_pattern renders today's
   booklet for the engine's choice (strip when the grid has a repeating block, historical
-  otherwise), fills the summary from the same purchase lines and batting rule as that booklet, and
-  reports no size basis and no wide-back line. A square below 0.9 confidence counts as uncertain,
+  otherwise), fills the summary from the same purchase lines and batting plan as that booklet (the
+  wide-back line is null when MATH.md F11 offers none), and reports no size basis. A square below 0.9 confidence counts as uncertain,
   the mark the web already draws.
 - The sizing call takes the size you set: typed (a width, a height or both, in eighths), a preset
   by name, or the default. It returns the sized model and its size basis: the source, the size you
