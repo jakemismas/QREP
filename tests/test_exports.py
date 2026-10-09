@@ -143,3 +143,18 @@ def test_yardage_report_at_an_eighth_yard_increment(fixture_quilt):
     # ceil(180 / 36) = 5 eighths of a yard = 5/8 yd
     assert '| Binding - Chain blue (b) | 22 1/2" | 22 1/2" | 5/8 yd |' in text
     assert "Each line rounds up to the nearest 1/8 yd." in text
+
+
+def test_fixture_strip_top_lines_at_the_stored_42_in(fixture_quilt):
+    report = compute_purchase_lines(fixture_quilt, plan_strip(fixture_quilt))
+    top = {line.fabric_id: line for line in report.lines if line.purpose == "top"}
+    # U = 336 e: per set = 336 // 16 = 21; sets = ceil(needed / 21):
+    #   SS1 bbcbb 100 -> 5, SS2 bbbbb 100 -> 5, SS3 cbbbc 50 -> 3, SS4 bcccb 98 -> 5,
+    #   SS5 ccccc 147 -> 7
+    # blue strips: 4 x 5 + 5 x 5 + 3 x 3 + 2 x 5 = 64; 64 x 16 = 1024 e;
+    #   purchase = ceil(1024 x 110 / 100) = ceil(1126.4) = 1127 e; qy = ceil(1127 / 72) = 16
+    assert (top["b"].length_needed, top["b"].purchase, top["b"].increments) == (1024, 1127, 16)
+    # cream strips: 1 x 5 + 2 x 3 + 3 x 5 + 5 x 7 = 61; 61 x 16 = 976 e; border at
+    #   U = 42 (V-BORD-01): 8 strips x 34 e = 272 e; length = 1248 e;
+    #   purchase = ceil(1248 x 110 / 100) = ceil(1372.8) = 1373 e; qy = ceil(1373 / 72) = 20
+    assert (top["c"].length_needed, top["c"].purchase, top["c"].increments) == (1248, 1373, 20)

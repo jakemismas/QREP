@@ -126,7 +126,7 @@ def test_module_entry_point_runs_the_app(monkeypatch, capsys):
     monkeypatch.setattr(sys, "argv", ["qrep", "--help"])
     with warnings.catch_warnings():
         # qrep.cli is already imported by this file, and runpy warns about that
-        warnings.simplefilter("ignore", RuntimeWarning)
+        warnings.filterwarnings("ignore", "'qrep.cli' found in sys.modules", RuntimeWarning)
         with pytest.raises(SystemExit) as exit_info:
             runpy.run_module("qrep.cli", run_name="__main__")
     assert exit_info.value.code == 0

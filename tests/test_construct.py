@@ -153,7 +153,7 @@ def test_subcut_counts_hand_computed_on_checker_quilt():
     assert by_id["SS2"].sets_needed == 1
 
     # cut ops: WOF strips 2 sets x 2 strips = 4; crosscuts 4 + 4 = 8;
-    # binding: perimeter 2x(32+32) = 128, +80 = 208, ceil(208/336) = 1 strip.
+    # binding: perimeter 2x(32+32) = 128, +80 = 208, ceil(208/(336-20)) = 1 strip.
     # total = 4 + 8 + 1 = 13
     assert plan.metrics.cut_count == 13
 
@@ -397,3 +397,40 @@ def test_wide_back_must_be_wider_than_the_backing():
     with pytest.raises(ValidationError, match="wide_back_width"):
         Settings(backing_width=336, wide_back_width=336)
     assert Settings(backing_width=336, wide_back_width=337).wide_back_width == 337
+
+
+def wide_field_quilt() -> Quilt:
+    """7 x 7 cells of 8 in (64 e): one red cell in the top-left corner, the rest white."""
+    cells = [["w"] * 7 for _ in range(7)]
+    cells[0][0] = "r"
+    return Quilt(
+        metadata=QuiltMetadata(name="wide field"),
+        palette=Palette(
+            fabrics=[
+                Fabric(id="r", name="Red", color="#cc3333"),
+                Fabric(id="w", name="White", color="#ffffff"),
+            ]
+        ),
+        center=GridRegion(rows=7, cols=7, cell_size=64, cells=cells),
+        binding=Binding(fabric_id="r"),
+    )
+
+
+def test_modern_splits_a_merged_piece_too_wide_for_a_strip():
+    quilt = wide_field_quilt()
+    plan = plan_modern(quilt)
+    # The largest white rectangle is 7 rows x 6 cols = 56 x 48 in finished, cut
+    # 452 x 388 e: both sides exceed U = 320 e, so no WOF strip can yield it (F2).
+    # A band of k columns cuts k x 64 + 4 e wide; k = floor((320 - 4) / 64) = 4,
+    # so it splits into 4 + 2 columns: 256 x 448 e and 128 x 448 e finished.
+    # The leftover white column under the red cell is 1 x 6 cells = 64 x 384 e.
+    white = sorted(
+        (p.finished_width, p.finished_height, p.quantity)
+        for p in plan.cut_pieces
+        if p.component == "center" and p.fabric_id == "w"
+    )
+    assert white == [(64, 384, 1), (128, 448, 1), (256, 448, 1)]
+    assert all(
+        min(p.cut_width, p.cut_height) <= 320 for p in plan.cut_pieces if p.component == "center"
+    )
+    assert compute_purchase_lines(quilt, plan).lines

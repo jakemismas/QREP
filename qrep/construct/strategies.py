@@ -517,13 +517,27 @@ def plan_modern(quilt: Quilt) -> ConstructionPlan:
     grid = quilt.center
     cell = grid.cell_size
     structure = infer_block_structure(grid.cells)
+    # A merged rectangle wider than one strip both ways cannot come from WOF
+    # strips (MATH.md F2), so it splits into column bands that fit. Capping
+    # every merged run at U is the one-method planner's job (A3a).
+    band = (quilt.settings.wof - quilt.settings.cut_add) // cell
+
+    def cuttable(pieces: list[tuple[int, int, int, int, str]]):
+        out = []
+        for r, c, h, w, fabric in pieces:
+            if 0 < band < min(h, w):
+                out.extend((r, c + start, h, min(band, w - start), fabric)
+                           for start in range(0, w, band))
+            else:
+                out.append((r, c, h, w, fabric))
+        return out
 
     rects: list[tuple[str, int, int]] = []
     seams = 0
     steps: list[AssemblyStep] = []
     number = 1
     if structure is not None:
-        decompositions = [_decompose(block) for block in structure.types]
+        decompositions = [cuttable(_decompose(block)) for block in structure.types]
         for idx, decomposition in enumerate(decompositions):
             count = structure.counts[idx]
             for _r, _c, h, w, fabric in decomposition:
@@ -548,7 +562,7 @@ def plan_modern(quilt: Quilt) -> ConstructionPlan:
             )
             number += 1
     else:
-        decomposition = _decompose(tuple(tuple(row) for row in grid.cells))
+        decomposition = cuttable(_decompose(tuple(tuple(row) for row in grid.cells)))
         for _r, _c, h, w, fabric in decomposition:
             rects.append((fabric, w * cell, h * cell))
         seams += len(decomposition) - 1
