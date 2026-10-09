@@ -888,7 +888,9 @@ REGISTRY: dict[str, Calc] = {
                               _OMNI_RULE),
                     "panels": ("seam loss", _OMNI_RULE)}),
                 "batting": Model("omni_backing", None, {
-                    "size": ("page rule: in batting mode a piece is (piece length + 8) / k wide",)}),
+                    "size": ("page rule: in batting mode a piece is (piece length + 8) / k wide",),
+                    "size vertical": ("rounding increment or thirds",
+                                      "page rule: piece sizes round up to 0.1 in")}),
             },
         ),
         Calc(
@@ -1285,6 +1287,24 @@ def _sd_backing(job: Job):
     )  # fmt: skip
 
 
+def _size_kind(calc: Calc, job: Job) -> str:
+    # Omni's width split shows only its 0.1 in piece rounding in the batting size; its length
+    # split also shows the batting-mode width formula, so the two carry different causes.
+    if calc.key == "omni_backing":
+        r = calc_rules.omni_backing(job.width, job.length, bolt_width=job.fabric, overage=0,
+                                    mode="batting")  # fmt: skip
+        if r["seams"] == "vertical":
+            return "size vertical"
+    return "size"
+
+
+def _same_package(a, b) -> bool:
+    def norm(v):
+        return "" if v is None or v == SD_OFF_THE_ROLL else str(v).strip().lower()
+
+    return norm(a) == norm(b)
+
+
 def model_value(calc: Calc, line: str, job: Job, quantity: str, layout=None, band=0):
     """The page model's value for one displayed quantity, or None without a model."""
     key = calc.key
@@ -1386,9 +1406,10 @@ class Builder:
         self.cells[(table, row, job.calculator, job.variant)] = cell
         return cell, rec
 
-    def rule_for(self, calc, line, evaluate, quantity, *, overrides=None, model=None):
+    def rule_for(self, calc, line, evaluate, quantity, *, overrides=None, model=None, kind=None):
         """(has_rule, rule value, labeler(ref, today), rule text) for one displayed quantity:
-        the calculator's MATH.md parameter set, else its page model."""
+        the calculator's MATH.md parameter set, else its page model, whose causes are looked up
+        by kind (the quantity unless given)."""
         name = calc.rules.get(line)
         params = _with(rule_set(line, name), **(overrides or {}))
         if params is not None:
@@ -1402,7 +1423,7 @@ class Builder:
         spec = calc.models.get(line)
         if spec is None or model is None:
             return False, None, None, None
-        kind = quantity.split()[-1] if quantity.startswith("band") else quantity
+        kind = kind or (quantity.split()[-1] if quantity.startswith("band") else quantity)
 
         def by_model(ref, today):
             if spec.proxy is not None and evaluate is not None and ref is not None:
@@ -1710,7 +1731,8 @@ class Builder:
         if bat.get("width") is not None and bat.get("length") is not None:
             shown = (bat["width"], bat["length"])
             rule = self.rule_for(calc, "batting", None, "size",
-                                 model=model_value(calc, "batting", job, "size"))  # fmt: skip
+                                 model=model_value(calc, "batting", job, "size"),
+                                 kind=_size_kind(calc, job))  # fmt: skip
             targets = [(vector["vector"], (vector["width"], vector["length"]), False)] if vector else []
             targets.append(("QREP today", (today["width"], today["length"]), True))
             for target_id, target, is_today in targets:
@@ -1725,8 +1747,7 @@ class Builder:
             self.compare(
                 cell, table="batting", row=rid, calc=calc, job=job, quantity="package",
                 shown=bat["package"], against=vector["vector"], target=vector["package"],
-                today=False, rule=rule,
-                same=lambda a, b: str(a or "").strip().lower() == str(b or "").strip().lower(),
+                today=False, rule=rule, same=_same_package,
             )  # fmt: skip
 
     # -- borders -----------------------------------------------------------------------------

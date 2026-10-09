@@ -1303,6 +1303,15 @@ def test_stitchdesk_batting_off_the_roll_is_a_package_answer():
     assert got["batting"] == {"width": F(201, 2), "length": F(123), "package": "off the roll"}
 
 
+def test_off_the_roll_matches_a_vector_with_no_package():
+    # V-BATT-10 (102 1/2 x 120 -> 110 1/2 x 128) names no package, since 128 > 124; the page's
+    # "Buy off the roll" is the same answer. V-BATT-08's king is a different one.
+    assert bl._same_package("off the roll", None)
+    assert bl._same_package(" King", "king")
+    assert not bl._same_package("off the roll", "king")
+    assert not bl._same_package("Queen", None)
+
+
 def test_stitchdesk_binding_throw_60x72():
     # Perimeter 2 (60 + 72) = 264; extra 4 x 2.5 + 10 = 20; total 284; usable 42 - 2 = 40;
     # join loss 2.5 + 0.5 = 3. ceil(284 / 40) = 8; ceil((284 + 7 x 3) / 40) = ceil(7.63) = 8,
@@ -1607,6 +1616,20 @@ def test_omni_model_follows_the_width_split():
     assert bl.model_value(calc, "backing", job, "panels", layout="vertical") == 2
     batting = _omni_job(70, 90, "42-batting")
     assert bl.model_value(calc, "batting", batting, "size") == (F(78), F(98))
+
+
+def test_omni_width_split_batting_size_names_the_tenth_rounding():
+    # 110 x 108 batting: Wb = 118, Lb = 116. Length split: 116 in (84, 126] -> 3 x 118 = 354;
+    # width split: 118 in (84, 126] -> 3 x 116 = 348, smaller, so vertical. Each piece is
+    # ceil(118 / 3 x 10) / 10 = ceil(393.3) / 10 = 39.4 in across, and 3 x 39.4 = 118.2 in,
+    # not 118: the difference is the page's 0.1 in rounding, not its length-split width formula.
+    calc = bl.REGISTRY["omni_backing"]
+    job = _omni_job(110, 108, "42-batting")
+    assert bl.model_value(calc, "batting", job, "size") == (F(591, 5), F(116))
+    assert bl._size_kind(calc, job) == "size vertical"
+    assert "rounding increment or thirds" in calc.models["batting"].causes["size vertical"]
+    # 50 x 65 splits the length, so it keeps the batting-mode width label.
+    assert bl._size_kind(calc, _omni_job(50, 65, "42-batting")) == "size"
 
 
 def test_dtq_border_center_60x72():
