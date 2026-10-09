@@ -1,10 +1,10 @@
 {
  "provenance": {
-  "date": "2026-10-08",
+  "date": "2026-10-09",
   "command": ".venv/Scripts/python scripts/eval/calculators/baseline.py --start-sha 3fa671e --work '<work>/.' --raw '<work>/raw.json' --raw '<work>/raw_retry.json' --shots scripts/eval/calculators/failures --out-json docs/sprint-5/evidence/D2-calculators-baseline.json --out-md docs/sprint-5/evidence/D2-calculators-baseline.md",
   "driver_command": null,
   "qrep_file": "C:\\Users\\Jake Mismas\\qrep-wt\\d2\\qrep\\__init__.py",
-  "head": "e6869da6af4c11d123ab3431c3f361e5c4596d8d",
+  "head": "4410244e1579424fadadc179197ae1eedb6c427c",
   "start_sha": "3fa671ecc52f7939aa60bac11551bc68054faf6d",
   "start_sha_arg": "3fa671e",
   "qrep_tree": "59a4cc0314963b1422b74cde4f7303e9d21eb99e",
@@ -11164,7 +11164,7 @@
     "batting": {
      "width": "201/2",
      "length": "123",
-     "package": null
+     "package": "off the roll"
     }
    },
    "timestamp": "2026-10-09T01:21:40.612Z",
@@ -11572,7 +11572,7 @@
     "batting": {
      "width": "221/2",
      "length": "128",
-     "package": null
+     "package": "off the roll"
     }
    },
    "timestamp": "2026-10-09T01:22:09.546Z",
@@ -13245,12 +13245,12 @@
     "backing": {
      "fabric": "42",
      "layouts": {
-      "unstated": {
+      "vertical": {
        "yards": "109/20",
        "panels": "2"
       }
      },
-     "chosen": "unstated",
+     "chosen": "vertical",
      "wide": null
     }
    },
@@ -13501,12 +13501,12 @@
     "backing": {
      "fabric": "42",
      "layouts": {
-      "unstated": {
+      "vertical": {
        "yards": "967/100",
        "panels": "3"
       }
      },
-     "chosen": "unstated",
+     "chosen": "vertical",
      "wide": null
     }
    },
@@ -13568,12 +13568,12 @@
     "backing": {
      "fabric": "42",
      "layouts": {
-      "unstated": {
+      "vertical": {
        "yards": "109/20",
        "panels": "2"
       }
      },
-     "chosen": "unstated",
+     "chosen": "vertical",
      "wide": null
     }
    },
@@ -13702,12 +13702,12 @@
     "backing": {
      "fabric": "42",
      "layouts": {
-      "unstated": {
+      "vertical": {
        "yards": "517/100",
        "panels": "2"
       }
      },
-     "chosen": "unstated",
+     "chosen": "vertical",
      "wide": null
     }
    },
@@ -13836,12 +13836,12 @@
     "backing": {
      "fabric": "42",
      "layouts": {
-      "unstated": {
+      "vertical": {
        "yards": "1067/100",
        "panels": "3"
       }
      },
-     "chosen": "unstated",
+     "chosen": "vertical",
      "wide": null
     }
    },
@@ -14209,8 +14209,8 @@
    },
    "parsed": {
     "batting": {
-     "width": "196",
-     "length": "39",
+     "width": "78",
+     "length": "98",
      "yards": "109/20",
      "pieces": "2"
     }
@@ -14438,8 +14438,8 @@
    },
    "parsed": {
     "batting": {
-     "width": "348",
-     "length": "197/5",
+     "width": "591/5",
+     "length": "116",
      "yards": "967/100",
      "pieces": "3"
     }
@@ -14497,8 +14497,8 @@
    },
    "parsed": {
     "batting": {
-     "width": "196",
-     "length": "83/2",
+     "width": "83",
+     "length": "98",
      "yards": "109/20",
      "pieces": "2"
     }
@@ -14615,8 +14615,8 @@
    },
    "parsed": {
     "batting": {
-     "width": "186",
-     "length": "42",
+     "width": "84",
+     "length": "93",
      "yards": "517/100",
      "pieces": "2"
     }
@@ -14733,8 +14733,8 @@
    },
    "parsed": {
     "batting": {
-     "width": "384",
-     "length": "369/10",
+     "width": "1107/10",
+     "length": "128",
      "yards": "1067/100",
      "pieces": "3"
     }
@@ -22847,16 +22847,21 @@
    "shown": "109/20",
    "against": "V-BACK-05",
    "target": "23/4",
-   "rule": null,
-   "rule_value": null,
-   "reproduced": null,
-   "labels": [],
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "109/20",
+   "reproduced": true,
+   "labels": [
+    "seam loss",
+    "allowance",
+    "rounding increment or thirds",
+    "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
+   ],
    "joint": false,
    "notes": [
-    "no parameter set or page model covers this calculator"
+    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-33",
-   "status": "unexplained"
+   "status": "explained"
   },
   {
    "line_type": "backing",
@@ -22869,16 +22874,21 @@
    "shown": "109/20",
    "against": "QREP today",
    "target": "11/2",
-   "rule": null,
-   "rule_value": null,
-   "reproduced": null,
-   "labels": [],
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "109/20",
+   "reproduced": true,
+   "labels": [
+    "seam loss",
+    "allowance",
+    "rounding increment or thirds",
+    "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
+   ],
    "joint": false,
    "notes": [
-    "no parameter set or page model covers this calculator"
+    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-34",
-   "status": "unexplained"
+   "status": "explained"
   },
   {
    "line_type": "backing",
@@ -22891,9 +22901,9 @@
    "shown": "2",
    "against": "V-BACK-05",
    "target": "2",
-   "rule": null,
-   "rule_value": null,
-   "reproduced": null,
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "2",
+   "reproduced": true,
    "labels": [],
    "joint": false,
    "notes": [],
@@ -22911,9 +22921,9 @@
    "shown": "2",
    "against": "QREP today",
    "target": "2",
-   "rule": null,
-   "rule_value": null,
-   "reproduced": null,
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "2",
+   "reproduced": true,
    "labels": [],
    "joint": false,
    "notes": [],
@@ -24661,16 +24671,21 @@
    "shown": "967/100",
    "against": "V-BACK-08",
    "target": "10",
-   "rule": null,
-   "rule_value": null,
-   "reproduced": null,
-   "labels": [],
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "967/100",
+   "reproduced": true,
+   "labels": [
+    "seam loss",
+    "allowance",
+    "rounding increment or thirds",
+    "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
+   ],
    "joint": false,
    "notes": [
-    "no parameter set or page model covers this calculator"
+    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-68",
-   "status": "unexplained"
+   "status": "explained"
   },
   {
    "line_type": "backing",
@@ -24683,16 +24698,21 @@
    "shown": "967/100",
    "against": "QREP today",
    "target": "39/4",
-   "rule": null,
-   "rule_value": null,
-   "reproduced": null,
-   "labels": [],
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "967/100",
+   "reproduced": true,
+   "labels": [
+    "seam loss",
+    "allowance",
+    "rounding increment or thirds",
+    "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
+   ],
    "joint": false,
    "notes": [
-    "no parameter set or page model covers this calculator"
+    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-69",
-   "status": "unexplained"
+   "status": "explained"
   },
   {
    "line_type": "backing",
@@ -24705,9 +24725,9 @@
    "shown": "3",
    "against": "V-BACK-08",
    "target": "3",
-   "rule": null,
-   "rule_value": null,
-   "reproduced": null,
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "3",
+   "reproduced": true,
    "labels": [],
    "joint": false,
    "notes": [],
@@ -24725,9 +24745,9 @@
    "shown": "3",
    "against": "QREP today",
    "target": "3",
-   "rule": null,
-   "rule_value": null,
-   "reproduced": null,
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "3",
+   "reproduced": true,
    "labels": [],
    "joint": false,
    "notes": [],
@@ -25190,16 +25210,21 @@
    "shown": "109/20",
    "against": "V-BACK-09",
    "target": "23/4",
-   "rule": null,
-   "rule_value": null,
-   "reproduced": null,
-   "labels": [],
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "109/20",
+   "reproduced": true,
+   "labels": [
+    "seam loss",
+    "allowance",
+    "rounding increment or thirds",
+    "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
+   ],
    "joint": false,
    "notes": [
-    "no parameter set or page model covers this calculator"
+    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-83",
-   "status": "unexplained"
+   "status": "explained"
   },
   {
    "line_type": "backing",
@@ -25212,16 +25237,21 @@
    "shown": "109/20",
    "against": "QREP today",
    "target": "11/2",
-   "rule": null,
-   "rule_value": null,
-   "reproduced": null,
-   "labels": [],
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "109/20",
+   "reproduced": true,
+   "labels": [
+    "seam loss",
+    "allowance",
+    "rounding increment or thirds",
+    "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
+   ],
    "joint": false,
    "notes": [
-    "no parameter set or page model covers this calculator"
+    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-84",
-   "status": "unexplained"
+   "status": "explained"
   },
   {
    "line_type": "backing",
@@ -25234,9 +25264,9 @@
    "shown": "2",
    "against": "V-BACK-09",
    "target": "2",
-   "rule": null,
-   "rule_value": null,
-   "reproduced": null,
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "2",
+   "reproduced": true,
    "labels": [],
    "joint": false,
    "notes": [],
@@ -25254,9 +25284,9 @@
    "shown": "2",
    "against": "QREP today",
    "target": "2",
-   "rule": null,
-   "rule_value": null,
-   "reproduced": null,
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "2",
+   "reproduced": true,
    "labels": [],
    "joint": false,
    "notes": [],
@@ -26069,16 +26099,22 @@
    "shown": "517/100",
    "against": "V-BACK-10",
    "target": "29/4",
-   "rule": null,
-   "rule_value": null,
-   "reproduced": null,
-   "labels": [],
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "517/100",
+   "reproduced": true,
+   "labels": [
+    "orientation",
+    "seam loss",
+    "allowance",
+    "rounding increment or thirds",
+    "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
+   ],
    "joint": false,
    "notes": [
-    "no parameter set or page model covers this calculator"
+    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-106",
-   "status": "unexplained"
+   "status": "explained"
   },
   {
    "line_type": "backing",
@@ -26091,16 +26127,21 @@
    "shown": "517/100",
    "against": "QREP today",
    "target": "21/4",
-   "rule": null,
-   "rule_value": null,
-   "reproduced": null,
-   "labels": [],
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "517/100",
+   "reproduced": true,
+   "labels": [
+    "seam loss",
+    "allowance",
+    "rounding increment or thirds",
+    "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
+   ],
    "joint": false,
    "notes": [
-    "no parameter set or page model covers this calculator"
+    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-107",
-   "status": "unexplained"
+   "status": "explained"
   },
   {
    "line_type": "backing",
@@ -26113,16 +26154,20 @@
    "shown": "2",
    "against": "V-BACK-10",
    "target": "3",
-   "rule": null,
-   "rule_value": null,
-   "reproduced": null,
-   "labels": [],
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "2",
+   "reproduced": true,
+   "labels": [
+    "orientation",
+    "seam loss",
+    "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
+   ],
    "joint": false,
    "notes": [
-    "no parameter set or page model covers this calculator"
+    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-108",
-   "status": "unexplained"
+   "status": "explained"
   },
   {
    "line_type": "backing",
@@ -26135,9 +26180,9 @@
    "shown": "2",
    "against": "QREP today",
    "target": "2",
-   "rule": null,
-   "rule_value": null,
-   "reproduced": null,
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "2",
+   "reproduced": true,
    "labels": [],
    "joint": false,
    "notes": [],
@@ -26785,16 +26830,21 @@
    "shown": "1067/100",
    "against": "V-BACK-16",
    "target": "11",
-   "rule": null,
-   "rule_value": null,
-   "reproduced": null,
-   "labels": [],
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "1067/100",
+   "reproduced": true,
+   "labels": [
+    "seam loss",
+    "allowance",
+    "rounding increment or thirds",
+    "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
+   ],
    "joint": false,
    "notes": [
-    "no parameter set or page model covers this calculator"
+    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-116",
-   "status": "unexplained"
+   "status": "explained"
   },
   {
    "line_type": "backing",
@@ -26807,16 +26857,21 @@
    "shown": "1067/100",
    "against": "QREP today",
    "target": "43/4",
-   "rule": null,
-   "rule_value": null,
-   "reproduced": null,
-   "labels": [],
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "1067/100",
+   "reproduced": true,
+   "labels": [
+    "seam loss",
+    "allowance",
+    "rounding increment or thirds",
+    "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
+   ],
    "joint": false,
    "notes": [
-    "no parameter set or page model covers this calculator"
+    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-117",
-   "status": "unexplained"
+   "status": "explained"
   },
   {
    "line_type": "backing",
@@ -26829,9 +26884,9 @@
    "shown": "3",
    "against": "V-BACK-16",
    "target": "3",
-   "rule": null,
-   "rule_value": null,
-   "reproduced": null,
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "3",
+   "reproduced": true,
    "labels": [],
    "joint": false,
    "notes": [],
@@ -26849,9 +26904,9 @@
    "shown": "3",
    "against": "QREP today",
    "target": "3",
-   "rule": null,
-   "rule_value": null,
-   "reproduced": null,
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "3",
+   "reproduced": true,
    "labels": [],
    "joint": false,
    "notes": [],
@@ -34809,8 +34864,8 @@
    "row_id": "70x90@42-batting",
    "quantity": "size (in)",
    "shown": [
-    "196",
-    "39"
+    "78",
+    "98"
    ],
    "against": "V-BATT-05",
    "target": [
@@ -34819,19 +34874,15 @@
    ],
    "rule": "calc_rules.omni_backing",
    "rule_value": [
-    "196",
-    "39"
+    "78",
+    "98"
    ],
    "reproduced": true,
-   "labels": [
-    "page rule: in batting mode a piece is (piece length + 8) / k wide"
-   ],
+   "labels": [],
    "joint": false,
-   "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
-   ],
-   "id": "BT-15",
-   "status": "explained"
+   "notes": [],
+   "id": null,
+   "status": "match"
   },
   {
    "line_type": "batting",
@@ -34842,8 +34893,8 @@
    "row_id": "70x90@42-batting",
    "quantity": "size (in)",
    "shown": [
-    "196",
-    "39"
+    "78",
+    "98"
    ],
    "against": "QREP today",
    "target": [
@@ -34852,17 +34903,57 @@
    ],
    "rule": "calc_rules.omni_backing",
    "rule_value": [
-    "196",
-    "39"
+    "78",
+    "98"
    ],
    "reproduced": true,
+   "labels": [],
+   "joint": false,
+   "notes": [],
+   "id": null,
+   "status": "match"
+  },
+  {
+   "line_type": "batting",
+   "table": "batting",
+   "row": "84x90",
+   "calculator": "qp_backing",
+   "variant": "batting120",
+   "row_id": "84x90@batting120",
+   "quantity": "roll length (in)",
+   "shown": "99",
+   "against": "V-BATT-06",
+   "target": "98",
+   "rule": "qp_backing_display, bolt 120, overage 4",
+   "rule_value": "99",
+   "reproduced": true,
    "labels": [
-    "page rule: in batting mode a piece is (piece length + 8) / k wide"
+    "rounding increment or thirds"
    ],
    "joint": false,
-   "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   "notes": [],
+   "id": "BT-15",
+   "status": "explained"
+  },
+  {
+   "line_type": "batting",
+   "table": "batting",
+   "row": "84x90",
+   "calculator": "qp_backing",
+   "variant": "batting120",
+   "row_id": "84x90@batting120",
+   "quantity": "roll length (in)",
+   "shown": "99",
+   "against": "QREP today",
+   "target": "98",
+   "rule": "qp_backing_display, bolt 120, overage 4",
+   "rule_value": "99",
+   "reproduced": true,
+   "labels": [
+    "rounding increment or thirds"
    ],
+   "joint": false,
+   "notes": [],
    "id": "BT-16",
    "status": "explained"
   },
@@ -34870,21 +34961,188 @@
    "line_type": "batting",
    "table": "batting",
    "row": "84x90",
-   "calculator": "qp_backing",
-   "variant": "batting120",
-   "row_id": "84x90@batting120",
-   "quantity": "roll length (in)",
-   "shown": "99",
-   "against": "V-BATT-06",
-   "target": "98",
-   "rule": "qp_backing_display, bolt 120, overage 4",
-   "rule_value": "99",
-   "reproduced": true,
-   "labels": [
-    "rounding increment or thirds"
+   "calculator": "mfqs_backing",
+   "variant": "42",
+   "row_id": "84x90@42",
+   "quantity": "size (in)",
+   "shown": [
+    "92",
+    "98"
    ],
+   "against": "V-BATT-06",
+   "target": [
+    "92",
+    "98"
+   ],
+   "rule": "calc_rules.mfqs_backing",
+   "rule_value": [
+    "92",
+    "98"
+   ],
+   "reproduced": true,
+   "labels": [],
    "joint": false,
    "notes": [],
+   "id": null,
+   "status": "match"
+  },
+  {
+   "line_type": "batting",
+   "table": "batting",
+   "row": "84x90",
+   "calculator": "mfqs_backing",
+   "variant": "42",
+   "row_id": "84x90@42",
+   "quantity": "size (in)",
+   "shown": [
+    "92",
+    "98"
+   ],
+   "against": "QREP today",
+   "target": [
+    "92",
+    "98"
+   ],
+   "rule": "calc_rules.mfqs_backing",
+   "rule_value": [
+    "92",
+    "98"
+   ],
+   "reproduced": true,
+   "labels": [],
+   "joint": false,
+   "notes": [],
+   "id": null,
+   "status": "match"
+  },
+  {
+   "line_type": "batting",
+   "table": "batting",
+   "row": "84x90",
+   "calculator": "mfqs_backing",
+   "variant": "42",
+   "row_id": "84x90@42",
+   "quantity": "package",
+   "shown": "King",
+   "against": "V-BATT-06",
+   "target": "king",
+   "rule": "calc_rules.mfqs_backing",
+   "rule_value": "King",
+   "reproduced": true,
+   "labels": [],
+   "joint": false,
+   "notes": [],
+   "id": null,
+   "status": "match"
+  },
+  {
+   "line_type": "batting",
+   "table": "batting",
+   "row": "84x90",
+   "calculator": "stitchdesk_backing",
+   "variant": "42",
+   "row_id": "84x90@42",
+   "quantity": "size (in)",
+   "shown": [
+    "92",
+    "98"
+   ],
+   "against": "V-BATT-06",
+   "target": [
+    "92",
+    "98"
+   ],
+   "rule": "calc_rules.stitchdesk_backing",
+   "rule_value": [
+    "92",
+    "98"
+   ],
+   "reproduced": true,
+   "labels": [],
+   "joint": false,
+   "notes": [],
+   "id": null,
+   "status": "match"
+  },
+  {
+   "line_type": "batting",
+   "table": "batting",
+   "row": "84x90",
+   "calculator": "stitchdesk_backing",
+   "variant": "42",
+   "row_id": "84x90@42",
+   "quantity": "size (in)",
+   "shown": [
+    "92",
+    "98"
+   ],
+   "against": "QREP today",
+   "target": [
+    "92",
+    "98"
+   ],
+   "rule": "calc_rules.stitchdesk_backing",
+   "rule_value": [
+    "92",
+    "98"
+   ],
+   "reproduced": true,
+   "labels": [],
+   "joint": false,
+   "notes": [],
+   "id": null,
+   "status": "match"
+  },
+  {
+   "line_type": "batting",
+   "table": "batting",
+   "row": "84x90",
+   "calculator": "stitchdesk_backing",
+   "variant": "42",
+   "row_id": "84x90@42",
+   "quantity": "package",
+   "shown": "King",
+   "against": "V-BATT-06",
+   "target": "king",
+   "rule": "calc_rules.stitchdesk_backing",
+   "rule_value": "King",
+   "reproduced": true,
+   "labels": [],
+   "joint": false,
+   "notes": [],
+   "id": null,
+   "status": "match"
+  },
+  {
+   "line_type": "batting",
+   "table": "batting",
+   "row": "84x90",
+   "calculator": "omni_backing",
+   "variant": "42-batting",
+   "row_id": "84x90@42-batting",
+   "quantity": "size (in)",
+   "shown": [
+    "92",
+    "501/5"
+   ],
+   "against": "V-BATT-06",
+   "target": [
+    "92",
+    "98"
+   ],
+   "rule": "calc_rules.omni_backing",
+   "rule_value": [
+    "92",
+    "501/5"
+   ],
+   "reproduced": true,
+   "labels": [
+    "page rule: in batting mode a piece is (piece length + 8) / k wide"
+   ],
+   "joint": false,
+   "notes": [
+    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
    "id": "BT-17",
    "status": "explained"
   },
@@ -34892,243 +35150,76 @@
    "line_type": "batting",
    "table": "batting",
    "row": "84x90",
-   "calculator": "qp_backing",
-   "variant": "batting120",
-   "row_id": "84x90@batting120",
-   "quantity": "roll length (in)",
-   "shown": "99",
+   "calculator": "omni_backing",
+   "variant": "42-batting",
+   "row_id": "84x90@42-batting",
+   "quantity": "size (in)",
+   "shown": [
+    "92",
+    "501/5"
+   ],
    "against": "QREP today",
-   "target": "98",
-   "rule": "qp_backing_display, bolt 120, overage 4",
-   "rule_value": "99",
+   "target": [
+    "92",
+    "98"
+   ],
+   "rule": "calc_rules.omni_backing",
+   "rule_value": [
+    "92",
+    "501/5"
+   ],
    "reproduced": true,
    "labels": [
-    "rounding increment or thirds"
+    "page rule: in batting mode a piece is (piece length + 8) / k wide"
    ],
    "joint": false,
-   "notes": [],
+   "notes": [
+    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
    "id": "BT-18",
    "status": "explained"
   },
   {
    "line_type": "batting",
    "table": "batting",
-   "row": "84x90",
-   "calculator": "mfqs_backing",
-   "variant": "42",
-   "row_id": "84x90@42",
-   "quantity": "size (in)",
-   "shown": [
-    "92",
-    "98"
-   ],
-   "against": "V-BATT-06",
-   "target": [
-    "92",
-    "98"
-   ],
-   "rule": "calc_rules.mfqs_backing",
-   "rule_value": [
-    "92",
-    "98"
-   ],
-   "reproduced": true,
-   "labels": [],
-   "joint": false,
-   "notes": [],
-   "id": null,
-   "status": "match"
-  },
-  {
-   "line_type": "batting",
-   "table": "batting",
-   "row": "84x90",
-   "calculator": "mfqs_backing",
-   "variant": "42",
-   "row_id": "84x90@42",
-   "quantity": "size (in)",
-   "shown": [
-    "92",
-    "98"
-   ],
-   "against": "QREP today",
-   "target": [
-    "92",
-    "98"
-   ],
-   "rule": "calc_rules.mfqs_backing",
-   "rule_value": [
-    "92",
-    "98"
-   ],
-   "reproduced": true,
-   "labels": [],
-   "joint": false,
-   "notes": [],
-   "id": null,
-   "status": "match"
-  },
-  {
-   "line_type": "batting",
-   "table": "batting",
-   "row": "84x90",
-   "calculator": "mfqs_backing",
-   "variant": "42",
-   "row_id": "84x90@42",
-   "quantity": "package",
-   "shown": "King",
-   "against": "V-BATT-06",
-   "target": "king",
-   "rule": "calc_rules.mfqs_backing",
-   "rule_value": "King",
-   "reproduced": true,
-   "labels": [],
-   "joint": false,
-   "notes": [],
-   "id": null,
-   "status": "match"
-  },
-  {
-   "line_type": "batting",
-   "table": "batting",
-   "row": "84x90",
-   "calculator": "stitchdesk_backing",
-   "variant": "42",
-   "row_id": "84x90@42",
-   "quantity": "size (in)",
-   "shown": [
-    "92",
-    "98"
-   ],
-   "against": "V-BATT-06",
-   "target": [
-    "92",
-    "98"
-   ],
-   "rule": "calc_rules.stitchdesk_backing",
-   "rule_value": [
-    "92",
-    "98"
-   ],
-   "reproduced": true,
-   "labels": [],
-   "joint": false,
-   "notes": [],
-   "id": null,
-   "status": "match"
-  },
-  {
-   "line_type": "batting",
-   "table": "batting",
-   "row": "84x90",
-   "calculator": "stitchdesk_backing",
-   "variant": "42",
-   "row_id": "84x90@42",
-   "quantity": "size (in)",
-   "shown": [
-    "92",
-    "98"
-   ],
-   "against": "QREP today",
-   "target": [
-    "92",
-    "98"
-   ],
-   "rule": "calc_rules.stitchdesk_backing",
-   "rule_value": [
-    "92",
-    "98"
-   ],
-   "reproduced": true,
-   "labels": [],
-   "joint": false,
-   "notes": [],
-   "id": null,
-   "status": "match"
-  },
-  {
-   "line_type": "batting",
-   "table": "batting",
-   "row": "84x90",
-   "calculator": "stitchdesk_backing",
-   "variant": "42",
-   "row_id": "84x90@42",
-   "quantity": "package",
-   "shown": "King",
-   "against": "V-BATT-06",
-   "target": "king",
-   "rule": "calc_rules.stitchdesk_backing",
-   "rule_value": "King",
-   "reproduced": true,
-   "labels": [],
-   "joint": false,
-   "notes": [],
-   "id": null,
-   "status": "match"
-  },
-  {
-   "line_type": "batting",
-   "table": "batting",
-   "row": "84x90",
-   "calculator": "omni_backing",
-   "variant": "42-batting",
-   "row_id": "84x90@42-batting",
-   "quantity": "size (in)",
-   "shown": [
-    "92",
-    "501/5"
-   ],
-   "against": "V-BATT-06",
-   "target": [
-    "92",
-    "98"
-   ],
-   "rule": "calc_rules.omni_backing",
-   "rule_value": [
-    "92",
-    "501/5"
-   ],
+   "row": "90x108",
+   "calculator": "qp_backing",
+   "variant": "batting120",
+   "row_id": "90x108@batting120",
+   "quantity": "roll length (in)",
+   "shown": "117",
+   "against": "V-BATT-07",
+   "target": "116",
+   "rule": "qp_backing_display, bolt 120, overage 4",
+   "rule_value": "117",
    "reproduced": true,
    "labels": [
-    "page rule: in batting mode a piece is (piece length + 8) / k wide"
+    "rounding increment or thirds"
    ],
    "joint": false,
-   "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
-   ],
+   "notes": [],
    "id": "BT-19",
    "status": "explained"
   },
   {
    "line_type": "batting",
    "table": "batting",
-   "row": "84x90",
-   "calculator": "omni_backing",
-   "variant": "42-batting",
-   "row_id": "84x90@42-batting",
-   "quantity": "size (in)",
-   "shown": [
-    "92",
-    "501/5"
-   ],
+   "row": "90x108",
+   "calculator": "qp_backing",
+   "variant": "batting120",
+   "row_id": "90x108@batting120",
+   "quantity": "roll length (in)",
+   "shown": "117",
    "against": "QREP today",
-   "target": [
-    "92",
-    "98"
-   ],
-   "rule": "calc_rules.omni_backing",
-   "rule_value": [
-    "92",
-    "501/5"
-   ],
+   "target": "116",
+   "rule": "qp_backing_display, bolt 120, overage 4",
+   "rule_value": "117",
    "reproduced": true,
    "labels": [
-    "page rule: in batting mode a piece is (piece length + 8) / k wide"
+    "rounding increment or thirds"
    ],
    "joint": false,
-   "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
-   ],
+   "notes": [],
    "id": "BT-20",
    "status": "explained"
   },
@@ -35136,21 +35227,188 @@
    "line_type": "batting",
    "table": "batting",
    "row": "90x108",
-   "calculator": "qp_backing",
-   "variant": "batting120",
-   "row_id": "90x108@batting120",
-   "quantity": "roll length (in)",
-   "shown": "117",
-   "against": "V-BATT-07",
-   "target": "116",
-   "rule": "qp_backing_display, bolt 120, overage 4",
-   "rule_value": "117",
-   "reproduced": true,
-   "labels": [
-    "rounding increment or thirds"
+   "calculator": "mfqs_backing",
+   "variant": "42",
+   "row_id": "90x108@42",
+   "quantity": "size (in)",
+   "shown": [
+    "98",
+    "116"
    ],
+   "against": "V-BATT-07",
+   "target": [
+    "98",
+    "116"
+   ],
+   "rule": "calc_rules.mfqs_backing",
+   "rule_value": [
+    "98",
+    "116"
+   ],
+   "reproduced": true,
+   "labels": [],
    "joint": false,
    "notes": [],
+   "id": null,
+   "status": "match"
+  },
+  {
+   "line_type": "batting",
+   "table": "batting",
+   "row": "90x108",
+   "calculator": "mfqs_backing",
+   "variant": "42",
+   "row_id": "90x108@42",
+   "quantity": "size (in)",
+   "shown": [
+    "98",
+    "116"
+   ],
+   "against": "QREP today",
+   "target": [
+    "98",
+    "116"
+   ],
+   "rule": "calc_rules.mfqs_backing",
+   "rule_value": [
+    "98",
+    "116"
+   ],
+   "reproduced": true,
+   "labels": [],
+   "joint": false,
+   "notes": [],
+   "id": null,
+   "status": "match"
+  },
+  {
+   "line_type": "batting",
+   "table": "batting",
+   "row": "90x108",
+   "calculator": "mfqs_backing",
+   "variant": "42",
+   "row_id": "90x108@42",
+   "quantity": "package",
+   "shown": "King",
+   "against": "V-BATT-07",
+   "target": "king",
+   "rule": "calc_rules.mfqs_backing",
+   "rule_value": "King",
+   "reproduced": true,
+   "labels": [],
+   "joint": false,
+   "notes": [],
+   "id": null,
+   "status": "match"
+  },
+  {
+   "line_type": "batting",
+   "table": "batting",
+   "row": "90x108",
+   "calculator": "stitchdesk_backing",
+   "variant": "42",
+   "row_id": "90x108@42",
+   "quantity": "size (in)",
+   "shown": [
+    "98",
+    "116"
+   ],
+   "against": "V-BATT-07",
+   "target": [
+    "98",
+    "116"
+   ],
+   "rule": "calc_rules.stitchdesk_backing",
+   "rule_value": [
+    "98",
+    "116"
+   ],
+   "reproduced": true,
+   "labels": [],
+   "joint": false,
+   "notes": [],
+   "id": null,
+   "status": "match"
+  },
+  {
+   "line_type": "batting",
+   "table": "batting",
+   "row": "90x108",
+   "calculator": "stitchdesk_backing",
+   "variant": "42",
+   "row_id": "90x108@42",
+   "quantity": "size (in)",
+   "shown": [
+    "98",
+    "116"
+   ],
+   "against": "QREP today",
+   "target": [
+    "98",
+    "116"
+   ],
+   "rule": "calc_rules.stitchdesk_backing",
+   "rule_value": [
+    "98",
+    "116"
+   ],
+   "reproduced": true,
+   "labels": [],
+   "joint": false,
+   "notes": [],
+   "id": null,
+   "status": "match"
+  },
+  {
+   "line_type": "batting",
+   "table": "batting",
+   "row": "90x108",
+   "calculator": "stitchdesk_backing",
+   "variant": "42",
+   "row_id": "90x108@42",
+   "quantity": "package",
+   "shown": "King",
+   "against": "V-BATT-07",
+   "target": "king",
+   "rule": "calc_rules.stitchdesk_backing",
+   "rule_value": "King",
+   "reproduced": true,
+   "labels": [],
+   "joint": false,
+   "notes": [],
+   "id": null,
+   "status": "match"
+  },
+  {
+   "line_type": "batting",
+   "table": "batting",
+   "row": "90x108",
+   "calculator": "omni_backing",
+   "variant": "42-batting",
+   "row_id": "90x108@42-batting",
+   "quantity": "size (in)",
+   "shown": [
+    "98",
+    "531/5"
+   ],
+   "against": "V-BATT-07",
+   "target": [
+    "98",
+    "116"
+   ],
+   "rule": "calc_rules.omni_backing",
+   "rule_value": [
+    "98",
+    "531/5"
+   ],
+   "reproduced": true,
+   "labels": [
+    "page rule: in batting mode a piece is (piece length + 8) / k wide"
+   ],
+   "joint": false,
+   "notes": [
+    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
    "id": "BT-21",
    "status": "explained"
   },
@@ -35158,244 +35416,33 @@
    "line_type": "batting",
    "table": "batting",
    "row": "90x108",
-   "calculator": "qp_backing",
-   "variant": "batting120",
-   "row_id": "90x108@batting120",
-   "quantity": "roll length (in)",
-   "shown": "117",
+   "calculator": "omni_backing",
+   "variant": "42-batting",
+   "row_id": "90x108@42-batting",
+   "quantity": "size (in)",
+   "shown": [
+    "98",
+    "531/5"
+   ],
    "against": "QREP today",
-   "target": "116",
-   "rule": "qp_backing_display, bolt 120, overage 4",
-   "rule_value": "117",
+   "target": [
+    "98",
+    "116"
+   ],
+   "rule": "calc_rules.omni_backing",
+   "rule_value": [
+    "98",
+    "531/5"
+   ],
    "reproduced": true,
    "labels": [
-    "rounding increment or thirds"
+    "page rule: in batting mode a piece is (piece length + 8) / k wide"
    ],
    "joint": false,
-   "notes": [],
+   "notes": [
+    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
    "id": "BT-22",
-   "status": "explained"
-  },
-  {
-   "line_type": "batting",
-   "table": "batting",
-   "row": "90x108",
-   "calculator": "mfqs_backing",
-   "variant": "42",
-   "row_id": "90x108@42",
-   "quantity": "size (in)",
-   "shown": [
-    "98",
-    "116"
-   ],
-   "against": "V-BATT-07",
-   "target": [
-    "98",
-    "116"
-   ],
-   "rule": "calc_rules.mfqs_backing",
-   "rule_value": [
-    "98",
-    "116"
-   ],
-   "reproduced": true,
-   "labels": [],
-   "joint": false,
-   "notes": [],
-   "id": null,
-   "status": "match"
-  },
-  {
-   "line_type": "batting",
-   "table": "batting",
-   "row": "90x108",
-   "calculator": "mfqs_backing",
-   "variant": "42",
-   "row_id": "90x108@42",
-   "quantity": "size (in)",
-   "shown": [
-    "98",
-    "116"
-   ],
-   "against": "QREP today",
-   "target": [
-    "98",
-    "116"
-   ],
-   "rule": "calc_rules.mfqs_backing",
-   "rule_value": [
-    "98",
-    "116"
-   ],
-   "reproduced": true,
-   "labels": [],
-   "joint": false,
-   "notes": [],
-   "id": null,
-   "status": "match"
-  },
-  {
-   "line_type": "batting",
-   "table": "batting",
-   "row": "90x108",
-   "calculator": "mfqs_backing",
-   "variant": "42",
-   "row_id": "90x108@42",
-   "quantity": "package",
-   "shown": "King",
-   "against": "V-BATT-07",
-   "target": "king",
-   "rule": "calc_rules.mfqs_backing",
-   "rule_value": "King",
-   "reproduced": true,
-   "labels": [],
-   "joint": false,
-   "notes": [],
-   "id": null,
-   "status": "match"
-  },
-  {
-   "line_type": "batting",
-   "table": "batting",
-   "row": "90x108",
-   "calculator": "stitchdesk_backing",
-   "variant": "42",
-   "row_id": "90x108@42",
-   "quantity": "size (in)",
-   "shown": [
-    "98",
-    "116"
-   ],
-   "against": "V-BATT-07",
-   "target": [
-    "98",
-    "116"
-   ],
-   "rule": "calc_rules.stitchdesk_backing",
-   "rule_value": [
-    "98",
-    "116"
-   ],
-   "reproduced": true,
-   "labels": [],
-   "joint": false,
-   "notes": [],
-   "id": null,
-   "status": "match"
-  },
-  {
-   "line_type": "batting",
-   "table": "batting",
-   "row": "90x108",
-   "calculator": "stitchdesk_backing",
-   "variant": "42",
-   "row_id": "90x108@42",
-   "quantity": "size (in)",
-   "shown": [
-    "98",
-    "116"
-   ],
-   "against": "QREP today",
-   "target": [
-    "98",
-    "116"
-   ],
-   "rule": "calc_rules.stitchdesk_backing",
-   "rule_value": [
-    "98",
-    "116"
-   ],
-   "reproduced": true,
-   "labels": [],
-   "joint": false,
-   "notes": [],
-   "id": null,
-   "status": "match"
-  },
-  {
-   "line_type": "batting",
-   "table": "batting",
-   "row": "90x108",
-   "calculator": "stitchdesk_backing",
-   "variant": "42",
-   "row_id": "90x108@42",
-   "quantity": "package",
-   "shown": "King",
-   "against": "V-BATT-07",
-   "target": "king",
-   "rule": "calc_rules.stitchdesk_backing",
-   "rule_value": "King",
-   "reproduced": true,
-   "labels": [],
-   "joint": false,
-   "notes": [],
-   "id": null,
-   "status": "match"
-  },
-  {
-   "line_type": "batting",
-   "table": "batting",
-   "row": "90x108",
-   "calculator": "omni_backing",
-   "variant": "42-batting",
-   "row_id": "90x108@42-batting",
-   "quantity": "size (in)",
-   "shown": [
-    "98",
-    "531/5"
-   ],
-   "against": "V-BATT-07",
-   "target": [
-    "98",
-    "116"
-   ],
-   "rule": "calc_rules.omni_backing",
-   "rule_value": [
-    "98",
-    "531/5"
-   ],
-   "reproduced": true,
-   "labels": [
-    "page rule: in batting mode a piece is (piece length + 8) / k wide"
-   ],
-   "joint": false,
-   "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
-   ],
-   "id": "BT-23",
-   "status": "explained"
-  },
-  {
-   "line_type": "batting",
-   "table": "batting",
-   "row": "90x108",
-   "calculator": "omni_backing",
-   "variant": "42-batting",
-   "row_id": "90x108@42-batting",
-   "quantity": "size (in)",
-   "shown": [
-    "98",
-    "531/5"
-   ],
-   "against": "QREP today",
-   "target": [
-    "98",
-    "116"
-   ],
-   "rule": "calc_rules.omni_backing",
-   "rule_value": [
-    "98",
-    "531/5"
-   ],
-   "reproduced": true,
-   "labels": [
-    "page rule: in batting mode a piece is (piece length + 8) / k wide"
-   ],
-   "joint": false,
-   "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
-   ],
-   "id": "BT-24",
    "status": "explained"
   },
   {
@@ -35417,7 +35464,7 @@
    ],
    "joint": false,
    "notes": [],
-   "id": "BT-25",
+   "id": "BT-23",
    "status": "explained"
   },
   {
@@ -35439,7 +35486,7 @@
    ],
    "joint": false,
    "notes": [],
-   "id": "BT-26",
+   "id": "BT-24",
    "status": "explained"
   },
   {
@@ -35517,7 +35564,7 @@
    "labels": [],
    "joint": false,
    "notes": [],
-   "id": "BT-27",
+   "id": "BT-25",
    "status": "record only"
   },
   {
@@ -35586,19 +35633,21 @@
    "variant": "42",
    "row_id": "92.5x115@42",
    "quantity": "package",
-   "shown": null,
+   "shown": "off the roll",
    "against": "V-BATT-08",
    "target": "king",
-   "rule": null,
-   "rule_value": null,
-   "reproduced": null,
-   "labels": [],
+   "rule": "calc_rules.stitchdesk_backing",
+   "rule_value": "off the roll",
+   "reproduced": true,
+   "labels": [
+    "page rule: its own precut table, Craft to King"
+   ],
    "joint": false,
    "notes": [
-    "no parameter set or page model covers this calculator"
+    "labels list the page rule's differences (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
    ],
-   "id": "BT-28",
-   "status": "unexplained"
+   "id": "BT-26",
+   "status": "explained"
   },
   {
    "line_type": "batting",
@@ -35630,7 +35679,7 @@
    "notes": [
     "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
-   "id": "BT-29",
+   "id": "BT-27",
    "status": "explained"
   },
   {
@@ -35663,6 +35712,50 @@
    "notes": [
     "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
+   "id": "BT-28",
+   "status": "explained"
+  },
+  {
+   "line_type": "batting",
+   "table": "batting",
+   "row": "110x108",
+   "calculator": "qp_backing",
+   "variant": "batting120",
+   "row_id": "110x108@batting120",
+   "quantity": "roll length (in)",
+   "shown": "117",
+   "against": "V-BATT-09",
+   "target": "116",
+   "rule": "qp_backing_display, bolt 120, overage 4",
+   "rule_value": "117",
+   "reproduced": true,
+   "labels": [
+    "rounding increment or thirds"
+   ],
+   "joint": false,
+   "notes": [],
+   "id": "BT-29",
+   "status": "explained"
+  },
+  {
+   "line_type": "batting",
+   "table": "batting",
+   "row": "110x108",
+   "calculator": "qp_backing",
+   "variant": "batting120",
+   "row_id": "110x108@batting120",
+   "quantity": "roll length (in)",
+   "shown": "117",
+   "against": "QREP today",
+   "target": "116",
+   "rule": "qp_backing_display, bolt 120, overage 4",
+   "rule_value": "117",
+   "reproduced": true,
+   "labels": [
+    "rounding increment or thirds"
+   ],
+   "joint": false,
+   "notes": [],
    "id": "BT-30",
    "status": "explained"
   },
@@ -35670,21 +35763,189 @@
    "line_type": "batting",
    "table": "batting",
    "row": "110x108",
-   "calculator": "qp_backing",
-   "variant": "batting120",
-   "row_id": "110x108@batting120",
-   "quantity": "roll length (in)",
-   "shown": "117",
-   "against": "V-BATT-09",
-   "target": "116",
-   "rule": "qp_backing_display, bolt 120, overage 4",
-   "rule_value": "117",
-   "reproduced": true,
-   "labels": [
-    "rounding increment or thirds"
+   "calculator": "mfqs_backing",
+   "variant": "42",
+   "row_id": "110x108@42",
+   "quantity": "size (in)",
+   "shown": [
+    "118",
+    "116"
    ],
+   "against": "V-BATT-09",
+   "target": [
+    "118",
+    "116"
+   ],
+   "rule": "calc_rules.mfqs_backing",
+   "rule_value": [
+    "118",
+    "116"
+   ],
+   "reproduced": true,
+   "labels": [],
    "joint": false,
    "notes": [],
+   "id": null,
+   "status": "match"
+  },
+  {
+   "line_type": "batting",
+   "table": "batting",
+   "row": "110x108",
+   "calculator": "mfqs_backing",
+   "variant": "42",
+   "row_id": "110x108@42",
+   "quantity": "size (in)",
+   "shown": [
+    "118",
+    "116"
+   ],
+   "against": "QREP today",
+   "target": [
+    "118",
+    "116"
+   ],
+   "rule": "calc_rules.mfqs_backing",
+   "rule_value": [
+    "118",
+    "116"
+   ],
+   "reproduced": true,
+   "labels": [],
+   "joint": false,
+   "notes": [],
+   "id": null,
+   "status": "match"
+  },
+  {
+   "line_type": "batting",
+   "table": "batting",
+   "row": "110x108",
+   "calculator": "mfqs_backing",
+   "variant": "42",
+   "row_id": "110x108@42",
+   "quantity": "package",
+   "shown": "King",
+   "against": "V-BATT-09",
+   "target": "king",
+   "rule": "calc_rules.mfqs_backing",
+   "rule_value": "King",
+   "reproduced": true,
+   "labels": [],
+   "joint": false,
+   "notes": [],
+   "id": null,
+   "status": "match"
+  },
+  {
+   "line_type": "batting",
+   "table": "batting",
+   "row": "110x108",
+   "calculator": "stitchdesk_backing",
+   "variant": "42",
+   "row_id": "110x108@42",
+   "quantity": "size (in)",
+   "shown": [
+    "118",
+    "116"
+   ],
+   "against": "V-BATT-09",
+   "target": [
+    "118",
+    "116"
+   ],
+   "rule": "calc_rules.stitchdesk_backing",
+   "rule_value": [
+    "118",
+    "116"
+   ],
+   "reproduced": true,
+   "labels": [],
+   "joint": false,
+   "notes": [],
+   "id": null,
+   "status": "match"
+  },
+  {
+   "line_type": "batting",
+   "table": "batting",
+   "row": "110x108",
+   "calculator": "stitchdesk_backing",
+   "variant": "42",
+   "row_id": "110x108@42",
+   "quantity": "size (in)",
+   "shown": [
+    "118",
+    "116"
+   ],
+   "against": "QREP today",
+   "target": [
+    "118",
+    "116"
+   ],
+   "rule": "calc_rules.stitchdesk_backing",
+   "rule_value": [
+    "118",
+    "116"
+   ],
+   "reproduced": true,
+   "labels": [],
+   "joint": false,
+   "notes": [],
+   "id": null,
+   "status": "match"
+  },
+  {
+   "line_type": "batting",
+   "table": "batting",
+   "row": "110x108",
+   "calculator": "stitchdesk_backing",
+   "variant": "42",
+   "row_id": "110x108@42",
+   "quantity": "package",
+   "shown": "King",
+   "against": "V-BATT-09",
+   "target": "king",
+   "rule": "calc_rules.stitchdesk_backing",
+   "rule_value": "King",
+   "reproduced": true,
+   "labels": [],
+   "joint": false,
+   "notes": [],
+   "id": null,
+   "status": "match"
+  },
+  {
+   "line_type": "batting",
+   "table": "batting",
+   "row": "110x108",
+   "calculator": "omni_backing",
+   "variant": "42-batting",
+   "row_id": "110x108@42-batting",
+   "quantity": "size (in)",
+   "shown": [
+    "591/5",
+    "116"
+   ],
+   "against": "V-BATT-09",
+   "target": [
+    "118",
+    "116"
+   ],
+   "rule": "calc_rules.omni_backing",
+   "rule_value": [
+    "591/5",
+    "116"
+   ],
+   "reproduced": true,
+   "labels": [
+    "rounding increment or thirds",
+    "page rule: piece sizes round up to 0.1 in"
+   ],
+   "joint": false,
+   "notes": [
+    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
    "id": "BT-31",
    "status": "explained"
   },
@@ -35692,243 +35953,77 @@
    "line_type": "batting",
    "table": "batting",
    "row": "110x108",
-   "calculator": "qp_backing",
-   "variant": "batting120",
-   "row_id": "110x108@batting120",
-   "quantity": "roll length (in)",
-   "shown": "117",
+   "calculator": "omni_backing",
+   "variant": "42-batting",
+   "row_id": "110x108@42-batting",
+   "quantity": "size (in)",
+   "shown": [
+    "591/5",
+    "116"
+   ],
    "against": "QREP today",
-   "target": "116",
-   "rule": "qp_backing_display, bolt 120, overage 4",
-   "rule_value": "117",
+   "target": [
+    "118",
+    "116"
+   ],
+   "rule": "calc_rules.omni_backing",
+   "rule_value": [
+    "591/5",
+    "116"
+   ],
    "reproduced": true,
    "labels": [
-    "rounding increment or thirds"
+    "rounding increment or thirds",
+    "page rule: piece sizes round up to 0.1 in"
    ],
    "joint": false,
-   "notes": [],
+   "notes": [
+    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
    "id": "BT-32",
    "status": "explained"
   },
   {
    "line_type": "batting",
    "table": "batting",
-   "row": "110x108",
-   "calculator": "mfqs_backing",
-   "variant": "42",
-   "row_id": "110x108@42",
-   "quantity": "size (in)",
-   "shown": [
-    "118",
-    "116"
-   ],
-   "against": "V-BATT-09",
-   "target": [
-    "118",
-    "116"
-   ],
-   "rule": "calc_rules.mfqs_backing",
-   "rule_value": [
-    "118",
-    "116"
-   ],
-   "reproduced": true,
-   "labels": [],
-   "joint": false,
-   "notes": [],
-   "id": null,
-   "status": "match"
-  },
-  {
-   "line_type": "batting",
-   "table": "batting",
-   "row": "110x108",
-   "calculator": "mfqs_backing",
-   "variant": "42",
-   "row_id": "110x108@42",
-   "quantity": "size (in)",
-   "shown": [
-    "118",
-    "116"
-   ],
-   "against": "QREP today",
-   "target": [
-    "118",
-    "116"
-   ],
-   "rule": "calc_rules.mfqs_backing",
-   "rule_value": [
-    "118",
-    "116"
-   ],
-   "reproduced": true,
-   "labels": [],
-   "joint": false,
-   "notes": [],
-   "id": null,
-   "status": "match"
-  },
-  {
-   "line_type": "batting",
-   "table": "batting",
-   "row": "110x108",
-   "calculator": "mfqs_backing",
-   "variant": "42",
-   "row_id": "110x108@42",
-   "quantity": "package",
-   "shown": "King",
-   "against": "V-BATT-09",
-   "target": "king",
-   "rule": "calc_rules.mfqs_backing",
-   "rule_value": "King",
-   "reproduced": true,
-   "labels": [],
-   "joint": false,
-   "notes": [],
-   "id": null,
-   "status": "match"
-  },
-  {
-   "line_type": "batting",
-   "table": "batting",
-   "row": "110x108",
-   "calculator": "stitchdesk_backing",
-   "variant": "42",
-   "row_id": "110x108@42",
-   "quantity": "size (in)",
-   "shown": [
-    "118",
-    "116"
-   ],
-   "against": "V-BATT-09",
-   "target": [
-    "118",
-    "116"
-   ],
-   "rule": "calc_rules.stitchdesk_backing",
-   "rule_value": [
-    "118",
-    "116"
-   ],
-   "reproduced": true,
-   "labels": [],
-   "joint": false,
-   "notes": [],
-   "id": null,
-   "status": "match"
-  },
-  {
-   "line_type": "batting",
-   "table": "batting",
-   "row": "110x108",
-   "calculator": "stitchdesk_backing",
-   "variant": "42",
-   "row_id": "110x108@42",
-   "quantity": "size (in)",
-   "shown": [
-    "118",
-    "116"
-   ],
-   "against": "QREP today",
-   "target": [
-    "118",
-    "116"
-   ],
-   "rule": "calc_rules.stitchdesk_backing",
-   "rule_value": [
-    "118",
-    "116"
-   ],
-   "reproduced": true,
-   "labels": [],
-   "joint": false,
-   "notes": [],
-   "id": null,
-   "status": "match"
-  },
-  {
-   "line_type": "batting",
-   "table": "batting",
-   "row": "110x108",
-   "calculator": "stitchdesk_backing",
-   "variant": "42",
-   "row_id": "110x108@42",
-   "quantity": "package",
-   "shown": "King",
-   "against": "V-BATT-09",
-   "target": "king",
-   "rule": "calc_rules.stitchdesk_backing",
-   "rule_value": "King",
-   "reproduced": true,
-   "labels": [],
-   "joint": false,
-   "notes": [],
-   "id": null,
-   "status": "match"
-  },
-  {
-   "line_type": "batting",
-   "table": "batting",
-   "row": "110x108",
-   "calculator": "omni_backing",
-   "variant": "42-batting",
-   "row_id": "110x108@42-batting",
-   "quantity": "size (in)",
-   "shown": [
-    "348",
-    "197/5"
-   ],
-   "against": "V-BATT-09",
-   "target": [
-    "118",
-    "116"
-   ],
-   "rule": "calc_rules.omni_backing",
-   "rule_value": [
-    "348",
-    "197/5"
-   ],
+   "row": "75x90",
+   "calculator": "qp_backing",
+   "variant": "batting120",
+   "row_id": "75x90@batting120",
+   "quantity": "roll length (in)",
+   "shown": "99",
+   "against": "V-BATT-01",
+   "target": "98",
+   "rule": "qp_backing_display, bolt 120, overage 4",
+   "rule_value": "99",
    "reproduced": true,
    "labels": [
-    "page rule: in batting mode a piece is (piece length + 8) / k wide"
+    "rounding increment or thirds"
    ],
    "joint": false,
-   "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
-   ],
+   "notes": [],
    "id": "BT-33",
    "status": "explained"
   },
   {
    "line_type": "batting",
    "table": "batting",
-   "row": "110x108",
-   "calculator": "omni_backing",
-   "variant": "42-batting",
-   "row_id": "110x108@42-batting",
-   "quantity": "size (in)",
-   "shown": [
-    "348",
-    "197/5"
-   ],
+   "row": "75x90",
+   "calculator": "qp_backing",
+   "variant": "batting120",
+   "row_id": "75x90@batting120",
+   "quantity": "roll length (in)",
+   "shown": "99",
    "against": "QREP today",
-   "target": [
-    "118",
-    "116"
-   ],
-   "rule": "calc_rules.omni_backing",
-   "rule_value": [
-    "348",
-    "197/5"
-   ],
+   "target": "98",
+   "rule": "qp_backing_display, bolt 120, overage 4",
+   "rule_value": "99",
    "reproduced": true,
    "labels": [
-    "page rule: in batting mode a piece is (piece length + 8) / k wide"
+    "rounding increment or thirds"
    ],
    "joint": false,
-   "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
-   ],
+   "notes": [],
    "id": "BT-34",
    "status": "explained"
   },
@@ -35936,50 +36031,6 @@
    "line_type": "batting",
    "table": "batting",
    "row": "75x90",
-   "calculator": "qp_backing",
-   "variant": "batting120",
-   "row_id": "75x90@batting120",
-   "quantity": "roll length (in)",
-   "shown": "99",
-   "against": "V-BATT-01",
-   "target": "98",
-   "rule": "qp_backing_display, bolt 120, overage 4",
-   "rule_value": "99",
-   "reproduced": true,
-   "labels": [
-    "rounding increment or thirds"
-   ],
-   "joint": false,
-   "notes": [],
-   "id": "BT-35",
-   "status": "explained"
-  },
-  {
-   "line_type": "batting",
-   "table": "batting",
-   "row": "75x90",
-   "calculator": "qp_backing",
-   "variant": "batting120",
-   "row_id": "75x90@batting120",
-   "quantity": "roll length (in)",
-   "shown": "99",
-   "against": "QREP today",
-   "target": "98",
-   "rule": "qp_backing_display, bolt 120, overage 4",
-   "rule_value": "99",
-   "reproduced": true,
-   "labels": [
-    "rounding increment or thirds"
-   ],
-   "joint": false,
-   "notes": [],
-   "id": "BT-36",
-   "status": "explained"
-  },
-  {
-   "line_type": "batting",
-   "table": "batting",
-   "row": "75x90",
    "calculator": "mfqs_backing",
    "variant": "42",
    "row_id": "75x90@42",
@@ -36141,8 +36192,8 @@
    "row_id": "75x90@42-batting",
    "quantity": "size (in)",
    "shown": [
-    "196",
-    "83/2"
+    "83",
+    "98"
    ],
    "against": "V-BATT-01",
    "target": [
@@ -36151,19 +36202,15 @@
    ],
    "rule": "calc_rules.omni_backing",
    "rule_value": [
-    "196",
-    "83/2"
+    "83",
+    "98"
    ],
    "reproduced": true,
-   "labels": [
-    "page rule: in batting mode a piece is (piece length + 8) / k wide"
-   ],
+   "labels": [],
    "joint": false,
-   "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
-   ],
-   "id": "BT-37",
-   "status": "explained"
+   "notes": [],
+   "id": null,
+   "status": "match"
   },
   {
    "line_type": "batting",
@@ -36174,8 +36221,8 @@
    "row_id": "75x90@42-batting",
    "quantity": "size (in)",
    "shown": [
-    "196",
-    "83/2"
+    "83",
+    "98"
    ],
    "against": "QREP today",
    "target": [
@@ -36184,19 +36231,15 @@
    ],
    "rule": "calc_rules.omni_backing",
    "rule_value": [
-    "196",
-    "83/2"
+    "83",
+    "98"
    ],
    "reproduced": true,
-   "labels": [
-    "page rule: in batting mode a piece is (piece length + 8) / k wide"
-   ],
+   "labels": [],
    "joint": false,
-   "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
-   ],
-   "id": "BT-38",
-   "status": "explained"
+   "notes": [],
+   "id": null,
+   "status": "match"
   },
   {
    "line_type": "batting",
@@ -36217,7 +36260,7 @@
    ],
    "joint": false,
    "notes": [],
-   "id": "BT-39",
+   "id": "BT-35",
    "status": "explained"
   },
   {
@@ -36239,7 +36282,7 @@
    ],
    "joint": false,
    "notes": [],
-   "id": "BT-40",
+   "id": "BT-36",
    "status": "explained"
   },
   {
@@ -36399,7 +36442,7 @@
    "notes": [
     "labels list the page rule's differences (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
    ],
-   "id": "BT-41",
+   "id": "BT-37",
    "status": "explained"
   },
   {
@@ -36432,7 +36475,7 @@
    "notes": [
     "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
-   "id": "BT-42",
+   "id": "BT-38",
    "status": "explained"
   },
   {
@@ -36465,7 +36508,7 @@
    "notes": [
     "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
-   "id": "BT-43",
+   "id": "BT-39",
    "status": "explained"
   },
   {
@@ -36487,7 +36530,7 @@
    ],
    "joint": false,
    "notes": [],
-   "id": "BT-44",
+   "id": "BT-40",
    "status": "explained"
   },
   {
@@ -36557,8 +36600,8 @@
    "row_id": "76x85@42-batting",
    "quantity": "size (in)",
    "shown": [
-    "186",
-    "42"
+    "84",
+    "93"
    ],
    "against": "QREP today",
    "target": [
@@ -36567,12 +36610,464 @@
    ],
    "rule": "calc_rules.omni_backing",
    "rule_value": [
-    "186",
-    "42"
+    "84",
+    "93"
+   ],
+   "reproduced": true,
+   "labels": [],
+   "joint": false,
+   "notes": [],
+   "id": null,
+   "status": "match"
+  },
+  {
+   "line_type": "batting",
+   "table": "batting",
+   "row": "68x68",
+   "calculator": "qp_backing",
+   "variant": "batting120",
+   "row_id": "68x68@batting120",
+   "quantity": "roll length (in)",
+   "shown": "153/2",
+   "against": "V-BATT-11",
+   "target": "76",
+   "rule": "qp_backing_display, bolt 120, overage 4",
+   "rule_value": "153/2",
+   "reproduced": true,
+   "labels": [
+    "rounding increment or thirds"
+   ],
+   "joint": false,
+   "notes": [],
+   "id": "BT-41",
+   "status": "explained"
+  },
+  {
+   "line_type": "batting",
+   "table": "batting",
+   "row": "68x68",
+   "calculator": "qp_backing",
+   "variant": "batting120",
+   "row_id": "68x68@batting120",
+   "quantity": "roll length (in)",
+   "shown": "153/2",
+   "against": "QREP today",
+   "target": "76",
+   "rule": "qp_backing_display, bolt 120, overage 4",
+   "rule_value": "153/2",
+   "reproduced": true,
+   "labels": [
+    "rounding increment or thirds"
+   ],
+   "joint": false,
+   "notes": [],
+   "id": "BT-42",
+   "status": "explained"
+  },
+  {
+   "line_type": "batting",
+   "table": "batting",
+   "row": "68x68",
+   "calculator": "mfqs_backing",
+   "variant": "42",
+   "row_id": "68x68@42",
+   "quantity": "size (in)",
+   "shown": [
+    "76",
+    "76"
+   ],
+   "against": "V-BATT-11",
+   "target": [
+    "76",
+    "76"
+   ],
+   "rule": "calc_rules.mfqs_backing",
+   "rule_value": [
+    "76",
+    "76"
+   ],
+   "reproduced": true,
+   "labels": [],
+   "joint": false,
+   "notes": [],
+   "id": null,
+   "status": "match"
+  },
+  {
+   "line_type": "batting",
+   "table": "batting",
+   "row": "68x68",
+   "calculator": "mfqs_backing",
+   "variant": "42",
+   "row_id": "68x68@42",
+   "quantity": "size (in)",
+   "shown": [
+    "76",
+    "76"
+   ],
+   "against": "QREP today",
+   "target": [
+    "76",
+    "76"
+   ],
+   "rule": "calc_rules.mfqs_backing",
+   "rule_value": [
+    "76",
+    "76"
+   ],
+   "reproduced": true,
+   "labels": [],
+   "joint": false,
+   "notes": [],
+   "id": null,
+   "status": "match"
+  },
+  {
+   "line_type": "batting",
+   "table": "batting",
+   "row": "68x68",
+   "calculator": "mfqs_backing",
+   "variant": "42",
+   "row_id": "68x68@42",
+   "quantity": "package",
+   "shown": "Full",
+   "against": "V-BATT-11",
+   "target": "full",
+   "rule": "calc_rules.mfqs_backing",
+   "rule_value": "Full",
+   "reproduced": true,
+   "labels": [],
+   "joint": false,
+   "notes": [],
+   "id": null,
+   "status": "match"
+  },
+  {
+   "line_type": "batting",
+   "table": "batting",
+   "row": "68x68",
+   "calculator": "stitchdesk_backing",
+   "variant": "42",
+   "row_id": "68x68@42",
+   "quantity": "size (in)",
+   "shown": [
+    "76",
+    "76"
+   ],
+   "against": "V-BATT-11",
+   "target": [
+    "76",
+    "76"
+   ],
+   "rule": "calc_rules.stitchdesk_backing",
+   "rule_value": [
+    "76",
+    "76"
+   ],
+   "reproduced": true,
+   "labels": [],
+   "joint": false,
+   "notes": [],
+   "id": null,
+   "status": "match"
+  },
+  {
+   "line_type": "batting",
+   "table": "batting",
+   "row": "68x68",
+   "calculator": "stitchdesk_backing",
+   "variant": "42",
+   "row_id": "68x68@42",
+   "quantity": "size (in)",
+   "shown": [
+    "76",
+    "76"
+   ],
+   "against": "QREP today",
+   "target": [
+    "76",
+    "76"
+   ],
+   "rule": "calc_rules.stitchdesk_backing",
+   "rule_value": [
+    "76",
+    "76"
+   ],
+   "reproduced": true,
+   "labels": [],
+   "joint": false,
+   "notes": [],
+   "id": null,
+   "status": "match"
+  },
+  {
+   "line_type": "batting",
+   "table": "batting",
+   "row": "68x68",
+   "calculator": "stitchdesk_backing",
+   "variant": "42",
+   "row_id": "68x68@42",
+   "quantity": "package",
+   "shown": "Full",
+   "against": "V-BATT-11",
+   "target": "full",
+   "rule": "calc_rules.stitchdesk_backing",
+   "rule_value": "Full",
+   "reproduced": true,
+   "labels": [],
+   "joint": false,
+   "notes": [],
+   "id": null,
+   "status": "match"
+  },
+  {
+   "line_type": "batting",
+   "table": "batting",
+   "row": "68x68",
+   "calculator": "omni_backing",
+   "variant": "42-batting",
+   "row_id": "68x68@42-batting",
+   "quantity": "size (in)",
+   "shown": [
+    "76",
+    "84"
+   ],
+   "against": "V-BATT-11",
+   "target": [
+    "76",
+    "76"
+   ],
+   "rule": "calc_rules.omni_backing",
+   "rule_value": [
+    "76",
+    "84"
    ],
    "reproduced": true,
    "labels": [
     "page rule: in batting mode a piece is (piece length + 8) / k wide"
+   ],
+   "joint": false,
+   "notes": [
+    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "id": "BT-43",
+   "status": "explained"
+  },
+  {
+   "line_type": "batting",
+   "table": "batting",
+   "row": "68x68",
+   "calculator": "omni_backing",
+   "variant": "42-batting",
+   "row_id": "68x68@42-batting",
+   "quantity": "size (in)",
+   "shown": [
+    "76",
+    "84"
+   ],
+   "against": "QREP today",
+   "target": [
+    "76",
+    "76"
+   ],
+   "rule": "calc_rules.omni_backing",
+   "rule_value": [
+    "76",
+    "84"
+   ],
+   "reproduced": true,
+   "labels": [
+    "page rule: in batting mode a piece is (piece length + 8) / k wide"
+   ],
+   "joint": false,
+   "notes": [
+    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "id": "BT-44",
+   "status": "explained"
+  },
+  {
+   "line_type": "batting",
+   "table": "batting",
+   "row": "102.5x120",
+   "calculator": "mfqs_backing",
+   "variant": "42",
+   "row_id": "102.5x120@42",
+   "quantity": "size (in)",
+   "shown": [
+    "221/2",
+    "128"
+   ],
+   "against": "V-BATT-10",
+   "target": [
+    "221/2",
+    "128"
+   ],
+   "rule": "calc_rules.mfqs_backing",
+   "rule_value": [
+    "221/2",
+    "128"
+   ],
+   "reproduced": true,
+   "labels": [],
+   "joint": false,
+   "notes": [],
+   "id": null,
+   "status": "match"
+  },
+  {
+   "line_type": "batting",
+   "table": "batting",
+   "row": "102.5x120",
+   "calculator": "mfqs_backing",
+   "variant": "42",
+   "row_id": "102.5x120@42",
+   "quantity": "size (in)",
+   "shown": [
+    "221/2",
+    "128"
+   ],
+   "against": "QREP today",
+   "target": [
+    "221/2",
+    "128"
+   ],
+   "rule": "calc_rules.mfqs_backing",
+   "rule_value": [
+    "221/2",
+    "128"
+   ],
+   "reproduced": true,
+   "labels": [],
+   "joint": false,
+   "notes": [],
+   "id": null,
+   "status": "match"
+  },
+  {
+   "line_type": "batting",
+   "table": "batting",
+   "row": "102.5x120",
+   "calculator": "mfqs_backing",
+   "variant": "42",
+   "row_id": "102.5x120@42",
+   "quantity": "package",
+   "shown": null,
+   "against": "V-BATT-10",
+   "target": null,
+   "rule": null,
+   "rule_value": null,
+   "reproduced": null,
+   "labels": [],
+   "joint": false,
+   "notes": [],
+   "id": null,
+   "status": "match"
+  },
+  {
+   "line_type": "batting",
+   "table": "batting",
+   "row": "102.5x120",
+   "calculator": "stitchdesk_backing",
+   "variant": "42",
+   "row_id": "102.5x120@42",
+   "quantity": "size (in)",
+   "shown": [
+    "221/2",
+    "128"
+   ],
+   "against": "V-BATT-10",
+   "target": [
+    "221/2",
+    "128"
+   ],
+   "rule": "calc_rules.stitchdesk_backing",
+   "rule_value": [
+    "221/2",
+    "128"
+   ],
+   "reproduced": true,
+   "labels": [],
+   "joint": false,
+   "notes": [],
+   "id": null,
+   "status": "match"
+  },
+  {
+   "line_type": "batting",
+   "table": "batting",
+   "row": "102.5x120",
+   "calculator": "stitchdesk_backing",
+   "variant": "42",
+   "row_id": "102.5x120@42",
+   "quantity": "size (in)",
+   "shown": [
+    "221/2",
+    "128"
+   ],
+   "against": "QREP today",
+   "target": [
+    "221/2",
+    "128"
+   ],
+   "rule": "calc_rules.stitchdesk_backing",
+   "rule_value": [
+    "221/2",
+    "128"
+   ],
+   "reproduced": true,
+   "labels": [],
+   "joint": false,
+   "notes": [],
+   "id": null,
+   "status": "match"
+  },
+  {
+   "line_type": "batting",
+   "table": "batting",
+   "row": "102.5x120",
+   "calculator": "stitchdesk_backing",
+   "variant": "42",
+   "row_id": "102.5x120@42",
+   "quantity": "package",
+   "shown": "off the roll",
+   "against": "V-BATT-10",
+   "target": null,
+   "rule": "calc_rules.stitchdesk_backing",
+   "rule_value": "off the roll",
+   "reproduced": true,
+   "labels": [],
+   "joint": false,
+   "notes": [],
+   "id": null,
+   "status": "match"
+  },
+  {
+   "line_type": "batting",
+   "table": "batting",
+   "row": "102.5x120",
+   "calculator": "omni_backing",
+   "variant": "42-batting",
+   "row_id": "102.5x120@42-batting",
+   "quantity": "size (in)",
+   "shown": [
+    "1107/10",
+    "128"
+   ],
+   "against": "V-BATT-10",
+   "target": [
+    "221/2",
+    "128"
+   ],
+   "rule": "calc_rules.omni_backing",
+   "rule_value": [
+    "1107/10",
+    "128"
+   ],
+   "reproduced": true,
+   "labels": [
+    "rounding increment or thirds",
+    "page rule: piece sizes round up to 0.1 in"
    ],
    "joint": false,
    "notes": [
@@ -36584,489 +37079,35 @@
   {
    "line_type": "batting",
    "table": "batting",
-   "row": "68x68",
-   "calculator": "qp_backing",
-   "variant": "batting120",
-   "row_id": "68x68@batting120",
-   "quantity": "roll length (in)",
-   "shown": "153/2",
-   "against": "V-BATT-11",
-   "target": "76",
-   "rule": "qp_backing_display, bolt 120, overage 4",
-   "rule_value": "153/2",
+   "row": "102.5x120",
+   "calculator": "omni_backing",
+   "variant": "42-batting",
+   "row_id": "102.5x120@42-batting",
+   "quantity": "size (in)",
+   "shown": [
+    "1107/10",
+    "128"
+   ],
+   "against": "QREP today",
+   "target": [
+    "221/2",
+    "128"
+   ],
+   "rule": "calc_rules.omni_backing",
+   "rule_value": [
+    "1107/10",
+    "128"
+   ],
    "reproduced": true,
    "labels": [
-    "rounding increment or thirds"
+    "rounding increment or thirds",
+    "page rule: piece sizes round up to 0.1 in"
    ],
    "joint": false,
-   "notes": [],
+   "notes": [
+    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
    "id": "BT-46",
-   "status": "explained"
-  },
-  {
-   "line_type": "batting",
-   "table": "batting",
-   "row": "68x68",
-   "calculator": "qp_backing",
-   "variant": "batting120",
-   "row_id": "68x68@batting120",
-   "quantity": "roll length (in)",
-   "shown": "153/2",
-   "against": "QREP today",
-   "target": "76",
-   "rule": "qp_backing_display, bolt 120, overage 4",
-   "rule_value": "153/2",
-   "reproduced": true,
-   "labels": [
-    "rounding increment or thirds"
-   ],
-   "joint": false,
-   "notes": [],
-   "id": "BT-47",
-   "status": "explained"
-  },
-  {
-   "line_type": "batting",
-   "table": "batting",
-   "row": "68x68",
-   "calculator": "mfqs_backing",
-   "variant": "42",
-   "row_id": "68x68@42",
-   "quantity": "size (in)",
-   "shown": [
-    "76",
-    "76"
-   ],
-   "against": "V-BATT-11",
-   "target": [
-    "76",
-    "76"
-   ],
-   "rule": "calc_rules.mfqs_backing",
-   "rule_value": [
-    "76",
-    "76"
-   ],
-   "reproduced": true,
-   "labels": [],
-   "joint": false,
-   "notes": [],
-   "id": null,
-   "status": "match"
-  },
-  {
-   "line_type": "batting",
-   "table": "batting",
-   "row": "68x68",
-   "calculator": "mfqs_backing",
-   "variant": "42",
-   "row_id": "68x68@42",
-   "quantity": "size (in)",
-   "shown": [
-    "76",
-    "76"
-   ],
-   "against": "QREP today",
-   "target": [
-    "76",
-    "76"
-   ],
-   "rule": "calc_rules.mfqs_backing",
-   "rule_value": [
-    "76",
-    "76"
-   ],
-   "reproduced": true,
-   "labels": [],
-   "joint": false,
-   "notes": [],
-   "id": null,
-   "status": "match"
-  },
-  {
-   "line_type": "batting",
-   "table": "batting",
-   "row": "68x68",
-   "calculator": "mfqs_backing",
-   "variant": "42",
-   "row_id": "68x68@42",
-   "quantity": "package",
-   "shown": "Full",
-   "against": "V-BATT-11",
-   "target": "full",
-   "rule": "calc_rules.mfqs_backing",
-   "rule_value": "Full",
-   "reproduced": true,
-   "labels": [],
-   "joint": false,
-   "notes": [],
-   "id": null,
-   "status": "match"
-  },
-  {
-   "line_type": "batting",
-   "table": "batting",
-   "row": "68x68",
-   "calculator": "stitchdesk_backing",
-   "variant": "42",
-   "row_id": "68x68@42",
-   "quantity": "size (in)",
-   "shown": [
-    "76",
-    "76"
-   ],
-   "against": "V-BATT-11",
-   "target": [
-    "76",
-    "76"
-   ],
-   "rule": "calc_rules.stitchdesk_backing",
-   "rule_value": [
-    "76",
-    "76"
-   ],
-   "reproduced": true,
-   "labels": [],
-   "joint": false,
-   "notes": [],
-   "id": null,
-   "status": "match"
-  },
-  {
-   "line_type": "batting",
-   "table": "batting",
-   "row": "68x68",
-   "calculator": "stitchdesk_backing",
-   "variant": "42",
-   "row_id": "68x68@42",
-   "quantity": "size (in)",
-   "shown": [
-    "76",
-    "76"
-   ],
-   "against": "QREP today",
-   "target": [
-    "76",
-    "76"
-   ],
-   "rule": "calc_rules.stitchdesk_backing",
-   "rule_value": [
-    "76",
-    "76"
-   ],
-   "reproduced": true,
-   "labels": [],
-   "joint": false,
-   "notes": [],
-   "id": null,
-   "status": "match"
-  },
-  {
-   "line_type": "batting",
-   "table": "batting",
-   "row": "68x68",
-   "calculator": "stitchdesk_backing",
-   "variant": "42",
-   "row_id": "68x68@42",
-   "quantity": "package",
-   "shown": "Full",
-   "against": "V-BATT-11",
-   "target": "full",
-   "rule": "calc_rules.stitchdesk_backing",
-   "rule_value": "Full",
-   "reproduced": true,
-   "labels": [],
-   "joint": false,
-   "notes": [],
-   "id": null,
-   "status": "match"
-  },
-  {
-   "line_type": "batting",
-   "table": "batting",
-   "row": "68x68",
-   "calculator": "omni_backing",
-   "variant": "42-batting",
-   "row_id": "68x68@42-batting",
-   "quantity": "size (in)",
-   "shown": [
-    "76",
-    "84"
-   ],
-   "against": "V-BATT-11",
-   "target": [
-    "76",
-    "76"
-   ],
-   "rule": "calc_rules.omni_backing",
-   "rule_value": [
-    "76",
-    "84"
-   ],
-   "reproduced": true,
-   "labels": [
-    "page rule: in batting mode a piece is (piece length + 8) / k wide"
-   ],
-   "joint": false,
-   "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
-   ],
-   "id": "BT-48",
-   "status": "explained"
-  },
-  {
-   "line_type": "batting",
-   "table": "batting",
-   "row": "68x68",
-   "calculator": "omni_backing",
-   "variant": "42-batting",
-   "row_id": "68x68@42-batting",
-   "quantity": "size (in)",
-   "shown": [
-    "76",
-    "84"
-   ],
-   "against": "QREP today",
-   "target": [
-    "76",
-    "76"
-   ],
-   "rule": "calc_rules.omni_backing",
-   "rule_value": [
-    "76",
-    "84"
-   ],
-   "reproduced": true,
-   "labels": [
-    "page rule: in batting mode a piece is (piece length + 8) / k wide"
-   ],
-   "joint": false,
-   "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
-   ],
-   "id": "BT-49",
-   "status": "explained"
-  },
-  {
-   "line_type": "batting",
-   "table": "batting",
-   "row": "102.5x120",
-   "calculator": "mfqs_backing",
-   "variant": "42",
-   "row_id": "102.5x120@42",
-   "quantity": "size (in)",
-   "shown": [
-    "221/2",
-    "128"
-   ],
-   "against": "V-BATT-10",
-   "target": [
-    "221/2",
-    "128"
-   ],
-   "rule": "calc_rules.mfqs_backing",
-   "rule_value": [
-    "221/2",
-    "128"
-   ],
-   "reproduced": true,
-   "labels": [],
-   "joint": false,
-   "notes": [],
-   "id": null,
-   "status": "match"
-  },
-  {
-   "line_type": "batting",
-   "table": "batting",
-   "row": "102.5x120",
-   "calculator": "mfqs_backing",
-   "variant": "42",
-   "row_id": "102.5x120@42",
-   "quantity": "size (in)",
-   "shown": [
-    "221/2",
-    "128"
-   ],
-   "against": "QREP today",
-   "target": [
-    "221/2",
-    "128"
-   ],
-   "rule": "calc_rules.mfqs_backing",
-   "rule_value": [
-    "221/2",
-    "128"
-   ],
-   "reproduced": true,
-   "labels": [],
-   "joint": false,
-   "notes": [],
-   "id": null,
-   "status": "match"
-  },
-  {
-   "line_type": "batting",
-   "table": "batting",
-   "row": "102.5x120",
-   "calculator": "mfqs_backing",
-   "variant": "42",
-   "row_id": "102.5x120@42",
-   "quantity": "package",
-   "shown": null,
-   "against": "V-BATT-10",
-   "target": null,
-   "rule": null,
-   "rule_value": null,
-   "reproduced": null,
-   "labels": [],
-   "joint": false,
-   "notes": [],
-   "id": null,
-   "status": "match"
-  },
-  {
-   "line_type": "batting",
-   "table": "batting",
-   "row": "102.5x120",
-   "calculator": "stitchdesk_backing",
-   "variant": "42",
-   "row_id": "102.5x120@42",
-   "quantity": "size (in)",
-   "shown": [
-    "221/2",
-    "128"
-   ],
-   "against": "V-BATT-10",
-   "target": [
-    "221/2",
-    "128"
-   ],
-   "rule": "calc_rules.stitchdesk_backing",
-   "rule_value": [
-    "221/2",
-    "128"
-   ],
-   "reproduced": true,
-   "labels": [],
-   "joint": false,
-   "notes": [],
-   "id": null,
-   "status": "match"
-  },
-  {
-   "line_type": "batting",
-   "table": "batting",
-   "row": "102.5x120",
-   "calculator": "stitchdesk_backing",
-   "variant": "42",
-   "row_id": "102.5x120@42",
-   "quantity": "size (in)",
-   "shown": [
-    "221/2",
-    "128"
-   ],
-   "against": "QREP today",
-   "target": [
-    "221/2",
-    "128"
-   ],
-   "rule": "calc_rules.stitchdesk_backing",
-   "rule_value": [
-    "221/2",
-    "128"
-   ],
-   "reproduced": true,
-   "labels": [],
-   "joint": false,
-   "notes": [],
-   "id": null,
-   "status": "match"
-  },
-  {
-   "line_type": "batting",
-   "table": "batting",
-   "row": "102.5x120",
-   "calculator": "stitchdesk_backing",
-   "variant": "42",
-   "row_id": "102.5x120@42",
-   "quantity": "package",
-   "shown": null,
-   "against": "V-BATT-10",
-   "target": null,
-   "rule": null,
-   "rule_value": null,
-   "reproduced": null,
-   "labels": [],
-   "joint": false,
-   "notes": [],
-   "id": null,
-   "status": "match"
-  },
-  {
-   "line_type": "batting",
-   "table": "batting",
-   "row": "102.5x120",
-   "calculator": "omni_backing",
-   "variant": "42-batting",
-   "row_id": "102.5x120@42-batting",
-   "quantity": "size (in)",
-   "shown": [
-    "384",
-    "369/10"
-   ],
-   "against": "V-BATT-10",
-   "target": [
-    "221/2",
-    "128"
-   ],
-   "rule": "calc_rules.omni_backing",
-   "rule_value": [
-    "384",
-    "369/10"
-   ],
-   "reproduced": true,
-   "labels": [
-    "page rule: in batting mode a piece is (piece length + 8) / k wide"
-   ],
-   "joint": false,
-   "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
-   ],
-   "id": "BT-50",
-   "status": "explained"
-  },
-  {
-   "line_type": "batting",
-   "table": "batting",
-   "row": "102.5x120",
-   "calculator": "omni_backing",
-   "variant": "42-batting",
-   "row_id": "102.5x120@42-batting",
-   "quantity": "size (in)",
-   "shown": [
-    "384",
-    "369/10"
-   ],
-   "against": "QREP today",
-   "target": [
-    "221/2",
-    "128"
-   ],
-   "rule": "calc_rules.omni_backing",
-   "rule_value": [
-    "384",
-    "369/10"
-   ],
-   "reproduced": true,
-   "labels": [
-    "page rule: in batting mode a piece is (piece length + 8) / k wide"
-   ],
-   "joint": false,
-   "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
-   ],
-   "id": "BT-51",
    "status": "explained"
   },
   {
@@ -37088,7 +37129,7 @@
    ],
    "joint": false,
    "notes": [],
-   "id": "BT-52",
+   "id": "BT-47",
    "status": "explained"
   },
   {
@@ -37197,7 +37238,7 @@
    ],
    "joint": false,
    "notes": [],
-   "id": "BT-53",
+   "id": "BT-48",
    "status": "explained"
   },
   {
@@ -39480,212 +39521,7 @@
   ],
   "rejected": 23
  },
- "unexplained": [
-  {
-   "id": "BK-33",
-   "line_type": "backing",
-   "row": "70x90",
-   "calculator": "omni_backing",
-   "variant": "42",
-   "quantity": "yards",
-   "shown": "109/20",
-   "against": "V-BACK-05",
-   "target": "23/4",
-   "rule": null,
-   "rule_value": null,
-   "notes": [
-    "no parameter set or page model covers this calculator"
-   ],
-   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
-  },
-  {
-   "id": "BK-34",
-   "line_type": "backing",
-   "row": "70x90",
-   "calculator": "omni_backing",
-   "variant": "42",
-   "quantity": "yards",
-   "shown": "109/20",
-   "against": "QREP today",
-   "target": "11/2",
-   "rule": null,
-   "rule_value": null,
-   "notes": [
-    "no parameter set or page model covers this calculator"
-   ],
-   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
-  },
-  {
-   "id": "BK-68",
-   "line_type": "backing",
-   "row": "110x108",
-   "calculator": "omni_backing",
-   "variant": "42",
-   "quantity": "yards",
-   "shown": "967/100",
-   "against": "V-BACK-08",
-   "target": "10",
-   "rule": null,
-   "rule_value": null,
-   "notes": [
-    "no parameter set or page model covers this calculator"
-   ],
-   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
-  },
-  {
-   "id": "BK-69",
-   "line_type": "backing",
-   "row": "110x108",
-   "calculator": "omni_backing",
-   "variant": "42",
-   "quantity": "yards",
-   "shown": "967/100",
-   "against": "QREP today",
-   "target": "39/4",
-   "rule": null,
-   "rule_value": null,
-   "notes": [
-    "no parameter set or page model covers this calculator"
-   ],
-   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
-  },
-  {
-   "id": "BK-83",
-   "line_type": "backing",
-   "row": "75x90",
-   "calculator": "omni_backing",
-   "variant": "42",
-   "quantity": "yards",
-   "shown": "109/20",
-   "against": "V-BACK-09",
-   "target": "23/4",
-   "rule": null,
-   "rule_value": null,
-   "notes": [
-    "no parameter set or page model covers this calculator"
-   ],
-   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
-  },
-  {
-   "id": "BK-84",
-   "line_type": "backing",
-   "row": "75x90",
-   "calculator": "omni_backing",
-   "variant": "42",
-   "quantity": "yards",
-   "shown": "109/20",
-   "against": "QREP today",
-   "target": "11/2",
-   "rule": null,
-   "rule_value": null,
-   "notes": [
-    "no parameter set or page model covers this calculator"
-   ],
-   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
-  },
-  {
-   "id": "BK-106",
-   "line_type": "backing",
-   "row": "76x85",
-   "calculator": "omni_backing",
-   "variant": "42",
-   "quantity": "yards",
-   "shown": "517/100",
-   "against": "V-BACK-10",
-   "target": "29/4",
-   "rule": null,
-   "rule_value": null,
-   "notes": [
-    "no parameter set or page model covers this calculator"
-   ],
-   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
-  },
-  {
-   "id": "BK-107",
-   "line_type": "backing",
-   "row": "76x85",
-   "calculator": "omni_backing",
-   "variant": "42",
-   "quantity": "yards",
-   "shown": "517/100",
-   "against": "QREP today",
-   "target": "21/4",
-   "rule": null,
-   "rule_value": null,
-   "notes": [
-    "no parameter set or page model covers this calculator"
-   ],
-   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
-  },
-  {
-   "id": "BK-108",
-   "line_type": "backing",
-   "row": "76x85",
-   "calculator": "omni_backing",
-   "variant": "42",
-   "quantity": "panels",
-   "shown": "2",
-   "against": "V-BACK-10",
-   "target": "3",
-   "rule": null,
-   "rule_value": null,
-   "notes": [
-    "no parameter set or page model covers this calculator"
-   ],
-   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
-  },
-  {
-   "id": "BK-116",
-   "line_type": "backing",
-   "row": "102.5x120",
-   "calculator": "omni_backing",
-   "variant": "42",
-   "quantity": "yards",
-   "shown": "1067/100",
-   "against": "V-BACK-16",
-   "target": "11",
-   "rule": null,
-   "rule_value": null,
-   "notes": [
-    "no parameter set or page model covers this calculator"
-   ],
-   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
-  },
-  {
-   "id": "BK-117",
-   "line_type": "backing",
-   "row": "102.5x120",
-   "calculator": "omni_backing",
-   "variant": "42",
-   "quantity": "yards",
-   "shown": "1067/100",
-   "against": "QREP today",
-   "target": "43/4",
-   "rule": null,
-   "rule_value": null,
-   "notes": [
-    "no parameter set or page model covers this calculator"
-   ],
-   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
-  },
-  {
-   "id": "BT-28",
-   "line_type": "batting",
-   "row": "92.5x115",
-   "calculator": "stitchdesk_backing",
-   "variant": "42",
-   "quantity": "package",
-   "shown": null,
-   "against": "V-BATT-08",
-   "target": "king",
-   "rule": null,
-   "rule_value": null,
-   "notes": [
-    "no parameter set or page model covers this calculator"
-   ],
-   "lead": "calc_rules.stitchdesk_backing, from the page script; Backing size = quilt size + 2 x overhang on each dimension. Usable width = fabric width minus 2 in selvage. One panel if the backing dimension fits within usable width; otherwise panels = ceil(dimension / (usable width minus 2 x seam allowance)). Both seam directions are compared and the smaller yardage is chosen (panels x cut length / 36), rounded up to the next 1/8 yd. Batting = quilt size + 2 x batting overhang, matched against a precut list. Read from the page's public /assets/calc.js."
-  }
- ],
+ "unexplained": [],
  "failures": [
   {
    "id": "F1",

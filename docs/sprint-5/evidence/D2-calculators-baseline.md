@@ -1,6 +1,6 @@
 # D2 calculator conformance baseline
 
-Generated on 2026-10-08 by:
+Generated on 2026-10-09 by:
 
 ```
 .venv/Scripts/python scripts/eval/calculators/baseline.py --start-sha 3fa671e --work '<work>/.' --raw '<work>/raw.json' --raw '<work>/raw_retry.json' --shots scripts/eval/calculators/failures --out-json docs/sprint-5/evidence/D2-calculators-baseline.json --out-md docs/sprint-5/evidence/D2-calculators-baseline.md
@@ -9,7 +9,7 @@ Generated on 2026-10-08 by:
 | Item | Value |
 | --- | --- |
 | qrep imported from | C:\Users\Jake Mismas\qrep-wt\d2\qrep\__init__.py |
-| git HEAD | e6869da6af4c11d123ab3431c3f361e5c4596d8d |
+| git HEAD | 4410244e1579424fadadc179197ae1eedb6c427c |
 | Start SHA | 3fa671ecc52f7939aa60bac11551bc68054faf6d (given as 3fa671e) |
 | qrep tree at the start SHA | 59a4cc0314963b1422b74cde4f7303e9d21eb99e |
 | OpenCV (cv2) | 5.0.0; decode path: not applicable (no images decoded) |
@@ -119,16 +119,16 @@ Rows that returned a parsed value, of rows tried (a record that was not a not-ap
 | 36x52 | V-BACK-03: H 2 3/4 (2) | V 3 1/2 (2) | H 2 1/2 (2); V 3 3/8 (2) [BK-1, BK-2] | H 2 1/2 (2) [BK-4, BK-5] | H 2 1/2 (2) [BK-7, BK-8] | H 2.45 (2) [BK-9, BK-10] |
 | 50x65 | V-BACK-04: H 3 1/2 (2) | V 4 1/4 (2) | H 3 1/4 (2); V 4 1/8 (2) [BK-11, BK-12] | H 3 1/4 (2) [BK-14, BK-15] | H 3 1/4 (2) [BK-17, BK-18] | H 3.23 (2) [BK-19, BK-20] |
 | 60x72 | V-BACK-02: H 4 1/4 (2) | V 4 1/2 (2) | H 3 7/8 (2); V 4 1/2 (2) [BK-21, BK-22] | H 3 7/8 (2) [BK-24, BK-25] | V 4 1/2 (2) [BK-27] | H 3.78 (2) [BK-28, BK-29] |
-| 70x90 | V-BACK-05: V 5 3/4 (2) | V 5 1/2 (2) | V 5 1/2 (2); H 6 1/2 (3) [BK-30] | V 5 1/2 (2) [BK-31] | V 5 1/2 (2) [BK-32] | ? 5.45 (2) [BK-33, BK-34] |
+| 70x90 | V-BACK-05: V 5 3/4 (2) | V 5 1/2 (2) | V 5 1/2 (2); H 6 1/2 (3) [BK-30] | V 5 1/2 (2) [BK-31] | V 5 1/2 (2) [BK-32] | V 5.45 (2) [BK-33, BK-34] |
 | 84x90 | V-BACK-06: H 8 (3) | V 8 1/4 (3) | H 7 2/3 (3); V 8 1/4 (3) [BK-35, BK-36] | H 7 3/4 (3) [BK-38, BK-39] | H 7 3/4 (3) [BK-41, BK-42] | H 7.67 (3) [BK-43, BK-44] |
 | 90x108 | V-BACK-07: H 8 1/2 (3) | V 9 3/4 (3) | H 8 1/4 (3); V 9 3/4 (3) [BK-45, BK-46] | H 8 1/4 (3) [BK-48, BK-49] | H 8 1/4 (3) [BK-51, BK-52] | H 8.17 (3) [BK-53, BK-54] |
 | 92.5x115 | V-BACK-01: H 8 3/4 (3) | V 10 1/4 (3) | H 8 3/8 (3); V 10 1/4 (3) [BK-55, BK-56] | H 8 3/8 (3) [BK-58, BK-59] | V 10 1/4 (3) [BK-61] | H 8.38 (3) [BK-62, BK-63] |
-| 110x108 | V-BACK-08: V 10 (3) | V 9 3/4 (3) | V 9 3/4 (3); H 9 7/8 (3) [BK-64] | V 9 3/4 (3) [BK-65] | H 9 7/8 (3) [BK-66, BK-67] | ? 9.67 (3) [BK-68, BK-69] |
-| 75x90 | V-BACK-09: V 5 3/4 (2) | V 5 1/2 (2) | V 5 1/2 (2); H 7 (3) [BK-70] | H 7 (3) [BK-73, BK-74, BK-75, BK-76] | H 7 (3) [BK-79, BK-80, BK-81, BK-82] | ? 5.45 (2) [BK-83, BK-84] |
+| 110x108 | V-BACK-08: V 10 (3) | V 9 3/4 (3) | V 9 3/4 (3); H 9 7/8 (3) [BK-64] | V 9 3/4 (3) [BK-65] | H 9 7/8 (3) [BK-66, BK-67] | V 9.67 (3) [BK-68, BK-69] |
+| 75x90 | V-BACK-09: V 5 3/4 (2) | V 5 1/2 (2) | V 5 1/2 (2); H 7 (3) [BK-70] | H 7 (3) [BK-73, BK-74, BK-75, BK-76] | H 7 (3) [BK-79, BK-80, BK-81, BK-82] | V 5.45 (2) [BK-83, BK-84] |
 | 42x52 | V-BACK-11: H 3 1/4 (2) | V 3 1/2 (2) | H 2 7/8 (2); V 3 3/8 (2) [BK-85, BK-86] | H 2 7/8 (2) [BK-88, BK-89] | H 2 7/8 (2) [BK-91, BK-92] | H 2.78 (2) [BK-93, BK-94] |
-| 76x85 | V-BACK-10: H 7 1/4 (3) | V 5 1/4 (2) | H 7 (3); V 7 3/4 (3) [BK-95, BK-96, BK-97] | H 7 (3) [BK-99, BK-100, BK-101] | H 7 (3) [BK-103, BK-104, BK-105] | ? 5.17 (2) [BK-106, BK-107, BK-108] |
+| 76x85 | V-BACK-10: H 7 1/4 (3) | V 5 1/4 (2) | H 7 (3); V 7 3/4 (3) [BK-95, BK-96, BK-97] | H 7 (3) [BK-99, BK-100, BK-101] | H 7 (3) [BK-103, BK-104, BK-105] | V 5.17 (2) [BK-106, BK-107, BK-108] |
 | 68x68 | V-BACK-13: V 4 1/2 (2) | V 4 1/4 (2) | V 4 1/4 (2); H 4 1/4 (2) [BK-109] | H 4 1/4 (2) [BK-110] | V 4 1/4 (2) [BK-111] | H 4.23 (2) [BK-112, BK-113] |
-| 102.5x120 | V-BACK-16: V 11 (3) | V 10 3/4 (3) | failed [F10] | V 10 3/4 (3) [BK-114] | V 10 3/4 (3) [BK-115] | ? 10.67 (3) [BK-116, BK-117] |
+| 102.5x120 | V-BACK-16: V 11 (3) | V 10 3/4 (3) | failed [F10] | V 10 3/4 (3) [BK-114] | V 10 3/4 (3) [BK-115] | V 10.67 (3) [BK-116, BK-117] |
 | 58x66 | V-BACK-23: H 4 (2) | V 4 1/4 (2) | H 3 2/3 (2); V 4 1/8 (2) [BK-118, BK-119] | H 3 3/4 (2) [BK-121, BK-122] | H 3 3/4 (2) [BK-124, BK-125] | H 3.67 (2) [BK-126, BK-127] |
 | 24x58 | V-BACK-14: V 2 (1) | V 2 (1) | V 1 7/8 (1); H 1 7/8 (2) [BK-128, BK-129] | 1 pc 1 7/8 (1) [BK-131, BK-132] | H 1 7/8 (2) [BK-133, BK-134, BK-135, BK-136] | 1 pc 1.84 (1) [BK-137, BK-138] |
 
@@ -205,18 +205,18 @@ Quilter's Paradise sells batting as a roll length on a 120 in bolt; its implied 
 | 36x52 | V-BATT-02: 44 x 60, crib | 44 x 60 | 1 3/4 yd = 63 in [BT-1, BT-2] | 44 x 60, Crib | 44 x 60, Crib | 44 x 52 [BT-3, BT-4] |
 | 50x65 | V-BATT-04: 58 x 73, twin | 58 x 73 | 2 1/8 yd = 76 1/2 in [BT-5, BT-6] | 58 x 73, Twin | 58 x 73, Twin | 58 x 66 [BT-7, BT-8] |
 | 60x72 | V-BATT-03: 68 x 80, twin | 68 x 80 | 2 1/4 yd = 81 in [BT-9, BT-10] | 68 x 80, Twin | 68 x 80, Twin | 68 x 76 [BT-11, BT-12] |
-| 70x90 | V-BATT-05: 78 x 98, queen | 78 x 98 | 2 3/4 yd = 99 in [BT-13, BT-14] | 78 x 98, Queen | 78 x 98, Queen | 196 x 39 [BT-15, BT-16] |
-| 84x90 | V-BATT-06: 92 x 98, king | 92 x 98 | 2 3/4 yd = 99 in [BT-17, BT-18] | 92 x 98, King | 92 x 98, King | 92 x 100.2 [BT-19, BT-20] |
-| 90x108 | V-BATT-07: 98 x 116, king | 98 x 116 | 3 1/4 yd = 117 in [BT-21, BT-22] | 98 x 116, King | 98 x 116, King | 98 x 106.2 [BT-23, BT-24] |
-| 92.5x115 | V-BATT-08: 100 1/2 x 123, king | 100 1/2 x 123 | 3 1/2 yd = 126 in [BT-25, BT-26] | 100 1/2 x 123 [BT-27] | 100 1/2 x 123 [BT-28] | 100 1/2 x 108.6 [BT-29, BT-30] |
-| 110x108 | V-BATT-09: 118 x 116, king | 118 x 116 | 3 1/4 yd = 117 in [BT-31, BT-32] | 118 x 116, King | 118 x 116, King | 348 x 39.4 [BT-33, BT-34] |
-| 75x90 | V-BATT-01: 83 x 98, queen | 83 x 98 | 2 3/4 yd = 99 in [BT-35, BT-36] | 83 x 98, Queen | 83 x 98, Queen | 196 x 41 1/2 [BT-37, BT-38] |
-| 42x52 | V-BATT-13: 50 x 60, twin | 50 x 60 | 1 3/4 yd = 63 in [BT-39, BT-40] | 50 x 60, Twin | 50 x 60, Throw [BT-41] | 50 x 58 [BT-42, BT-43] |
-| 76x85 | no vector | 84 x 93 | 2 5/8 yd = 94 1/2 in [BT-44] | 84 x 93, Queen | 84 x 93, Queen | 186 x 42 [BT-45] |
-| 68x68 | V-BATT-11: 76 x 76, full | 76 x 76 | 2 1/8 yd = 76 1/2 in [BT-46, BT-47] | 76 x 76, Full | 76 x 76, Full | 76 x 84 [BT-48, BT-49] |
-| 102.5x120 | V-BATT-10: 110 1/2 x 128, None | 110 1/2 x 128 | failed [F12] | 110 1/2 x 128 | 110 1/2 x 128 | 384 x 36.9 [BT-50, BT-51] |
-| 58x66 | no vector | 66 x 74 | 2 1/8 yd = 76 1/2 in [BT-52] | 66 x 74, Twin | 66 x 74, Twin | 66 x 74 |
-| 24x58 | no vector | 32 x 66 | 1 7/8 yd = 67 1/2 in [BT-53] | 32 x 66, Twin | 32 x 66, Twin | 32 x 66 |
+| 70x90 | V-BATT-05: 78 x 98, queen | 78 x 98 | 2 3/4 yd = 99 in [BT-13, BT-14] | 78 x 98, Queen | 78 x 98, Queen | 78 x 98 |
+| 84x90 | V-BATT-06: 92 x 98, king | 92 x 98 | 2 3/4 yd = 99 in [BT-15, BT-16] | 92 x 98, King | 92 x 98, King | 92 x 100.2 [BT-17, BT-18] |
+| 90x108 | V-BATT-07: 98 x 116, king | 98 x 116 | 3 1/4 yd = 117 in [BT-19, BT-20] | 98 x 116, King | 98 x 116, King | 98 x 106.2 [BT-21, BT-22] |
+| 92.5x115 | V-BATT-08: 100 1/2 x 123, king | 100 1/2 x 123 | 3 1/2 yd = 126 in [BT-23, BT-24] | 100 1/2 x 123 [BT-25] | 100 1/2 x 123, off the roll [BT-26] | 100 1/2 x 108.6 [BT-27, BT-28] |
+| 110x108 | V-BATT-09: 118 x 116, king | 118 x 116 | 3 1/4 yd = 117 in [BT-29, BT-30] | 118 x 116, King | 118 x 116, King | 118.2 x 116 [BT-31, BT-32] |
+| 75x90 | V-BATT-01: 83 x 98, queen | 83 x 98 | 2 3/4 yd = 99 in [BT-33, BT-34] | 83 x 98, Queen | 83 x 98, Queen | 83 x 98 |
+| 42x52 | V-BATT-13: 50 x 60, twin | 50 x 60 | 1 3/4 yd = 63 in [BT-35, BT-36] | 50 x 60, Twin | 50 x 60, Throw [BT-37] | 50 x 58 [BT-38, BT-39] |
+| 76x85 | no vector | 84 x 93 | 2 5/8 yd = 94 1/2 in [BT-40] | 84 x 93, Queen | 84 x 93, Queen | 84 x 93 |
+| 68x68 | V-BATT-11: 76 x 76, full | 76 x 76 | 2 1/8 yd = 76 1/2 in [BT-41, BT-42] | 76 x 76, Full | 76 x 76, Full | 76 x 84 [BT-43, BT-44] |
+| 102.5x120 | V-BATT-10: 110 1/2 x 128, None | 110 1/2 x 128 | failed [F12] | 110 1/2 x 128 | 110 1/2 x 128, off the roll | 110.7 x 128 [BT-45, BT-46] |
+| 58x66 | no vector | 66 x 74 | 2 1/8 yd = 76 1/2 in [BT-47] | 66 x 74, Twin | 66 x 74, Twin | 66 x 74 |
+| 24x58 | no vector | 32 x 66 | 1 7/8 yd = 67 1/2 in [BT-48] | 32 x 66, Twin | 32 x 66, Twin | 32 x 66 |
 
 ## Borders
 
@@ -253,7 +253,7 @@ Vectors are F4 per piece at U = 40 (strips per band). QREP today cuts one piece 
 
 ## Labeled differences
 
-Comparisons: n = 799; matches n = 410; differences n = 389 (explained n = 337, unexplained n = 12, record only n = 40).
+Comparisons: n = 799; matches n = 415; differences n = 384 (explained n = 344, unexplained n = 0, record only n = 40).
 
 A difference is explained only when the calculator's own rule (its MATH.md parameter set, or its page model in calc_rules) reproduces the shown value. Its labels name the parameters whose one-at-a-time switch from the reference set (MATH.md defaults against a vector, today's set against QREP) changes the value; 'jointly' marks parameters that only act together, named by switching each back from the calculator's set.
 
@@ -291,8 +291,8 @@ A difference is explained only when the calculator's own rule (its MATH.md param
 | BK-30 | 70x90 | qp_backing @42 | yards | 5 1/2 | V-BACK-05 | 5 3/4 | explained | allowance | - |
 | BK-31 | 70x90 | mfqs_backing @42 | yards | 5 1/2 | V-BACK-05 | 5 3/4 | record only | - | calc_rules.mfqs_backing reproduces the shown value |
 | BK-32 | 70x90 | stitchdesk_backing @42 | yards | 5 1/2 | V-BACK-05 | 5 3/4 | explained | allowance | labels from the proxy set (proxy: B 40, overhang_per_side 4, s 1, allowance_pieced 0, allowance_one 0, increment eighth, keep least_total), which gives the page model's value on this row |
-| BK-33 | 70x90 | omni_backing @42 | yards | 5.45 | V-BACK-05 | 5 3/4 | unexplained | - | no parameter set or page model covers this calculator |
-| BK-34 | 70x90 | omni_backing @42 | yards | 5.45 | QREP today | 5 1/2 | unexplained | - | no parameter set or page model covers this calculator |
+| BK-33 | 70x90 | omni_backing @42 | yards | 5.45 | V-BACK-05 | 5 3/4 | explained | seam loss, allowance, rounding increment or thirds, page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01 | labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row |
+| BK-34 | 70x90 | omni_backing @42 | yards | 5.45 | QREP today | 5 1/2 | explained | seam loss, allowance, rounding increment or thirds, page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01 | labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row |
 | BK-35 | 84x90 | qp_backing @42 | yards | 7 2/3 | V-BACK-06 | 8 | explained | allowance, rounding increment or thirds | - |
 | BK-36 | 84x90 | qp_backing @42 | yards | 7 2/3 | QREP today | 8 1/4 | explained | orientation (D-01), rounding increment or thirds | - |
 | BK-37 | 84x90 | qp_backing @40 | yards | 7 2/3 | QREP at wof 320 | 8 1/4 | explained | orientation (D-01), rounding increment or thirds | - |
@@ -326,8 +326,8 @@ A difference is explained only when the calculator's own rule (its MATH.md param
 | BK-65 | 110x108 | mfqs_backing @42 | yards | 9 3/4 | V-BACK-08 | 10 | record only | - | calc_rules.mfqs_backing reproduces the shown value |
 | BK-66 | 110x108 | stitchdesk_backing @42 | yards | 9 7/8 | V-BACK-08 | 10 | explained | orientation, allowance, rounding increment or thirds | labels from the proxy set (proxy: B 40, overhang_per_side 4, s 1, allowance_pieced 0, allowance_one 0, increment eighth, keep least_total), which gives the page model's value on this row |
 | BK-67 | 110x108 | stitchdesk_backing @42 | yards | 9 7/8 | QREP today | 9 3/4 | explained | orientation (D-01), rounding increment or thirds | labels from the proxy set (proxy: B 40, overhang_per_side 4, s 1, allowance_pieced 0, allowance_one 0, increment eighth, keep least_total), which gives the page model's value on this row |
-| BK-68 | 110x108 | omni_backing @42 | yards | 9.67 | V-BACK-08 | 10 | unexplained | - | no parameter set or page model covers this calculator |
-| BK-69 | 110x108 | omni_backing @42 | yards | 9.67 | QREP today | 9 3/4 | unexplained | - | no parameter set or page model covers this calculator |
+| BK-68 | 110x108 | omni_backing @42 | yards | 9.67 | V-BACK-08 | 10 | explained | seam loss, allowance, rounding increment or thirds, page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01 | labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row |
+| BK-69 | 110x108 | omni_backing @42 | yards | 9.67 | QREP today | 9 3/4 | explained | seam loss, allowance, rounding increment or thirds, page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01 | labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row |
 | BK-70 | 75x90 | qp_backing @42 | yards | 5 1/2 | V-BACK-09 | 5 3/4 | explained | allowance | - |
 | BK-71 | 75x90 | qp_backing @40 | yards | 7 | V-BACK-20 | 7 1/4 | explained | allowance | - |
 | BK-72 | 75x90 | qp_backing @40 | yards | 7 | QREP at wof 320 | 8 1/4 | explained | orientation (D-01) | - |
@@ -341,8 +341,8 @@ A difference is explained only when the calculator's own rule (its MATH.md param
 | BK-80 | 75x90 | stitchdesk_backing @42 | yards | 7 | QREP today | 5 1/2 | explained | orientation (D-01), fabric width, allowance, rounding increment or thirds, page rule: usable = fabric width - 2 in selvage, panels = ceil(D / (usable - 1)) | labels list the page rule's differences (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row |
 | BK-81 | 75x90 | stitchdesk_backing @42 | panels | 3 | V-BACK-09 | 2 | explained | orientation, fabric width, seam loss, page rule: usable = fabric width - 2 in selvage, panels = ceil(D / (usable - 1)) | labels list the page rule's differences (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row |
 | BK-82 | 75x90 | stitchdesk_backing @42 | panels | 3 | QREP today | 2 | explained | orientation (D-01), fabric width, seam loss, page rule: usable = fabric width - 2 in selvage, panels = ceil(D / (usable - 1)) | labels list the page rule's differences (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row |
-| BK-83 | 75x90 | omni_backing @42 | yards | 5.45 | V-BACK-09 | 5 3/4 | unexplained | - | no parameter set or page model covers this calculator |
-| BK-84 | 75x90 | omni_backing @42 | yards | 5.45 | QREP today | 5 1/2 | unexplained | - | no parameter set or page model covers this calculator |
+| BK-83 | 75x90 | omni_backing @42 | yards | 5.45 | V-BACK-09 | 5 3/4 | explained | seam loss, allowance, rounding increment or thirds, page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01 | labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row |
+| BK-84 | 75x90 | omni_backing @42 | yards | 5.45 | QREP today | 5 1/2 | explained | seam loss, allowance, rounding increment or thirds, page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01 | labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row |
 | BK-85 | 42x52 | qp_backing @42 | yards | 2 7/8 | V-BACK-11 | 3 1/4 | explained | allowance, rounding increment or thirds | - |
 | BK-86 | 42x52 | qp_backing @42 | yards | 2 7/8 | QREP today | 3 1/2 | explained | orientation (D-01), rounding increment or thirds | - |
 | BK-87 | 42x52 | qp_backing @40 | yards | 2 7/8 | QREP at wof 320 | 3 1/2 | explained | orientation (D-01), rounding increment or thirds | - |
@@ -364,9 +364,9 @@ A difference is explained only when the calculator's own rule (its MATH.md param
 | BK-103 | 76x85 | stitchdesk_backing @42 | yards | 7 | V-BACK-10 | 7 1/4 | explained | allowance | labels from the proxy set (proxy: B 40, overhang_per_side 4, s 1, allowance_pieced 0, allowance_one 0, increment eighth, keep least_total), which gives the page model's value on this row |
 | BK-104 | 76x85 | stitchdesk_backing @42 | yards | 7 | QREP today | 5 1/4 | explained | orientation (D-01), fabric width, allowance, rounding increment or thirds, page rule: usable = fabric width - 2 in selvage, panels = ceil(D / (usable - 1)) | labels list the page rule's differences (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row |
 | BK-105 | 76x85 | stitchdesk_backing @42 | panels | 3 | QREP today | 2 | explained | orientation (D-01), fabric width, seam loss, page rule: usable = fabric width - 2 in selvage, panels = ceil(D / (usable - 1)) | labels list the page rule's differences (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row |
-| BK-106 | 76x85 | omni_backing @42 | yards | 5.17 | V-BACK-10 | 7 1/4 | unexplained | - | no parameter set or page model covers this calculator |
-| BK-107 | 76x85 | omni_backing @42 | yards | 5.17 | QREP today | 5 1/4 | unexplained | - | no parameter set or page model covers this calculator |
-| BK-108 | 76x85 | omni_backing @42 | panels | 2 | V-BACK-10 | 3 | unexplained | - | no parameter set or page model covers this calculator |
+| BK-106 | 76x85 | omni_backing @42 | yards | 5.17 | V-BACK-10 | 7 1/4 | explained | orientation, seam loss, allowance, rounding increment or thirds, page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01 | labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row |
+| BK-107 | 76x85 | omni_backing @42 | yards | 5.17 | QREP today | 5 1/4 | explained | seam loss, allowance, rounding increment or thirds, page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01 | labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row |
+| BK-108 | 76x85 | omni_backing @42 | panels | 2 | V-BACK-10 | 3 | explained | orientation, seam loss, page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01 | labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row |
 | BK-109 | 68x68 | qp_backing @42 | yards | 4 1/4 | V-BACK-13 | 4 1/2 | explained | allowance | - |
 | BK-110 | 68x68 | mfqs_backing @42 | yards | 4 1/4 | V-BACK-13 | 4 1/2 | record only | - | calc_rules.mfqs_backing reproduces the shown value |
 | BK-111 | 68x68 | stitchdesk_backing @42 | yards | 4 1/4 | V-BACK-13 | 4 1/2 | explained | allowance | labels from the proxy set (proxy: B 40, overhang_per_side 4, s 1, allowance_pieced 0, allowance_one 0, increment eighth, keep least_total), which gives the page model's value on this row |
@@ -374,8 +374,8 @@ A difference is explained only when the calculator's own rule (its MATH.md param
 | BK-113 | 68x68 | omni_backing @42 | yards | 4.23 | QREP today | 4 1/4 | explained | orientation (D-01), seam loss, allowance, rounding increment or thirds, page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01 | labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row |
 | BK-114 | 102.5x120 | mfqs_backing @42 | yards | 10 3/4 | V-BACK-16 | 11 | record only | - | calc_rules.mfqs_backing reproduces the shown value |
 | BK-115 | 102.5x120 | stitchdesk_backing @42 | yards | 10 3/4 | V-BACK-16 | 11 | explained | allowance | labels from the proxy set (proxy: B 40, overhang_per_side 4, s 1, allowance_pieced 0, allowance_one 0, increment eighth, keep least_total), which gives the page model's value on this row |
-| BK-116 | 102.5x120 | omni_backing @42 | yards | 10.67 | V-BACK-16 | 11 | unexplained | - | no parameter set or page model covers this calculator |
-| BK-117 | 102.5x120 | omni_backing @42 | yards | 10.67 | QREP today | 10 3/4 | unexplained | - | no parameter set or page model covers this calculator |
+| BK-116 | 102.5x120 | omni_backing @42 | yards | 10.67 | V-BACK-16 | 11 | explained | seam loss, allowance, rounding increment or thirds, page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01 | labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row |
+| BK-117 | 102.5x120 | omni_backing @42 | yards | 10.67 | QREP today | 10 3/4 | explained | seam loss, allowance, rounding increment or thirds, page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01 | labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row |
 | BK-118 | 58x66 | qp_backing @42 | yards | 3 2/3 | V-BACK-23 | 4 | explained | allowance, rounding increment or thirds | - |
 | BK-119 | 58x66 | qp_backing @42 | yards | 3 2/3 | QREP today | 4 1/4 | explained | orientation (D-01), rounding increment or thirds | - |
 | BK-120 | 58x66 | qp_backing @40 | yards | 3 2/3 | QREP at wof 320 | 4 1/4 | explained | orientation (D-01), rounding increment or thirds | - |
@@ -551,45 +551,40 @@ A difference is explained only when the calculator's own rule (its MATH.md param
 | BT-12 | 60x72 | omni_backing @42-batting | size (in) | 68 x 76 | QREP today | 68 x 80 | explained | page rule: in batting mode a piece is (piece length + 8) / k wide | labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row |
 | BT-13 | 70x90 | qp_backing @batting120 | roll length (in) | 99 | V-BATT-05 | 98 | explained | rounding increment or thirds | - |
 | BT-14 | 70x90 | qp_backing @batting120 | roll length (in) | 99 | QREP today | 98 | explained | rounding increment or thirds | - |
-| BT-15 | 70x90 | omni_backing @42-batting | size (in) | 196 x 39 | V-BATT-05 | 78 x 98 | explained | page rule: in batting mode a piece is (piece length + 8) / k wide | labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row |
-| BT-16 | 70x90 | omni_backing @42-batting | size (in) | 196 x 39 | QREP today | 78 x 98 | explained | page rule: in batting mode a piece is (piece length + 8) / k wide | labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row |
-| BT-17 | 84x90 | qp_backing @batting120 | roll length (in) | 99 | V-BATT-06 | 98 | explained | rounding increment or thirds | - |
-| BT-18 | 84x90 | qp_backing @batting120 | roll length (in) | 99 | QREP today | 98 | explained | rounding increment or thirds | - |
-| BT-19 | 84x90 | omni_backing @42-batting | size (in) | 92 x 100.2 | V-BATT-06 | 92 x 98 | explained | page rule: in batting mode a piece is (piece length + 8) / k wide | labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row |
-| BT-20 | 84x90 | omni_backing @42-batting | size (in) | 92 x 100.2 | QREP today | 92 x 98 | explained | page rule: in batting mode a piece is (piece length + 8) / k wide | labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row |
-| BT-21 | 90x108 | qp_backing @batting120 | roll length (in) | 117 | V-BATT-07 | 116 | explained | rounding increment or thirds | - |
-| BT-22 | 90x108 | qp_backing @batting120 | roll length (in) | 117 | QREP today | 116 | explained | rounding increment or thirds | - |
-| BT-23 | 90x108 | omni_backing @42-batting | size (in) | 98 x 106.2 | V-BATT-07 | 98 x 116 | explained | page rule: in batting mode a piece is (piece length + 8) / k wide | labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row |
-| BT-24 | 90x108 | omni_backing @42-batting | size (in) | 98 x 106.2 | QREP today | 98 x 116 | explained | page rule: in batting mode a piece is (piece length + 8) / k wide | labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row |
-| BT-25 | 92.5x115 | qp_backing @batting120 | roll length (in) | 126 | V-BATT-08 | 123 | explained | rounding increment or thirds | - |
-| BT-26 | 92.5x115 | qp_backing @batting120 | roll length (in) | 126 | QREP today | 123 | explained | rounding increment or thirds | - |
-| BT-27 | 92.5x115 | mfqs_backing @42 | package | - | V-BATT-08 | king | record only | - | - |
-| BT-28 | 92.5x115 | stitchdesk_backing @42 | package | - | V-BATT-08 | king | unexplained | - | no parameter set or page model covers this calculator |
-| BT-29 | 92.5x115 | omni_backing @42-batting | size (in) | 100 1/2 x 108.6 | V-BATT-08 | 100 1/2 x 123 | explained | page rule: in batting mode a piece is (piece length + 8) / k wide | labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row |
-| BT-30 | 92.5x115 | omni_backing @42-batting | size (in) | 100 1/2 x 108.6 | QREP today | 100 1/2 x 123 | explained | page rule: in batting mode a piece is (piece length + 8) / k wide | labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row |
-| BT-31 | 110x108 | qp_backing @batting120 | roll length (in) | 117 | V-BATT-09 | 116 | explained | rounding increment or thirds | - |
-| BT-32 | 110x108 | qp_backing @batting120 | roll length (in) | 117 | QREP today | 116 | explained | rounding increment or thirds | - |
-| BT-33 | 110x108 | omni_backing @42-batting | size (in) | 348 x 39.4 | V-BATT-09 | 118 x 116 | explained | page rule: in batting mode a piece is (piece length + 8) / k wide | labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row |
-| BT-34 | 110x108 | omni_backing @42-batting | size (in) | 348 x 39.4 | QREP today | 118 x 116 | explained | page rule: in batting mode a piece is (piece length + 8) / k wide | labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row |
-| BT-35 | 75x90 | qp_backing @batting120 | roll length (in) | 99 | V-BATT-01 | 98 | explained | rounding increment or thirds | - |
-| BT-36 | 75x90 | qp_backing @batting120 | roll length (in) | 99 | QREP today | 98 | explained | rounding increment or thirds | - |
-| BT-37 | 75x90 | omni_backing @42-batting | size (in) | 196 x 41 1/2 | V-BATT-01 | 83 x 98 | explained | page rule: in batting mode a piece is (piece length + 8) / k wide | labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row |
-| BT-38 | 75x90 | omni_backing @42-batting | size (in) | 196 x 41 1/2 | QREP today | 83 x 98 | explained | page rule: in batting mode a piece is (piece length + 8) / k wide | labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row |
-| BT-39 | 42x52 | qp_backing @batting120 | roll length (in) | 63 | V-BATT-13 | 60 | explained | rounding increment or thirds | - |
-| BT-40 | 42x52 | qp_backing @batting120 | roll length (in) | 63 | QREP today | 60 | explained | rounding increment or thirds | - |
-| BT-41 | 42x52 | stitchdesk_backing @42 | package | Throw | V-BATT-13 | twin | explained | page rule: its own precut table, Craft to King | labels list the page rule's differences (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row |
-| BT-42 | 42x52 | omni_backing @42-batting | size (in) | 50 x 58 | V-BATT-13 | 50 x 60 | explained | page rule: in batting mode a piece is (piece length + 8) / k wide | labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row |
-| BT-43 | 42x52 | omni_backing @42-batting | size (in) | 50 x 58 | QREP today | 50 x 60 | explained | page rule: in batting mode a piece is (piece length + 8) / k wide | labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row |
-| BT-44 | 76x85 | qp_backing @batting120 | roll length (in) | 94 1/2 | QREP today | 93 | explained | rounding increment or thirds | - |
-| BT-45 | 76x85 | omni_backing @42-batting | size (in) | 186 x 42 | QREP today | 84 x 93 | explained | page rule: in batting mode a piece is (piece length + 8) / k wide | labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row |
-| BT-46 | 68x68 | qp_backing @batting120 | roll length (in) | 76 1/2 | V-BATT-11 | 76 | explained | rounding increment or thirds | - |
-| BT-47 | 68x68 | qp_backing @batting120 | roll length (in) | 76 1/2 | QREP today | 76 | explained | rounding increment or thirds | - |
-| BT-48 | 68x68 | omni_backing @42-batting | size (in) | 76 x 84 | V-BATT-11 | 76 x 76 | explained | page rule: in batting mode a piece is (piece length + 8) / k wide | labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row |
-| BT-49 | 68x68 | omni_backing @42-batting | size (in) | 76 x 84 | QREP today | 76 x 76 | explained | page rule: in batting mode a piece is (piece length + 8) / k wide | labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row |
-| BT-50 | 102.5x120 | omni_backing @42-batting | size (in) | 384 x 36.9 | V-BATT-10 | 110 1/2 x 128 | explained | page rule: in batting mode a piece is (piece length + 8) / k wide | labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row |
-| BT-51 | 102.5x120 | omni_backing @42-batting | size (in) | 384 x 36.9 | QREP today | 110 1/2 x 128 | explained | page rule: in batting mode a piece is (piece length + 8) / k wide | labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row |
-| BT-52 | 58x66 | qp_backing @batting120 | roll length (in) | 76 1/2 | QREP today | 74 | explained | rounding increment or thirds | - |
-| BT-53 | 24x58 | qp_backing @batting120 | roll length (in) | 67 1/2 | QREP today | 66 | explained | rounding increment or thirds | - |
+| BT-15 | 84x90 | qp_backing @batting120 | roll length (in) | 99 | V-BATT-06 | 98 | explained | rounding increment or thirds | - |
+| BT-16 | 84x90 | qp_backing @batting120 | roll length (in) | 99 | QREP today | 98 | explained | rounding increment or thirds | - |
+| BT-17 | 84x90 | omni_backing @42-batting | size (in) | 92 x 100.2 | V-BATT-06 | 92 x 98 | explained | page rule: in batting mode a piece is (piece length + 8) / k wide | labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row |
+| BT-18 | 84x90 | omni_backing @42-batting | size (in) | 92 x 100.2 | QREP today | 92 x 98 | explained | page rule: in batting mode a piece is (piece length + 8) / k wide | labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row |
+| BT-19 | 90x108 | qp_backing @batting120 | roll length (in) | 117 | V-BATT-07 | 116 | explained | rounding increment or thirds | - |
+| BT-20 | 90x108 | qp_backing @batting120 | roll length (in) | 117 | QREP today | 116 | explained | rounding increment or thirds | - |
+| BT-21 | 90x108 | omni_backing @42-batting | size (in) | 98 x 106.2 | V-BATT-07 | 98 x 116 | explained | page rule: in batting mode a piece is (piece length + 8) / k wide | labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row |
+| BT-22 | 90x108 | omni_backing @42-batting | size (in) | 98 x 106.2 | QREP today | 98 x 116 | explained | page rule: in batting mode a piece is (piece length + 8) / k wide | labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row |
+| BT-23 | 92.5x115 | qp_backing @batting120 | roll length (in) | 126 | V-BATT-08 | 123 | explained | rounding increment or thirds | - |
+| BT-24 | 92.5x115 | qp_backing @batting120 | roll length (in) | 126 | QREP today | 123 | explained | rounding increment or thirds | - |
+| BT-25 | 92.5x115 | mfqs_backing @42 | package | - | V-BATT-08 | king | record only | - | - |
+| BT-26 | 92.5x115 | stitchdesk_backing @42 | package | off the roll | V-BATT-08 | king | explained | page rule: its own precut table, Craft to King | labels list the page rule's differences (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row |
+| BT-27 | 92.5x115 | omni_backing @42-batting | size (in) | 100 1/2 x 108.6 | V-BATT-08 | 100 1/2 x 123 | explained | page rule: in batting mode a piece is (piece length + 8) / k wide | labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row |
+| BT-28 | 92.5x115 | omni_backing @42-batting | size (in) | 100 1/2 x 108.6 | QREP today | 100 1/2 x 123 | explained | page rule: in batting mode a piece is (piece length + 8) / k wide | labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row |
+| BT-29 | 110x108 | qp_backing @batting120 | roll length (in) | 117 | V-BATT-09 | 116 | explained | rounding increment or thirds | - |
+| BT-30 | 110x108 | qp_backing @batting120 | roll length (in) | 117 | QREP today | 116 | explained | rounding increment or thirds | - |
+| BT-31 | 110x108 | omni_backing @42-batting | size (in) | 118.2 x 116 | V-BATT-09 | 118 x 116 | explained | rounding increment or thirds, page rule: piece sizes round up to 0.1 in | labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row |
+| BT-32 | 110x108 | omni_backing @42-batting | size (in) | 118.2 x 116 | QREP today | 118 x 116 | explained | rounding increment or thirds, page rule: piece sizes round up to 0.1 in | labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row |
+| BT-33 | 75x90 | qp_backing @batting120 | roll length (in) | 99 | V-BATT-01 | 98 | explained | rounding increment or thirds | - |
+| BT-34 | 75x90 | qp_backing @batting120 | roll length (in) | 99 | QREP today | 98 | explained | rounding increment or thirds | - |
+| BT-35 | 42x52 | qp_backing @batting120 | roll length (in) | 63 | V-BATT-13 | 60 | explained | rounding increment or thirds | - |
+| BT-36 | 42x52 | qp_backing @batting120 | roll length (in) | 63 | QREP today | 60 | explained | rounding increment or thirds | - |
+| BT-37 | 42x52 | stitchdesk_backing @42 | package | Throw | V-BATT-13 | twin | explained | page rule: its own precut table, Craft to King | labels list the page rule's differences (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row |
+| BT-38 | 42x52 | omni_backing @42-batting | size (in) | 50 x 58 | V-BATT-13 | 50 x 60 | explained | page rule: in batting mode a piece is (piece length + 8) / k wide | labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row |
+| BT-39 | 42x52 | omni_backing @42-batting | size (in) | 50 x 58 | QREP today | 50 x 60 | explained | page rule: in batting mode a piece is (piece length + 8) / k wide | labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row |
+| BT-40 | 76x85 | qp_backing @batting120 | roll length (in) | 94 1/2 | QREP today | 93 | explained | rounding increment or thirds | - |
+| BT-41 | 68x68 | qp_backing @batting120 | roll length (in) | 76 1/2 | V-BATT-11 | 76 | explained | rounding increment or thirds | - |
+| BT-42 | 68x68 | qp_backing @batting120 | roll length (in) | 76 1/2 | QREP today | 76 | explained | rounding increment or thirds | - |
+| BT-43 | 68x68 | omni_backing @42-batting | size (in) | 76 x 84 | V-BATT-11 | 76 x 76 | explained | page rule: in batting mode a piece is (piece length + 8) / k wide | labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row |
+| BT-44 | 68x68 | omni_backing @42-batting | size (in) | 76 x 84 | QREP today | 76 x 76 | explained | page rule: in batting mode a piece is (piece length + 8) / k wide | labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row |
+| BT-45 | 102.5x120 | omni_backing @42-batting | size (in) | 110.7 x 128 | V-BATT-10 | 110 1/2 x 128 | explained | rounding increment or thirds, page rule: piece sizes round up to 0.1 in | labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row |
+| BT-46 | 102.5x120 | omni_backing @42-batting | size (in) | 110.7 x 128 | QREP today | 110 1/2 x 128 | explained | rounding increment or thirds, page rule: piece sizes round up to 0.1 in | labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row |
+| BT-47 | 58x66 | qp_backing @batting120 | roll length (in) | 76 1/2 | QREP today | 74 | explained | rounding increment or thirds | - |
+| BT-48 | 24x58 | qp_backing @batting120 | roll length (in) | 67 1/2 | QREP today | 66 | explained | rounding increment or thirds | - |
 | BR-1 | 36x52-b3.75 | qp_border @40 | band 1 yards | 5/8 | QREP at wof 320 | 1/2 | explained | border area (D-11), rounding increment or thirds | - |
 | BR-2 | 36x52-b3.75 | sewbecca_border @40 | band 1 yards | 3/8 | QREP at wof 320 | 1/2 | explained | border area (D-11), page rule: yards = strips x b / fw (fabric width, not 36), up to 1/8 yd | labels list the page rule's differences (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row |
 | BR-3 | 36x52-b3.75 | qc_border @40 | band 1 yards | 5/8 | QREP at wof 320 | 1/2 | explained | border area (D-11), pooled border strips, rounding increment or thirds, page rule: strips = ceil((2 W + 2 L + 4 b + 12) / (fw - 1/2)), (b + 1/2) wide | labels list the page rule's differences (calc_rules.qc_border); no MATH.md parameter set reproduces this row |
@@ -651,22 +646,10 @@ A difference is explained only when the calculator's own rule (its MATH.md param
 
 ## Unexplained, for the A1 and A2 owners
 
-n = 12. Each lead is the calculator's observed rule where one is recorded (searches.json, the registry and calc_rules); the vectors and parameter sets were not changed to match.
+n = 0. Each lead is the calculator's observed rule where one is recorded (searches.json, the registry and calc_rules); the vectors and parameter sets were not changed to match.
 
 | ID | Row | Calculator | Value | Shown | Against | Target | Rule gives | Lead | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| BK-33 | 70x90 | omni_backing @42 | yards | 5.45 | V-BACK-05 | 5 3/4 | - | calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders. | no parameter set or page model covers this calculator |
-| BK-34 | 70x90 | omni_backing @42 | yards | 5.45 | QREP today | 5 1/2 | - | calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders. | no parameter set or page model covers this calculator |
-| BK-68 | 110x108 | omni_backing @42 | yards | 9.67 | V-BACK-08 | 10 | - | calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders. | no parameter set or page model covers this calculator |
-| BK-69 | 110x108 | omni_backing @42 | yards | 9.67 | QREP today | 9 3/4 | - | calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders. | no parameter set or page model covers this calculator |
-| BK-83 | 75x90 | omni_backing @42 | yards | 5.45 | V-BACK-09 | 5 3/4 | - | calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders. | no parameter set or page model covers this calculator |
-| BK-84 | 75x90 | omni_backing @42 | yards | 5.45 | QREP today | 5 1/2 | - | calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders. | no parameter set or page model covers this calculator |
-| BK-106 | 76x85 | omni_backing @42 | yards | 5.17 | V-BACK-10 | 7 1/4 | - | calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders. | no parameter set or page model covers this calculator |
-| BK-107 | 76x85 | omni_backing @42 | yards | 5.17 | QREP today | 5 1/4 | - | calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders. | no parameter set or page model covers this calculator |
-| BK-108 | 76x85 | omni_backing @42 | panels | 2 | V-BACK-10 | 3 | - | calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders. | no parameter set or page model covers this calculator |
-| BK-116 | 102.5x120 | omni_backing @42 | yards | 10.67 | V-BACK-16 | 11 | - | calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders. | no parameter set or page model covers this calculator |
-| BK-117 | 102.5x120 | omni_backing @42 | yards | 10.67 | QREP today | 10 3/4 | - | calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders. | no parameter set or page model covers this calculator |
-| BT-28 | 92.5x115 | stitchdesk_backing @42 | package | - | V-BATT-08 | king | - | calc_rules.stitchdesk_backing, from the page script; Backing size = quilt size + 2 x overhang on each dimension. Usable width = fabric width minus 2 in selvage. One panel if the backing dimension fits within usable width; otherwise panels = ceil(dimension / (usable width minus 2 x seam allowance)). Both seam directions are compared and the smaller yardage is chosen (panels x cut length / 36), rounded up to the next 1/8 yd. Batting = quilt size + 2 x batting overhang, matched against a precut list. Read from the page's public /assets/calc.js. | no parameter set or page model covers this calculator |
 
 ## Calculators per line type (plan section 9, item 13)
 
