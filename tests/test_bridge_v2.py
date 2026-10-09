@@ -363,6 +363,21 @@ def test_export_pattern_reports_a_wrong_delegate_result_as_internal(model_json, 
     assert error_of(bridge.export_pattern(model_json))["kind"] == "internal"
 
 
+def test_a_delegate_result_that_fails_validation_is_internal(model_json, monkeypatch):
+    # An empty PDF is no pattern: the result model refuses it, and a delegate
+    # that builds an invalid result is an engine bug (kind internal), not
+    # your input (kind validation).
+    from qrep.export.pattern import build_pattern
+
+    summary = build_pattern(loads(mini_model())).summary
+    fake = types.ModuleType("qrep.export.pattern")
+    fake.build_pattern = lambda quilt: PatternResult(
+        outcome="pattern_ready", pdf_b64="", summary=summary
+    )
+    monkeypatch.setitem(sys.modules, "qrep.export.pattern", fake)
+    assert error_of(bridge.export_pattern(model_json))["kind"] == "internal"
+
+
 def test_export_pattern_returns_the_pdf_and_its_summary(model_json):
     quilt = loads(model_json)
     result = ok_result(bridge.export_pattern(model_json))

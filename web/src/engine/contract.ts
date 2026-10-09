@@ -208,7 +208,9 @@ function requireReason(result: Record<string, unknown>, outcome: string): void {
 
 function requireField(result: Record<string, unknown>, field: string, outcome: string): void {
   const value = result[field];
-  const present = field === "pdf_b64" ? typeof value === "string" : isRecord(value);
+  // An empty PDF is no pattern, so pdf_b64 must be a non-empty string.
+  const present =
+    field === "pdf_b64" ? typeof value === "string" && value.length > 0 : isRecord(value);
   if (!present) throw new OutcomeError(`a ${outcome} result needs its ${field}`);
 }
 

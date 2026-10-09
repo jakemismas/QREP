@@ -187,6 +187,9 @@ describe("per-call result parsers", () => {
 
   it("never treats an incomplete success as success", () => {
     expect(() => parsePatternResult({ outcome: "pattern_ready", summary })).toThrow("pdf_b64");
+    expect(() => parsePatternResult({ outcome: "pattern_ready", pdf_b64: "", summary })).toThrow(
+      "pdf_b64",
+    );
     expect(() => parsePatternResult({ outcome: "pattern_ready", pdf_b64: "x" })).toThrow(
       "summary",
     );

@@ -223,7 +223,8 @@ class PatternResult(_Shape):
     """The one pattern download: the PDF, base64, with its summary."""
 
     outcome: Literal["pattern_ready", "refused"]
-    pdf_b64: str | None = None
+    # An empty PDF is no pattern, so a ready result never carries one.
+    pdf_b64: str | None = Field(default=None, min_length=1)
     summary: PatternSummary | None = None
     reason: Reason | None = None
 
