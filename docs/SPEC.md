@@ -327,7 +327,12 @@ bridge (qrep/bridge.py), so the screen and the PDF cannot disagree (section 2). 
 contract (tickets E1a and E1b) keeps these rules:
 
 - It carries the confirmed read (sections 4, 5 and 8), the sizing call (section 6.3) and the
-  pattern export.
+  pattern export: read_confirmed, size_pattern and export_pattern, beside the v1 methods until
+  their removal tickets (A7, B6b, C6). Each validates its request first. size_pattern and
+  export_pattern load their implementations lazily, from qrep.model.sizing:size_pattern (A10) and
+  qrep.export.pattern:build_pattern (A4a to A4d), and return kind not_implemented while that module
+  or function is absent. read_confirmed returns not_implemented until B2b switches it to the real
+  read. Why: the tickets that write the implementations never need the contract lease.
 - The read request takes the staged photo; the frame, given either as the four corners of the
   pieced field or as the four outer-edge corners plus a list of border bands from the outside in,
   each with one width in squares that need not be whole; the corners in staged-image pixels with
@@ -343,12 +348,22 @@ contract (tickets E1a and E1b) keeps these rules:
 - The pattern export takes no strategy. It returns the PDF with the summary Your pattern shows: the
   finished size and its basis, the method and its reason, the fabric letters, names and yards, the
   binding, backing, wide-back and batting lines, both width assumptions and the uncertain-square
-  count.
+  count. Until A4d switches it to the new document, the interim build_pattern renders today's
+  booklet for the engine's choice (strip when the grid has a repeating block, historical
+  otherwise), fills the summary from the same purchase lines and batting plan as that booklet (the
+  wide-back line is null when MATH.md F11 offers none), and reports no size basis. A square below 0.9 confidence counts as uncertain,
+  the mark the web already draws.
+- The sizing call takes the size you set: typed (a width, a height or both, in eighths), a preset
+  by name, or the default. It returns the sized model and its size basis: the source, the size you
+  asked for and the size achieved.
 - The web, the eval harness and the corpus annotations use the same field names and units: D3a's
   annotation format reuses E1b's frame, band and count models.
-- Every v2 result states an explicit outcome, such as pattern-ready or a refusal with its code. A
-  missing or unknown outcome is an error, never a success. Why: today a missing verdict renders as
-  readable (web/src/model/verdictStory.ts:82), which breaks binding rule 5.
+- Every v2 result states an explicit outcome: read, held or refused for the read; sized for the
+  sizing call; pattern_ready or refused for the pattern. A hold or a refusal carries a reason, a
+  code and a message. A missing or unknown outcome, or one the call does not return, is an error,
+  never a success: every v2 caller parses results with contract.ts's parsers, which throw a typed
+  OutcomeError, and also refuse a success that lacks its model, PDF or summary. Why: today a missing
+  verdict renders as readable (web/src/model/verdictStory.ts:82), which breaks binding rule 5.
 - A CONTRACT_VERSION, kept equal in qrep/contract.py and web/src/engine/contract.ts, is checked by
   the web worker at boot: it calls bridge.contract_version() after it imports the bridge and before
   it reports boot-done. A mismatch, or an engine that reports no version, stops the app with a
@@ -356,7 +371,10 @@ contract (tickets E1a and E1b) keeps these rules:
   tells you to reload. tests/test_bridge.py fails when the two literals differ, and when the
   worker's method allowlist differs from the bridge's envelope functions. E1a and E1b together
   define version 2, and the plan sets which later changes bump it (plan sections 4.2 and 5.A,
-  rule 6). Why: a cached wheel from another release must not serve the page.
+  rule 6). The worker fetches the wheel manifest and every wheel with the contract version in the
+  URL (?contract=2), so the browser cache never hands a page the files of the release it replaced,
+  and a reload after a mismatch loads a matching pair. Why: a cached wheel from another release
+  must not serve the page.
 - Every call returns a typed envelope whose error kind tells your input errors from engine bugs:
   validation for a model that fails validation, a call with the wrong number of arguments, or an
   argument with the wrong type or structure, naming the field (a whole-number argument must be
@@ -364,15 +382,25 @@ contract (tickets E1a and E1b) keeps these rules:
   it (an unknown strategy, a preset object without both a width and a height, a level, seed,
   scale or fabric count out of range, a missing or unreadable image); schema for malformed JSON
   or an unknown schema_version; not_implemented for a stub; and internal for anything else,
-  including a KeyError, TypeError or AttributeError raised inside the engine. No traceback
-  reaches the app. The worker passes a JavaScript null argument as Python None, because Pyodide
-  would otherwise hand the bridge a jsnull.
+  including a KeyError, TypeError or AttributeError raised inside the engine, and a v2
+  implementation that returns an invalid result. No traceback reaches the app: an internal error
+  prints its traceback to stderr, which Pyodide sends to the browser console (console.warn), where
+  the error message points. The worker passes a JavaScript null argument as Python None, because
+  Pyodide would otherwise hand the bridge a jsnull. A forced fabric count for the v1 reverse()
+  follows the read's, 2 to 12.
 - render() takes a scale from 1 to 20 pixels per inch (RENDER_SCALE_MAX in qrep/bridge.py, which
-  records the arithmetic) and returns kind value outside that range. The bound caps the scale, not
-  the image, which also grows with the quilt (#187).
+  records the arithmetic) and at least 1.5 pixels per square: 12 divided by the square size in
+  eighths, rounded up, so 2 for squares from 3/4 in to under 1 1/2 in and 1 from 1 1/2 in up
+  (RENDER_SQUARE_SPAN_MIN). It returns kind value outside that range. Why the floor: under 1
+  pixel a square can get no pixels and the renderer fails, and levels 1 to 3 re-derive the scale
+  from the rounded image width, which can cost a square half a pixel. The bound caps the scale,
+  not the image, which also grows with the quilt (#187).
 
-The request and response shapes live in qrep/contract.py and web/src/engine/contract.ts, which E1a
-created; E1b adds the request and response models.
+The request and response shapes live in qrep/contract.py (pydantic) and web/src/engine/contract.ts
+(TypeScript), one interface per model with the same field names, which tests/test_bridge.py
+checks. The models are strict: a value of the wrong type (true for a count, "10" for a
+coordinate) and an unknown field are kind validation, naming the field. The frame corners are
+named (top_left, top_right, bottom_right, bottom_left) so no corner order is guessed.
 
 ### 12.2 The CLI
 

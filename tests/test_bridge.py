@@ -21,13 +21,21 @@ import inspect
 import json
 import re
 import struct
+import typing
 from pathlib import Path
 
 import pypdf
 import pytest
 
 from qrep import bridge
-from qrep.contract import CONTRACT_VERSION
+from qrep.contract import (
+    CONTRACT_MODELS,
+    CONTRACT_VERSION,
+    OUTCOMES,
+    PatternResult,
+    ReadResult,
+    SizeResult,
+)
 from qrep.export.pdf import SECTION_TITLES
 from qrep.export.yardage_report import render_yardage_md
 from qrep.construct.strategies import STRATEGIES
@@ -764,10 +772,17 @@ def test_unknown_preset_stays_value_kind_naming_it(model_json, preset, named):
     [
         (lambda: bridge.render(mini_model(), 0, -1, 2), "seed"),
         (lambda: bridge.reverse(NO_PHOTO, json.dumps({"fabrics": 0})), "fabrics"),
+        # 1 is one below FABRICS_MIN = 2 (SPEC.md section 12.1: 2 to 12).
+        (lambda: bridge.reverse(NO_PHOTO, json.dumps({"fabrics": 1})), "fabrics"),
         # 13 is one past FABRICS_MAX = 12 (SPEC.md section 12.1).
         (lambda: bridge.reverse(NO_PHOTO, json.dumps({"fabrics": 13})), "fabrics"),
     ],
-    ids=["render-negative-seed", "reverse-zero-fabrics", "reverse-thirteen-fabrics"],
+    ids=[
+        "render-negative-seed",
+        "reverse-zero-fabrics",
+        "reverse-one-fabric",
+        "reverse-thirteen-fabrics",
+    ],
 )
 def test_out_of_range_inputs_are_value_kind_naming_them(call, named):
     error = error_of(call())
@@ -823,3 +838,144 @@ def test_render_scale_at_the_maximum_renders():
     png = base64.b64decode(result["png_b64"])
     width, height = struct.unpack(">II", png[16:24])  # IHDR width, height
     assert (width, height) == (418, 318)
+
+
+# ---------------------------------------- E1a review items (#175 comment)
+
+
+@pytest.mark.parametrize("fabrics", [2, 12])
+def test_reverse_fabric_count_bounds_are_accepted(fabrics):
+    # SPEC.md section 12.1: an optional fabric count from 2 to 12. Both ends
+    # pass the check, so the call stops at the missing image, the next check.
+    error = error_of(bridge.reverse(NO_PHOTO, json.dumps({"fabrics": fabrics})))
+    assert error["kind"] == "value"
+    assert error["message"] == f"image file not found: {NO_PHOTO}"
+
+
+@pytest.mark.parametrize("cell", [6, 7])
+def test_render_scale_below_the_square_floor_is_value_kind(cell):
+    # The renderer fills each square from px(start) to px(end) - 1 with
+    # half-up rounding, so a square under 1 px can get no pixels and Pillow
+    # refuses the rectangle. At 1 px per inch a 6-eighth square spans
+    # 6 x 1 / 8 = 0.75 px and a 7-eighth one 7 x 1 / 8 = 0.875 px. The floor
+    # asks for 1.5 px per square (scale x cell >= 12), because levels 1 to 3
+    # re-derive the scale from the rounded image width and can lose up to
+    # half a pixel per square: ceil(12 / 6) = 2 and ceil(12 / 7) = 2.
+    error = error_of(bridge.render(mini_model(cell_size=cell), 0, 42, 1))
+    assert error["kind"] == "value"
+    assert "scale" in error["message"]
+    assert "at least 2 " in error["message"]
+
+
+@pytest.mark.parametrize("level", [0, 1])
+def test_render_scale_at_the_square_floor_renders(level):
+    # Mini model with 6-eighth squares: finished width 7 x 6 + 2 x 2 = 46
+    # eighths, height 5 x 6 + 2 x 2 = 34 eighths. At the floor, scale 2:
+    # 6 x 2 / 8 = 1.5 px per square. Image: round(46 x 2 / 8) = round(11.5)
+    # = 12 px (Python rounds half to even) by round(34 x 2 / 8) = round(8.5)
+    # = 8 px; margin round(0.08 x 12) = round(0.96) = 1 px per side, so the
+    # PNG is 12 + 2 = 14 by 8 + 2 = 10 at levels 0 and 1. Level 1 re-derives
+    # 12 / (46 / 8) = 2.087 px per inch, 6 x 2.087 / 8 = 1.565 px per square.
+    result = ok_result(bridge.render(mini_model(cell_size=6), level, 42, 2))
+    png = base64.b64decode(result["png_b64"])
+    assert struct.unpack(">II", png[16:24]) == (14, 10)
+
+
+def test_internal_error_writes_its_traceback_to_stderr(model_json, monkeypatch, capsys):
+    # The envelope keeps engine internals out of the app; the traceback goes
+    # to stderr, which Pyodide 0.28.3 sends to console.warn in the browser
+    # (_getStderrDefaults in web/public/pyodide/pyodide.asm.js), so the
+    # message's pointer to the browser console holds.
+    def boom(_quilt):
+        raise RuntimeError("secret internals: construct.py line 42")
+
+    monkeypatch.setitem(STRATEGIES, "historical", boom)
+    error = error_of(bridge.plan(model_json, "historical"))
+    assert error["kind"] == "internal"
+    assert "secret internals" not in error["message"]
+    assert "browser console" in error["message"]
+    logged = capsys.readouterr().err
+    assert "Traceback" in logged
+    assert "RuntimeError: secret internals: construct.py line 42" in logged
+
+
+# ------------------------------------------------- bridge v2 contract (E1b)
+
+
+def _contract_ts() -> str:
+    return (ENGINE_TS_DIR / "contract.ts").read_text(encoding="utf-8")
+
+
+def _ts_interfaces() -> dict[str, set[str]]:
+    # One interface per contract model, with no inline object types, so each
+    # block's body is its field list: "  name: type;" or "  name?: type;".
+    blocks = re.findall(
+        r"^export interface (\w+) \{\n(.*?)^\}", _contract_ts(), re.MULTILINE | re.DOTALL
+    )
+    return {name: set(re.findall(r"^  (\w+)\??:", body, re.MULTILINE)) for name, body in blocks}
+
+
+def _ts_string_list(name: str) -> list[str]:
+    block = re.search(
+        rf"^export const {name} = \[(.*?)\] as const;", _contract_ts(), re.MULTILINE | re.DOTALL
+    )
+    assert block is not None, f"{name} not found in contract.ts"
+    return re.findall(r'"(\w+)"', block.group(1))
+
+
+def test_contract_models_match_the_ts_interfaces():
+    # Plan section 4.2: the pydantic models in qrep/contract.py and the TS
+    # types in contract.ts share their field names, so a field renamed or
+    # added on one side fails here instead of in the browser.
+    interfaces = _ts_interfaces()
+    assert set(interfaces) == {model.__name__ for model in CONTRACT_MODELS}
+    for model in CONTRACT_MODELS:
+        assert interfaces[model.__name__] == set(model.model_fields), model.__name__
+
+
+def test_contract_outcomes_match_the_ts_lists():
+    # Every v2 result states an outcome (SPEC.md section 12.1). Each call's
+    # outcomes in TS equal the Literal on its pydantic result, and OUTCOMES
+    # lists them all once.
+    for ts_name, model in [
+        ("READ_OUTCOMES", ReadResult),
+        ("SIZE_OUTCOMES", SizeResult),
+        ("PATTERN_OUTCOMES", PatternResult),
+    ]:
+        assert _ts_string_list(ts_name) == list(
+            typing.get_args(model.model_fields["outcome"].annotation)
+        )
+    assert _ts_string_list("OUTCOMES") == list(OUTCOMES)
+
+
+READ_REQUEST = {
+    "token": "/staging/photo-1.png",
+    "frame": {
+        "kind": "field",
+        "corners": {
+            "top_left": {"x": 10, "y": 12},
+            "top_right": {"x": 410, "y": 14},
+            "bottom_right": {"x": 404, "y": 512},
+            "bottom_left": {"x": 8, "y": 506},
+        },
+    },
+    "crop_offset": {"x": 120, "y": 64},
+    "counts": {
+        "blocks_across": 9,
+        "blocks_down": 11,
+        "squares_per_block_across": 5,
+        "squares_per_block_down": 5,
+    },
+    "fabric_count": 2,
+}
+
+
+def test_read_confirmed_validates_then_reports_not_implemented():
+    # A stub until B2b switches it to the real read in qrep/vision/read/,
+    # under the contract lease: a valid request reaches not_implemented, and
+    # an invalid one is refused first, naming the field.
+    error = error_of(bridge.read_confirmed(json.dumps(READ_REQUEST)))
+    assert error["kind"] == "not_implemented"
+    error = error_of(bridge.read_confirmed(json.dumps({**READ_REQUEST, "fabric_count": 1})))
+    assert error["kind"] == "validation"
+    assert "fabric_count" in error["message"]

@@ -6,7 +6,7 @@
  * with every call - so the client may terminate and re-boot at any time.
  */
 import type { PyodideInterface } from "pyodide";
-import { assertEngineContract, bridgeArgs } from "./contract";
+import { assertEngineContract, bridgeArgs, engineAssetUrl } from "./contract";
 
 interface InitMessage {
   type: "init";
@@ -47,11 +47,23 @@ const BRIDGE_METHODS = new Set([
   "apply_finished_size",
   "resize_locked",
   "resize_unlocked",
+  "read_confirmed",
+  "size_pattern",
+  "export_pattern",
 ]);
 
 // Bridge methods that need cv2: the vision wheel lazy-loads before these
-// run (S6). Everything else works on the boot closure alone.
-const VISION_METHODS = new Set(["reverse", "reverse_photo", "render", "compare", "detect_quad"]);
+// run (S6). Everything else works on the boot closure alone. read_confirmed
+// takes the staged token from stage_photo inside its request, as
+// reverse_photo takes it as its first argument, so it needs no staging here.
+const VISION_METHODS = new Set([
+  "reverse",
+  "reverse_photo",
+  "render",
+  "compare",
+  "detect_quad",
+  "read_confirmed",
+]);
 
 const scope = self as unknown as DedicatedWorkerGlobalScope;
 let pyodidePromise: Promise<PyodideInterface> | null = null;
@@ -102,12 +114,14 @@ async function boot(baseUrl: string): Promise<PyodideInterface> {
   // No opencv here: the vision wheel lazy-loads on first photo use (S6).
   await pyodide.loadPackage(["numpy", "pillow", "pydantic", "micropip"]);
   progress("Loading the qrep engine");
-  const manifest = (await (await fetch(`${baseUrl}wheels/manifest.json`)).json()) as {
+  // Contract-tagged URLs, so a reload after a contract mismatch never gets
+  // the replaced release's manifest or wheel from the browser cache.
+  const manifest = (await (await fetch(engineAssetUrl(baseUrl, "manifest.json"))).json()) as {
     pypiWheels: string[];
     qrepWheel: string;
   };
-  const wheelUrls = [...manifest.pypiWheels, manifest.qrepWheel].map(
-    (file) => `${baseUrl}wheels/${file}`,
+  const wheelUrls = [...manifest.pypiWheels, manifest.qrepWheel].map((file) =>
+    engineAssetUrl(baseUrl, file),
   );
   pyodide.globals.set("wheel_urls", pyodide.toPy(wheelUrls));
   await pyodide.runPythonAsync(

@@ -10,7 +10,17 @@ import {
   bridgeArgs,
   CONTRACT_VERSION,
   contractMismatch,
+  engineAssetUrl,
   engineContractVersion,
+  OUTCOMES,
+  OutcomeError,
+  PATTERN_OUTCOMES,
+  parseOutcome,
+  parsePatternResult,
+  parseReadResult,
+  parseSizeResult,
+  READ_OUTCOMES,
+  SIZE_OUTCOMES,
 } from "./contract";
 
 const envelope = (version: unknown) =>
@@ -121,5 +131,121 @@ describe("worker boot", () => {
 
   it("passes every bridge call through bridgeArgs", () => {
     expect(source).toContain("bridge[method](...bridgeArgs(args))");
+  });
+});
+
+describe("parseOutcome", () => {
+  // SPEC.md section 12.1: a missing or unknown outcome is an error, never a
+  // success (the verdictStory.ts:82 hazard, where a missing verdict read as
+  // readable).
+  it("rejects a result with no outcome", () => {
+    expect(() => parseOutcome({}, OUTCOMES)).toThrow(OutcomeError);
+    expect(() => parseOutcome({ outcome: null }, OUTCOMES)).toThrow("states no outcome");
+    expect(() => parseOutcome({ pdf_b64: "JVBERi0=" }, PATTERN_OUTCOMES)).toThrow(OutcomeError);
+  });
+
+  it("rejects a result that is not an object", () => {
+    for (const result of [undefined, null, "pattern_ready", ["pattern_ready"], 1]) {
+      expect(() => parseOutcome(result, OUTCOMES)).toThrow("no result object");
+    }
+  });
+
+  it("rejects an unknown outcome", () => {
+    expect(() => parseOutcome({ outcome: "readable" }, OUTCOMES)).toThrow("unknown outcome");
+    expect(() => parseOutcome({ outcome: 1 }, OUTCOMES)).toThrow("unknown outcome: 1");
+  });
+
+  it("accepts each known outcome", () => {
+    for (const outcome of OUTCOMES) {
+      expect(parseOutcome({ outcome }, OUTCOMES)).toBe(outcome);
+    }
+    expect([...READ_OUTCOMES, ...SIZE_OUTCOMES, ...PATTERN_OUTCOMES].sort()).toEqual(
+      [...OUTCOMES, "refused"].sort(),
+    );
+  });
+
+  it("rejects a known outcome that this call does not return", () => {
+    expect(() => parseOutcome({ outcome: "read" }, PATTERN_OUTCOMES)).toThrow(
+      "this call returns pattern_ready or refused",
+    );
+  });
+});
+
+describe("per-call result parsers", () => {
+  const reason = { code: "too_many_fabrics", message: "More than 12 fabrics." };
+  const summary = { finished_width: 600 };
+
+  it("passes complete results through", () => {
+    const ready = { outcome: "pattern_ready", pdf_b64: "JVBERi0=", summary, reason: null };
+    expect(parsePatternResult(ready)).toBe(ready);
+    const refused = { outcome: "refused", reason };
+    expect(parsePatternResult(refused)).toBe(refused);
+    expect(parseReadResult({ outcome: "read", model: {} }).outcome).toBe("read");
+    expect(parseReadResult({ outcome: "held", reason }).outcome).toBe("held");
+    expect(parseSizeResult({ outcome: "sized", model: {}, basis: {} }).outcome).toBe("sized");
+  });
+
+  it("never treats an incomplete success as success", () => {
+    expect(() => parsePatternResult({ outcome: "pattern_ready", summary })).toThrow("pdf_b64");
+    expect(() => parsePatternResult({ outcome: "pattern_ready", pdf_b64: "", summary })).toThrow(
+      "pdf_b64",
+    );
+    expect(() => parsePatternResult({ outcome: "pattern_ready", pdf_b64: "x" })).toThrow(
+      "summary",
+    );
+    expect(() => parseReadResult({ outcome: "read", model: null })).toThrow("model");
+    expect(() => parseSizeResult({ outcome: "sized", model: {} })).toThrow("basis");
+  });
+
+  it("needs a reason on a hold or a refusal", () => {
+    expect(() => parsePatternResult({ outcome: "refused" })).toThrow("reason");
+    expect(() => parseReadResult({ outcome: "held", reason: { code: "x" } })).toThrow("reason");
+  });
+
+  it("rejects another call's outcome", () => {
+    expect(() => parseSizeResult({ outcome: "pattern_ready", pdf_b64: "x", summary })).toThrow(
+      "this call returns sized",
+    );
+    expect(() => parseReadResult({ outcome: "sized", model: {}, basis: {} })).toThrow(
+      "this call returns read or held or refused",
+    );
+  });
+
+  it("throws the typed OutcomeError", () => {
+    let thrown: unknown;
+    try {
+      parseOutcome({}, OUTCOMES);
+    } catch (error) {
+      thrown = error;
+    }
+    expect(typeof OutcomeError).toBe("function");
+    expect(thrown).toBeInstanceOf(OutcomeError);
+    expect((thrown as Error).name).toBe("OutcomeError");
+  });
+});
+
+describe("engineAssetUrl", () => {
+  it("tags a wheels-folder file with the contract version", () => {
+    expect(engineAssetUrl("/QREP/", "manifest.json")).toBe(
+      `/QREP/wheels/manifest.json?contract=${CONTRACT_VERSION}`,
+    );
+    expect(engineAssetUrl("/", "qrep-0.3.0-py3-none-any.whl")).toBe(
+      `/wheels/qrep-0.3.0-py3-none-any.whl?contract=${CONTRACT_VERSION}`,
+    );
+  });
+});
+
+describe("worker v2 wiring", () => {
+  const source = readFileSync(new URL("./worker.ts", import.meta.url), "utf8");
+
+  it("fetches the manifest and every wheel through engineAssetUrl", () => {
+    expect(source).toContain('fetch(engineAssetUrl(baseUrl, "manifest.json"))');
+    expect(source).toContain("engineAssetUrl(baseUrl, file)");
+    expect(source).not.toContain("wheels/manifest.json");
+  });
+
+  it("loads the vision wheel before the confirmed read", () => {
+    const vision = source.slice(source.indexOf("const VISION_METHODS"), source.indexOf("]);", source.indexOf("const VISION_METHODS")));
+    expect(vision).toContain('"read_confirmed"');
   });
 });
