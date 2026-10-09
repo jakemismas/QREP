@@ -2571,6 +2571,10 @@ def main(argv=None) -> int:
         used = picked.get((rec.job.calculator, rec.job.row_id)) if rec.job else None
         f["used"] = used is rec
         f["used_status"] = used.status if used is not None else None
+        # Third-party page crops are published only where they document a failure that
+        # stands; a row a later record answered keeps its error text, not its image.
+        if not f["used"] and f["used_status"] == "ok" and f["screenshot"]:
+            f["screenshot"] = "not kept: a later record of this row returned values"
 
     qrep, qrep_borders = qrep_tables(calc_qrep)
     builder = Builder(picked, universe, qrep, qrep_borders, calculator_leads()).run()

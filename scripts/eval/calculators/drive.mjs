@@ -65,6 +65,7 @@ const CALCULATORS = {
     form: "YardageForm",
     fields: ["Fabric_Width", "Width", "Length", "Overage"].map((k) => byName(k)),
     submit: { find: true },
+    clear: 'form[name="YardageForm"] input[type="reset"]',
     results: { ids: ["yardage1", "yardage2"] },
   },
   qp_binding: {
@@ -72,6 +73,7 @@ const CALCULATORS = {
     form: "BindingForm",
     fields: ["Fabric_Width", "Width", "Length", "Strip_Width"].map((k) => byName(k)),
     submit: { find: true },
+    clear: 'form[name="BindingForm"] input[type="reset"]',
     results: { ids: ["binding length", "yardage", "number strips"] },
   },
   qp_border: {
@@ -84,6 +86,7 @@ const CALCULATORS = {
       { key: "mitre", kind: "radio", sel: ['input[type="radio"][name="mitre" i]'], set: /non/i },
     ],
     submit: { find: true },
+    clear: 'form[name="BorderForm"] input[type="reset"]',
     results: { ids: [...[1, 2, 3, 4, 5].flatMap((i) => [`StripWidth${i}`, `Border${i}Yardage`, `NumStrips${i}`]), "OverallWidth", "OverallLength"], pattern: "StripWidth|Yardage|NumStrips|Overall|Mitre" },
     bands: 5,
   },
@@ -863,6 +866,14 @@ async function runRow(page, st, ctx, calc, key, job, site, meta, out) {
     if (calc.region) {
       await installObserver(ctx.frame);
       ctlStart = await controlList(ctx.frame);
+    }
+    if (calc.clear) {
+      // Consecutive rows can legitimately show identical text (the same panels at 40 and
+      // 42 in), which would read as a failed submit, so clear the outputs first with the
+      // form's own Clear Form button, the way a person starts a new calculation.
+      await site.pace();
+      await safeClick(page, ctx.frame.locator(calc.clear).first(), meta.notes);
+      site.mark();
     }
     const rowStart = await snapshot(ctx, st, calc);
     const c0 = calc.region ? (await obsState(ctx.frame)).count : 0;
