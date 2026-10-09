@@ -6,12 +6,12 @@
 
 It builds the job list for drive.mjs (one job per calculator, matrix row and variant), or reads a
 saved raw record file, parses every record with calc_parse, computes QREP's own values at the
-start SHA, places the MATH.md vectors beside them, labels every difference with a cause that the
-calculator's own parameter set reproduces, and writes the JSON record and the Markdown report.
+start SHA, places the MATH.md vectors beside them, labels every difference with the MATH.md
+causes shown to account for it (_status), and writes the JSON record and the Markdown report.
 
 Expected values come from calc_vectors (MATH.md hand arithmetic). A calculator's number never
-changes a vector or a parameter set: a difference that its parameter set cannot reproduce is
-listed as unexplained for the A1 and A2 owners.
+changes a vector or a parameter set: a difference that only the page's own rule reproduces, or
+that nothing accounts for, is listed for the A1 and A2 owners.
 """
 
 from __future__ import annotations
@@ -1235,6 +1235,14 @@ def explain(evaluate: Callable, ref: dict, mine: dict, skip=("keep",)) -> tuple[
         ok, v = run({**mine, k: ref[k]})
         if ok and ok_mine and v != value:
             found.append(k)
+    if found and ok_mine:
+        # A parameter that moves the value only alongside a named one is a cause too: its
+        # switch back from the calculator's set changes the shown value.
+        for k in keys:
+            if k not in found:
+                ok, v = run({**mine, k: ref[k]})
+                if ok and v != value:
+                    found.append(k)
     if found or not (ok_ref and ok_mine) or base == value:
         return found, False
     joint = []
@@ -1248,6 +1256,46 @@ def explain(evaluate: Callable, ref: dict, mine: dict, skip=("keep",)) -> tuple[
 def switch_labels(evaluate, ref, mine, today) -> tuple[list[str], bool]:
     params, joint = explain(evaluate, ref, mine)
     return _dedupe(cause(p, today) for p in params), joint and bool(params)
+
+
+def switch_proof(evaluate: Callable, ref: dict, mine: dict, skip=("keep",)) -> dict:
+    """What the labeled switches alone reach: the reference set's value (start) and the
+    calculator's set with every unlabeled parameter put back to the reference (after). The
+    labels account for a difference only when after is the shown value (Builder.compare)."""
+    found, _joint = explain(evaluate, ref, mine, skip)
+    keys = [k for k in mine if k in ref and k not in skip and mine[k] != ref[k]]
+    params = dict(mine)
+    for k in keys:
+        # An unlabeled parameter the rules refuse to put back is a precondition of a labeled
+        # switch (Quilter's Paradise rounding allows no allowance), not a cause; it stays.
+        if k not in found and _safe(evaluate, {**params, k: ref[k]}) is not None:
+            params[k] = ref[k]
+    return {"kind": "switch", "start": _safe(evaluate, ref), "after": _safe(evaluate, params)}
+
+
+def _status(labels, proof, shown, target, eq, anchor=None, bridge=None) -> tuple[str, str | None]:
+    """The status of a difference whose rule reproduces the shown value, and why it is not
+    explained. Explained needs its labels shown to carry the target to the shown value: the
+    reference set gives the target (anchor, or its own value here; a bridge label covers the
+    step between them), and the labeled switches alone give the shown value. A page model with
+    no such proof is "page rule"."""
+    if not labels or proof is None:
+        return "unexplained", "its rule reproduces the shown value, but no label names a cause"
+    if proof["kind"] == "page":
+        return "page rule", None
+    if proof["kind"] == "fixed":
+        return ("explained", None) if proof["ok"] else ("unexplained", proof["why"])
+    after = proof["after"]
+    if after is None or not eq(after, shown):
+        return "unexplained", (f"the labeled switches alone give {fmt_value(after)}, not the "
+                               f"shown {fmt_value(shown)}")  # fmt: skip
+    if bridge == "D-11":
+        return "explained", None
+    base = anchor if bridge == "orientation" else proof["start"]
+    if base is None or not eq(base, target):
+        return "unexplained", (f"the reference set gives {fmt_value(base)}, not the target "
+                               f"{fmt_value(target)}, so the labels do not reach it")  # fmt: skip
+    return "explained", None
 
 
 def page_causes(spec: Model, kind: str, ref: dict | None) -> list[str]:
@@ -1413,6 +1461,7 @@ class Builder:
             self.jobs_by_row.setdefault((job.calculator, job.base), []).append(job)
         self.comparisons: list[dict] = []
         self.unexplained: list[dict] = []
+        self.page_rule: list[dict] = []
         self.cells: dict[tuple, dict] = {}
         self.counter = dict.fromkeys(PREFIX.values(), 0)
 
@@ -1437,7 +1486,7 @@ class Builder:
 
             def by_set(ref, today):
                 labels, joint = switch_labels(evaluate, ref, params, today)
-                return labels, joint, []
+                return labels, joint, [], switch_proof(evaluate, ref, params)
 
             return True, value, by_set, _set_text(name, params)
         spec = calc.models.get(line)
@@ -1452,17 +1501,22 @@ class Builder:
                     if labels:
                         note = (f"labels from the proxy set ({_set_text('proxy', spec.proxy)}), "
                                 "which gives the page model's value on this row")  # fmt: skip
-                        return labels, joint, [note]
+                        return labels, joint, [note], switch_proof(evaluate, ref, spec.proxy)
             note = (f"labels list the page rule's differences from the reference "
                     f"(calc_rules.{spec.fn}); no MATH.md parameter set reproduces this row")  # fmt: skip
-            return page_causes(spec, kind, ref), False, [note]
+            return page_causes(spec, kind, ref), False, [note], {"kind": "page"}
 
         return True, model, by_model, f"calc_rules.{spec.fn}"
 
     def compare(
         self, cell, *, table, row, calc, job, quantity, shown, against, target, today,
         rule=(False, None, None, None), ref=None, pre_labels=(), notes=(), same=None,
+        anchor=None, bridge=None,
     ) -> dict:  # fmt: skip
+        """One comparison. anchor is the reference set's value for the target's own layout or
+        size when the caller computes it; bridge names a pre-label that carries the target to
+        the reference set's value here ("orientation": the anchor is the target's layout;
+        "D-11": QREP today buys by area, which no parameter set models)."""
         has_rule, rule_value, labeler, rule_text = rule
         comp = {
             "line_type": "backing" if table == "wide" else table,
@@ -1503,29 +1557,25 @@ class Builder:
                 f"its rule gives {fmt_value(rule_value)}, not the shown {fmt_value(shown)}"
             )
         else:
-            labels, joint, more = labeler(ref, today) if labeler else ([], False, [])
+            labels, joint, more, proof = (labeler(ref, today) if labeler
+                                          else ([], False, [], None))  # fmt: skip
             comp["labels"] = _dedupe([*pre_labels, *labels])
             comp["joint"] = joint
             comp["notes"] += more
-            if comp["labels"]:
-                comp["status"] = "explained"
-            else:
-                comp["status"] = "unexplained"
-                comp["notes"].append(
-                    "its rule reproduces the shown value, but no switch from the reference set "
-                    "accounts for the difference"
-                )
+            comp["status"], why = _status(comp["labels"], proof, shown, target, eq, anchor, bridge)
+            if why:
+                comp["notes"].append(why)
         if comp["status"] != "match":
             prefix = PREFIX[table]
             self.counter[prefix] += 1
             comp["id"] = f"{prefix}-{self.counter[prefix]}"
             cell["ids"].append(comp["id"])
-        if comp["status"] == "unexplained":
+        if comp["status"] in ("unexplained", "page rule"):
             entry = {k: comp[k] for k in ("id", "line_type", "row", "calculator", "variant",
                                           "quantity", "shown", "against", "target", "rule",
-                                          "rule_value", "notes")}  # fmt: skip
+                                          "rule_value", "labels", "notes")}  # fmt: skip
             entry["lead"] = self.leads.get(calc.key)
-            self.unexplained.append(entry)
+            (self.unexplained if comp["status"] == "unexplained" else self.page_rule).append(entry)
         self.comparisons.append(comp)
         return comp
 
@@ -1585,7 +1635,8 @@ class Builder:
                 self.compare(
                     cell, table="backing", row=rid, calc=calc, job=job, quantity=quantity,
                     shown=value, against=target_id, target=target[quantity], today=today,
-                    rule=rule, ref=ref, pre_labels=pre, notes=notes,
+                    rule=rule, ref=ref, pre_labels=pre, notes=notes, anchor=ref_value,
+                    bridge="orientation" if pre else None,
                 )  # fmt: skip
 
     # -- wide-back ---------------------------------------------------------------------------
@@ -1732,12 +1783,22 @@ class Builder:
         notes = []
         if widths is not None and widths != 1:
             notes.append(f"its rule needs {widths} widths of {mixed(job.fabric)} in")
-        rule = (yards is not None, None if yards is None else yards * 36,
-                lambda ref, today: ([cause("increment", today)], False, []),
-                f"qp_backing_display, bolt {mixed(job.fabric)}, overage 4")  # fmt: skip
+        # Rounding accounts for the gap only when the page's unrounded length, L + 2 x 4 on one
+        # width, is the target itself.
+        raw = F(ln) + 8
+
+        def labeler(target):
+            ok = widths == 1 and target == raw
+            why = None if ok else (f"the page's unrounded length is {fmt_value(raw)} in on "
+                                   f"{widths} width(s), not the target {fmt_value(target)}")  # fmt: skip
+            return lambda ref, today: ([cause("increment", today)], False, [],
+                                       {"kind": "fixed", "ok": ok, "why": why})  # fmt: skip
+
         targets = [(vector["vector"], vector["length"], False)] if vector else []
         targets.append(("QREP today", today["length"], True))
         for target_id, target, is_today in targets:
+            rule = (yards is not None, None if yards is None else yards * 36, labeler(target),
+                    f"qp_backing_display, bolt {mixed(job.fabric)}, overage 4")  # fmt: skip
             self.compare(
                 cell, table="batting", row=rid, calc=calc, job=job, quantity="roll length (in)",
                 shown=bat["roll_length"], against=target_id, target=target, today=is_today,
@@ -1831,22 +1892,28 @@ class Builder:
 
         rule = self.rule_for(calc, "borders", evaluate, f"band {i + 1} yards",
                              model=model_value(calc, "borders", job, "yards", band=i))  # fmt: skip
-        pre = ["border area (D-11)"]
-        params = rule_set("borders", calc.rules.get("borders"))
-        band = _safe(lambda p: calc_rules.border(cw, cl, list(bands), **p)["bands"][i], params)
-        if band is not None:
-            quarter = calc_rules.purchase_yards(calc_rules.to_eighths(band["length"]), "quarter")
-            if quarter != band["yards"]:
-                pre.append(cause("increment", True))
-        has_rule, value, labeler, text = rule
-        if has_rule and calc.rules.get("borders"):
-            # QREP today has no border parameter set (it buys by area), so only the defect and
-            # the rounding switch can name the cause.
-            labeler = None
+        # QREP today buys borders by area (D-11), which no parameter set models, so the chain is
+        # today -> MATH.md's strip set (D-11, and today's 1/4 yd where it differs) -> the
+        # calculator's set by labeled switches. D-11 is named only where the strip set's value
+        # differs from today's.
+        target = today[i]["yards"]
+        strip_set = rule_set("borders", "math")
+        strip_value = _safe(evaluate, strip_set)
+        pre, notes, bridge = [], [], None
+        if strip_value is not None and strip_value != target:
+            pre, bridge = ["border area (D-11)"], "D-11"
+            notes.append(f"MATH.md's strip set gives {fmt_value(strip_value)} here")
+            params = rule_set("borders", calc.rules.get("borders"))
+            band = _safe(lambda p: calc_rules.border(cw, cl, list(bands), **p)["bands"][i], params)
+            if band is not None:
+                quarter = calc_rules.purchase_yards(calc_rules.to_eighths(band["length"]),
+                                                    "quarter")  # fmt: skip
+                if quarter != band["yards"]:
+                    pre.append(cause("increment", True))
         self.compare(
             cell, table="borders", row=rid, calc=calc, job=job, quantity=f"band {i + 1} yards",
-            shown=sb["yards"], against="QREP at wof 320", target=today[i]["yards"], today=True,
-            rule=(has_rule, value, labeler, text), pre_labels=pre,
+            shown=sb["yards"], against="QREP at wof 320", target=target, today=True,
+            rule=rule, ref=strip_set, pre_labels=pre, notes=notes, bridge=bridge,
         )  # fmt: skip
 
     # -- piece count -------------------------------------------------------------------------
@@ -2332,18 +2399,25 @@ def render(ctx: dict) -> str:
     diffs.sort(key=lambda c: (order[c["id"].split("-")[0]], int(c["id"].split("-")[1])))
     n_match = sum(c["status"] == "match" for c in b.comparisons)
     tally = {s: sum(c["status"] == s for c in diffs)
-             for s in ("explained", "unexplained", "record only")}  # fmt: skip
+             for s in ("explained", "page rule", "unexplained", "record only")}  # fmt: skip
     out += ["", "## Labeled differences", "",
             f"Comparisons: n = {len(b.comparisons)}; matches n = {n_match}; differences "
-            f"n = {len(diffs)} (explained n = {tally['explained']}, unexplained "
+            f"n = {len(diffs)} (explained by a MATH.md cause n = {tally['explained']}, "
+            f"explained only by the page's own rule n = {tally['page rule']}, unexplained "
             f"n = {tally['unexplained']}, record only n = {tally['record only']}).",
             "",
-            "A difference is explained only when the calculator's own rule (its MATH.md "
-            "parameter set, or its page model in calc_rules) reproduces the shown value. Its "
-            "labels name the parameters whose one-at-a-time switch from the reference set "
-            "(MATH.md defaults against a vector, today's set against QREP) changes the value; "
-            "'jointly' marks parameters that only act together, named by switching each back "
-            "from the calculator's set.", ""]  # fmt: skip
+            "Explained means a MATH.md 5.2 cause is shown to account for the difference: the "
+            "calculator's MATH.md parameter set (or a page model's proxy set) reproduces the "
+            "shown value, the reference set (MATH.md defaults against a vector, today's set "
+            "against QREP) gives the target, and switching only the labeled parameters from the "
+            "reference set gives the shown value. A layout the page keeps that differs from the "
+            "target's is labeled orientation and checked from the target's layout; border yards "
+            "against QREP today go through MATH.md's strip set, since today buys by area "
+            "(D-11). 'Jointly' marks parameters that act only together. Page rule means the "
+            "calculator's own page model in calc_rules reproduces the shown value but no MATH.md "
+            "parameter set does; its labels list how that rule differs from the reference, "
+            "unproved, and the row is listed for the A1 and A2 owners. Unexplained means no "
+            "rule reproduces the shown value or the labels do not reach it.", ""]  # fmt: skip
     out += md_table(
         ["ID", "Row", "Calculator", "Value", "Shown", "Against", "Target", "Status", "Labels",
          "Notes"],
@@ -2352,6 +2426,19 @@ def render(ctx: dict) -> str:
           ", ".join(c["labels"]) + (" (jointly)" if c["joint"] else "") or "-",
           "; ".join(c["notes"]) or "-")
          for c in diffs],
+    )  # fmt: skip
+
+    out += ["", "## Explained only by the page's own rule, for the A1 and A2 owners", "",
+            f"n = {len(b.page_rule)}. The page model reproduces each shown value; the listed "
+            "differences of its rule from the reference are not proved to account for the gap.",
+            ""]  # fmt: skip
+    out += md_table(
+        ["ID", "Row", "Calculator", "Value", "Shown", "Against", "Target", "Page rule",
+         "Rule differences"],
+        [(u["id"], u["row"], f"{u['calculator']} @{u['variant']}", u["quantity"],
+          fmt_value(u["shown"]), u["against"], fmt_value(u["target"]), u["rule"] or "-",
+          ", ".join(u["labels"]) or "-")
+         for u in b.page_rule],
     )  # fmt: skip
 
     out += ["", "## Unexplained, for the A1 and A2 owners", "",
@@ -2737,6 +2824,8 @@ def main(argv=None) -> int:
         "search_summary": ctx["search"],
         "unexplained": [{k: num(v) if k in ("shown", "target", "rule_value") else v
                          for k, v in u.items()} for u in builder.unexplained],
+        "page_rule_only": [{k: num(v) if k in ("shown", "target", "rule_value") else v
+                            for k, v in u.items()} for u in builder.page_rule],
         "failures": failures,
         "not_compared": not_compared,
         "not_run": not_run_by_calc,
@@ -2749,7 +2838,8 @@ def main(argv=None) -> int:
     with open(args.out_md, "w", encoding="ascii", newline="\n") as fh:
         fh.write(markdown)
     print(f"baseline.py: {len(recs)} record(s), {len(builder.comparisons)} comparison(s), "
-          f"{len(builder.unexplained)} unexplained -> {args.out_json}, {args.out_md}")  # fmt: skip
+          f"{len(builder.page_rule)} page rule only, {len(builder.unexplained)} unexplained -> "
+          f"{args.out_json}, {args.out_md}")  # fmt: skip
     return 0
 
 

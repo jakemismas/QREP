@@ -6,6 +6,7 @@ QREP or a calculator (MATH.md rule 3). Fragments are hand-written in the shape e
 no saved third-party page is used.
 """
 
+import dataclasses
 import sys
 from fractions import Fraction as F
 from pathlib import Path
@@ -1595,7 +1596,10 @@ def test_omni_page_width_split_reads_as_vertical():
     got = bl._extract_omni(cp.parse_omni_backing, _omni_job(70, 90, "42"), rec)
     assert got["backing"]["chosen"] == "vertical"
     assert got["backing"]["layouts"] == {"vertical": {"yards": F(109, 20), "panels": 2}}
-    # Batting: the two 39 in pieces sit side by side, 2 x 39 = 78 in across by 98 in long.
+    # Batting mode prints the same split, with no space before its centimetres; the two 39 in
+    # pieces sit side by side, 2 x 39 = 78 in across by 98 in long.
+    batting = OMNI_VERTICAL.replace("98 inches (249 cm) wide", f"98{NBSP}inches(249{NBSP}cm) wide")
+    rec = {"html": {"results_text": batting}}
     got = bl._extract_omni(cp.parse_omni_backing, _omni_job(70, 90, "42-batting"), rec)
     assert (got["batting"]["width"], got["batting"]["length"]) == (F(78), F(98))
     # 50 x 65 (test_omni_backing_split_length): the length split's piece is Wb = 58 in long
@@ -1603,8 +1607,13 @@ def test_omni_page_width_split_reads_as_vertical():
     rec = {"html": {"results_text": OMNI_SPLIT}}
     got = bl._extract_omni(cp.parse_omni_backing, _omni_job(50, 65, "42"), rec)
     assert got["backing"]["layouts"] == {"horizontal": {"yards": F(323, 100), "panels": 2}}
+    # Its batting page prints pieces (58 + 8 + 0) / 2 = 33 in wide (the batting-mode width
+    # formula, test_omni_backing_one_piece_directional_batting_and_too_many), so the size it
+    # implies is 58 in by 2 x 33 = 66 in.
+    batting = OMNI_SPLIT.replace("36.5 inches (93 cm) wide", f"33{NBSP}inches(84{NBSP}cm) wide")
+    rec = {"html": {"results_text": batting}}
     got = bl._extract_omni(cp.parse_omni_backing, _omni_job(50, 65, "42-batting"), rec)
-    assert (got["batting"]["width"], got["batting"]["length"]) == (F(58), F(73))
+    assert (got["batting"]["width"], got["batting"]["length"]) == (F(58), F(66))
 
 
 def test_omni_model_follows_the_width_split():
@@ -1710,3 +1719,124 @@ def test_qp_piece_count_turned_and_float_order():
     # 0.1 as 0.10000000000000000555, their quotient rounds to 2.9999999999999996, below 3,
     # so floor gives 2 pieces where exact arithmetic gives 3.
     assert cr.qp_piece_count("0.1", "1", "0.3", "1")["as_typed"]["pieces"] == 2
+
+
+# ---------------------------------------------------------------------------------------------
+# Difference classification (baseline.explain, switch_proof, Builder.rule_for and compare) on
+# hand-made rows: toy rules over the parameters s (seam loss), allowance_pieced and
+# allowance_one (allowance) and overhang_per_side (overhang).
+
+TOY_REF = {"s": 0, "allowance_pieced": 0, "allowance_one": 0, "overhang_per_side": 0}
+TOY_MINE = {"s": 1, "allowance_pieced": 2, "allowance_one": 1, "overhang_per_side": 1}
+
+
+def _toy_sum(p):
+    return 10 + p["s"] + p["allowance_pieced"]
+
+
+def _toy_product(p):
+    return 10 + p["s"] * p["allowance_pieced"]
+
+
+def _toy_majority(p):
+    # 1 more when at least two of the three switches are on.
+    on = (p["allowance_pieced"] > 0) + (p["allowance_one"] > 0) + (p["overhang_per_side"] > 0)
+    return 10 + p["s"] + (1 if on >= 2 else 0)
+
+
+def test_explain_names_single_joint_and_alongside_switches():
+    # Sum: ref 10 + 0 + 0 = 10, mine 10 + 1 + 2 = 13. From ref, s alone gives 11 and
+    # allowance_pieced alone 12, so both are named; the other two change nothing either way.
+    assert bl.explain(_toy_sum, TOY_REF, TOY_MINE) == (["s", "allowance_pieced"], False)
+    # Product: ref 10, mine 10 + 1 x 2 = 12. Alone from ref: 10 + 1 x 0 = 10 and 10 + 0 x 2 =
+    # 10, no move; back from mine: 10 + 0 x 2 = 10 and 10 + 1 x 0 = 10, so both, jointly.
+    assert bl.explain(_toy_product, TOY_REF, TOY_MINE) == (["s", "allowance_pieced"], True)
+    # 10 + s + s x allowance_pieced: from ref s gives 11 (named), allowance_pieced 10 (not);
+    # back from mine allowance_pieced gives 10 + 1 + 0 = 11, not 13, so it is named alongside.
+    def alongside(p):
+        return 10 + p["s"] + p["s"] * p["allowance_pieced"]
+
+    assert bl.explain(alongside, TOY_REF, TOY_MINE) == (["s", "allowance_pieced"], False)
+    labels, joint = bl.switch_labels(_toy_product, TOY_REF, TOY_MINE, False)
+    assert (labels, joint) == (["seam loss", "allowance"], True)
+
+
+def test_switch_proof_keeps_a_refused_precondition():
+    # The toy refuses a nonzero allowance_one unless s is 1, like Quilter's Paradise rounding.
+    def refusing(p):
+        if p["allowance_one"] == 0 and p["s"] == 1 and p["allowance_pieced"] == 2:
+            raise ValueError("needs its own allowance")
+        return _toy_sum(p)
+
+    # Named: s and allowance_pieced (11 and 12 from ref). Putting allowance_one back to 0 is
+    # refused, so it stays at 1; overhang goes back to 0. After = 10 + 1 + 2 = 13.
+    assert bl.switch_proof(refusing, TOY_REF, TOY_MINE) == {"kind": "switch", "start": 10,
+                                                          "after": 13}  # fmt: skip
+
+
+def _toy_builder(monkeypatch, mine):
+    monkeypatch.setattr(cr, "BACKING_SETS", {**cr.BACKING_SETS, "toy": mine})
+    calc = dataclasses.replace(bl.REGISTRY["qp_backing"], key="toy_calc",
+                               rules={"backing": "toy"}, models={}, record_only=False)  # fmt: skip
+    return bl.Builder({}, [], {}, {}, {}), calc
+
+
+def _toy_compare(b, calc, evaluate, shown, target, **kw):
+    rule = b.rule_for(calc, "backing", evaluate, "yards")
+    return b.compare({"ids": []}, table="backing", row="r", calc=calc,
+                     job=_omni_job(10, 10, "42"), quantity="yards", shown=shown,
+                     against="V-TOY", target=target, today=False, rule=rule, ref=TOY_REF, **kw)  # fmt: skip
+
+
+def test_compare_explains_only_what_the_labels_reach(monkeypatch):
+    b, calc = _toy_builder(monkeypatch, TOY_MINE)
+    # Sum: the set gives 13 = shown; ref gives 10 = target; s and allowance_pieced alone carry
+    # 10 to 13, so explained.
+    got = _toy_compare(b, calc, _toy_sum, 13, 10)
+    assert (got["status"], got["labels"], got["id"]) == ("explained", ["seam loss", "allowance"],
+                                                        "BK-1")  # fmt: skip
+    # Product, jointly: 10 to 12, explained.
+    got = _toy_compare(b, calc, _toy_product, 12, 10)
+    assert (got["status"], got["joint"]) == ("explained", True)
+    # Same sum against a target of 11: ref gives 10, not 11, so the labels do not reach it.
+    got = _toy_compare(b, calc, _toy_sum, 13, 11)
+    assert got["status"] == "unexplained"
+    assert "the reference set gives 10, not the target 11" in got["notes"][-1]
+    # Majority: ref 10, mine 10 + 1 + 1 = 12. From ref only s moves the value (11); back from
+    # mine no single one of the other three moves it (two stay on). Only s is named, and s
+    # alone gives 11, which changes the value but does not reach the shown 12: unexplained.
+    got = _toy_compare(b, calc, _toy_majority, 12, 10)
+    assert (got["status"], got["labels"]) == ("unexplained", ["seam loss"])
+    assert "the labeled switches alone give 11, not the shown 12" in got["notes"][-1]
+    # The set gives 13 but the page shows 14: its rule does not reproduce the shown value.
+    got = _toy_compare(b, calc, _toy_sum, 14, 10)
+    assert got["status"] == "unexplained" and "its rule gives 13" in got["notes"][-1]
+    assert [u["id"] for u in b.unexplained] == ["BK-3", "BK-4", "BK-5"]
+
+
+def test_compare_bridges_and_page_rule(monkeypatch):
+    b, calc = _toy_builder(monkeypatch, TOY_MINE)
+    # Orientation: the target's layout gives 9 under ref (anchor), the page's layout 10; the
+    # labels carry 10 to 13. Explained when the anchor is the target, not otherwise.
+    got = _toy_compare(b, calc, _toy_sum, 13, 9, pre_labels=["orientation"], anchor=9,
+                       bridge="orientation")  # fmt: skip
+    assert (got["status"], got["labels"][0]) == ("explained", "orientation")
+    got = _toy_compare(b, calc, _toy_sum, 13, 9, pre_labels=["orientation"], anchor=8,
+                       bridge="orientation")  # fmt: skip
+    assert got["status"] == "unexplained"
+    # D-11: today's area value (7) has no parameter set; the labels still must reach 13.
+    got = _toy_compare(b, calc, _toy_sum, 13, 7, pre_labels=["border area (D-11)"], bridge="D-11")
+    assert got["status"] == "explained"
+    # A page model with no MATH.md set: Omni's 70 x 90 (5.45 = 109/20 yd, hand arithmetic in
+    # test_omni_page_width_split_reads_as_vertical) is "page rule", listed apart.
+    omni = bl.REGISTRY["omni_backing"]
+    rule = b.rule_for(omni, "backing", None, "yards", model=F(109, 20))
+    got = b.compare({"ids": []}, table="backing", row="70x90", calc=omni,
+                    job=_omni_job(70, 90, "42"), quantity="yards", shown=F(109, 20),
+                    against="V-BACK-05", target=F(23, 4), today=False, rule=rule,
+                    ref=cr.BACKING_SETS["math"])  # fmt: skip
+    assert got["status"] == "page rule"
+    assert [u["id"] for u in b.page_rule] == [got["id"]]
+    # A fixed proof decides on its own.
+    proof = {"kind": "fixed", "ok": False, "why": "not one width"}
+    assert bl._status(["x"], proof, 1, 2, lambda a, c: a == c) == ("unexplained", "not one width")
