@@ -4,7 +4,7 @@
   "command": ".venv/Scripts/python scripts/eval/calculators/baseline.py --start-sha 3fa671e --work '<work>/.' --raw '<work>/raw.json' --raw '<work>/raw_retry.json' --shots scripts/eval/calculators/failures --out-json docs/sprint-5/evidence/D2-calculators-baseline.json --out-md docs/sprint-5/evidence/D2-calculators-baseline.md",
   "driver_command": null,
   "qrep_file": "C:\\Users\\Jake Mismas\\qrep-wt\\d2\\qrep\\__init__.py",
-  "head": "4410244e1579424fadadc179197ae1eedb6c427c",
+  "head": "736f8b00a8c6d123b2f8a4499f0ad40cda83f8b2",
   "start_sha": "3fa671ecc52f7939aa60bac11551bc68054faf6d",
   "start_sha_arg": "3fa671e",
   "qrep_tree": "59a4cc0314963b1422b74cde4f7303e9d21eb99e",
@@ -544,7 +544,7 @@
     "@42: mode backing, width W, length L, fabric_width 42, overage 0",
     "@42-batting: mode batting, width W, length L, fabric_width 42, overage 0"
    ],
-   "fixed": "non-directional fabric, additional overage 0 (the page adds 4 in per side)",
+   "fixed": "non-directional fabric, additional overage 0 (the page adds 4 in per side); batting size = its displayed pieces side by side (pieces x piece size)",
    "parser": "parse_omni_backing",
    "parser_status": "calc_parse.parse_omni_backing",
    "rule": "calc_rules.omni_backing",
@@ -598,7 +598,7 @@
    "vendor": "Quilt Calculator",
    "page": "Border Calculator",
    "url": "https://quiltcalculator.com/border-calculator",
-   "accessed": null,
+   "accessed": "2026-10-09",
    "line_types": [
     "borders"
    ],
@@ -21409,13 +21409,12 @@
    "labels": [
     "orientation (D-01)",
     "fabric width",
-    "allowance",
     "rounding increment or thirds",
     "page rule: usable = fabric width - 2 in selvage, panels = ceil(D / (usable - 1))"
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-8",
    "status": "explained"
@@ -21482,7 +21481,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-9",
    "status": "explained"
@@ -21503,14 +21502,12 @@
    "reproduced": true,
    "labels": [
     "orientation (D-01)",
-    "seam loss",
-    "allowance",
     "rounding increment or thirds",
     "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-10",
    "status": "explained"
@@ -21848,13 +21845,12 @@
    "labels": [
     "orientation (D-01)",
     "fabric width",
-    "allowance",
     "rounding increment or thirds",
     "page rule: usable = fabric width - 2 in selvage, panels = ceil(D / (usable - 1))"
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-18",
    "status": "explained"
@@ -21921,7 +21917,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-19",
    "status": "explained"
@@ -21942,14 +21938,12 @@
    "reproduced": true,
    "labels": [
     "orientation (D-01)",
-    "seam loss",
-    "allowance",
     "rounding increment or thirds",
     "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-20",
    "status": "explained"
@@ -22435,7 +22429,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-28",
    "status": "explained"
@@ -22456,14 +22450,12 @@
    "reproduced": true,
    "labels": [
     "orientation (D-01)",
-    "seam loss",
-    "allowance",
     "rounding increment or thirds",
     "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-29",
    "status": "explained"
@@ -22858,7 +22850,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-33",
    "status": "explained"
@@ -22878,14 +22870,12 @@
    "rule_value": "109/20",
    "reproduced": true,
    "labels": [
-    "seam loss",
-    "allowance",
     "rounding increment or thirds",
     "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-34",
    "status": "explained"
@@ -23226,13 +23216,12 @@
    "labels": [
     "orientation (D-01)",
     "fabric width",
-    "allowance",
     "rounding increment or thirds",
     "page rule: usable = fabric width - 2 in selvage, panels = ceil(D / (usable - 1))"
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-42",
    "status": "explained"
@@ -23299,7 +23288,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-43",
    "status": "explained"
@@ -23320,14 +23309,12 @@
    "reproduced": true,
    "labels": [
     "orientation (D-01)",
-    "seam loss",
-    "allowance",
     "rounding increment or thirds",
     "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-44",
    "status": "explained"
@@ -23665,13 +23652,12 @@
    "labels": [
     "orientation (D-01)",
     "fabric width",
-    "allowance",
     "rounding increment or thirds",
     "page rule: usable = fabric width - 2 in selvage, panels = ceil(D / (usable - 1))"
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-52",
    "status": "explained"
@@ -23738,7 +23724,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-53",
    "status": "explained"
@@ -23759,14 +23745,12 @@
    "reproduced": true,
    "labels": [
     "orientation (D-01)",
-    "seam loss",
-    "allowance",
     "rounding increment or thirds",
     "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-54",
    "status": "explained"
@@ -24252,7 +24236,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-62",
    "status": "explained"
@@ -24273,14 +24257,12 @@
    "reproduced": true,
    "labels": [
     "orientation (D-01)",
-    "seam loss",
-    "allowance",
     "rounding increment or thirds",
     "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-63",
    "status": "explained"
@@ -24682,7 +24664,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-68",
    "status": "explained"
@@ -24702,14 +24684,12 @@
    "rule_value": "967/100",
    "reproduced": true,
    "labels": [
-    "seam loss",
-    "allowance",
     "rounding increment or thirds",
     "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-69",
    "status": "explained"
@@ -25134,13 +25114,12 @@
    "labels": [
     "orientation (D-01)",
     "fabric width",
-    "allowance",
     "rounding increment or thirds",
     "page rule: usable = fabric width - 2 in selvage, panels = ceil(D / (usable - 1))"
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-80",
    "status": "explained"
@@ -25162,12 +25141,11 @@
    "labels": [
     "orientation",
     "fabric width",
-    "seam loss",
     "page rule: usable = fabric width - 2 in selvage, panels = ceil(D / (usable - 1))"
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-81",
    "status": "explained"
@@ -25194,7 +25172,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-82",
    "status": "explained"
@@ -25221,7 +25199,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-83",
    "status": "explained"
@@ -25241,14 +25219,12 @@
    "rule_value": "109/20",
    "reproduced": true,
    "labels": [
-    "seam loss",
-    "allowance",
     "rounding increment or thirds",
     "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-84",
    "status": "explained"
@@ -25660,7 +25636,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-93",
    "status": "explained"
@@ -25681,14 +25657,12 @@
    "reproduced": true,
    "labels": [
     "orientation (D-01)",
-    "seam loss",
-    "allowance",
     "rounding increment or thirds",
     "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-94",
    "status": "explained"
@@ -26030,13 +26004,12 @@
    "labels": [
     "orientation (D-01)",
     "fabric width",
-    "allowance",
     "rounding increment or thirds",
     "page rule: usable = fabric width - 2 in selvage, panels = ceil(D / (usable - 1))"
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-104",
    "status": "explained"
@@ -26083,7 +26056,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-105",
    "status": "explained"
@@ -26111,7 +26084,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-106",
    "status": "explained"
@@ -26131,14 +26104,12 @@
    "rule_value": "517/100",
    "reproduced": true,
    "labels": [
-    "seam loss",
-    "allowance",
     "rounding increment or thirds",
     "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-107",
    "status": "explained"
@@ -26164,7 +26135,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-108",
    "status": "explained"
@@ -26540,7 +26511,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-112",
    "status": "explained"
@@ -26561,14 +26532,12 @@
    "reproduced": true,
    "labels": [
     "orientation (D-01)",
-    "seam loss",
-    "allowance",
     "rounding increment or thirds",
     "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-113",
    "status": "explained"
@@ -26841,7 +26810,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-116",
    "status": "explained"
@@ -26861,14 +26830,12 @@
    "rule_value": "1067/100",
    "reproduced": true,
    "labels": [
-    "seam loss",
-    "allowance",
     "rounding increment or thirds",
     "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-117",
    "status": "explained"
@@ -27209,13 +27176,12 @@
    "labels": [
     "orientation (D-01)",
     "fabric width",
-    "allowance",
     "rounding increment or thirds",
     "page rule: usable = fabric width - 2 in selvage, panels = ceil(D / (usable - 1))"
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-125",
    "status": "explained"
@@ -27282,7 +27248,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-126",
    "status": "explained"
@@ -27303,14 +27269,12 @@
    "reproduced": true,
    "labels": [
     "orientation (D-01)",
-    "seam loss",
-    "allowance",
     "rounding increment or thirds",
     "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-127",
    "status": "explained"
@@ -27673,12 +27637,11 @@
    "labels": [
     "orientation",
     "fabric width",
-    "seam loss",
     "page rule: usable = fabric width - 2 in selvage, panels = ceil(D / (usable - 1))"
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-135",
    "status": "explained"
@@ -27705,7 +27668,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-136",
    "status": "explained"
@@ -27732,7 +27695,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-137",
    "status": "explained"
@@ -27752,14 +27715,12 @@
    "rule_value": "46/25",
    "reproduced": true,
    "labels": [
-    "seam loss",
-    "allowance",
     "rounding increment or thirds",
     "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-138",
    "status": "explained"
@@ -29851,7 +29812,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.stitchdesk_binding); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.stitchdesk_binding); no MATH.md parameter set reproduces this row"
    ],
    "id": "BD-16",
    "status": "explained"
@@ -34085,7 +34046,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BT-3",
    "status": "explained"
@@ -34118,7 +34079,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BT-4",
    "status": "explained"
@@ -34351,7 +34312,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BT-7",
    "status": "explained"
@@ -34384,7 +34345,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BT-8",
    "status": "explained"
@@ -34617,7 +34578,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BT-11",
    "status": "explained"
@@ -34650,7 +34611,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BT-12",
    "status": "explained"
@@ -35141,7 +35102,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BT-17",
    "status": "explained"
@@ -35174,7 +35135,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BT-18",
    "status": "explained"
@@ -35407,7 +35368,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BT-21",
    "status": "explained"
@@ -35440,7 +35401,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BT-22",
    "status": "explained"
@@ -35644,7 +35605,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BT-26",
    "status": "explained"
@@ -35677,7 +35638,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BT-27",
    "status": "explained"
@@ -35710,7 +35671,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BT-28",
    "status": "explained"
@@ -35944,7 +35905,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BT-31",
    "status": "explained"
@@ -35978,7 +35939,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BT-32",
    "status": "explained"
@@ -36440,7 +36401,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BT-37",
    "status": "explained"
@@ -36473,7 +36434,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BT-38",
    "status": "explained"
@@ -36506,7 +36467,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BT-39",
    "status": "explained"
@@ -36848,7 +36809,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BT-43",
    "status": "explained"
@@ -36881,7 +36842,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BT-44",
    "status": "explained"
@@ -37071,7 +37032,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BT-45",
    "status": "explained"
@@ -37105,7 +37066,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BT-46",
    "status": "explained"
@@ -37371,7 +37332,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-2",
    "status": "explained"
@@ -37398,7 +37359,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-3",
    "status": "explained"
@@ -37463,7 +37424,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-4",
    "status": "explained"
@@ -37533,7 +37494,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-6",
    "status": "explained"
@@ -37580,7 +37541,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-7",
    "status": "explained"
@@ -37645,7 +37606,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-8",
    "status": "explained"
@@ -37672,7 +37633,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-9",
    "status": "explained"
@@ -37722,7 +37683,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-11",
    "status": "explained"
@@ -37747,7 +37708,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-12",
    "status": "explained"
@@ -37774,7 +37735,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-13",
    "status": "explained"
@@ -37819,7 +37780,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-14",
    "status": "explained"
@@ -37866,7 +37827,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-15",
    "status": "explained"
@@ -37891,7 +37852,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-16",
    "status": "explained"
@@ -37918,7 +37879,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-17",
    "status": "explained"
@@ -37945,7 +37906,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-18",
    "status": "explained"
@@ -37970,7 +37931,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-19",
    "status": "explained"
@@ -37997,7 +37958,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-20",
    "status": "explained"
@@ -38064,7 +38025,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-22",
    "status": "explained"
@@ -38091,7 +38052,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-23",
    "status": "explained"
@@ -38116,7 +38077,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-24",
    "status": "explained"
@@ -38141,7 +38102,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-25",
    "status": "explained"
@@ -38168,7 +38129,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-26",
    "status": "explained"
@@ -38218,7 +38179,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-28",
    "status": "explained"
@@ -38243,7 +38204,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-29",
    "status": "explained"
@@ -38270,7 +38231,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-30",
    "status": "explained"
@@ -38335,7 +38296,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-31",
    "status": "explained"
@@ -38362,7 +38323,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-32",
    "status": "explained"
@@ -38412,7 +38373,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-34",
    "status": "explained"
@@ -38437,7 +38398,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-35",
    "status": "explained"
@@ -38464,7 +38425,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-36",
    "status": "explained"
@@ -38509,7 +38470,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-37",
    "status": "explained"
@@ -38576,7 +38537,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-38",
    "status": "explained"
@@ -38601,7 +38562,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-39",
    "status": "explained"
@@ -38628,7 +38589,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-40",
    "status": "explained"
@@ -38693,7 +38654,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-41",
    "status": "explained"
@@ -38720,7 +38681,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-42",
    "status": "explained"
@@ -38790,7 +38751,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-45",
    "status": "explained"
@@ -38817,7 +38778,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-46",
    "status": "explained"
@@ -38842,7 +38803,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-47",
    "status": "explained"
@@ -38867,7 +38828,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-48",
    "status": "explained"
@@ -38894,7 +38855,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-49",
    "status": "explained"
@@ -39003,7 +38964,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-51",
    "status": "explained"
@@ -39093,7 +39054,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-54",
    "status": "explained"
@@ -39120,7 +39081,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-55",
    "status": "explained"
@@ -39145,7 +39106,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-56",
    "status": "explained"
@@ -39170,7 +39131,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-57",
    "status": "explained"
@@ -39197,7 +39158,7 @@
    ],
    "joint": false,
    "notes": [
-    "labels list the page rule's differences (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
+    "labels list the page rule's differences from the reference (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-58",
    "status": "explained"
@@ -39495,8 +39456,9 @@
    "borders": {
     "queries": 3,
     "results_listed": 27,
-    "qualified": 2,
+    "qualified": 3,
     "qualified_vendors": [
+     "Quilt Calculator (quiltcalculator.com)",
      "Designed to Quilt (designedtoquilt.com)",
      "Sew Becca (sewbecca.com)"
     ],
@@ -39508,7 +39470,7 @@
    }
   },
   "queries_total": 10,
-  "qualified_total": 8,
+  "qualified_total": 9,
   "qualified_not_driven": [
    {
     "vendor": "Quilt Calculator (quiltcalculator.com)",
