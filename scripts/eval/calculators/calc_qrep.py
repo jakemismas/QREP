@@ -43,6 +43,10 @@ def engine_provenance(start_sha: str) -> dict:
         "head": git("rev-parse", "HEAD"),
         "start_sha": git("rev-parse", start_sha),
         "qrep_tree": git("rev-parse", f"{start_sha}:qrep"),
+        # A report cannot name the commit that adds it; this tree id carries over unchanged
+        # into the commit that records the report, so any later commit can be checked.
+        "harness_tree": git("rev-parse", "HEAD:scripts/eval/calculators"),
+        "harness_uncommitted": bool(git("status", "--porcelain", "--", "scripts/eval/calculators")),
     }
 
 

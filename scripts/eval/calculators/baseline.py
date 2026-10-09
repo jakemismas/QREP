@@ -2196,6 +2196,9 @@ def render(ctx: dict) -> str:
         [
             ("qrep imported from", p["qrep_file"]),
             ("git HEAD", p["head"]),
+            ("Harness tree (scripts/eval/calculators at git HEAD)",
+             f"{p['harness_tree']}; uncommitted changes there: "
+             f"{'yes' if p['harness_uncommitted'] else 'none'}"),
             ("Start SHA", f"{p['start_sha']} (given as {p['start_sha_arg']})"),
             ("qrep tree at the start SHA", p["qrep_tree"]),
             ("OpenCV (cv2)", f"{p['cv2']}; decode path: {p['decode_path']}"),
@@ -2740,6 +2743,8 @@ def main(argv=None) -> int:
         "driver_command": driver_command,
         "qrep_file": engine["qrep_file"],
         "head": engine["head"],
+        "harness_tree": engine["harness_tree"],
+        "harness_uncommitted": engine["harness_uncommitted"],
         "start_sha": engine["start_sha"],
         "start_sha_arg": args.start_sha,
         "qrep_tree": engine["qrep_tree"],
