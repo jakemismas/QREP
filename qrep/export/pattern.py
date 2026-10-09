@@ -5,7 +5,7 @@ module into the qrep/export/pattern/ package and A4d switches build_pattern
 to the new document; until then it renders the sprint 1 booklet for the
 engine's own choice of method (strip when the grid has a repeating block,
 historical otherwise) and fills the summary from the same purchase lines and
-batting rule the booklet prints, so the screen and the PDF agree (PS-40).
+batting plan the booklet prints, so the screen and the PDF agree (PS-40).
 """
 
 import base64
@@ -13,10 +13,11 @@ import tempfile
 from pathlib import Path
 
 from qrep.construct import compute_purchase_lines, get_strategy, infer_block_structure
+from qrep.construct.finishing import batting_plan
 from qrep.construct.plan import ConstructionPlan
 from qrep.construct.yardage import YardageReport
 from qrep.contract import BattingSize, FabricLine, PatternResult, PatternSummary, PurchaseLine
-from qrep.export.pdf import BATTING_MARGIN_EIGHTHS, render_booklet
+from qrep.export.pdf import render_booklet
 from qrep.model.schema import Quilt
 
 # A square read below this confidence counts as uncertain: the mark the web
@@ -75,6 +76,8 @@ def _letter(index: int) -> str:
 def _summary(quilt: Quilt, method: str, reason: str, purchase: YardageReport) -> PatternSummary:
     top = {line.fabric_id: line.yards for line in purchase.lines if line.purpose == "top"}
     backing = next(line for line in purchase.lines if line.purpose == "backing")
+    wide = purchase.wide_back
+    batting = batting_plan(quilt.finished_width, quilt.finished_height, quilt.settings)
     uncertain = sum(
         value < UNCERTAIN_BELOW
         for row in quilt.center.effective_cell_confidence()
@@ -102,14 +105,12 @@ def _summary(quilt: Quilt, method: str, reason: str, purchase: YardageReport) ->
             if line.purpose == "binding"
         ],
         backing=PurchaseLine(fabric_id=None, name=backing.name, yards=backing.yards),
-        # Today's purchase lines have no wide-back option.
-        wide_back=None,
-        batting=BattingSize(
-            width=quilt.finished_width + BATTING_MARGIN_EIGHTHS,
-            height=quilt.finished_height + BATTING_MARGIN_EIGHTHS,
+        # Null when MATH.md F11 offers no wide back for this size.
+        wide_back=(
+            PurchaseLine(fabric_id=None, name=wide.name, yards=wide.yards) if wide else None
         ),
-        # One width serves the top and the backing in today's math.
+        batting=BattingSize(width=batting.width, height=batting.height),
         strip_width=quilt.settings.wof,
-        backing_width=quilt.settings.wof,
+        backing_width=quilt.settings.backing_width,
         uncertain_squares=uncertain,
     )

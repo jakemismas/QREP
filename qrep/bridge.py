@@ -65,6 +65,7 @@ from pathlib import Path
 from pydantic import BaseModel, ValidationError
 
 from qrep.construct import get_strategy
+from qrep.construct.finishing import batting_plan
 from qrep.construct.yardage import compute_purchase_lines
 from qrep.construct.strategies import STRATEGIES, infer_block_structure
 from qrep.contract import (
@@ -220,8 +221,9 @@ def _strategy(name):
 
 
 def _summary(quilt: Quilt) -> dict:
-    # Batting per PARITY item 9: finished dims + 4" per side = +64 eighths
-    # per axis (the same margin convention as the backing formula).
+    # One function serves every batting line (A1's batting_plan, MATH.md
+    # F12): finished size plus the backing margin, 64 eighths per axis.
+    batting = batting_plan(quilt.finished_width, quilt.finished_height, quilt.settings)
     counts: dict[str, int] = {}
     for row in quilt.center.cells:
         for fabric_id in row:
@@ -242,8 +244,8 @@ def _summary(quilt: Quilt) -> dict:
         ],
         "finished_width": quilt.finished_width,
         "finished_height": quilt.finished_height,
-        "batting_width": quilt.finished_width + quilt.settings.backing_margin,
-        "batting_height": quilt.finished_height + quilt.settings.backing_margin,
+        "batting_width": batting.width,
+        "batting_height": batting.height,
         "usable_width": quilt.settings.wof,
     }
 

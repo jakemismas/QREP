@@ -21,7 +21,7 @@ import pytest
 
 from qrep import bridge
 from qrep.construct import compute_purchase_lines, get_strategy
-from qrep.construct.yardage import BACKING_NAME
+from qrep.construct.yardage import backing_line, wide_back_line
 from qrep.contract import (
     BorderBand,
     Counts,
@@ -381,12 +381,24 @@ def test_export_pattern_returns_the_pdf_and_its_summary(model_json):
     # One letter per palette fabric, in palette order.
     assert [f["letter"] for f in summary["fabrics"]] == ["A", "B"]
     assert [f["name"] for f in summary["fabrics"]] == [f.name for f in quilt.palette.fabrics]
-    assert summary["backing"]["name"] == BACKING_NAME
-    assert summary["wide_back"] is None
-    # Batting: finished size plus 4in per side, 64 eighths per axis:
+    # The backing and wide-back lines are the purchase-line functions' own,
+    # whatever the method (one purchase-line function serves every export).
+    backing = backing_line(quilt)
+    assert summary["backing"] == {"fabric_id": None, "name": backing.name, "yards": backing.yards}
+    # Wide back (MATH.md F11, fixture settings): backing 600 + 64 = 664 by
+    # 720 + 64 = 784 eighths needs 2 or more 336-eighth panels, and both sides
+    # fit 864, so one piece of min(664, 784) = 664 eighths plus the 36-eighth
+    # one-piece allowance = 700; 700 / 72 rounds up to 10 quarter yards = 2.5.
+    assert summary["wide_back"] == {
+        "fabric_id": None,
+        "name": wide_back_line(quilt).name,
+        "yards": 2.5,
+    }
+    # Batting (MATH.md F12): finished size plus the 64-eighth backing margin,
     # 600 + 64 = 664 by 720 + 64 = 784 (83in x 98in).
     assert summary["batting"] == {"width": 664, "height": 784}
-    # Both width assumptions come from the fixture's settings: wof 336 (42in).
+    # Both width assumptions come from the fixture's settings: wof 336 for
+    # the strips and backing_width 336 for the backing (42in each).
     assert (summary["strip_width"], summary["backing_width"]) == (336, 336)
     # Authored data carries confidence 1.0, so no square is uncertain.
     assert summary["uncertain_squares"] == 0
