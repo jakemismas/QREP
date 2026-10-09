@@ -742,11 +742,14 @@ class Model:
     """A calculator modeled by its own page-script function in calc_rules rather than by a
     MATH.md parameter set. proxy is a MATH.md parameter set that matches the page on most rows;
     it names causes only on a row where it gives the model's value. causes, per quantity kind,
-    are the page rule's differences from MATH.md, used when the proxy does not fit."""
+    are the page rule's differences from MATH.md, used when the proxy does not fit. params are
+    the page's own values for parameters those causes name (the proxy's when None), so a cause
+    the page shares with the reference set is dropped (page_causes)."""
 
     fn: str
     proxy: dict | None = None
     causes: dict = field(default_factory=dict)
+    params: dict | None = None
 
 
 @dataclass(frozen=True)
@@ -881,12 +884,14 @@ REGISTRY: dict[str, Calc] = {
             "https://www.omnicalculator.com/everyday-life/quilt", ("backing", "batting"), False,
             "parse_omni_backing", _jobs_omni, _extract_omni, {},
             "calc_rules.omni_backing, from the page script",
-            fixed="non-directional fabric, additional overage 0 (the page adds 4 in per side)",
+            fixed="non-directional fabric, additional overage 0 (the page adds 4 in per side); "
+                  "batting size = its displayed pieces side by side (pieces x piece size)",
             models={
                 "backing": Model("omni_backing", None, {
                     "yards": ("seam loss", "allowance", "rounding increment or thirds",
                               _OMNI_RULE),
-                    "panels": ("seam loss", _OMNI_RULE)}),
+                    "panels": ("seam loss", _OMNI_RULE)},
+                    params={"s": 0, "allowance_pieced": 0, "allowance_one": 0}),
                 "batting": Model("omni_backing", None, {
                     "size": ("page rule: in batting mode a piece is (piece length + 8) / k wide",),
                     "size vertical": ("rounding increment or thirds",
@@ -1245,6 +1250,21 @@ def switch_labels(evaluate, ref, mine, today) -> tuple[list[str], bool]:
     return _dedupe(cause(p, today) for p in params), joint and bool(params)
 
 
+def page_causes(spec: Model, kind: str, ref: dict | None) -> list[str]:
+    # A cause stays unless every parameter it names is one the page shares with the reference
+    # (Omni's seam loss against today's s = 0); page-rule text names no parameter, so it stays.
+    causes = list(spec.causes.get(kind, ()))
+    page = spec.params if spec.params is not None else spec.proxy
+    if not page or not ref:
+        return causes
+
+    def shared(label: str) -> bool:
+        keys = [p for p, name in CAUSES.items() if name == label and p in page]
+        return bool(keys) and all(p in ref and ref[p] == page[p] for p in keys)
+
+    return [c for c in causes if not shared(c)]
+
+
 def _dedupe(items) -> list:
     seen, out = set(), []
     for item in items:
@@ -1433,9 +1453,9 @@ class Builder:
                         note = (f"labels from the proxy set ({_set_text('proxy', spec.proxy)}), "
                                 "which gives the page model's value on this row")  # fmt: skip
                         return labels, joint, [note]
-            note = (f"labels list the page rule's differences (calc_rules.{spec.fn}); no MATH.md "
-                    "parameter set reproduces this row")  # fmt: skip
-            return list(spec.causes.get(kind, ())), False, [note]
+            note = (f"labels list the page rule's differences from the reference "
+                    f"(calc_rules.{spec.fn}); no MATH.md parameter set reproduces this row")  # fmt: skip
+            return page_causes(spec, kind, ref), False, [note]
 
         return True, model, by_model, f"calc_rules.{spec.fn}"
 

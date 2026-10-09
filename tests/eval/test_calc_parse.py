@@ -1632,6 +1632,26 @@ def test_omni_width_split_batting_size_names_the_tenth_rounding():
     assert bl._size_kind(calc, _omni_job(50, 65, "42-batting")) == "size"
 
 
+def test_page_causes_drop_what_the_page_shares_with_the_reference():
+    # Omni adds no seam loss and no allowance (calc_rules.omni_backing), and neither does
+    # today's set (s = 0, allowances 0). 110 x 108 is 3 x 116 = 348 in for both, and
+    # 348 / 36 = 9.667 shows as 9.67 on Omni (up to 0.01) and 9 3/4 today (up to 1/4): only the
+    # rounding differs. MATH.md's set (s = 1, allowances 9 and 4 1/2) differs in all three.
+    omni = bl.REGISTRY["omni_backing"].models["backing"]
+    today, math_set = cr.BACKING_SETS["today"], cr.BACKING_SETS["math"]
+    assert bl.page_causes(omni, "yards", today) == ["rounding increment or thirds", bl._OMNI_RULE]
+    assert bl.page_causes(omni, "yards", math_set) == [
+        "seam loss", "allowance", "rounding increment or thirds", bl._OMNI_RULE,
+    ]  # fmt: skip
+    assert bl.page_causes(omni, "panels", today) == [bl._OMNI_RULE]
+    # The Stitch Desk's proxy set adds no allowance either, but its usable width is 40 in
+    # (42 - 2 selvage) against today's 42.
+    sd = bl.REGISTRY["stitchdesk_backing"].models["backing"]
+    assert "allowance" not in bl.page_causes(sd, "yards", today)
+    assert "allowance" in bl.page_causes(sd, "yards", math_set)
+    assert "fabric width" in bl.page_causes(sd, "yards", today)
+
+
 def test_dtq_border_center_60x72():
     # Top/bottom 60 + 2 x 4 + 1 = 69; sides 72 + 1 = 73; total 2 x 69 + 2 x 73 = 284.
     # strips = ceil((284 / 42 + 284) / 42) = ceil(290.76 / 42) = ceil(6.92) = 7 (about 1 in
