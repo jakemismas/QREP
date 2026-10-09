@@ -4,7 +4,9 @@
   "command": ".venv/Scripts/python scripts/eval/calculators/baseline.py --start-sha 3fa671e --work '<work>/.' --raw '<work>/raw.json' --raw '<work>/raw_retry.json' --shots scripts/eval/calculators/failures --out-json docs/sprint-5/evidence/D2-calculators-baseline.json --out-md docs/sprint-5/evidence/D2-calculators-baseline.md",
   "driver_command": null,
   "qrep_file": "C:\\Users\\Jake Mismas\\qrep-wt\\d2\\qrep\\__init__.py",
-  "head": "736f8b00a8c6d123b2f8a4499f0ad40cda83f8b2",
+  "head": "77e4b5cad46803b96fb1044027b6d4baf6fa8c7a",
+  "harness_tree": "2f8e01f1f9fac33b79d8d86cc807a57a77ab1583",
+  "harness_uncommitted": false,
   "start_sha": "3fa671ecc52f7939aa60bac11551bc68054faf6d",
   "start_sha_arg": "3fa671e",
   "qrep_tree": "59a4cc0314963b1422b74cde4f7303e9d21eb99e",
@@ -21417,7 +21419,7 @@
     "labels list the page rule's differences from the reference (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-8",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "backing",
@@ -21484,7 +21486,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-9",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "backing",
@@ -21510,7 +21512,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-10",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "backing",
@@ -21853,7 +21855,7 @@
     "labels list the page rule's differences from the reference (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-18",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "backing",
@@ -21920,7 +21922,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-19",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "backing",
@@ -21946,7 +21948,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-20",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "backing",
@@ -22432,7 +22434,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-28",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "backing",
@@ -22458,7 +22460,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-29",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "backing",
@@ -22853,7 +22855,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-33",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "backing",
@@ -22878,7 +22880,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-34",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "backing",
@@ -23224,7 +23226,7 @@
     "labels list the page rule's differences from the reference (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-42",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "backing",
@@ -23291,7 +23293,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-43",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "backing",
@@ -23317,7 +23319,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-44",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "backing",
@@ -23660,7 +23662,7 @@
     "labels list the page rule's differences from the reference (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-52",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "backing",
@@ -23727,7 +23729,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-53",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "backing",
@@ -23753,7 +23755,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-54",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "backing",
@@ -24239,7 +24241,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-62",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "backing",
@@ -24265,7 +24267,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-63",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "backing",
@@ -24667,7 +24669,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-68",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "backing",
@@ -24692,7 +24694,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-69",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "backing",
@@ -25122,7 +25124,7 @@
     "labels list the page rule's differences from the reference (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-80",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "backing",
@@ -25148,7 +25150,7 @@
     "labels list the page rule's differences from the reference (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-81",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "backing",
@@ -25175,7 +25177,7 @@
     "labels list the page rule's differences from the reference (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-82",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "backing",
@@ -25202,7 +25204,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-83",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "backing",
@@ -25227,7 +25229,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-84",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "backing",
@@ -25639,7 +25641,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-93",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "backing",
@@ -25665,7 +25667,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-94",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "backing",
@@ -26012,7 +26014,7 @@
     "labels list the page rule's differences from the reference (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-104",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "backing",
@@ -26059,7 +26061,7 @@
     "labels list the page rule's differences from the reference (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-105",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "backing",
@@ -26087,7 +26089,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-106",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "backing",
@@ -26112,7 +26114,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-107",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "backing",
@@ -26138,7 +26140,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-108",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "backing",
@@ -26514,7 +26516,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-112",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "backing",
@@ -26540,7 +26542,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-113",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "backing",
@@ -26813,7 +26815,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-116",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "backing",
@@ -26838,7 +26840,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-117",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "backing",
@@ -27184,7 +27186,7 @@
     "labels list the page rule's differences from the reference (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-125",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "backing",
@@ -27251,7 +27253,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-126",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "backing",
@@ -27277,7 +27279,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-127",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "backing",
@@ -27644,7 +27646,7 @@
     "labels list the page rule's differences from the reference (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-135",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "backing",
@@ -27671,7 +27673,7 @@
     "labels list the page rule's differences from the reference (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-136",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "backing",
@@ -27698,7 +27700,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-137",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "backing",
@@ -27723,7 +27725,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BK-138",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "backing",
@@ -29815,7 +29817,7 @@
     "labels list the page rule's differences from the reference (calc_rules.stitchdesk_binding); no MATH.md parameter set reproduces this row"
    ],
    "id": "BD-16",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "binding",
@@ -29860,10 +29862,11 @@
    ],
    "joint": true,
    "notes": [
-    "labels from the proxy set (proxy: U 40, w 2 1/2, extra 20, join_aware True, increment eighth), which gives the page model's value on this row"
+    "labels from the proxy set (proxy: U 40, w 2 1/2, extra 20, join_aware True, increment eighth), which gives the page model's value on this row",
+    "the labeled switches alone give 1/2, not the shown 5/8"
    ],
    "id": "BD-18",
-   "status": "explained"
+   "status": "unexplained"
   },
   {
    "line_type": "binding",
@@ -30711,7 +30714,8 @@
    "reproduced": true,
    "labels": [
     "fabric width",
-    "join loss (D-08)"
+    "join loss (D-08)",
+    "rounding increment or thirds"
    ],
    "joint": false,
    "notes": [],
@@ -30842,7 +30846,8 @@
    "reproduced": true,
    "labels": [
     "fabric width",
-    "join loss (D-08)"
+    "join loss (D-08)",
+    "binding extra length"
    ],
    "joint": false,
    "notes": [
@@ -30891,7 +30896,8 @@
    "reproduced": true,
    "labels": [
     "fabric width",
-    "join loss (D-08)"
+    "join loss (D-08)",
+    "rounding increment or thirds"
    ],
    "joint": false,
    "notes": [
@@ -30979,7 +30985,8 @@
    "rule_value": "7/8",
    "reproduced": true,
    "labels": [
-    "fabric width"
+    "fabric width",
+    "rounding increment or thirds"
    ],
    "joint": false,
    "notes": [],
@@ -31194,10 +31201,11 @@
    ],
    "joint": true,
    "notes": [
-    "labels from the proxy set (proxy: U 40, w 2 1/2, extra 20, join_aware True, increment eighth), which gives the page model's value on this row"
+    "labels from the proxy set (proxy: U 40, w 2 1/2, extra 20, join_aware True, increment eighth), which gives the page model's value on this row",
+    "the labeled switches alone give 11, not the shown 12"
    ],
    "id": "BD-52",
-   "status": "explained"
+   "status": "unexplained"
   },
   {
    "line_type": "binding",
@@ -31542,7 +31550,8 @@
    "reproduced": true,
    "labels": [
     "fabric width",
-    "join loss (D-08)"
+    "join loss (D-08)",
+    "binding extra length"
    ],
    "joint": false,
    "notes": [
@@ -32779,7 +32788,8 @@
    "reproduced": true,
    "labels": [
     "fabric width",
-    "join loss (D-08)"
+    "join loss (D-08)",
+    "rounding increment or thirds"
    ],
    "joint": false,
    "notes": [],
@@ -32955,7 +32965,8 @@
    "reproduced": true,
    "labels": [
     "fabric width",
-    "join loss (D-08)"
+    "join loss (D-08)",
+    "rounding increment or thirds"
    ],
    "joint": false,
    "notes": [
@@ -33043,7 +33054,8 @@
    "rule_value": "5/8",
    "reproduced": true,
    "labels": [
-    "fabric width"
+    "fabric width",
+    "rounding increment or thirds"
    ],
    "joint": false,
    "notes": [],
@@ -33534,7 +33546,8 @@
    "rule_value": "5/8",
    "reproduced": true,
    "labels": [
-    "binding extra length"
+    "binding extra length",
+    "rounding increment or thirds"
    ],
    "joint": false,
    "notes": [
@@ -34049,7 +34062,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BT-3",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "batting",
@@ -34082,7 +34095,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BT-4",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "batting",
@@ -34315,7 +34328,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BT-7",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "batting",
@@ -34348,7 +34361,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BT-8",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "batting",
@@ -34581,7 +34594,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BT-11",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "batting",
@@ -34614,7 +34627,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BT-12",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "batting",
@@ -35105,7 +35118,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BT-17",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "batting",
@@ -35138,7 +35151,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BT-18",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "batting",
@@ -35371,7 +35384,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BT-21",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "batting",
@@ -35404,7 +35417,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BT-22",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "batting",
@@ -35608,7 +35621,7 @@
     "labels list the page rule's differences from the reference (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BT-26",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "batting",
@@ -35641,7 +35654,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BT-27",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "batting",
@@ -35674,7 +35687,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BT-28",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "batting",
@@ -35908,7 +35921,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BT-31",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "batting",
@@ -35942,7 +35955,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BT-32",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "batting",
@@ -36404,7 +36417,7 @@
     "labels list the page rule's differences from the reference (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BT-37",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "batting",
@@ -36437,7 +36450,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BT-38",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "batting",
@@ -36470,7 +36483,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BT-39",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "batting",
@@ -36812,7 +36825,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BT-43",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "batting",
@@ -36845,7 +36858,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BT-44",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "batting",
@@ -37035,7 +37048,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BT-45",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "batting",
@@ -37069,7 +37082,7 @@
     "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
    ],
    "id": "BT-46",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "batting",
@@ -37305,10 +37318,13 @@
    "reproduced": true,
    "labels": [
     "border area (D-11)",
-    "rounding increment or thirds"
+    "rounding increment or thirds",
+    "pooled border strips"
    ],
    "joint": false,
-   "notes": [],
+   "notes": [
+    "MATH.md's strip set gives 1 here"
+   ],
    "id": "BR-1",
    "status": "explained"
   },
@@ -37332,10 +37348,11 @@
    ],
    "joint": false,
    "notes": [
+    "MATH.md's strip set gives 1 here",
     "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-2",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "borders",
@@ -37359,10 +37376,11 @@
    ],
    "joint": false,
    "notes": [
+    "MATH.md's strip set gives 1 here",
     "labels list the page rule's differences from the reference (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-3",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "borders",
@@ -37380,7 +37398,9 @@
    "reproduced": true,
    "labels": [],
    "joint": false,
-   "notes": [],
+   "notes": [
+    "MATH.md's strip set gives 1 1/4 here"
+   ],
    "id": null,
    "status": "match"
   },
@@ -37400,7 +37420,9 @@
    "reproduced": true,
    "labels": [],
    "joint": false,
-   "notes": [],
+   "notes": [
+    "MATH.md's strip set gives 1 1/4 here"
+   ],
    "id": null,
    "status": "match"
   },
@@ -37424,10 +37446,11 @@
    ],
    "joint": false,
    "notes": [
+    "MATH.md's strip set gives 1 1/4 here",
     "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-4",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "borders",
@@ -37445,7 +37468,9 @@
    "reproduced": true,
    "labels": [],
    "joint": false,
-   "notes": [],
+   "notes": [
+    "MATH.md's strip set gives 1 1/4 here"
+   ],
    "id": null,
    "status": "match"
   },
@@ -37465,10 +37490,13 @@
    "reproduced": true,
    "labels": [
     "border area (D-11)",
-    "rounding increment or thirds"
+    "rounding increment or thirds",
+    "pooled border strips"
    ],
    "joint": false,
-   "notes": [],
+   "notes": [
+    "MATH.md's strip set gives 1 1/4 here"
+   ],
    "id": "BR-5",
    "status": "explained"
   },
@@ -37494,10 +37522,11 @@
    ],
    "joint": false,
    "notes": [
+    "MATH.md's strip set gives 1 1/4 here",
     "labels list the page rule's differences from the reference (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-6",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "borders",
@@ -37515,7 +37544,9 @@
    "reproduced": true,
    "labels": [],
    "joint": false,
-   "notes": [],
+   "notes": [
+    "MATH.md's strip set gives 1 1/4 here"
+   ],
    "id": null,
    "status": "match"
   },
@@ -37541,10 +37572,11 @@
    ],
    "joint": false,
    "notes": [
+    "MATH.md's strip set gives 1 1/4 here",
     "labels list the page rule's differences from the reference (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-7",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "borders",
@@ -37562,7 +37594,9 @@
    "reproduced": true,
    "labels": [],
    "joint": false,
-   "notes": [],
+   "notes": [
+    "MATH.md's strip set gives 1 1/2 here"
+   ],
    "id": null,
    "status": "match"
   },
@@ -37582,7 +37616,9 @@
    "reproduced": true,
    "labels": [],
    "joint": false,
-   "notes": [],
+   "notes": [
+    "MATH.md's strip set gives 1 1/2 here"
+   ],
    "id": null,
    "status": "match"
   },
@@ -37606,10 +37642,11 @@
    ],
    "joint": false,
    "notes": [
+    "MATH.md's strip set gives 1 1/2 here",
     "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-8",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "borders",
@@ -37633,10 +37670,11 @@
    ],
    "joint": false,
    "notes": [
+    "MATH.md's strip set gives 1 1/2 here",
     "labels list the page rule's differences from the reference (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-9",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "borders",
@@ -37654,10 +37692,13 @@
    "reproduced": true,
    "labels": [
     "border area (D-11)",
-    "rounding increment or thirds"
+    "rounding increment or thirds",
+    "pooled border strips"
    ],
    "joint": false,
-   "notes": [],
+   "notes": [
+    "MATH.md's strip set gives 1 3/4 here"
+   ],
    "id": "BR-10",
    "status": "explained"
   },
@@ -37683,10 +37724,11 @@
    ],
    "joint": false,
    "notes": [
+    "MATH.md's strip set gives 1 3/4 here",
     "labels list the page rule's differences from the reference (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-11",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "borders",
@@ -37708,10 +37750,11 @@
    ],
    "joint": false,
    "notes": [
+    "MATH.md's strip set gives 1 3/4 here",
     "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-12",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "borders",
@@ -37735,10 +37778,11 @@
    ],
    "joint": false,
    "notes": [
+    "MATH.md's strip set gives 1 3/4 here",
     "labels list the page rule's differences from the reference (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-13",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "borders",
@@ -37756,7 +37800,9 @@
    "reproduced": true,
    "labels": [],
    "joint": false,
-   "notes": [],
+   "notes": [
+    "MATH.md's strip set gives 1 3/4 here"
+   ],
    "id": null,
    "status": "match"
   },
@@ -37780,10 +37826,11 @@
    ],
    "joint": false,
    "notes": [
+    "MATH.md's strip set gives 1 3/4 here",
     "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-14",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "borders",
@@ -37801,7 +37848,9 @@
    "reproduced": true,
    "labels": [],
    "joint": false,
-   "notes": [],
+   "notes": [
+    "MATH.md's strip set gives 1 3/4 here"
+   ],
    "id": null,
    "status": "match"
   },
@@ -37827,10 +37876,11 @@
    ],
    "joint": false,
    "notes": [
+    "MATH.md's strip set gives 1 3/4 here",
     "labels list the page rule's differences from the reference (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-15",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "borders",
@@ -37852,10 +37902,11 @@
    ],
    "joint": false,
    "notes": [
+    "MATH.md's strip set gives 1 3/4 here",
     "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-16",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "borders",
@@ -37879,10 +37930,11 @@
    ],
    "joint": false,
    "notes": [
+    "MATH.md's strip set gives 1 3/4 here",
     "labels list the page rule's differences from the reference (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-17",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "borders",
@@ -37906,10 +37958,11 @@
    ],
    "joint": false,
    "notes": [
+    "MATH.md's strip set gives 1 3/4 here",
     "labels list the page rule's differences from the reference (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-18",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "borders",
@@ -37931,10 +37984,11 @@
    ],
    "joint": false,
    "notes": [
+    "MATH.md's strip set gives 1 3/4 here",
     "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-19",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "borders",
@@ -37958,10 +38012,11 @@
    ],
    "joint": false,
    "notes": [
+    "MATH.md's strip set gives 1 3/4 here",
     "labels list the page rule's differences from the reference (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-20",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "borders",
@@ -38001,7 +38056,9 @@
    "reproduced": true,
    "labels": [],
    "joint": false,
-   "notes": [],
+   "notes": [
+    "MATH.md's strip set gives 1 1/2 here"
+   ],
    "id": null,
    "status": "match"
   },
@@ -38028,7 +38085,7 @@
     "labels list the page rule's differences from the reference (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-22",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "borders",
@@ -38052,10 +38109,11 @@
    ],
    "joint": false,
    "notes": [
+    "MATH.md's strip set gives 1 1/2 here",
     "labels list the page rule's differences from the reference (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-23",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "borders",
@@ -38080,7 +38138,7 @@
     "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-24",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "borders",
@@ -38102,10 +38160,11 @@
    ],
    "joint": false,
    "notes": [
+    "MATH.md's strip set gives 1 1/2 here",
     "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-25",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "borders",
@@ -38129,10 +38188,11 @@
    ],
    "joint": false,
    "notes": [
+    "MATH.md's strip set gives 1 1/2 here",
     "labels list the page rule's differences from the reference (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-26",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "borders",
@@ -38150,10 +38210,13 @@
    "reproduced": true,
    "labels": [
     "border area (D-11)",
-    "rounding increment or thirds"
+    "rounding increment or thirds",
+    "pooled border strips"
    ],
    "joint": false,
-   "notes": [],
+   "notes": [
+    "MATH.md's strip set gives 1 1/4 here"
+   ],
    "id": "BR-27",
    "status": "explained"
   },
@@ -38179,10 +38242,11 @@
    ],
    "joint": false,
    "notes": [
+    "MATH.md's strip set gives 1 1/4 here",
     "labels list the page rule's differences from the reference (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-28",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "borders",
@@ -38204,10 +38268,11 @@
    ],
    "joint": false,
    "notes": [
+    "MATH.md's strip set gives 1 1/4 here",
     "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-29",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "borders",
@@ -38231,10 +38296,11 @@
    ],
    "joint": false,
    "notes": [
+    "MATH.md's strip set gives 1 1/4 here",
     "labels list the page rule's differences from the reference (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-30",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "borders",
@@ -38252,7 +38318,9 @@
    "reproduced": true,
    "labels": [],
    "joint": false,
-   "notes": [],
+   "notes": [
+    "MATH.md's strip set gives 1 1/4 here"
+   ],
    "id": null,
    "status": "match"
   },
@@ -38272,7 +38340,9 @@
    "reproduced": true,
    "labels": [],
    "joint": false,
-   "notes": [],
+   "notes": [
+    "MATH.md's strip set gives 1 1/4 here"
+   ],
    "id": null,
    "status": "match"
   },
@@ -38296,10 +38366,11 @@
    ],
    "joint": false,
    "notes": [
+    "MATH.md's strip set gives 1 1/4 here",
     "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-31",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "borders",
@@ -38323,10 +38394,11 @@
    ],
    "joint": false,
    "notes": [
+    "MATH.md's strip set gives 1 1/4 here",
     "labels list the page rule's differences from the reference (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-32",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "borders",
@@ -38344,10 +38416,13 @@
    "reproduced": true,
    "labels": [
     "border area (D-11)",
-    "rounding increment or thirds"
+    "rounding increment or thirds",
+    "pooled border strips"
    ],
    "joint": false,
-   "notes": [],
+   "notes": [
+    "MATH.md's strip set gives 1 1/4 here"
+   ],
    "id": "BR-33",
    "status": "explained"
   },
@@ -38373,10 +38448,11 @@
    ],
    "joint": false,
    "notes": [
+    "MATH.md's strip set gives 1 1/4 here",
     "labels list the page rule's differences from the reference (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-34",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "borders",
@@ -38398,10 +38474,11 @@
    ],
    "joint": false,
    "notes": [
+    "MATH.md's strip set gives 1 1/4 here",
     "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-35",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "borders",
@@ -38425,10 +38502,11 @@
    ],
    "joint": false,
    "notes": [
+    "MATH.md's strip set gives 1 1/4 here",
     "labels list the page rule's differences from the reference (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-36",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "borders",
@@ -38446,7 +38524,9 @@
    "reproduced": true,
    "labels": [],
    "joint": false,
-   "notes": [],
+   "notes": [
+    "MATH.md's strip set gives 1 3/4 here"
+   ],
    "id": null,
    "status": "match"
   },
@@ -38470,10 +38550,11 @@
    ],
    "joint": false,
    "notes": [
+    "MATH.md's strip set gives 1 3/4 here",
     "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-37",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "borders",
@@ -38491,7 +38572,9 @@
    "reproduced": true,
    "labels": [],
    "joint": false,
-   "notes": [],
+   "notes": [
+    "MATH.md's strip set gives 1 3/4 here"
+   ],
    "id": null,
    "status": "match"
   },
@@ -38511,7 +38594,9 @@
    "reproduced": true,
    "labels": [],
    "joint": false,
-   "notes": [],
+   "notes": [
+    "MATH.md's strip set gives 1 1/4 here"
+   ],
    "id": null,
    "status": "match"
   },
@@ -38537,10 +38622,11 @@
    ],
    "joint": false,
    "notes": [
+    "MATH.md's strip set gives 1 1/4 here",
     "labels list the page rule's differences from the reference (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-38",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "borders",
@@ -38562,10 +38648,11 @@
    ],
    "joint": false,
    "notes": [
+    "MATH.md's strip set gives 1 1/4 here",
     "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-39",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "borders",
@@ -38589,10 +38676,11 @@
    ],
    "joint": false,
    "notes": [
+    "MATH.md's strip set gives 1 1/4 here",
     "labels list the page rule's differences from the reference (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-40",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "borders",
@@ -38610,7 +38698,9 @@
    "reproduced": true,
    "labels": [],
    "joint": false,
-   "notes": [],
+   "notes": [
+    "MATH.md's strip set gives 1 here"
+   ],
    "id": null,
    "status": "match"
   },
@@ -38630,7 +38720,9 @@
    "reproduced": true,
    "labels": [],
    "joint": false,
-   "notes": [],
+   "notes": [
+    "MATH.md's strip set gives 1 here"
+   ],
    "id": null,
    "status": "match"
   },
@@ -38654,10 +38746,11 @@
    ],
    "joint": false,
    "notes": [
+    "MATH.md's strip set gives 1 here",
     "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-41",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "borders",
@@ -38681,10 +38774,11 @@
    ],
    "joint": false,
    "notes": [
+    "MATH.md's strip set gives 1 here",
     "labels list the page rule's differences from the reference (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-42",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "borders",
@@ -38723,8 +38817,7 @@
    "rule_value": "3/8",
    "reproduced": true,
    "labels": [
-    "border area (D-11)",
-    "rounding increment or thirds"
+    "pooled border strips"
    ],
    "joint": false,
    "notes": [],
@@ -38754,7 +38847,7 @@
     "labels list the page rule's differences from the reference (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-45",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "borders",
@@ -38771,7 +38864,6 @@
    "rule_value": "3/8",
    "reproduced": true,
    "labels": [
-    "border area (D-11)",
     "pooled border strips",
     "rounding increment or thirds",
     "page rule: strips = ceil((T / fw + T) / fw), T = 2 (W + 2 b + 1) + 2 (L + 1)"
@@ -38781,7 +38873,7 @@
     "labels list the page rule's differences from the reference (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-46",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "borders",
@@ -38806,7 +38898,7 @@
     "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-47",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "borders",
@@ -38823,7 +38915,6 @@
    "rule_value": "1/4",
    "reproduced": true,
    "labels": [
-    "border area (D-11)",
     "page rule: yards = strips x b / fw (fabric width, not 36), up to 1/8 yd"
    ],
    "joint": false,
@@ -38831,7 +38922,7 @@
     "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-48",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "borders",
@@ -38848,7 +38939,6 @@
    "rule_value": "3/8",
    "reproduced": true,
    "labels": [
-    "border area (D-11)",
     "pooled border strips",
     "rounding increment or thirds",
     "page rule: strips = ceil((2 W + 2 L + 4 b + 12) / (fw - 1/2)), (b + 1/2) wide"
@@ -38858,7 +38948,7 @@
     "labels list the page rule's differences from the reference (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-49",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "borders",
@@ -38898,7 +38988,9 @@
    "reproduced": true,
    "labels": [],
    "joint": false,
-   "notes": [],
+   "notes": [
+    "MATH.md's strip set gives 3/4 here"
+   ],
    "id": null,
    "status": "match"
   },
@@ -38938,7 +39030,9 @@
    "reproduced": true,
    "labels": [],
    "joint": false,
-   "notes": [],
+   "notes": [
+    "MATH.md's strip set gives 1 1/2 here"
+   ],
    "id": null,
    "status": "match"
   },
@@ -38964,10 +39058,11 @@
    ],
    "joint": false,
    "notes": [
+    "MATH.md's strip set gives 3/4 here",
     "labels list the page rule's differences from the reference (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-51",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "borders",
@@ -38985,7 +39080,9 @@
    "reproduced": true,
    "labels": [],
    "joint": false,
-   "notes": [],
+   "notes": [
+    "MATH.md's strip set gives 1 1/2 here"
+   ],
    "id": null,
    "status": "match"
   },
@@ -39026,8 +39123,7 @@
    "rule_value": "1/8",
    "reproduced": true,
    "labels": [
-    "border area (D-11)",
-    "rounding increment or thirds"
+    "pooled border strips"
    ],
    "joint": false,
    "notes": [],
@@ -39057,7 +39153,7 @@
     "labels list the page rule's differences from the reference (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-54",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "borders",
@@ -39074,7 +39170,6 @@
    "rule_value": "1/8",
    "reproduced": true,
    "labels": [
-    "border area (D-11)",
     "pooled border strips",
     "rounding increment or thirds",
     "page rule: strips = ceil((T / fw + T) / fw), T = 2 (W + 2 b + 1) + 2 (L + 1)"
@@ -39084,7 +39179,7 @@
     "labels list the page rule's differences from the reference (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-55",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "borders",
@@ -39109,7 +39204,7 @@
     "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-56",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "borders",
@@ -39126,7 +39221,6 @@
    "rule_value": "1/8",
    "reproduced": true,
    "labels": [
-    "border area (D-11)",
     "page rule: yards = strips x b / fw (fabric width, not 36), up to 1/8 yd"
    ],
    "joint": false,
@@ -39134,7 +39228,7 @@
     "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-57",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "borders",
@@ -39151,7 +39245,6 @@
    "rule_value": "1/8",
    "reproduced": true,
    "labels": [
-    "border area (D-11)",
     "pooled border strips",
     "rounding increment or thirds",
     "page rule: strips = ceil((2 W + 2 L + 4 b + 12) / (fw - 1/2)), (b + 1/2) wide"
@@ -39161,7 +39254,7 @@
     "labels list the page rule's differences from the reference (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
    ],
    "id": "BR-58",
-   "status": "explained"
+   "status": "page rule"
   },
   {
    "line_type": "yield",
@@ -39483,7 +39576,2731 @@
   ],
   "rejected": 23
  },
- "unexplained": [],
+ "unexplained": [
+  {
+   "id": "BD-18",
+   "line_type": "binding",
+   "row": "60x72",
+   "calculator": "stitchdesk_binding",
+   "variant": "42",
+   "quantity": "yards",
+   "shown": "5/8",
+   "against": "QREP today",
+   "target": "1/2",
+   "rule": "calc_rules.stitchdesk_binding",
+   "rule_value": "5/8",
+   "labels": [
+    "rounding increment or thirds"
+   ],
+   "notes": [
+    "labels from the proxy set (proxy: U 40, w 2 1/2, extra 20, join_aware True, increment eighth), which gives the page model's value on this row",
+    "the labeled switches alone give 1/2, not the shown 5/8"
+   ],
+   "lead": "calc_rules.stitchdesk_binding, from the page script; Perimeter = 2 x (width + length); add 4 x strip width + 10 in for corners and closing join. Usable width = fabric width minus 2 in. Strip count is solved iteratively, adding strip width + 0.5 in loss per join. Yardage = strips x strip width / 36, rounded up to 1/8 yd. Bias branch uses a square-area estimate with a waste factor."
+  },
+  {
+   "id": "BD-52",
+   "line_type": "binding",
+   "row": "92.5x115",
+   "calculator": "stitchdesk_binding",
+   "variant": "42",
+   "quantity": "strips",
+   "shown": "12",
+   "against": "QREP today",
+   "target": "11",
+   "rule": "calc_rules.stitchdesk_binding",
+   "rule_value": "12",
+   "labels": [
+    "join loss (D-08)"
+   ],
+   "notes": [
+    "labels from the proxy set (proxy: U 40, w 2 1/2, extra 20, join_aware True, increment eighth), which gives the page model's value on this row",
+    "the labeled switches alone give 11, not the shown 12"
+   ],
+   "lead": "calc_rules.stitchdesk_binding, from the page script; Perimeter = 2 x (width + length); add 4 x strip width + 10 in for corners and closing join. Usable width = fabric width minus 2 in. Strip count is solved iteratively, adding strip width + 0.5 in loss per join. Yardage = strips x strip width / 36, rounded up to 1/8 yd. Bias branch uses a square-area estimate with a waste factor."
+  }
+ ],
+ "page_rule_only": [
+  {
+   "id": "BK-8",
+   "line_type": "backing",
+   "row": "36x52",
+   "calculator": "stitchdesk_backing",
+   "variant": "42",
+   "quantity": "yards",
+   "shown": "5/2",
+   "against": "QREP today",
+   "target": "7/2",
+   "rule": "calc_rules.stitchdesk_backing",
+   "rule_value": "5/2",
+   "labels": [
+    "orientation (D-01)",
+    "fabric width",
+    "rounding increment or thirds",
+    "page rule: usable = fabric width - 2 in selvage, panels = ceil(D / (usable - 1))"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.stitchdesk_backing, from the page script; Backing size = quilt size + 2 x overhang on each dimension. Usable width = fabric width minus 2 in selvage. One panel if the backing dimension fits within usable width; otherwise panels = ceil(dimension / (usable width minus 2 x seam allowance)). Both seam directions are compared and the smaller yardage is chosen (panels x cut length / 36), rounded up to the next 1/8 yd. Batting = quilt size + 2 x batting overhang, matched against a precut list. Read from the page's public /assets/calc.js."
+  },
+  {
+   "id": "BK-9",
+   "line_type": "backing",
+   "row": "36x52",
+   "calculator": "omni_backing",
+   "variant": "42",
+   "quantity": "yards",
+   "shown": "49/20",
+   "against": "V-BACK-03",
+   "target": "11/4",
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "49/20",
+   "labels": [
+    "seam loss",
+    "allowance",
+    "rounding increment or thirds",
+    "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BK-10",
+   "line_type": "backing",
+   "row": "36x52",
+   "calculator": "omni_backing",
+   "variant": "42",
+   "quantity": "yards",
+   "shown": "49/20",
+   "against": "QREP today",
+   "target": "7/2",
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "49/20",
+   "labels": [
+    "orientation (D-01)",
+    "rounding increment or thirds",
+    "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BK-18",
+   "line_type": "backing",
+   "row": "50x65",
+   "calculator": "stitchdesk_backing",
+   "variant": "42",
+   "quantity": "yards",
+   "shown": "13/4",
+   "against": "QREP today",
+   "target": "17/4",
+   "rule": "calc_rules.stitchdesk_backing",
+   "rule_value": "13/4",
+   "labels": [
+    "orientation (D-01)",
+    "fabric width",
+    "rounding increment or thirds",
+    "page rule: usable = fabric width - 2 in selvage, panels = ceil(D / (usable - 1))"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.stitchdesk_backing, from the page script; Backing size = quilt size + 2 x overhang on each dimension. Usable width = fabric width minus 2 in selvage. One panel if the backing dimension fits within usable width; otherwise panels = ceil(dimension / (usable width minus 2 x seam allowance)). Both seam directions are compared and the smaller yardage is chosen (panels x cut length / 36), rounded up to the next 1/8 yd. Batting = quilt size + 2 x batting overhang, matched against a precut list. Read from the page's public /assets/calc.js."
+  },
+  {
+   "id": "BK-19",
+   "line_type": "backing",
+   "row": "50x65",
+   "calculator": "omni_backing",
+   "variant": "42",
+   "quantity": "yards",
+   "shown": "323/100",
+   "against": "V-BACK-04",
+   "target": "7/2",
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "323/100",
+   "labels": [
+    "seam loss",
+    "allowance",
+    "rounding increment or thirds",
+    "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BK-20",
+   "line_type": "backing",
+   "row": "50x65",
+   "calculator": "omni_backing",
+   "variant": "42",
+   "quantity": "yards",
+   "shown": "323/100",
+   "against": "QREP today",
+   "target": "17/4",
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "323/100",
+   "labels": [
+    "orientation (D-01)",
+    "rounding increment or thirds",
+    "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BK-28",
+   "line_type": "backing",
+   "row": "60x72",
+   "calculator": "omni_backing",
+   "variant": "42",
+   "quantity": "yards",
+   "shown": "189/50",
+   "against": "V-BACK-02",
+   "target": "17/4",
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "189/50",
+   "labels": [
+    "seam loss",
+    "allowance",
+    "rounding increment or thirds",
+    "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BK-29",
+   "line_type": "backing",
+   "row": "60x72",
+   "calculator": "omni_backing",
+   "variant": "42",
+   "quantity": "yards",
+   "shown": "189/50",
+   "against": "QREP today",
+   "target": "9/2",
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "189/50",
+   "labels": [
+    "orientation (D-01)",
+    "rounding increment or thirds",
+    "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BK-33",
+   "line_type": "backing",
+   "row": "70x90",
+   "calculator": "omni_backing",
+   "variant": "42",
+   "quantity": "yards",
+   "shown": "109/20",
+   "against": "V-BACK-05",
+   "target": "23/4",
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "109/20",
+   "labels": [
+    "seam loss",
+    "allowance",
+    "rounding increment or thirds",
+    "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BK-34",
+   "line_type": "backing",
+   "row": "70x90",
+   "calculator": "omni_backing",
+   "variant": "42",
+   "quantity": "yards",
+   "shown": "109/20",
+   "against": "QREP today",
+   "target": "11/2",
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "109/20",
+   "labels": [
+    "rounding increment or thirds",
+    "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BK-42",
+   "line_type": "backing",
+   "row": "84x90",
+   "calculator": "stitchdesk_backing",
+   "variant": "42",
+   "quantity": "yards",
+   "shown": "31/4",
+   "against": "QREP today",
+   "target": "33/4",
+   "rule": "calc_rules.stitchdesk_backing",
+   "rule_value": "31/4",
+   "labels": [
+    "orientation (D-01)",
+    "fabric width",
+    "rounding increment or thirds",
+    "page rule: usable = fabric width - 2 in selvage, panels = ceil(D / (usable - 1))"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.stitchdesk_backing, from the page script; Backing size = quilt size + 2 x overhang on each dimension. Usable width = fabric width minus 2 in selvage. One panel if the backing dimension fits within usable width; otherwise panels = ceil(dimension / (usable width minus 2 x seam allowance)). Both seam directions are compared and the smaller yardage is chosen (panels x cut length / 36), rounded up to the next 1/8 yd. Batting = quilt size + 2 x batting overhang, matched against a precut list. Read from the page's public /assets/calc.js."
+  },
+  {
+   "id": "BK-43",
+   "line_type": "backing",
+   "row": "84x90",
+   "calculator": "omni_backing",
+   "variant": "42",
+   "quantity": "yards",
+   "shown": "767/100",
+   "against": "V-BACK-06",
+   "target": "8",
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "767/100",
+   "labels": [
+    "seam loss",
+    "allowance",
+    "rounding increment or thirds",
+    "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BK-44",
+   "line_type": "backing",
+   "row": "84x90",
+   "calculator": "omni_backing",
+   "variant": "42",
+   "quantity": "yards",
+   "shown": "767/100",
+   "against": "QREP today",
+   "target": "33/4",
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "767/100",
+   "labels": [
+    "orientation (D-01)",
+    "rounding increment or thirds",
+    "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BK-52",
+   "line_type": "backing",
+   "row": "90x108",
+   "calculator": "stitchdesk_backing",
+   "variant": "42",
+   "quantity": "yards",
+   "shown": "33/4",
+   "against": "QREP today",
+   "target": "39/4",
+   "rule": "calc_rules.stitchdesk_backing",
+   "rule_value": "33/4",
+   "labels": [
+    "orientation (D-01)",
+    "fabric width",
+    "rounding increment or thirds",
+    "page rule: usable = fabric width - 2 in selvage, panels = ceil(D / (usable - 1))"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.stitchdesk_backing, from the page script; Backing size = quilt size + 2 x overhang on each dimension. Usable width = fabric width minus 2 in selvage. One panel if the backing dimension fits within usable width; otherwise panels = ceil(dimension / (usable width minus 2 x seam allowance)). Both seam directions are compared and the smaller yardage is chosen (panels x cut length / 36), rounded up to the next 1/8 yd. Batting = quilt size + 2 x batting overhang, matched against a precut list. Read from the page's public /assets/calc.js."
+  },
+  {
+   "id": "BK-53",
+   "line_type": "backing",
+   "row": "90x108",
+   "calculator": "omni_backing",
+   "variant": "42",
+   "quantity": "yards",
+   "shown": "817/100",
+   "against": "V-BACK-07",
+   "target": "17/2",
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "817/100",
+   "labels": [
+    "seam loss",
+    "allowance",
+    "rounding increment or thirds",
+    "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BK-54",
+   "line_type": "backing",
+   "row": "90x108",
+   "calculator": "omni_backing",
+   "variant": "42",
+   "quantity": "yards",
+   "shown": "817/100",
+   "against": "QREP today",
+   "target": "39/4",
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "817/100",
+   "labels": [
+    "orientation (D-01)",
+    "rounding increment or thirds",
+    "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BK-62",
+   "line_type": "backing",
+   "row": "92.5x115",
+   "calculator": "omni_backing",
+   "variant": "42",
+   "quantity": "yards",
+   "shown": "419/50",
+   "against": "V-BACK-01",
+   "target": "35/4",
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "419/50",
+   "labels": [
+    "seam loss",
+    "allowance",
+    "rounding increment or thirds",
+    "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BK-63",
+   "line_type": "backing",
+   "row": "92.5x115",
+   "calculator": "omni_backing",
+   "variant": "42",
+   "quantity": "yards",
+   "shown": "419/50",
+   "against": "QREP today",
+   "target": "41/4",
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "419/50",
+   "labels": [
+    "orientation (D-01)",
+    "rounding increment or thirds",
+    "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BK-68",
+   "line_type": "backing",
+   "row": "110x108",
+   "calculator": "omni_backing",
+   "variant": "42",
+   "quantity": "yards",
+   "shown": "967/100",
+   "against": "V-BACK-08",
+   "target": "10",
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "967/100",
+   "labels": [
+    "seam loss",
+    "allowance",
+    "rounding increment or thirds",
+    "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BK-69",
+   "line_type": "backing",
+   "row": "110x108",
+   "calculator": "omni_backing",
+   "variant": "42",
+   "quantity": "yards",
+   "shown": "967/100",
+   "against": "QREP today",
+   "target": "39/4",
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "967/100",
+   "labels": [
+    "rounding increment or thirds",
+    "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BK-80",
+   "line_type": "backing",
+   "row": "75x90",
+   "calculator": "stitchdesk_backing",
+   "variant": "42",
+   "quantity": "yards",
+   "shown": "7",
+   "against": "QREP today",
+   "target": "11/2",
+   "rule": "calc_rules.stitchdesk_backing",
+   "rule_value": "7",
+   "labels": [
+    "orientation (D-01)",
+    "fabric width",
+    "rounding increment or thirds",
+    "page rule: usable = fabric width - 2 in selvage, panels = ceil(D / (usable - 1))"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.stitchdesk_backing, from the page script; Backing size = quilt size + 2 x overhang on each dimension. Usable width = fabric width minus 2 in selvage. One panel if the backing dimension fits within usable width; otherwise panels = ceil(dimension / (usable width minus 2 x seam allowance)). Both seam directions are compared and the smaller yardage is chosen (panels x cut length / 36), rounded up to the next 1/8 yd. Batting = quilt size + 2 x batting overhang, matched against a precut list. Read from the page's public /assets/calc.js."
+  },
+  {
+   "id": "BK-81",
+   "line_type": "backing",
+   "row": "75x90",
+   "calculator": "stitchdesk_backing",
+   "variant": "42",
+   "quantity": "panels",
+   "shown": "3",
+   "against": "V-BACK-09",
+   "target": "2",
+   "rule": "calc_rules.stitchdesk_backing",
+   "rule_value": "3",
+   "labels": [
+    "orientation",
+    "fabric width",
+    "page rule: usable = fabric width - 2 in selvage, panels = ceil(D / (usable - 1))"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.stitchdesk_backing, from the page script; Backing size = quilt size + 2 x overhang on each dimension. Usable width = fabric width minus 2 in selvage. One panel if the backing dimension fits within usable width; otherwise panels = ceil(dimension / (usable width minus 2 x seam allowance)). Both seam directions are compared and the smaller yardage is chosen (panels x cut length / 36), rounded up to the next 1/8 yd. Batting = quilt size + 2 x batting overhang, matched against a precut list. Read from the page's public /assets/calc.js."
+  },
+  {
+   "id": "BK-82",
+   "line_type": "backing",
+   "row": "75x90",
+   "calculator": "stitchdesk_backing",
+   "variant": "42",
+   "quantity": "panels",
+   "shown": "3",
+   "against": "QREP today",
+   "target": "2",
+   "rule": "calc_rules.stitchdesk_backing",
+   "rule_value": "3",
+   "labels": [
+    "orientation (D-01)",
+    "fabric width",
+    "seam loss",
+    "page rule: usable = fabric width - 2 in selvage, panels = ceil(D / (usable - 1))"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.stitchdesk_backing, from the page script; Backing size = quilt size + 2 x overhang on each dimension. Usable width = fabric width minus 2 in selvage. One panel if the backing dimension fits within usable width; otherwise panels = ceil(dimension / (usable width minus 2 x seam allowance)). Both seam directions are compared and the smaller yardage is chosen (panels x cut length / 36), rounded up to the next 1/8 yd. Batting = quilt size + 2 x batting overhang, matched against a precut list. Read from the page's public /assets/calc.js."
+  },
+  {
+   "id": "BK-83",
+   "line_type": "backing",
+   "row": "75x90",
+   "calculator": "omni_backing",
+   "variant": "42",
+   "quantity": "yards",
+   "shown": "109/20",
+   "against": "V-BACK-09",
+   "target": "23/4",
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "109/20",
+   "labels": [
+    "seam loss",
+    "allowance",
+    "rounding increment or thirds",
+    "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BK-84",
+   "line_type": "backing",
+   "row": "75x90",
+   "calculator": "omni_backing",
+   "variant": "42",
+   "quantity": "yards",
+   "shown": "109/20",
+   "against": "QREP today",
+   "target": "11/2",
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "109/20",
+   "labels": [
+    "rounding increment or thirds",
+    "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BK-93",
+   "line_type": "backing",
+   "row": "42x52",
+   "calculator": "omni_backing",
+   "variant": "42",
+   "quantity": "yards",
+   "shown": "139/50",
+   "against": "V-BACK-11",
+   "target": "13/4",
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "139/50",
+   "labels": [
+    "seam loss",
+    "allowance",
+    "rounding increment or thirds",
+    "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BK-94",
+   "line_type": "backing",
+   "row": "42x52",
+   "calculator": "omni_backing",
+   "variant": "42",
+   "quantity": "yards",
+   "shown": "139/50",
+   "against": "QREP today",
+   "target": "7/2",
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "139/50",
+   "labels": [
+    "orientation (D-01)",
+    "rounding increment or thirds",
+    "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BK-104",
+   "line_type": "backing",
+   "row": "76x85",
+   "calculator": "stitchdesk_backing",
+   "variant": "42",
+   "quantity": "yards",
+   "shown": "7",
+   "against": "QREP today",
+   "target": "21/4",
+   "rule": "calc_rules.stitchdesk_backing",
+   "rule_value": "7",
+   "labels": [
+    "orientation (D-01)",
+    "fabric width",
+    "rounding increment or thirds",
+    "page rule: usable = fabric width - 2 in selvage, panels = ceil(D / (usable - 1))"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.stitchdesk_backing, from the page script; Backing size = quilt size + 2 x overhang on each dimension. Usable width = fabric width minus 2 in selvage. One panel if the backing dimension fits within usable width; otherwise panels = ceil(dimension / (usable width minus 2 x seam allowance)). Both seam directions are compared and the smaller yardage is chosen (panels x cut length / 36), rounded up to the next 1/8 yd. Batting = quilt size + 2 x batting overhang, matched against a precut list. Read from the page's public /assets/calc.js."
+  },
+  {
+   "id": "BK-105",
+   "line_type": "backing",
+   "row": "76x85",
+   "calculator": "stitchdesk_backing",
+   "variant": "42",
+   "quantity": "panels",
+   "shown": "3",
+   "against": "QREP today",
+   "target": "2",
+   "rule": "calc_rules.stitchdesk_backing",
+   "rule_value": "3",
+   "labels": [
+    "orientation (D-01)",
+    "fabric width",
+    "seam loss",
+    "page rule: usable = fabric width - 2 in selvage, panels = ceil(D / (usable - 1))"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.stitchdesk_backing, from the page script; Backing size = quilt size + 2 x overhang on each dimension. Usable width = fabric width minus 2 in selvage. One panel if the backing dimension fits within usable width; otherwise panels = ceil(dimension / (usable width minus 2 x seam allowance)). Both seam directions are compared and the smaller yardage is chosen (panels x cut length / 36), rounded up to the next 1/8 yd. Batting = quilt size + 2 x batting overhang, matched against a precut list. Read from the page's public /assets/calc.js."
+  },
+  {
+   "id": "BK-106",
+   "line_type": "backing",
+   "row": "76x85",
+   "calculator": "omni_backing",
+   "variant": "42",
+   "quantity": "yards",
+   "shown": "517/100",
+   "against": "V-BACK-10",
+   "target": "29/4",
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "517/100",
+   "labels": [
+    "orientation",
+    "seam loss",
+    "allowance",
+    "rounding increment or thirds",
+    "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BK-107",
+   "line_type": "backing",
+   "row": "76x85",
+   "calculator": "omni_backing",
+   "variant": "42",
+   "quantity": "yards",
+   "shown": "517/100",
+   "against": "QREP today",
+   "target": "21/4",
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "517/100",
+   "labels": [
+    "rounding increment or thirds",
+    "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BK-108",
+   "line_type": "backing",
+   "row": "76x85",
+   "calculator": "omni_backing",
+   "variant": "42",
+   "quantity": "panels",
+   "shown": "2",
+   "against": "V-BACK-10",
+   "target": "3",
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "2",
+   "labels": [
+    "orientation",
+    "seam loss",
+    "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BK-112",
+   "line_type": "backing",
+   "row": "68x68",
+   "calculator": "omni_backing",
+   "variant": "42",
+   "quantity": "yards",
+   "shown": "423/100",
+   "against": "V-BACK-13",
+   "target": "9/2",
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "423/100",
+   "labels": [
+    "orientation",
+    "seam loss",
+    "allowance",
+    "rounding increment or thirds",
+    "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BK-113",
+   "line_type": "backing",
+   "row": "68x68",
+   "calculator": "omni_backing",
+   "variant": "42",
+   "quantity": "yards",
+   "shown": "423/100",
+   "against": "QREP today",
+   "target": "17/4",
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "423/100",
+   "labels": [
+    "orientation (D-01)",
+    "rounding increment or thirds",
+    "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BK-116",
+   "line_type": "backing",
+   "row": "102.5x120",
+   "calculator": "omni_backing",
+   "variant": "42",
+   "quantity": "yards",
+   "shown": "1067/100",
+   "against": "V-BACK-16",
+   "target": "11",
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "1067/100",
+   "labels": [
+    "seam loss",
+    "allowance",
+    "rounding increment or thirds",
+    "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BK-117",
+   "line_type": "backing",
+   "row": "102.5x120",
+   "calculator": "omni_backing",
+   "variant": "42",
+   "quantity": "yards",
+   "shown": "1067/100",
+   "against": "QREP today",
+   "target": "43/4",
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "1067/100",
+   "labels": [
+    "rounding increment or thirds",
+    "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BK-125",
+   "line_type": "backing",
+   "row": "58x66",
+   "calculator": "stitchdesk_backing",
+   "variant": "42",
+   "quantity": "yards",
+   "shown": "15/4",
+   "against": "QREP today",
+   "target": "17/4",
+   "rule": "calc_rules.stitchdesk_backing",
+   "rule_value": "15/4",
+   "labels": [
+    "orientation (D-01)",
+    "fabric width",
+    "rounding increment or thirds",
+    "page rule: usable = fabric width - 2 in selvage, panels = ceil(D / (usable - 1))"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.stitchdesk_backing, from the page script; Backing size = quilt size + 2 x overhang on each dimension. Usable width = fabric width minus 2 in selvage. One panel if the backing dimension fits within usable width; otherwise panels = ceil(dimension / (usable width minus 2 x seam allowance)). Both seam directions are compared and the smaller yardage is chosen (panels x cut length / 36), rounded up to the next 1/8 yd. Batting = quilt size + 2 x batting overhang, matched against a precut list. Read from the page's public /assets/calc.js."
+  },
+  {
+   "id": "BK-126",
+   "line_type": "backing",
+   "row": "58x66",
+   "calculator": "omni_backing",
+   "variant": "42",
+   "quantity": "yards",
+   "shown": "367/100",
+   "against": "V-BACK-23",
+   "target": "4",
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "367/100",
+   "labels": [
+    "seam loss",
+    "allowance",
+    "rounding increment or thirds",
+    "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BK-127",
+   "line_type": "backing",
+   "row": "58x66",
+   "calculator": "omni_backing",
+   "variant": "42",
+   "quantity": "yards",
+   "shown": "367/100",
+   "against": "QREP today",
+   "target": "17/4",
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "367/100",
+   "labels": [
+    "orientation (D-01)",
+    "rounding increment or thirds",
+    "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BK-135",
+   "line_type": "backing",
+   "row": "24x58",
+   "calculator": "stitchdesk_backing",
+   "variant": "42",
+   "quantity": "panels",
+   "shown": "2",
+   "against": "V-BACK-14",
+   "target": "1",
+   "rule": "calc_rules.stitchdesk_backing",
+   "rule_value": "2",
+   "labels": [
+    "orientation",
+    "fabric width",
+    "page rule: usable = fabric width - 2 in selvage, panels = ceil(D / (usable - 1))"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.stitchdesk_backing, from the page script; Backing size = quilt size + 2 x overhang on each dimension. Usable width = fabric width minus 2 in selvage. One panel if the backing dimension fits within usable width; otherwise panels = ceil(dimension / (usable width minus 2 x seam allowance)). Both seam directions are compared and the smaller yardage is chosen (panels x cut length / 36), rounded up to the next 1/8 yd. Batting = quilt size + 2 x batting overhang, matched against a precut list. Read from the page's public /assets/calc.js."
+  },
+  {
+   "id": "BK-136",
+   "line_type": "backing",
+   "row": "24x58",
+   "calculator": "stitchdesk_backing",
+   "variant": "42",
+   "quantity": "panels",
+   "shown": "2",
+   "against": "QREP today",
+   "target": "1",
+   "rule": "calc_rules.stitchdesk_backing",
+   "rule_value": "2",
+   "labels": [
+    "orientation (D-01)",
+    "fabric width",
+    "seam loss",
+    "page rule: usable = fabric width - 2 in selvage, panels = ceil(D / (usable - 1))"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.stitchdesk_backing, from the page script; Backing size = quilt size + 2 x overhang on each dimension. Usable width = fabric width minus 2 in selvage. One panel if the backing dimension fits within usable width; otherwise panels = ceil(dimension / (usable width minus 2 x seam allowance)). Both seam directions are compared and the smaller yardage is chosen (panels x cut length / 36), rounded up to the next 1/8 yd. Batting = quilt size + 2 x batting overhang, matched against a precut list. Read from the page's public /assets/calc.js."
+  },
+  {
+   "id": "BK-137",
+   "line_type": "backing",
+   "row": "24x58",
+   "calculator": "omni_backing",
+   "variant": "42",
+   "quantity": "yards",
+   "shown": "46/25",
+   "against": "V-BACK-14",
+   "target": "2",
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "46/25",
+   "labels": [
+    "seam loss",
+    "allowance",
+    "rounding increment or thirds",
+    "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BK-138",
+   "line_type": "backing",
+   "row": "24x58",
+   "calculator": "omni_backing",
+   "variant": "42",
+   "quantity": "yards",
+   "shown": "46/25",
+   "against": "QREP today",
+   "target": "2",
+   "rule": "calc_rules.omni_backing",
+   "rule_value": "46/25",
+   "labels": [
+    "rounding increment or thirds",
+    "page rule: pieces = the fewest of 2 to 5 that fit the bolt, no seam loss, yards up to 0.01"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BD-16",
+   "line_type": "binding",
+   "row": "60x72",
+   "calculator": "stitchdesk_binding",
+   "variant": "42",
+   "quantity": "strips",
+   "shown": "8",
+   "against": "QREP today",
+   "target": "7",
+   "rule": "calc_rules.stitchdesk_binding",
+   "rule_value": "8",
+   "labels": [
+    "binding extra length",
+    "join loss",
+    "page rule: 4 x strip width + 10 in extra, 1/2 in more per join, usable = fabric width - 2"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.stitchdesk_binding); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.stitchdesk_binding, from the page script; Perimeter = 2 x (width + length); add 4 x strip width + 10 in for corners and closing join. Usable width = fabric width minus 2 in. Strip count is solved iteratively, adding strip width + 0.5 in loss per join. Yardage = strips x strip width / 36, rounded up to 1/8 yd. Bias branch uses a square-area estimate with a waste factor."
+  },
+  {
+   "id": "BT-3",
+   "line_type": "batting",
+   "row": "36x52",
+   "calculator": "omni_backing",
+   "variant": "42-batting",
+   "quantity": "size (in)",
+   "shown": [
+    "44",
+    "52"
+   ],
+   "against": "V-BATT-02",
+   "target": [
+    "44",
+    "60"
+   ],
+   "rule": "calc_rules.omni_backing",
+   "rule_value": [
+    "44",
+    "52"
+   ],
+   "labels": [
+    "page rule: in batting mode a piece is (piece length + 8) / k wide"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BT-4",
+   "line_type": "batting",
+   "row": "36x52",
+   "calculator": "omni_backing",
+   "variant": "42-batting",
+   "quantity": "size (in)",
+   "shown": [
+    "44",
+    "52"
+   ],
+   "against": "QREP today",
+   "target": [
+    "44",
+    "60"
+   ],
+   "rule": "calc_rules.omni_backing",
+   "rule_value": [
+    "44",
+    "52"
+   ],
+   "labels": [
+    "page rule: in batting mode a piece is (piece length + 8) / k wide"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BT-7",
+   "line_type": "batting",
+   "row": "50x65",
+   "calculator": "omni_backing",
+   "variant": "42-batting",
+   "quantity": "size (in)",
+   "shown": [
+    "58",
+    "66"
+   ],
+   "against": "V-BATT-04",
+   "target": [
+    "58",
+    "73"
+   ],
+   "rule": "calc_rules.omni_backing",
+   "rule_value": [
+    "58",
+    "66"
+   ],
+   "labels": [
+    "page rule: in batting mode a piece is (piece length + 8) / k wide"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BT-8",
+   "line_type": "batting",
+   "row": "50x65",
+   "calculator": "omni_backing",
+   "variant": "42-batting",
+   "quantity": "size (in)",
+   "shown": [
+    "58",
+    "66"
+   ],
+   "against": "QREP today",
+   "target": [
+    "58",
+    "73"
+   ],
+   "rule": "calc_rules.omni_backing",
+   "rule_value": [
+    "58",
+    "66"
+   ],
+   "labels": [
+    "page rule: in batting mode a piece is (piece length + 8) / k wide"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BT-11",
+   "line_type": "batting",
+   "row": "60x72",
+   "calculator": "omni_backing",
+   "variant": "42-batting",
+   "quantity": "size (in)",
+   "shown": [
+    "68",
+    "76"
+   ],
+   "against": "V-BATT-03",
+   "target": [
+    "68",
+    "80"
+   ],
+   "rule": "calc_rules.omni_backing",
+   "rule_value": [
+    "68",
+    "76"
+   ],
+   "labels": [
+    "page rule: in batting mode a piece is (piece length + 8) / k wide"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BT-12",
+   "line_type": "batting",
+   "row": "60x72",
+   "calculator": "omni_backing",
+   "variant": "42-batting",
+   "quantity": "size (in)",
+   "shown": [
+    "68",
+    "76"
+   ],
+   "against": "QREP today",
+   "target": [
+    "68",
+    "80"
+   ],
+   "rule": "calc_rules.omni_backing",
+   "rule_value": [
+    "68",
+    "76"
+   ],
+   "labels": [
+    "page rule: in batting mode a piece is (piece length + 8) / k wide"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BT-17",
+   "line_type": "batting",
+   "row": "84x90",
+   "calculator": "omni_backing",
+   "variant": "42-batting",
+   "quantity": "size (in)",
+   "shown": [
+    "92",
+    "501/5"
+   ],
+   "against": "V-BATT-06",
+   "target": [
+    "92",
+    "98"
+   ],
+   "rule": "calc_rules.omni_backing",
+   "rule_value": [
+    "92",
+    "501/5"
+   ],
+   "labels": [
+    "page rule: in batting mode a piece is (piece length + 8) / k wide"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BT-18",
+   "line_type": "batting",
+   "row": "84x90",
+   "calculator": "omni_backing",
+   "variant": "42-batting",
+   "quantity": "size (in)",
+   "shown": [
+    "92",
+    "501/5"
+   ],
+   "against": "QREP today",
+   "target": [
+    "92",
+    "98"
+   ],
+   "rule": "calc_rules.omni_backing",
+   "rule_value": [
+    "92",
+    "501/5"
+   ],
+   "labels": [
+    "page rule: in batting mode a piece is (piece length + 8) / k wide"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BT-21",
+   "line_type": "batting",
+   "row": "90x108",
+   "calculator": "omni_backing",
+   "variant": "42-batting",
+   "quantity": "size (in)",
+   "shown": [
+    "98",
+    "531/5"
+   ],
+   "against": "V-BATT-07",
+   "target": [
+    "98",
+    "116"
+   ],
+   "rule": "calc_rules.omni_backing",
+   "rule_value": [
+    "98",
+    "531/5"
+   ],
+   "labels": [
+    "page rule: in batting mode a piece is (piece length + 8) / k wide"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BT-22",
+   "line_type": "batting",
+   "row": "90x108",
+   "calculator": "omni_backing",
+   "variant": "42-batting",
+   "quantity": "size (in)",
+   "shown": [
+    "98",
+    "531/5"
+   ],
+   "against": "QREP today",
+   "target": [
+    "98",
+    "116"
+   ],
+   "rule": "calc_rules.omni_backing",
+   "rule_value": [
+    "98",
+    "531/5"
+   ],
+   "labels": [
+    "page rule: in batting mode a piece is (piece length + 8) / k wide"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BT-26",
+   "line_type": "batting",
+   "row": "92.5x115",
+   "calculator": "stitchdesk_backing",
+   "variant": "42",
+   "quantity": "package",
+   "shown": "off the roll",
+   "against": "V-BATT-08",
+   "target": "king",
+   "rule": "calc_rules.stitchdesk_backing",
+   "rule_value": "off the roll",
+   "labels": [
+    "page rule: its own precut table, Craft to King"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.stitchdesk_backing, from the page script; Backing size = quilt size + 2 x overhang on each dimension. Usable width = fabric width minus 2 in selvage. One panel if the backing dimension fits within usable width; otherwise panels = ceil(dimension / (usable width minus 2 x seam allowance)). Both seam directions are compared and the smaller yardage is chosen (panels x cut length / 36), rounded up to the next 1/8 yd. Batting = quilt size + 2 x batting overhang, matched against a precut list. Read from the page's public /assets/calc.js."
+  },
+  {
+   "id": "BT-27",
+   "line_type": "batting",
+   "row": "92.5x115",
+   "calculator": "omni_backing",
+   "variant": "42-batting",
+   "quantity": "size (in)",
+   "shown": [
+    "201/2",
+    "543/5"
+   ],
+   "against": "V-BATT-08",
+   "target": [
+    "201/2",
+    "123"
+   ],
+   "rule": "calc_rules.omni_backing",
+   "rule_value": [
+    "201/2",
+    "543/5"
+   ],
+   "labels": [
+    "page rule: in batting mode a piece is (piece length + 8) / k wide"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BT-28",
+   "line_type": "batting",
+   "row": "92.5x115",
+   "calculator": "omni_backing",
+   "variant": "42-batting",
+   "quantity": "size (in)",
+   "shown": [
+    "201/2",
+    "543/5"
+   ],
+   "against": "QREP today",
+   "target": [
+    "201/2",
+    "123"
+   ],
+   "rule": "calc_rules.omni_backing",
+   "rule_value": [
+    "201/2",
+    "543/5"
+   ],
+   "labels": [
+    "page rule: in batting mode a piece is (piece length + 8) / k wide"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BT-31",
+   "line_type": "batting",
+   "row": "110x108",
+   "calculator": "omni_backing",
+   "variant": "42-batting",
+   "quantity": "size (in)",
+   "shown": [
+    "591/5",
+    "116"
+   ],
+   "against": "V-BATT-09",
+   "target": [
+    "118",
+    "116"
+   ],
+   "rule": "calc_rules.omni_backing",
+   "rule_value": [
+    "591/5",
+    "116"
+   ],
+   "labels": [
+    "rounding increment or thirds",
+    "page rule: piece sizes round up to 0.1 in"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BT-32",
+   "line_type": "batting",
+   "row": "110x108",
+   "calculator": "omni_backing",
+   "variant": "42-batting",
+   "quantity": "size (in)",
+   "shown": [
+    "591/5",
+    "116"
+   ],
+   "against": "QREP today",
+   "target": [
+    "118",
+    "116"
+   ],
+   "rule": "calc_rules.omni_backing",
+   "rule_value": [
+    "591/5",
+    "116"
+   ],
+   "labels": [
+    "rounding increment or thirds",
+    "page rule: piece sizes round up to 0.1 in"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BT-37",
+   "line_type": "batting",
+   "row": "42x52",
+   "calculator": "stitchdesk_backing",
+   "variant": "42",
+   "quantity": "package",
+   "shown": "Throw",
+   "against": "V-BATT-13",
+   "target": "twin",
+   "rule": "calc_rules.stitchdesk_backing",
+   "rule_value": "Throw",
+   "labels": [
+    "page rule: its own precut table, Craft to King"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.stitchdesk_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.stitchdesk_backing, from the page script; Backing size = quilt size + 2 x overhang on each dimension. Usable width = fabric width minus 2 in selvage. One panel if the backing dimension fits within usable width; otherwise panels = ceil(dimension / (usable width minus 2 x seam allowance)). Both seam directions are compared and the smaller yardage is chosen (panels x cut length / 36), rounded up to the next 1/8 yd. Batting = quilt size + 2 x batting overhang, matched against a precut list. Read from the page's public /assets/calc.js."
+  },
+  {
+   "id": "BT-38",
+   "line_type": "batting",
+   "row": "42x52",
+   "calculator": "omni_backing",
+   "variant": "42-batting",
+   "quantity": "size (in)",
+   "shown": [
+    "50",
+    "58"
+   ],
+   "against": "V-BATT-13",
+   "target": [
+    "50",
+    "60"
+   ],
+   "rule": "calc_rules.omni_backing",
+   "rule_value": [
+    "50",
+    "58"
+   ],
+   "labels": [
+    "page rule: in batting mode a piece is (piece length + 8) / k wide"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BT-39",
+   "line_type": "batting",
+   "row": "42x52",
+   "calculator": "omni_backing",
+   "variant": "42-batting",
+   "quantity": "size (in)",
+   "shown": [
+    "50",
+    "58"
+   ],
+   "against": "QREP today",
+   "target": [
+    "50",
+    "60"
+   ],
+   "rule": "calc_rules.omni_backing",
+   "rule_value": [
+    "50",
+    "58"
+   ],
+   "labels": [
+    "page rule: in batting mode a piece is (piece length + 8) / k wide"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BT-43",
+   "line_type": "batting",
+   "row": "68x68",
+   "calculator": "omni_backing",
+   "variant": "42-batting",
+   "quantity": "size (in)",
+   "shown": [
+    "76",
+    "84"
+   ],
+   "against": "V-BATT-11",
+   "target": [
+    "76",
+    "76"
+   ],
+   "rule": "calc_rules.omni_backing",
+   "rule_value": [
+    "76",
+    "84"
+   ],
+   "labels": [
+    "page rule: in batting mode a piece is (piece length + 8) / k wide"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BT-44",
+   "line_type": "batting",
+   "row": "68x68",
+   "calculator": "omni_backing",
+   "variant": "42-batting",
+   "quantity": "size (in)",
+   "shown": [
+    "76",
+    "84"
+   ],
+   "against": "QREP today",
+   "target": [
+    "76",
+    "76"
+   ],
+   "rule": "calc_rules.omni_backing",
+   "rule_value": [
+    "76",
+    "84"
+   ],
+   "labels": [
+    "page rule: in batting mode a piece is (piece length + 8) / k wide"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BT-45",
+   "line_type": "batting",
+   "row": "102.5x120",
+   "calculator": "omni_backing",
+   "variant": "42-batting",
+   "quantity": "size (in)",
+   "shown": [
+    "1107/10",
+    "128"
+   ],
+   "against": "V-BATT-10",
+   "target": [
+    "221/2",
+    "128"
+   ],
+   "rule": "calc_rules.omni_backing",
+   "rule_value": [
+    "1107/10",
+    "128"
+   ],
+   "labels": [
+    "rounding increment or thirds",
+    "page rule: piece sizes round up to 0.1 in"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BT-46",
+   "line_type": "batting",
+   "row": "102.5x120",
+   "calculator": "omni_backing",
+   "variant": "42-batting",
+   "quantity": "size (in)",
+   "shown": [
+    "1107/10",
+    "128"
+   ],
+   "against": "QREP today",
+   "target": [
+    "221/2",
+    "128"
+   ],
+   "rule": "calc_rules.omni_backing",
+   "rule_value": [
+    "1107/10",
+    "128"
+   ],
+   "labels": [
+    "rounding increment or thirds",
+    "page rule: piece sizes round up to 0.1 in"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.omni_backing); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.omni_backing, from the page script; Page states 4 in is added on every side (8 in on width and length). Directional fabric: bolt width runs along quilt width; if the quilt width exceeds one bolt but fits in two, two pieces of quilt length are used; yardage = pieces x length / 36. Rounding and seam loss not found. Page does not cover binding or borders."
+  },
+  {
+   "id": "BR-2",
+   "line_type": "borders",
+   "row": "36x52-b3.75",
+   "calculator": "sewbecca_border",
+   "variant": "40",
+   "quantity": "band 1 yards",
+   "shown": "3/8",
+   "against": "QREP at wof 320",
+   "target": "1/2",
+   "rule": "calc_rules.sewbecca_border",
+   "rule_value": "3/8",
+   "labels": [
+    "border area (D-11)",
+    "page rule: yards = strips x b / fw (fabric width, not 36), up to 1/8 yd"
+   ],
+   "notes": [
+    "MATH.md's strip set gives 1 here",
+    "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.sewbecca_border, from the page script; strips = ceil(2 x length / fabricWidth + 2 x (width + borderWidth) / fabricWidth); yardage = strips x borderWidth / fabricWidth, then rounded up to 1/8 yd. No seam allowance and no join loss; the yardage term divides by fabric width, so it follows a different convention from the strip-cut formulas above."
+  },
+  {
+   "id": "BR-3",
+   "line_type": "borders",
+   "row": "36x52-b3.75",
+   "calculator": "qc_border",
+   "variant": "40",
+   "quantity": "band 1 yards",
+   "shown": "5/8",
+   "against": "QREP at wof 320",
+   "target": "1/2",
+   "rule": "calc_rules.qc_border",
+   "rule_value": "5/8",
+   "labels": [
+    "border area (D-11)",
+    "pooled border strips",
+    "rounding increment or thirds",
+    "page rule: strips = ceil((2 W + 2 L + 4 b + 12) / (fw - 1/2)), (b + 1/2) wide"
+   ],
+   "notes": [
+    "MATH.md's strip set gives 1 here",
+    "labels list the page rule's differences from the reference (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.qc_border, from the page script; As modeled in calc_rules.qc_border, which reproduces all 19 compared values: strips = ceil((2 W + 2 L + 4 b + 12) / (fabric width - 1/2)); yards = strips x (b + 1/2) / 36, rounded up to 1/8 yd; each later border sees W and L grown by 2 b."
+  },
+  {
+   "id": "BR-4",
+   "line_type": "borders",
+   "row": "50x65-b3.75",
+   "calculator": "sewbecca_border",
+   "variant": "40",
+   "quantity": "band 1 yards",
+   "shown": "5/8",
+   "against": "QREP at wof 320",
+   "target": "3/4",
+   "rule": "calc_rules.sewbecca_border",
+   "rule_value": "5/8",
+   "labels": [
+    "border area (D-11)",
+    "page rule: yards = strips x b / fw (fabric width, not 36), up to 1/8 yd"
+   ],
+   "notes": [
+    "MATH.md's strip set gives 1 1/4 here",
+    "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.sewbecca_border, from the page script; strips = ceil(2 x length / fabricWidth + 2 x (width + borderWidth) / fabricWidth); yardage = strips x borderWidth / fabricWidth, then rounded up to 1/8 yd. No seam allowance and no join loss; the yardage term divides by fabric width, so it follows a different convention from the strip-cut formulas above."
+  },
+  {
+   "id": "BR-6",
+   "line_type": "borders",
+   "row": "60x72-b3.75",
+   "calculator": "dtq_border",
+   "variant": "40",
+   "quantity": "band 1 yards",
+   "shown": "7/8",
+   "against": "QREP at wof 320",
+   "target": "3/4",
+   "rule": "calc_rules.dtq_border",
+   "rule_value": "7/8",
+   "labels": [
+    "border area (D-11)",
+    "pooled border strips",
+    "rounding increment or thirds",
+    "page rule: strips = ceil((T / fw + T) / fw), T = 2 (W + 2 b + 1) + 2 (L + 1)"
+   ],
+   "notes": [
+    "MATH.md's strip set gives 1 1/4 here",
+    "labels list the page rule's differences from the reference (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.dtq_border, from the page's form formulas; Cut strip width = finished width + 0.5 in (1/4 in seam on each side). Border lengths use quilt size + 2 x border width + 1 in, plus 2 in extra for the other pair. Strip count = ceil of required length (with a doubling factor) over fabric width; yardage = strips x cut width / 36, rounded up to 1/8 yd. Page says strips are joined end to end, not on the diagonal. Exact mitered branch not fully decoded."
+  },
+  {
+   "id": "BR-7",
+   "line_type": "borders",
+   "row": "60x72-b3.75",
+   "calculator": "qc_border",
+   "variant": "40",
+   "quantity": "band 1 yards",
+   "shown": "7/8",
+   "against": "QREP at wof 320",
+   "target": "3/4",
+   "rule": "calc_rules.qc_border",
+   "rule_value": "7/8",
+   "labels": [
+    "border area (D-11)",
+    "pooled border strips",
+    "rounding increment or thirds",
+    "page rule: strips = ceil((2 W + 2 L + 4 b + 12) / (fw - 1/2)), (b + 1/2) wide"
+   ],
+   "notes": [
+    "MATH.md's strip set gives 1 1/4 here",
+    "labels list the page rule's differences from the reference (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.qc_border, from the page script; As modeled in calc_rules.qc_border, which reproduces all 19 compared values: strips = ceil((2 W + 2 L + 4 b + 12) / (fabric width - 1/2)); yards = strips x (b + 1/2) / 36, rounded up to 1/8 yd; each later border sees W and L grown by 2 b."
+  },
+  {
+   "id": "BR-8",
+   "line_type": "borders",
+   "row": "70x90-b3.75",
+   "calculator": "sewbecca_border",
+   "variant": "40",
+   "quantity": "band 1 yards",
+   "shown": "3/4",
+   "against": "QREP at wof 320",
+   "target": "1",
+   "rule": "calc_rules.sewbecca_border",
+   "rule_value": "3/4",
+   "labels": [
+    "border area (D-11)",
+    "page rule: yards = strips x b / fw (fabric width, not 36), up to 1/8 yd"
+   ],
+   "notes": [
+    "MATH.md's strip set gives 1 1/2 here",
+    "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.sewbecca_border, from the page script; strips = ceil(2 x length / fabricWidth + 2 x (width + borderWidth) / fabricWidth); yardage = strips x borderWidth / fabricWidth, then rounded up to 1/8 yd. No seam allowance and no join loss; the yardage term divides by fabric width, so it follows a different convention from the strip-cut formulas above."
+  },
+  {
+   "id": "BR-9",
+   "line_type": "borders",
+   "row": "70x90-b3.75",
+   "calculator": "qc_border",
+   "variant": "40",
+   "quantity": "band 1 yards",
+   "shown": "9/8",
+   "against": "QREP at wof 320",
+   "target": "1",
+   "rule": "calc_rules.qc_border",
+   "rule_value": "9/8",
+   "labels": [
+    "border area (D-11)",
+    "pooled border strips",
+    "rounding increment or thirds",
+    "page rule: strips = ceil((2 W + 2 L + 4 b + 12) / (fw - 1/2)), (b + 1/2) wide"
+   ],
+   "notes": [
+    "MATH.md's strip set gives 1 1/2 here",
+    "labels list the page rule's differences from the reference (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.qc_border, from the page script; As modeled in calc_rules.qc_border, which reproduces all 19 compared values: strips = ceil((2 W + 2 L + 4 b + 12) / (fabric width - 1/2)); yards = strips x (b + 1/2) / 36, rounded up to 1/8 yd; each later border sees W and L grown by 2 b."
+  },
+  {
+   "id": "BR-11",
+   "line_type": "borders",
+   "row": "84x90-b3.75",
+   "calculator": "dtq_border",
+   "variant": "40",
+   "quantity": "band 1 yards",
+   "shown": "9/8",
+   "against": "QREP at wof 320",
+   "target": "1",
+   "rule": "calc_rules.dtq_border",
+   "rule_value": "9/8",
+   "labels": [
+    "border area (D-11)",
+    "pooled border strips",
+    "rounding increment or thirds",
+    "page rule: strips = ceil((T / fw + T) / fw), T = 2 (W + 2 b + 1) + 2 (L + 1)"
+   ],
+   "notes": [
+    "MATH.md's strip set gives 1 3/4 here",
+    "labels list the page rule's differences from the reference (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.dtq_border, from the page's form formulas; Cut strip width = finished width + 0.5 in (1/4 in seam on each side). Border lengths use quilt size + 2 x border width + 1 in, plus 2 in extra for the other pair. Strip count = ceil of required length (with a doubling factor) over fabric width; yardage = strips x cut width / 36, rounded up to 1/8 yd. Page says strips are joined end to end, not on the diagonal. Exact mitered branch not fully decoded."
+  },
+  {
+   "id": "BR-12",
+   "line_type": "borders",
+   "row": "84x90-b3.75",
+   "calculator": "sewbecca_border",
+   "variant": "40",
+   "quantity": "band 1 yards",
+   "shown": "7/8",
+   "against": "QREP at wof 320",
+   "target": "1",
+   "rule": "calc_rules.sewbecca_border",
+   "rule_value": "7/8",
+   "labels": [
+    "border area (D-11)",
+    "page rule: yards = strips x b / fw (fabric width, not 36), up to 1/8 yd"
+   ],
+   "notes": [
+    "MATH.md's strip set gives 1 3/4 here",
+    "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.sewbecca_border, from the page script; strips = ceil(2 x length / fabricWidth + 2 x (width + borderWidth) / fabricWidth); yardage = strips x borderWidth / fabricWidth, then rounded up to 1/8 yd. No seam allowance and no join loss; the yardage term divides by fabric width, so it follows a different convention from the strip-cut formulas above."
+  },
+  {
+   "id": "BR-13",
+   "line_type": "borders",
+   "row": "84x90-b3.75",
+   "calculator": "qc_border",
+   "variant": "40",
+   "quantity": "band 1 yards",
+   "shown": "9/8",
+   "against": "QREP at wof 320",
+   "target": "1",
+   "rule": "calc_rules.qc_border",
+   "rule_value": "9/8",
+   "labels": [
+    "border area (D-11)",
+    "pooled border strips",
+    "rounding increment or thirds",
+    "page rule: strips = ceil((2 W + 2 L + 4 b + 12) / (fw - 1/2)), (b + 1/2) wide"
+   ],
+   "notes": [
+    "MATH.md's strip set gives 1 3/4 here",
+    "labels list the page rule's differences from the reference (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.qc_border, from the page script; As modeled in calc_rules.qc_border, which reproduces all 19 compared values: strips = ceil((2 W + 2 L + 4 b + 12) / (fabric width - 1/2)); yards = strips x (b + 1/2) / 36, rounded up to 1/8 yd; each later border sees W and L grown by 2 b."
+  },
+  {
+   "id": "BR-14",
+   "line_type": "borders",
+   "row": "90x108-b3.75",
+   "calculator": "sewbecca_border",
+   "variant": "40",
+   "quantity": "band 1 yards",
+   "shown": "1",
+   "against": "QREP at wof 320",
+   "target": "5/4",
+   "rule": "calc_rules.sewbecca_border",
+   "rule_value": "1",
+   "labels": [
+    "border area (D-11)",
+    "page rule: yards = strips x b / fw (fabric width, not 36), up to 1/8 yd"
+   ],
+   "notes": [
+    "MATH.md's strip set gives 1 3/4 here",
+    "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.sewbecca_border, from the page script; strips = ceil(2 x length / fabricWidth + 2 x (width + borderWidth) / fabricWidth); yardage = strips x borderWidth / fabricWidth, then rounded up to 1/8 yd. No seam allowance and no join loss; the yardage term divides by fabric width, so it follows a different convention from the strip-cut formulas above."
+  },
+  {
+   "id": "BR-15",
+   "line_type": "borders",
+   "row": "92.5x115-b3.75",
+   "calculator": "dtq_border",
+   "variant": "40",
+   "quantity": "band 1 yards",
+   "shown": "11/8",
+   "against": "QREP at wof 320",
+   "target": "5/4",
+   "rule": "calc_rules.dtq_border",
+   "rule_value": "11/8",
+   "labels": [
+    "border area (D-11)",
+    "pooled border strips",
+    "rounding increment or thirds",
+    "page rule: strips = ceil((T / fw + T) / fw), T = 2 (W + 2 b + 1) + 2 (L + 1)"
+   ],
+   "notes": [
+    "MATH.md's strip set gives 1 3/4 here",
+    "labels list the page rule's differences from the reference (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.dtq_border, from the page's form formulas; Cut strip width = finished width + 0.5 in (1/4 in seam on each side). Border lengths use quilt size + 2 x border width + 1 in, plus 2 in extra for the other pair. Strip count = ceil of required length (with a doubling factor) over fabric width; yardage = strips x cut width / 36, rounded up to 1/8 yd. Page says strips are joined end to end, not on the diagonal. Exact mitered branch not fully decoded."
+  },
+  {
+   "id": "BR-16",
+   "line_type": "borders",
+   "row": "92.5x115-b3.75",
+   "calculator": "sewbecca_border",
+   "variant": "40",
+   "quantity": "band 1 yards",
+   "shown": "1",
+   "against": "QREP at wof 320",
+   "target": "5/4",
+   "rule": "calc_rules.sewbecca_border",
+   "rule_value": "1",
+   "labels": [
+    "border area (D-11)",
+    "page rule: yards = strips x b / fw (fabric width, not 36), up to 1/8 yd"
+   ],
+   "notes": [
+    "MATH.md's strip set gives 1 3/4 here",
+    "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.sewbecca_border, from the page script; strips = ceil(2 x length / fabricWidth + 2 x (width + borderWidth) / fabricWidth); yardage = strips x borderWidth / fabricWidth, then rounded up to 1/8 yd. No seam allowance and no join loss; the yardage term divides by fabric width, so it follows a different convention from the strip-cut formulas above."
+  },
+  {
+   "id": "BR-17",
+   "line_type": "borders",
+   "row": "92.5x115-b3.75",
+   "calculator": "qc_border",
+   "variant": "40",
+   "quantity": "band 1 yards",
+   "shown": "11/8",
+   "against": "QREP at wof 320",
+   "target": "5/4",
+   "rule": "calc_rules.qc_border",
+   "rule_value": "11/8",
+   "labels": [
+    "border area (D-11)",
+    "pooled border strips",
+    "rounding increment or thirds",
+    "page rule: strips = ceil((2 W + 2 L + 4 b + 12) / (fw - 1/2)), (b + 1/2) wide"
+   ],
+   "notes": [
+    "MATH.md's strip set gives 1 3/4 here",
+    "labels list the page rule's differences from the reference (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.qc_border, from the page script; As modeled in calc_rules.qc_border, which reproduces all 19 compared values: strips = ceil((2 W + 2 L + 4 b + 12) / (fabric width - 1/2)); yards = strips x (b + 1/2) / 36, rounded up to 1/8 yd; each later border sees W and L grown by 2 b."
+  },
+  {
+   "id": "BR-18",
+   "line_type": "borders",
+   "row": "110x108-b3.75",
+   "calculator": "dtq_border",
+   "variant": "40",
+   "quantity": "band 1 yards",
+   "shown": "11/8",
+   "against": "QREP at wof 320",
+   "target": "5/4",
+   "rule": "calc_rules.dtq_border",
+   "rule_value": "11/8",
+   "labels": [
+    "border area (D-11)",
+    "pooled border strips",
+    "rounding increment or thirds",
+    "page rule: strips = ceil((T / fw + T) / fw), T = 2 (W + 2 b + 1) + 2 (L + 1)"
+   ],
+   "notes": [
+    "MATH.md's strip set gives 1 3/4 here",
+    "labels list the page rule's differences from the reference (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.dtq_border, from the page's form formulas; Cut strip width = finished width + 0.5 in (1/4 in seam on each side). Border lengths use quilt size + 2 x border width + 1 in, plus 2 in extra for the other pair. Strip count = ceil of required length (with a doubling factor) over fabric width; yardage = strips x cut width / 36, rounded up to 1/8 yd. Page says strips are joined end to end, not on the diagonal. Exact mitered branch not fully decoded."
+  },
+  {
+   "id": "BR-19",
+   "line_type": "borders",
+   "row": "110x108-b3.75",
+   "calculator": "sewbecca_border",
+   "variant": "40",
+   "quantity": "band 1 yards",
+   "shown": "9/8",
+   "against": "QREP at wof 320",
+   "target": "5/4",
+   "rule": "calc_rules.sewbecca_border",
+   "rule_value": "9/8",
+   "labels": [
+    "border area (D-11)",
+    "page rule: yards = strips x b / fw (fabric width, not 36), up to 1/8 yd"
+   ],
+   "notes": [
+    "MATH.md's strip set gives 1 3/4 here",
+    "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.sewbecca_border, from the page script; strips = ceil(2 x length / fabricWidth + 2 x (width + borderWidth) / fabricWidth); yardage = strips x borderWidth / fabricWidth, then rounded up to 1/8 yd. No seam allowance and no join loss; the yardage term divides by fabric width, so it follows a different convention from the strip-cut formulas above."
+  },
+  {
+   "id": "BR-20",
+   "line_type": "borders",
+   "row": "110x108-b3.75",
+   "calculator": "qc_border",
+   "variant": "40",
+   "quantity": "band 1 yards",
+   "shown": "11/8",
+   "against": "QREP at wof 320",
+   "target": "5/4",
+   "rule": "calc_rules.qc_border",
+   "rule_value": "11/8",
+   "labels": [
+    "border area (D-11)",
+    "pooled border strips",
+    "rounding increment or thirds",
+    "page rule: strips = ceil((2 W + 2 L + 4 b + 12) / (fw - 1/2)), (b + 1/2) wide"
+   ],
+   "notes": [
+    "MATH.md's strip set gives 1 3/4 here",
+    "labels list the page rule's differences from the reference (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.qc_border, from the page script; As modeled in calc_rules.qc_border, which reproduces all 19 compared values: strips = ceil((2 W + 2 L + 4 b + 12) / (fabric width - 1/2)); yards = strips x (b + 1/2) / 36, rounded up to 1/8 yd; each later border sees W and L grown by 2 b."
+  },
+  {
+   "id": "BR-22",
+   "line_type": "borders",
+   "row": "75x90-b3.75",
+   "calculator": "dtq_border",
+   "variant": "40",
+   "quantity": "band 1 strips",
+   "shown": "9",
+   "against": "V-BORD-01",
+   "target": "10",
+   "rule": "calc_rules.dtq_border",
+   "rule_value": "9",
+   "labels": [
+    "pooled border strips",
+    "page rule: strips = ceil((T / fw + T) / fw), T = 2 (W + 2 b + 1) + 2 (L + 1)"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.dtq_border, from the page's form formulas; Cut strip width = finished width + 0.5 in (1/4 in seam on each side). Border lengths use quilt size + 2 x border width + 1 in, plus 2 in extra for the other pair. Strip count = ceil of required length (with a doubling factor) over fabric width; yardage = strips x cut width / 36, rounded up to 1/8 yd. Page says strips are joined end to end, not on the diagonal. Exact mitered branch not fully decoded."
+  },
+  {
+   "id": "BR-23",
+   "line_type": "borders",
+   "row": "75x90-b3.75",
+   "calculator": "dtq_border",
+   "variant": "40",
+   "quantity": "band 1 yards",
+   "shown": "9/8",
+   "against": "QREP at wof 320",
+   "target": "1",
+   "rule": "calc_rules.dtq_border",
+   "rule_value": "9/8",
+   "labels": [
+    "border area (D-11)",
+    "pooled border strips",
+    "rounding increment or thirds",
+    "page rule: strips = ceil((T / fw + T) / fw), T = 2 (W + 2 b + 1) + 2 (L + 1)"
+   ],
+   "notes": [
+    "MATH.md's strip set gives 1 1/2 here",
+    "labels list the page rule's differences from the reference (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.dtq_border, from the page's form formulas; Cut strip width = finished width + 0.5 in (1/4 in seam on each side). Border lengths use quilt size + 2 x border width + 1 in, plus 2 in extra for the other pair. Strip count = ceil of required length (with a doubling factor) over fabric width; yardage = strips x cut width / 36, rounded up to 1/8 yd. Page says strips are joined end to end, not on the diagonal. Exact mitered branch not fully decoded."
+  },
+  {
+   "id": "BR-24",
+   "line_type": "borders",
+   "row": "75x90-b3.75",
+   "calculator": "sewbecca_border",
+   "variant": "40",
+   "quantity": "band 1 strips",
+   "shown": "8",
+   "against": "V-BORD-01",
+   "target": "10",
+   "rule": "calc_rules.sewbecca_border",
+   "rule_value": "8",
+   "labels": [
+    "pooled border strips",
+    "page rule: strips = ceil(2 L / fw + 2 (W + b) / fw), no seam allowance and no join loss"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.sewbecca_border, from the page script; strips = ceil(2 x length / fabricWidth + 2 x (width + borderWidth) / fabricWidth); yardage = strips x borderWidth / fabricWidth, then rounded up to 1/8 yd. No seam allowance and no join loss; the yardage term divides by fabric width, so it follows a different convention from the strip-cut formulas above."
+  },
+  {
+   "id": "BR-25",
+   "line_type": "borders",
+   "row": "75x90-b3.75",
+   "calculator": "sewbecca_border",
+   "variant": "40",
+   "quantity": "band 1 yards",
+   "shown": "3/4",
+   "against": "QREP at wof 320",
+   "target": "1",
+   "rule": "calc_rules.sewbecca_border",
+   "rule_value": "3/4",
+   "labels": [
+    "border area (D-11)",
+    "page rule: yards = strips x b / fw (fabric width, not 36), up to 1/8 yd"
+   ],
+   "notes": [
+    "MATH.md's strip set gives 1 1/2 here",
+    "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.sewbecca_border, from the page script; strips = ceil(2 x length / fabricWidth + 2 x (width + borderWidth) / fabricWidth); yardage = strips x borderWidth / fabricWidth, then rounded up to 1/8 yd. No seam allowance and no join loss; the yardage term divides by fabric width, so it follows a different convention from the strip-cut formulas above."
+  },
+  {
+   "id": "BR-26",
+   "line_type": "borders",
+   "row": "75x90-b3.75",
+   "calculator": "qc_border",
+   "variant": "40",
+   "quantity": "band 1 yards",
+   "shown": "9/8",
+   "against": "QREP at wof 320",
+   "target": "1",
+   "rule": "calc_rules.qc_border",
+   "rule_value": "9/8",
+   "labels": [
+    "border area (D-11)",
+    "pooled border strips",
+    "rounding increment or thirds",
+    "page rule: strips = ceil((2 W + 2 L + 4 b + 12) / (fw - 1/2)), (b + 1/2) wide"
+   ],
+   "notes": [
+    "MATH.md's strip set gives 1 1/2 here",
+    "labels list the page rule's differences from the reference (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.qc_border, from the page script; As modeled in calc_rules.qc_border, which reproduces all 19 compared values: strips = ceil((2 W + 2 L + 4 b + 12) / (fabric width - 1/2)); yards = strips x (b + 1/2) / 36, rounded up to 1/8 yd; each later border sees W and L grown by 2 b."
+  },
+  {
+   "id": "BR-28",
+   "line_type": "borders",
+   "row": "42x52-b3.75",
+   "calculator": "dtq_border",
+   "variant": "40",
+   "quantity": "band 1 yards",
+   "shown": "5/8",
+   "against": "QREP at wof 320",
+   "target": "3/4",
+   "rule": "calc_rules.dtq_border",
+   "rule_value": "5/8",
+   "labels": [
+    "border area (D-11)",
+    "pooled border strips",
+    "rounding increment or thirds",
+    "page rule: strips = ceil((T / fw + T) / fw), T = 2 (W + 2 b + 1) + 2 (L + 1)"
+   ],
+   "notes": [
+    "MATH.md's strip set gives 1 1/4 here",
+    "labels list the page rule's differences from the reference (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.dtq_border, from the page's form formulas; Cut strip width = finished width + 0.5 in (1/4 in seam on each side). Border lengths use quilt size + 2 x border width + 1 in, plus 2 in extra for the other pair. Strip count = ceil of required length (with a doubling factor) over fabric width; yardage = strips x cut width / 36, rounded up to 1/8 yd. Page says strips are joined end to end, not on the diagonal. Exact mitered branch not fully decoded."
+  },
+  {
+   "id": "BR-29",
+   "line_type": "borders",
+   "row": "42x52-b3.75",
+   "calculator": "sewbecca_border",
+   "variant": "40",
+   "quantity": "band 1 yards",
+   "shown": "1/2",
+   "against": "QREP at wof 320",
+   "target": "3/4",
+   "rule": "calc_rules.sewbecca_border",
+   "rule_value": "1/2",
+   "labels": [
+    "border area (D-11)",
+    "page rule: yards = strips x b / fw (fabric width, not 36), up to 1/8 yd"
+   ],
+   "notes": [
+    "MATH.md's strip set gives 1 1/4 here",
+    "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.sewbecca_border, from the page script; strips = ceil(2 x length / fabricWidth + 2 x (width + borderWidth) / fabricWidth); yardage = strips x borderWidth / fabricWidth, then rounded up to 1/8 yd. No seam allowance and no join loss; the yardage term divides by fabric width, so it follows a different convention from the strip-cut formulas above."
+  },
+  {
+   "id": "BR-30",
+   "line_type": "borders",
+   "row": "42x52-b3.75",
+   "calculator": "qc_border",
+   "variant": "40",
+   "quantity": "band 1 yards",
+   "shown": "5/8",
+   "against": "QREP at wof 320",
+   "target": "3/4",
+   "rule": "calc_rules.qc_border",
+   "rule_value": "5/8",
+   "labels": [
+    "border area (D-11)",
+    "pooled border strips",
+    "rounding increment or thirds",
+    "page rule: strips = ceil((2 W + 2 L + 4 b + 12) / (fw - 1/2)), (b + 1/2) wide"
+   ],
+   "notes": [
+    "MATH.md's strip set gives 1 1/4 here",
+    "labels list the page rule's differences from the reference (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.qc_border, from the page script; As modeled in calc_rules.qc_border, which reproduces all 19 compared values: strips = ceil((2 W + 2 L + 4 b + 12) / (fabric width - 1/2)); yards = strips x (b + 1/2) / 36, rounded up to 1/8 yd; each later border sees W and L grown by 2 b."
+  },
+  {
+   "id": "BR-31",
+   "line_type": "borders",
+   "row": "76x85-b3.75",
+   "calculator": "sewbecca_border",
+   "variant": "40",
+   "quantity": "band 1 yards",
+   "shown": "3/4",
+   "against": "QREP at wof 320",
+   "target": "1",
+   "rule": "calc_rules.sewbecca_border",
+   "rule_value": "3/4",
+   "labels": [
+    "border area (D-11)",
+    "page rule: yards = strips x b / fw (fabric width, not 36), up to 1/8 yd"
+   ],
+   "notes": [
+    "MATH.md's strip set gives 1 1/4 here",
+    "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.sewbecca_border, from the page script; strips = ceil(2 x length / fabricWidth + 2 x (width + borderWidth) / fabricWidth); yardage = strips x borderWidth / fabricWidth, then rounded up to 1/8 yd. No seam allowance and no join loss; the yardage term divides by fabric width, so it follows a different convention from the strip-cut formulas above."
+  },
+  {
+   "id": "BR-32",
+   "line_type": "borders",
+   "row": "76x85-b3.75",
+   "calculator": "qc_border",
+   "variant": "40",
+   "quantity": "band 1 yards",
+   "shown": "9/8",
+   "against": "QREP at wof 320",
+   "target": "1",
+   "rule": "calc_rules.qc_border",
+   "rule_value": "9/8",
+   "labels": [
+    "border area (D-11)",
+    "pooled border strips",
+    "rounding increment or thirds",
+    "page rule: strips = ceil((2 W + 2 L + 4 b + 12) / (fw - 1/2)), (b + 1/2) wide"
+   ],
+   "notes": [
+    "MATH.md's strip set gives 1 1/4 here",
+    "labels list the page rule's differences from the reference (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.qc_border, from the page script; As modeled in calc_rules.qc_border, which reproduces all 19 compared values: strips = ceil((2 W + 2 L + 4 b + 12) / (fabric width - 1/2)); yards = strips x (b + 1/2) / 36, rounded up to 1/8 yd; each later border sees W and L grown by 2 b."
+  },
+  {
+   "id": "BR-34",
+   "line_type": "borders",
+   "row": "68x68-b3.75",
+   "calculator": "dtq_border",
+   "variant": "40",
+   "quantity": "band 1 yards",
+   "shown": "7/8",
+   "against": "QREP at wof 320",
+   "target": "1",
+   "rule": "calc_rules.dtq_border",
+   "rule_value": "7/8",
+   "labels": [
+    "border area (D-11)",
+    "pooled border strips",
+    "rounding increment or thirds",
+    "page rule: strips = ceil((T / fw + T) / fw), T = 2 (W + 2 b + 1) + 2 (L + 1)"
+   ],
+   "notes": [
+    "MATH.md's strip set gives 1 1/4 here",
+    "labels list the page rule's differences from the reference (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.dtq_border, from the page's form formulas; Cut strip width = finished width + 0.5 in (1/4 in seam on each side). Border lengths use quilt size + 2 x border width + 1 in, plus 2 in extra for the other pair. Strip count = ceil of required length (with a doubling factor) over fabric width; yardage = strips x cut width / 36, rounded up to 1/8 yd. Page says strips are joined end to end, not on the diagonal. Exact mitered branch not fully decoded."
+  },
+  {
+   "id": "BR-35",
+   "line_type": "borders",
+   "row": "68x68-b3.75",
+   "calculator": "sewbecca_border",
+   "variant": "40",
+   "quantity": "band 1 yards",
+   "shown": "3/4",
+   "against": "QREP at wof 320",
+   "target": "1",
+   "rule": "calc_rules.sewbecca_border",
+   "rule_value": "3/4",
+   "labels": [
+    "border area (D-11)",
+    "page rule: yards = strips x b / fw (fabric width, not 36), up to 1/8 yd"
+   ],
+   "notes": [
+    "MATH.md's strip set gives 1 1/4 here",
+    "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.sewbecca_border, from the page script; strips = ceil(2 x length / fabricWidth + 2 x (width + borderWidth) / fabricWidth); yardage = strips x borderWidth / fabricWidth, then rounded up to 1/8 yd. No seam allowance and no join loss; the yardage term divides by fabric width, so it follows a different convention from the strip-cut formulas above."
+  },
+  {
+   "id": "BR-36",
+   "line_type": "borders",
+   "row": "68x68-b3.75",
+   "calculator": "qc_border",
+   "variant": "40",
+   "quantity": "band 1 yards",
+   "shown": "7/8",
+   "against": "QREP at wof 320",
+   "target": "1",
+   "rule": "calc_rules.qc_border",
+   "rule_value": "7/8",
+   "labels": [
+    "border area (D-11)",
+    "pooled border strips",
+    "rounding increment or thirds",
+    "page rule: strips = ceil((2 W + 2 L + 4 b + 12) / (fw - 1/2)), (b + 1/2) wide"
+   ],
+   "notes": [
+    "MATH.md's strip set gives 1 1/4 here",
+    "labels list the page rule's differences from the reference (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.qc_border, from the page script; As modeled in calc_rules.qc_border, which reproduces all 19 compared values: strips = ceil((2 W + 2 L + 4 b + 12) / (fabric width - 1/2)); yards = strips x (b + 1/2) / 36, rounded up to 1/8 yd; each later border sees W and L grown by 2 b."
+  },
+  {
+   "id": "BR-37",
+   "line_type": "borders",
+   "row": "102.5x120-b3.75",
+   "calculator": "sewbecca_border",
+   "variant": "40",
+   "quantity": "band 1 yards",
+   "shown": "9/8",
+   "against": "QREP at wof 320",
+   "target": "3/2",
+   "rule": "calc_rules.sewbecca_border",
+   "rule_value": "9/8",
+   "labels": [
+    "border area (D-11)",
+    "page rule: yards = strips x b / fw (fabric width, not 36), up to 1/8 yd"
+   ],
+   "notes": [
+    "MATH.md's strip set gives 1 3/4 here",
+    "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.sewbecca_border, from the page script; strips = ceil(2 x length / fabricWidth + 2 x (width + borderWidth) / fabricWidth); yardage = strips x borderWidth / fabricWidth, then rounded up to 1/8 yd. No seam allowance and no join loss; the yardage term divides by fabric width, so it follows a different convention from the strip-cut formulas above."
+  },
+  {
+   "id": "BR-38",
+   "line_type": "borders",
+   "row": "58x66-b3.75",
+   "calculator": "dtq_border",
+   "variant": "40",
+   "quantity": "band 1 yards",
+   "shown": "7/8",
+   "against": "QREP at wof 320",
+   "target": "3/4",
+   "rule": "calc_rules.dtq_border",
+   "rule_value": "7/8",
+   "labels": [
+    "border area (D-11)",
+    "pooled border strips",
+    "rounding increment or thirds",
+    "page rule: strips = ceil((T / fw + T) / fw), T = 2 (W + 2 b + 1) + 2 (L + 1)"
+   ],
+   "notes": [
+    "MATH.md's strip set gives 1 1/4 here",
+    "labels list the page rule's differences from the reference (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.dtq_border, from the page's form formulas; Cut strip width = finished width + 0.5 in (1/4 in seam on each side). Border lengths use quilt size + 2 x border width + 1 in, plus 2 in extra for the other pair. Strip count = ceil of required length (with a doubling factor) over fabric width; yardage = strips x cut width / 36, rounded up to 1/8 yd. Page says strips are joined end to end, not on the diagonal. Exact mitered branch not fully decoded."
+  },
+  {
+   "id": "BR-39",
+   "line_type": "borders",
+   "row": "58x66-b3.75",
+   "calculator": "sewbecca_border",
+   "variant": "40",
+   "quantity": "band 1 yards",
+   "shown": "5/8",
+   "against": "QREP at wof 320",
+   "target": "3/4",
+   "rule": "calc_rules.sewbecca_border",
+   "rule_value": "5/8",
+   "labels": [
+    "border area (D-11)",
+    "page rule: yards = strips x b / fw (fabric width, not 36), up to 1/8 yd"
+   ],
+   "notes": [
+    "MATH.md's strip set gives 1 1/4 here",
+    "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.sewbecca_border, from the page script; strips = ceil(2 x length / fabricWidth + 2 x (width + borderWidth) / fabricWidth); yardage = strips x borderWidth / fabricWidth, then rounded up to 1/8 yd. No seam allowance and no join loss; the yardage term divides by fabric width, so it follows a different convention from the strip-cut formulas above."
+  },
+  {
+   "id": "BR-40",
+   "line_type": "borders",
+   "row": "58x66-b3.75",
+   "calculator": "qc_border",
+   "variant": "40",
+   "quantity": "band 1 yards",
+   "shown": "7/8",
+   "against": "QREP at wof 320",
+   "target": "3/4",
+   "rule": "calc_rules.qc_border",
+   "rule_value": "7/8",
+   "labels": [
+    "border area (D-11)",
+    "pooled border strips",
+    "rounding increment or thirds",
+    "page rule: strips = ceil((2 W + 2 L + 4 b + 12) / (fw - 1/2)), (b + 1/2) wide"
+   ],
+   "notes": [
+    "MATH.md's strip set gives 1 1/4 here",
+    "labels list the page rule's differences from the reference (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.qc_border, from the page script; As modeled in calc_rules.qc_border, which reproduces all 19 compared values: strips = ceil((2 W + 2 L + 4 b + 12) / (fabric width - 1/2)); yards = strips x (b + 1/2) / 36, rounded up to 1/8 yd; each later border sees W and L grown by 2 b."
+  },
+  {
+   "id": "BR-41",
+   "line_type": "borders",
+   "row": "24x58-b3.75",
+   "calculator": "sewbecca_border",
+   "variant": "40",
+   "quantity": "band 1 yards",
+   "shown": "3/8",
+   "against": "QREP at wof 320",
+   "target": "1/2",
+   "rule": "calc_rules.sewbecca_border",
+   "rule_value": "3/8",
+   "labels": [
+    "border area (D-11)",
+    "page rule: yards = strips x b / fw (fabric width, not 36), up to 1/8 yd"
+   ],
+   "notes": [
+    "MATH.md's strip set gives 1 here",
+    "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.sewbecca_border, from the page script; strips = ceil(2 x length / fabricWidth + 2 x (width + borderWidth) / fabricWidth); yardage = strips x borderWidth / fabricWidth, then rounded up to 1/8 yd. No seam allowance and no join loss; the yardage term divides by fabric width, so it follows a different convention from the strip-cut formulas above."
+  },
+  {
+   "id": "BR-42",
+   "line_type": "borders",
+   "row": "24x58-b3.75",
+   "calculator": "qc_border",
+   "variant": "40",
+   "quantity": "band 1 yards",
+   "shown": "5/8",
+   "against": "QREP at wof 320",
+   "target": "1/2",
+   "rule": "calc_rules.qc_border",
+   "rule_value": "5/8",
+   "labels": [
+    "border area (D-11)",
+    "pooled border strips",
+    "rounding increment or thirds",
+    "page rule: strips = ceil((2 W + 2 L + 4 b + 12) / (fw - 1/2)), (b + 1/2) wide"
+   ],
+   "notes": [
+    "MATH.md's strip set gives 1 here",
+    "labels list the page rule's differences from the reference (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.qc_border, from the page script; As modeled in calc_rules.qc_border, which reproduces all 19 compared values: strips = ceil((2 W + 2 L + 4 b + 12) / (fabric width - 1/2)); yards = strips x (b + 1/2) / 36, rounded up to 1/8 yd; each later border sees W and L grown by 2 b."
+  },
+  {
+   "id": "BR-45",
+   "line_type": "borders",
+   "row": "V-BORD-02",
+   "calculator": "dtq_border",
+   "variant": "40",
+   "quantity": "band 1 strips",
+   "shown": "5",
+   "against": "V-BORD-02",
+   "target": "6",
+   "rule": "calc_rules.dtq_border",
+   "rule_value": "5",
+   "labels": [
+    "pooled border strips",
+    "page rule: strips = ceil((T / fw + T) / fw), T = 2 (W + 2 b + 1) + 2 (L + 1)"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.dtq_border, from the page's form formulas; Cut strip width = finished width + 0.5 in (1/4 in seam on each side). Border lengths use quilt size + 2 x border width + 1 in, plus 2 in extra for the other pair. Strip count = ceil of required length (with a doubling factor) over fabric width; yardage = strips x cut width / 36, rounded up to 1/8 yd. Page says strips are joined end to end, not on the diagonal. Exact mitered branch not fully decoded."
+  },
+  {
+   "id": "BR-46",
+   "line_type": "borders",
+   "row": "V-BORD-02",
+   "calculator": "dtq_border",
+   "variant": "40",
+   "quantity": "band 1 yards",
+   "shown": "3/8",
+   "against": "QREP at wof 320",
+   "target": "1/2",
+   "rule": "calc_rules.dtq_border",
+   "rule_value": "3/8",
+   "labels": [
+    "pooled border strips",
+    "rounding increment or thirds",
+    "page rule: strips = ceil((T / fw + T) / fw), T = 2 (W + 2 b + 1) + 2 (L + 1)"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.dtq_border, from the page's form formulas; Cut strip width = finished width + 0.5 in (1/4 in seam on each side). Border lengths use quilt size + 2 x border width + 1 in, plus 2 in extra for the other pair. Strip count = ceil of required length (with a doubling factor) over fabric width; yardage = strips x cut width / 36, rounded up to 1/8 yd. Page says strips are joined end to end, not on the diagonal. Exact mitered branch not fully decoded."
+  },
+  {
+   "id": "BR-47",
+   "line_type": "borders",
+   "row": "V-BORD-02",
+   "calculator": "sewbecca_border",
+   "variant": "40",
+   "quantity": "band 1 strips",
+   "shown": "5",
+   "against": "V-BORD-02",
+   "target": "6",
+   "rule": "calc_rules.sewbecca_border",
+   "rule_value": "5",
+   "labels": [
+    "pooled border strips",
+    "page rule: strips = ceil(2 L / fw + 2 (W + b) / fw), no seam allowance and no join loss"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.sewbecca_border, from the page script; strips = ceil(2 x length / fabricWidth + 2 x (width + borderWidth) / fabricWidth); yardage = strips x borderWidth / fabricWidth, then rounded up to 1/8 yd. No seam allowance and no join loss; the yardage term divides by fabric width, so it follows a different convention from the strip-cut formulas above."
+  },
+  {
+   "id": "BR-48",
+   "line_type": "borders",
+   "row": "V-BORD-02",
+   "calculator": "sewbecca_border",
+   "variant": "40",
+   "quantity": "band 1 yards",
+   "shown": "1/4",
+   "against": "QREP at wof 320",
+   "target": "1/2",
+   "rule": "calc_rules.sewbecca_border",
+   "rule_value": "1/4",
+   "labels": [
+    "page rule: yards = strips x b / fw (fabric width, not 36), up to 1/8 yd"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.sewbecca_border, from the page script; strips = ceil(2 x length / fabricWidth + 2 x (width + borderWidth) / fabricWidth); yardage = strips x borderWidth / fabricWidth, then rounded up to 1/8 yd. No seam allowance and no join loss; the yardage term divides by fabric width, so it follows a different convention from the strip-cut formulas above."
+  },
+  {
+   "id": "BR-49",
+   "line_type": "borders",
+   "row": "V-BORD-02",
+   "calculator": "qc_border",
+   "variant": "40",
+   "quantity": "band 1 yards",
+   "shown": "3/8",
+   "against": "QREP at wof 320",
+   "target": "1/2",
+   "rule": "calc_rules.qc_border",
+   "rule_value": "3/8",
+   "labels": [
+    "pooled border strips",
+    "rounding increment or thirds",
+    "page rule: strips = ceil((2 W + 2 L + 4 b + 12) / (fw - 1/2)), (b + 1/2) wide"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.qc_border, from the page script; As modeled in calc_rules.qc_border, which reproduces all 19 compared values: strips = ceil((2 W + 2 L + 4 b + 12) / (fabric width - 1/2)); yards = strips x (b + 1/2) / 36, rounded up to 1/8 yd; each later border sees W and L grown by 2 b."
+  },
+  {
+   "id": "BR-51",
+   "line_type": "borders",
+   "row": "V-BORD-03",
+   "calculator": "qc_border",
+   "variant": "40",
+   "quantity": "band 1 yards",
+   "shown": "5/8",
+   "against": "QREP at wof 320",
+   "target": "1/2",
+   "rule": "calc_rules.qc_border",
+   "rule_value": "5/8",
+   "labels": [
+    "border area (D-11)",
+    "pooled border strips",
+    "rounding increment or thirds",
+    "page rule: strips = ceil((2 W + 2 L + 4 b + 12) / (fw - 1/2)), (b + 1/2) wide"
+   ],
+   "notes": [
+    "MATH.md's strip set gives 3/4 here",
+    "labels list the page rule's differences from the reference (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.qc_border, from the page script; As modeled in calc_rules.qc_border, which reproduces all 19 compared values: strips = ceil((2 W + 2 L + 4 b + 12) / (fabric width - 1/2)); yards = strips x (b + 1/2) / 36, rounded up to 1/8 yd; each later border sees W and L grown by 2 b."
+  },
+  {
+   "id": "BR-54",
+   "line_type": "borders",
+   "row": "V-BORD-04",
+   "calculator": "dtq_border",
+   "variant": "40",
+   "quantity": "band 1 strips",
+   "shown": "1",
+   "against": "V-BORD-04",
+   "target": "2",
+   "rule": "calc_rules.dtq_border",
+   "rule_value": "1",
+   "labels": [
+    "pooled border strips",
+    "page rule: strips = ceil((T / fw + T) / fw), T = 2 (W + 2 b + 1) + 2 (L + 1)"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.dtq_border, from the page's form formulas; Cut strip width = finished width + 0.5 in (1/4 in seam on each side). Border lengths use quilt size + 2 x border width + 1 in, plus 2 in extra for the other pair. Strip count = ceil of required length (with a doubling factor) over fabric width; yardage = strips x cut width / 36, rounded up to 1/8 yd. Page says strips are joined end to end, not on the diagonal. Exact mitered branch not fully decoded."
+  },
+  {
+   "id": "BR-55",
+   "line_type": "borders",
+   "row": "V-BORD-04",
+   "calculator": "dtq_border",
+   "variant": "40",
+   "quantity": "band 1 yards",
+   "shown": "1/8",
+   "against": "QREP at wof 320",
+   "target": "1/4",
+   "rule": "calc_rules.dtq_border",
+   "rule_value": "1/8",
+   "labels": [
+    "pooled border strips",
+    "rounding increment or thirds",
+    "page rule: strips = ceil((T / fw + T) / fw), T = 2 (W + 2 b + 1) + 2 (L + 1)"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.dtq_border); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.dtq_border, from the page's form formulas; Cut strip width = finished width + 0.5 in (1/4 in seam on each side). Border lengths use quilt size + 2 x border width + 1 in, plus 2 in extra for the other pair. Strip count = ceil of required length (with a doubling factor) over fabric width; yardage = strips x cut width / 36, rounded up to 1/8 yd. Page says strips are joined end to end, not on the diagonal. Exact mitered branch not fully decoded."
+  },
+  {
+   "id": "BR-56",
+   "line_type": "borders",
+   "row": "V-BORD-04",
+   "calculator": "sewbecca_border",
+   "variant": "40",
+   "quantity": "band 1 strips",
+   "shown": "1",
+   "against": "V-BORD-04",
+   "target": "2",
+   "rule": "calc_rules.sewbecca_border",
+   "rule_value": "1",
+   "labels": [
+    "pooled border strips",
+    "page rule: strips = ceil(2 L / fw + 2 (W + b) / fw), no seam allowance and no join loss"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.sewbecca_border, from the page script; strips = ceil(2 x length / fabricWidth + 2 x (width + borderWidth) / fabricWidth); yardage = strips x borderWidth / fabricWidth, then rounded up to 1/8 yd. No seam allowance and no join loss; the yardage term divides by fabric width, so it follows a different convention from the strip-cut formulas above."
+  },
+  {
+   "id": "BR-57",
+   "line_type": "borders",
+   "row": "V-BORD-04",
+   "calculator": "sewbecca_border",
+   "variant": "40",
+   "quantity": "band 1 yards",
+   "shown": "1/8",
+   "against": "QREP at wof 320",
+   "target": "1/4",
+   "rule": "calc_rules.sewbecca_border",
+   "rule_value": "1/8",
+   "labels": [
+    "page rule: yards = strips x b / fw (fabric width, not 36), up to 1/8 yd"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.sewbecca_border); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.sewbecca_border, from the page script; strips = ceil(2 x length / fabricWidth + 2 x (width + borderWidth) / fabricWidth); yardage = strips x borderWidth / fabricWidth, then rounded up to 1/8 yd. No seam allowance and no join loss; the yardage term divides by fabric width, so it follows a different convention from the strip-cut formulas above."
+  },
+  {
+   "id": "BR-58",
+   "line_type": "borders",
+   "row": "V-BORD-04",
+   "calculator": "qc_border",
+   "variant": "40",
+   "quantity": "band 1 yards",
+   "shown": "1/8",
+   "against": "QREP at wof 320",
+   "target": "1/4",
+   "rule": "calc_rules.qc_border",
+   "rule_value": "1/8",
+   "labels": [
+    "pooled border strips",
+    "rounding increment or thirds",
+    "page rule: strips = ceil((2 W + 2 L + 4 b + 12) / (fw - 1/2)), (b + 1/2) wide"
+   ],
+   "notes": [
+    "labels list the page rule's differences from the reference (calc_rules.qc_border); no MATH.md parameter set reproduces this row"
+   ],
+   "lead": "calc_rules.qc_border, from the page script; As modeled in calc_rules.qc_border, which reproduces all 19 compared values: strips = ceil((2 W + 2 L + 4 b + 12) / (fabric width - 1/2)); yards = strips x (b + 1/2) / 36, rounded up to 1/8 yd; each later border sees W and L grown by 2 b."
+  }
+ ],
  "failures": [
   {
    "id": "F1",
