@@ -14,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts" / "eval" 
 
 import pytest  # noqa: E402
 
+import baseline as bl  # noqa: E402
 import calc_parse as cp  # noqa: E402
 import calc_rules as cr  # noqa: E402
 import calc_vectors as cv  # noqa: E402
@@ -1284,6 +1285,24 @@ def test_stitchdesk_backing_one_panel_not_cheaper_on_wide():
     assert got["batting"]["precut"] == "Craft"
 
 
+def test_stitchdesk_batting_off_the_roll_is_a_package_answer():
+    # V-BATT-08's 92 1/2 x 115: batting 92.5 + 2 x 4 = 100.5 in by 115 + 2 x 4 = 123 in. The
+    # page's largest precut is King 120 x 120, and 123 > 120 either way, so none fits and the
+    # page says "Buy off the roll". MATH.md's king is 124 x 120, which fits turned.
+    assert cr.stitchdesk_backing(F(185, 2), 115)["batting"]["precut"] is None
+    job = bl.Job("stitchdesk_backing", "92.5x115@42", "92.5x115", "42", {},
+                 ("backing", "batting"), F(185, 2), F(115), F(42))  # fmt: skip
+    calc = bl.REGISTRY["stitchdesk_backing"]
+    assert bl.model_value(calc, "batting", job, "package") == "off the roll"
+    # The page's answer, with the 50 x 65 fragment's backing lines left as they are.
+    html = STITCHDESK_BACKING.replace(
+        f"58{INCH} {TIMES} 73{INCH} at 4{INCH} overhang. Nearest precut: Twin",
+        f"100 1/2{INCH} {TIMES} 123{INCH} at 4{INCH} overhang. Buy off the roll",
+    )
+    got = bl._extract_stitchdesk_backing(cp.parse_stitchdesk_backing, job, {"html": {"results": html}})
+    assert got["batting"] == {"width": F(201, 2), "length": F(123), "package": "off the roll"}
+
+
 def test_stitchdesk_binding_throw_60x72():
     # Perimeter 2 (60 + 72) = 264; extra 4 x 2.5 + 10 = 20; total 284; usable 42 - 2 = 40;
     # join loss 2.5 + 0.5 = 3. ceil(284 / 40) = 8; ceil((284 + 7 x 3) / 40) = ceil(7.63) = 8,
@@ -1537,6 +1556,57 @@ def test_omni_backing_one_piece_directional_batting_and_too_many():
     # 210 x 210: Wb = Lb = 218 > 5 x 42 = 210 either way, so neither split exists.
     got = cr.omni_backing(210, 210, bolt_width=42, overage=0)
     assert got["too_many_pieces"] is True and got["yards"] is None
+
+
+# Long 70 x 90 on a 42 in bolt, no extra overage: the page splits the width and prints each
+# piece's run along the quilt length as its width (W), as calc_rules.omni_backing reads it.
+OMNI_VERTICAL = (
+    "Results\n"
+    f"You need 5.45{NBSP}yards (4.98{NBSP}m) of fabric.\n"
+    f"Cut your fabric into 2{NBSP}pieces, each:\n"
+    "98 inches (249 cm) wide (W), and\n"
+    f"39{NBSP}inches (99 cm) long (L).{NBSP}\n"
+    f"We automatically add 4{NBSP}inches (10{NBSP}cm) of extra backing/batting to all sides of"
+    " the quilt top."
+)
+
+
+def _omni_job(w, ln, variant):
+    return bl.Job("omni_backing", f"{w}x{ln}@{variant}", f"{w}x{ln}", variant, {}, ("backing",),
+                  F(w), F(ln), F(42))  # fmt: skip
+
+
+def test_omni_page_width_split_reads_as_vertical():
+    # 70 x 90 on 42, overage 0: Wb = 70 + 8 = 78 > 42, Lb = 90 + 8 = 98.
+    # Length split: 98 in (84, 126] -> 3 pieces x 78 = 234 in. Width split: 78 in (42, 84]
+    # -> 2 pieces x 98 = 196 in, smaller, so the page shows it (vertical seams):
+    # ceil(196 / 36 x 100) / 100 = ceil(544.4) / 100 = 5.45 = 109/20 yd. Each piece is 98 in
+    # long and ceil(78 / 2 x 10) / 10 = 39 in across; the page prints 98 as W and 39 as L.
+    rec = {"html": {"results_text": OMNI_VERTICAL}}
+    got = bl._extract_omni(cp.parse_omni_backing, _omni_job(70, 90, "42"), rec)
+    assert got["backing"]["chosen"] == "vertical"
+    assert got["backing"]["layouts"] == {"vertical": {"yards": F(109, 20), "panels": 2}}
+    # Batting: the two 39 in pieces sit side by side, 2 x 39 = 78 in across by 98 in long.
+    got = bl._extract_omni(cp.parse_omni_backing, _omni_job(70, 90, "42-batting"), rec)
+    assert (got["batting"]["width"], got["batting"]["length"]) == (F(78), F(98))
+    # 50 x 65 (test_omni_backing_split_length): the length split's piece is Wb = 58 in long
+    # (its L), and the two 36.5 in pieces stack 2 x 36.5 = 73 in along the quilt length.
+    rec = {"html": {"results_text": OMNI_SPLIT}}
+    got = bl._extract_omni(cp.parse_omni_backing, _omni_job(50, 65, "42"), rec)
+    assert got["backing"]["layouts"] == {"horizontal": {"yards": F(323, 100), "panels": 2}}
+    got = bl._extract_omni(cp.parse_omni_backing, _omni_job(50, 65, "42-batting"), rec)
+    assert (got["batting"]["width"], got["batting"]["length"]) == (F(58), F(73))
+
+
+def test_omni_model_follows_the_width_split():
+    # The page model for the same 70 x 90 case: vertical, 5.45 yd in 2 panels (hand arithmetic
+    # in the test above), and a batting size of 2 x 39 = 78 in across by 98 in long.
+    calc = bl.REGISTRY["omni_backing"]
+    job = _omni_job(70, 90, "42")
+    assert bl.model_value(calc, "backing", job, "yards", layout="vertical") == F(109, 20)
+    assert bl.model_value(calc, "backing", job, "panels", layout="vertical") == 2
+    batting = _omni_job(70, 90, "42-batting")
+    assert bl.model_value(calc, "batting", batting, "size") == (F(78), F(98))
 
 
 def test_dtq_border_center_60x72():

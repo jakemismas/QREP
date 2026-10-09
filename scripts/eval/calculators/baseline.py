@@ -47,6 +47,9 @@ import calc_vectors as cv  # noqa: E402
 LINE_TYPES = ("backing", "binding", "batting", "borders")
 LIST_DATE = "2026-10-07"  # MATH.md 5.2: all five listed calculators were opened on this date
 TEXT_CAP = 4000  # displayed text kept per key; a page-wide capture (Omni) would swamp the JSON
+# The Stitch Desk's "Buy off the roll" is its package answer when no precut fits, so it is
+# recorded and compared as a value; None would read as a missing model.
+SD_OFF_THE_ROLL = "off the roll"
 
 # Which size the three single-band border calculators receive: "center" (the quilt before the
 # border) or "finished". Not settled yet, so it is a setting; --finished-size flips one per run.
@@ -495,7 +498,7 @@ def _extract_stitchdesk_backing(parser, job: Job, rec: dict) -> dict:
         "batting": {
             "width": got["batting"]["width"],
             "length": got["batting"]["length"],
-            "package": got["batting"]["precut"],
+            "package": got["batting"]["precut"] or SD_OFF_THE_ROLL,
         },
     }
     if got.get("wide"):
@@ -547,19 +550,24 @@ def _omni_layout(got: dict, job: Job) -> str:
         return "one piece"
     if got["piece_length"] == job.width + 8:
         return "horizontal"
-    if got["piece_length"] == job.length + 8:
+    # A width split prints each piece's run along the quilt length as its width (W).
+    if got["piece_width"] == job.length + 8:
         return "vertical"
     return "unstated"
 
 
 def _omni_size(pieces, piece_width, piece_length, layout) -> tuple | None:
-    # Pieces sit side by side, so their widths add up across the seams.
+    # Pieces sit side by side, so their short sides add up across the seams. A length split
+    # prints the short side as W, a width split as L (calc_rules.omni_backing).
     if pieces is None:
         return None
     if layout == "one piece":
         return (piece_width, piece_length)
-    across = pieces * piece_width
-    return (piece_length, across) if layout == "horizontal" else (across, piece_length)
+    if layout == "horizontal":
+        return (piece_length, pieces * piece_width)
+    if layout == "vertical":
+        return (pieces * piece_length, piece_width)
+    return None
 
 
 def _extract_omni(parser, job: Job, rec: dict) -> dict:
@@ -569,6 +577,8 @@ def _extract_omni(parser, job: Job, rec: dict) -> dict:
     lay = _omni_layout(got, job)
     if job.variant.endswith("batting"):
         size = _omni_size(got["pieces"], got["piece_width"], got["piece_length"], lay)
+        if size is None:
+            raise ValueError("the page's piece sizes match neither a length nor a width split")
         # The page names no batting package, so none is recorded or compared.
         return {"batting": {"width": size[0], "length": size[1], "yards": got["yards"],
                             "pieces": got["pieces"]}}  # fmt: skip
@@ -1293,7 +1303,9 @@ def model_value(calc: Calc, line: str, job: Job, quantity: str, layout=None, ban
                 return None if r["wide"] is None or quantity != "yards" else r["wide"]["yards"]
             if line == "batting":
                 bat = r["batting"]
-                return (bat["width"], bat["length"]) if quantity == "size" else bat["precut"]
+                if quantity == "size":
+                    return (bat["width"], bat["length"])
+                return bat["precut"] or SD_OFF_THE_ROLL
         if key == "mfqs_backing":
             r = calc_rules.mfqs_backing(job.width, job.length, fabric_width=job.fabric, overage=4)
             if line == "backing":
