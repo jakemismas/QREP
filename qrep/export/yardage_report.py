@@ -1,5 +1,6 @@
 """Yardage report markdown: one line per palette fabric plus the dedicated
-backing line. Yards are quarter-yard multiples by construction."""
+backing line, then the wide-back alternative when the report offers one.
+Yards are quarter-yard multiples by construction."""
 
 from qrep.construct.yardage import YardageReport
 from qrep.model.units import format_inches
@@ -26,6 +27,13 @@ def render_yardage_md(report: YardageReport) -> str:
             f"| {label} | {format_inches(line.length_needed)} "
             f"| {format_yards(line.quarter_yards)} |"
         )
+    if report.wide_back is not None:
+        wide = report.wide_back
+        lines += [
+            "",
+            f"Or replace the backing line with {wide.name}: "
+            f"{format_inches(wide.length_needed)} needed, {format_yards(wide.quarter_yards)}.",
+        ]
     lines += [
         "",
         "Yardage rounds up to the nearest 1/4 yard per fabric. "

@@ -225,6 +225,17 @@ MATH.md holds the formulas and vectors. This contract fixes:
   pattern prints both width assumptions from the settings.
 - Backing is computed in both seam orientations with seam allowance and overage; the cheaper layout
   wins. Binding is 2 1/2 in strips, perimeter plus 10 in, counted with its diagonal joins.
+- The finishing defaults, each a setting in eighths (qrep/model/schema.py, Settings): backing width
+  42 in (`backing_width`), wide-back width 108 in (`wide_back_width`), 4 in of backing and batting
+  overhang per side (`backing_margin`, 8 in per axis), 1 in lost per backing seam, a 9 in squaring
+  allowance for a backing of two or more panels (`backing_pieced_allowance`) and 4 1/2 in for a
+  one-piece or wide backing (`backing_one_piece_allowance`), and a 1/4 yd purchase increment
+  (`purchase_increment`). A tie between the two layouts keeps vertical seams. The wide-back line
+  appears only when the pieced backing needs two or more panels and one backing side fits within
+  the wide width. Batting is the backing's size, and the pattern names the smallest of the five
+  MATH.md packages that covers it (F12). One module holds this math
+  (qrep/construct/finishing.py), so the cut list, the purchase lines and the pattern print the
+  same numbers.
 - Yardage comes from strip yields plus a stated margin, never from area alone; borders are strips
   joined to length; one purchase-line function serves the CLI, metrics and exports.
 - Values still open for Jake (rounding increment, backing allowance, top-fabric margin, overhang)

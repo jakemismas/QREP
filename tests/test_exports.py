@@ -6,7 +6,6 @@ import io
 from pathlib import Path
 
 import pytest
-from _pytest.outcomes import Failed
 
 from qrep.construct import compute_purchase_lines, plan_strip
 from qrep.export import export_all, render_cutlist_csv, render_cutlist_md
@@ -34,7 +33,7 @@ def test_golden_cutlist_csv(fixture_quilt, golden):
 def test_missing_golden_fails_with_run_bless(golden, bless_mode):
     if bless_mode:
         pytest.skip("bless mode writes goldens; the missing-file path needs a plain run")
-    with pytest.raises(Failed, match="run --bless"):
+    with pytest.raises(pytest.fail.Exception, match="run --bless"):
         golden("never_blessed_anywhere.txt", "content")
 
 
@@ -59,14 +58,16 @@ def test_yardage_report_has_binding_and_backing_lines(fixture_quilt):
     binding = next(line for line in report.lines if line.purpose == "binding")
     assert binding.length_needed == 180
     assert binding.yards == 0.75
-    # backing: 2 panels x 784 = 1568 eighths -> 22 quarter yards = 5.5 yd
+    # backing (MATH.md V-BACK-09): 2 panels x 784 = 1568 eighths + the 72 e
+    # pieced allowance = 1640 -> ceil(1640/72) = 23 quarter yards = 5.75 yd
     backing = report.lines[-1]
-    assert backing.yards == 5.5
+    assert backing.yards == 5.75
     # every value is a whole multiple of 0.25 yd
     assert all((line.yards * 4).is_integer() for line in report.lines)
     text = render_yardage_md(report)
     assert "Binding - Chain blue" in text
-    assert "backing, any 42-inch WOF fabric" in text
+    # the name is built from the fixture's backing width, 336 e = 42"
+    assert 'backing, 42" wide fabric' in text
 
 
 def test_format_yards():
