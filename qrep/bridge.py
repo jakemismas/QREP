@@ -13,9 +13,14 @@ bridge argument with the wrong type or structure, with the field named);
 value (an input the engine cannot use: an unknown strategy or preset, a
 level, seed, scale or fabric count out of range, a missing or unreadable
 image, each named); not_implemented (stubbed
-strategies); internal (anything else, including a KeyError, TypeError or
-AttributeError raised inside the engine, which signals an engine bug;
-generic message, no stringified tracebacks reach the UI).
+strategies, and a v2 call whose implementation has not landed); internal
+(anything else, including a KeyError, TypeError or AttributeError raised
+inside the engine, which signals an engine bug; generic message, no
+stringified tracebacks reach the UI, which get printed to stderr instead).
+
+The v2 entry points (read_confirmed, size_pattern, export_pattern) take
+and return the models in qrep/contract.py, and every v2 result names its
+outcome.
 
 contract_version() reports CONTRACT_VERSION (qrep/contract.py), which the
 web worker checks at boot before it serves any call.
@@ -52,15 +57,25 @@ import json
 import math
 import shutil
 import tempfile
+import traceback
 import uuid
+from importlib import import_module
 from pathlib import Path
 
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from qrep.construct import get_strategy
 from qrep.construct.yardage import compute_purchase_lines
 from qrep.construct.strategies import STRATEGIES, infer_block_structure
-from qrep.contract import CONTRACT_VERSION
+from qrep.contract import (
+    CONTRACT_VERSION,
+    FABRICS_MAX,
+    FABRICS_MIN,
+    PatternResult,
+    ReadRequest,
+    SizeRequest,
+    SizeResult,
+)
 from qrep.export.cutlist import render_cutlist_csv, render_cutlist_md
 from qrep.export.pdf import render_booklet
 from qrep.export.svg import render_top_svg
@@ -95,10 +110,17 @@ QUARTER = 2  # 1/4" in eighths
 # and every one grows with the square of the scale.
 RENDER_SCALE_MAX = 20
 
-# Largest forced fabric count for reverse(): SPEC.md section 12.1 caps the
-# read's fabric count at 12. Above it, k-means only stalls or fails inside
-# OpenCV, which would report your input as an engine bug.
-FABRICS_MAX = 12
+# Smallest render() scale x square size, in pixels per inch x eighths: 12 is
+# 1.5 px per square. The renderer fills each square from px(start) to
+# px(end) - 1 with half-up rounding, so a square under 1 px can get no pixels
+# and Pillow refuses its rectangle. Levels 1 to 3 re-derive the scale from
+# the rounded image width, which shrinks a square by at most half a pixel
+# (the width rounds by 0.5 px or less over a quilt at least one square
+# wide), so 1.5 px keeps every square at 1 px or more on every level.
+RENDER_SQUARE_SPAN_MIN = 12
+
+# reverse()'s forced fabric count follows the read's, FABRICS_MIN to
+# FABRICS_MAX (qrep/contract.py; SPEC.md section 12.1).
 
 
 class _ArgumentError(Exception):
@@ -148,6 +170,10 @@ def _envelope(fn):
         except Exception:  # noqa: BLE001 - the seam must never leak internals
             # A KeyError lands here too: known input errors raise ValueError
             # at entry, so a KeyError from the engine is a bug, not your input.
+            # The traceback goes to stderr, never into the envelope: Pyodide
+            # sends stderr to the browser console (console.warn), where the
+            # message below points.
+            traceback.print_exc()
             return _error("internal", "internal engine error; see the browser console log")
 
     wrapper.__name__ = fn.__name__
@@ -305,7 +331,8 @@ def export_pdf(model_json: str, strategy: str) -> dict:
 def render(model_json: str, level: int, seed: int, scale: int) -> dict:
     """Render the synthetic PNG; returns PNG bytes plus the sidecar dict.
 
-    scale is pixels per inch, from 1 to RENDER_SCALE_MAX.
+    scale is pixels per inch, from 1 to RENDER_SCALE_MAX, and at least
+    RENDER_SQUARE_SPAN_MIN / cell size (1.5 px per square), rounded up.
     """
     from qrep.render import save_render
 
@@ -319,6 +346,13 @@ def render(model_json: str, level: int, seed: int, scale: int) -> dict:
     if not 1 <= scale <= RENDER_SCALE_MAX:
         raise ValueError(f"scale must be 1..{RENDER_SCALE_MAX} pixels per inch, got {scale}")
     quilt = _load(model_json)
+    cell = quilt.center.cell_size
+    if scale * cell < RENDER_SQUARE_SPAN_MIN:
+        floor = -(-RENDER_SQUARE_SPAN_MIN // cell)
+        raise ValueError(
+            f"scale must be at least {floor} pixels per inch for {cell}-eighth squares "
+            f"(1.5 pixels per square), got {scale}"
+        )
     scratch = _scratch_dir()
     try:
         png_path, sidecar_path = save_render(
@@ -417,8 +451,8 @@ def reverse(image_path: str, options_json: str) -> dict:
     fabrics = options.get("fabrics")
     if fabrics is not None:
         fabrics = _whole("options_json.fabrics", fabrics)
-        if not 1 <= fabrics <= FABRICS_MAX:
-            raise ValueError(f"fabrics must be 1..{FABRICS_MAX}, got {fabrics}")
+        if not FABRICS_MIN <= fabrics <= FABRICS_MAX:
+            raise ValueError(f"fabrics must be {FABRICS_MIN}..{FABRICS_MAX}, got {fabrics}")
 
     def _size_option(key: str) -> int | None:
         value = options.get(key)
@@ -697,3 +731,82 @@ def resize_unlocked(model_json: str, target_json: str) -> dict:
         "requested": requested,
         "achieved": _achieved(resized),
     }
+
+
+# ---------------------------------------------------------------- bridge v2
+#
+# The v2 entry points (E1b) take and return the models in qrep/contract.py;
+# every result names its outcome. size_pattern and export_pattern load their
+# implementations lazily from fixed module paths, so the tickets that write
+# them (A10; A4a to A4d) never touch this contract file.
+
+
+def _request(model: type[BaseModel], field: str, value) -> BaseModel:
+    """Validates a JSON request: malformed JSON is kind schema, a bad shape
+    kind validation naming the field."""
+    raw = _text(field, value)
+    json.loads(raw)
+    return model.model_validate_json(raw)
+
+
+def _delegate(module: str, name: str):
+    """The engine function that implements a v2 call, or not_implemented
+    while its ticket has not landed. Only the delegate's own module may be
+    missing: a dependency that fails to import inside it is an engine bug."""
+    try:
+        found = getattr(import_module(module), name, None)
+    except ModuleNotFoundError as e:
+        if e.name != module:
+            raise
+        found = None
+    if found is None:
+        raise NotImplementedError(f"{name} is not implemented yet ({module})")
+    return found
+
+
+def _result(model: type[BaseModel], produce):
+    """Runs a delegate and returns its result as JSON data. The request was
+    validated before, so a delegate that fails validation or returns another
+    type is an engine bug (kind internal), not your input."""
+    try:
+        result = produce()
+    except ValidationError as e:
+        raise RuntimeError("the engine produced an invalid result") from e
+    if not isinstance(result, model):
+        raise TypeError(f"expected {model.__name__}, got {type(result).__name__}")
+    return result.model_dump(mode="json")
+
+
+@_envelope
+def read_confirmed(request_json: str) -> dict:
+    """The confirmed read (SPEC.md sections 4, 5 and 12.1): reads the staged
+    photo the request's token names, with your frame, counts and optional
+    fabric count, and returns a ReadResult.
+
+    A stub until B2b switches it to the real read in qrep/vision/read/: it
+    validates the request, then returns kind not_implemented.
+    """
+    _request(ReadRequest, "request_json", request_json)
+    raise NotImplementedError("read_confirmed is not implemented yet")
+
+
+@_envelope
+def size_pattern(model_json: str, request_json: str) -> dict:
+    """Sizes the pattern for the size you set (SPEC.md section 6.3): returns a
+    SizeResult with the sized model and its size basis. Implemented by
+    qrep.model.sizing:size_pattern(quilt, request)."""
+    quilt = _load(model_json)
+    request = _request(SizeRequest, "request_json", request_json)
+    size = _delegate("qrep.model.sizing", "size_pattern")
+    return _result(SizeResult, lambda: size(quilt, request))
+
+
+@_envelope
+def export_pattern(model_json: str) -> dict:
+    """The one pattern download: a PatternResult with the PDF (base64) and
+    the summary Your pattern shows. The engine picks the method, so the call
+    takes no strategy (SPEC.md section 12.1). Implemented by
+    qrep.export.pattern:build_pattern(quilt)."""
+    quilt = _load(model_json)
+    build = _delegate("qrep.export.pattern", "build_pattern")
+    return _result(PatternResult, lambda: build(quilt))
