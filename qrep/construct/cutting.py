@@ -68,19 +68,24 @@ def joined_strip_count(piece_length: int, usable_width: int, join_loss: int) -> 
     """F4: each straight join between strips uses join_loss of length."""
     if piece_length <= usable_width:
         return 1
-    if join_loss >= usable_width:
+    if not 0 <= join_loss < usable_width:
         raise ValueError(
-            f"join loss {join_loss} must be shorter than the usable width {usable_width}"
+            f"join loss {join_loss} must be at least 0 and shorter than the usable width "
+            f"{usable_width}"
         )
     return _ceil_div(piece_length - join_loss, usable_width - join_loss)
 
 
 def with_margin(length: int, margin_percent: int) -> int:
+    if margin_percent < 0:
+        raise ValueError(f"margin {margin_percent} percent must be at least 0")
     # Integers only: ceil(200 x 1.1) is 221 in binary floating point (V-UNIT-02).
     return _ceil_div(length * (100 + margin_percent), 100)
 
 
 def purchase_increments(purchase: int, increment: int) -> int:
+    if increment < 1:
+        raise ValueError(f"purchase increment {increment} must be at least 1")
     return _ceil_div(purchase, increment)
 
 
@@ -133,6 +138,8 @@ def strip_set_plan(
     segments_needed: int, segment_cut_width: int, sequence: Sequence[str], usable_width: int
 ) -> StripSetPlan:
     """F3: one strip of each fabric in the sequence per set."""
+    if segments_needed < 0:
+        raise ValueError(f"segments needed {segments_needed} must be at least 0")
     per_set = pieces_per_strip(segment_cut_width, usable_width)
     sets = _ceil_div(segments_needed, per_set)
     counts = Counter(sequence)
@@ -162,10 +169,14 @@ def border_bands(
     seam_allowance: int,
 ) -> list[BorderBand]:
     """F4: sides first, then top and bottom, per band from the center outward."""
+    if seam_allowance < 0:
+        raise ValueError(f"seam allowance {seam_allowance} must be at least 0")
     cut_extra = 2 * seam_allowance
     inner_width, inner_length = center_width, center_length
     bands = []
     for band_width in band_widths:
+        if band_width < 1:
+            raise ValueError(f"border band width {band_width} must be at least 1")
         strip_width = band_width + cut_extra
         sides = _border_pair(inner_length + cut_extra, usable_width, join_loss)
         top_bottom = _border_pair(

@@ -188,6 +188,16 @@ def test_strip_yield_compares_the_joined_cut_for_every_quantity(quantity, strip_
     assert (plan.strip_width, plan.length) == (strip_width, length)
 
 
+def test_strip_yield_tie_between_the_joined_cut_and_orientation_2_keeps_the_narrower_strip():
+    # 12 pieces cut 2 1/2 x 60 in (20 x 480 e), U = 40, j = 1/2 in
+    #   joined: k = ceil((480 - 4) / 316) = ceil(476 / 316) = 2; strips = 12 x 2 = 24;
+    #           length = 24 x 20 = 480 e
+    #   orientation 2: per = 320 // 20 = 16; strips = ceil(12 / 16) = 1; length = 480 e
+    #   tie at 60 in -> the joined cut's 2 1/2 in strip (MATH.md F2 tie rule)
+    plan = strip_yield(12, 20, 480, U40, JOIN)
+    assert (plan.strip_width, plan.strips, plan.strips_per_piece, plan.length) == (20, 24, 2, 480)
+
+
 def test_strip_yield_refuses_a_piece_longer_than_u_both_ways():
     # 41 x 42 in (328 x 336 e) exceeds 40 in in both directions
     with pytest.raises(ValueError, match="both sides"):
@@ -314,8 +324,9 @@ def test_border_bands_v_bord_03_two_bands():
     #   8 strips; 8 x 20 = 160 e (20 in)
     assert (band1.inner_width, band1.inner_length) == (480, 576)
     assert band1.strip_width == 20
-    assert (band1.sides.cut_length, band1.sides.strips) == (580, 4)
-    assert (band1.top_bottom.cut_length, band1.top_bottom.strips) == (516, 4)
+    assert (band1.sides.cut_length, band1.sides.strips_per_piece, band1.sides.strips) == (580, 2, 4)
+    assert (band1.top_bottom.cut_length, band1.top_bottom.strips_per_piece,
+            band1.top_bottom.strips) == (516, 2, 4)
     assert (band1.strips, band1.length) == (8, 160)
     # inner size for band 2 = (480 + 2 x 16) x (576 + 2 x 16) = 512 x 608 e (64 x 76 in)
     # band 2: cut 40 + 4 = 44 e; Ls = 608 + 4 = 612 e: k = ceil(608 / 316) = ceil(1.924) = 2 -> 4;
@@ -323,8 +334,9 @@ def test_border_bands_v_bord_03_two_bands():
     #   8 strips; 8 x 44 = 352 e (44 in)
     assert (band2.inner_width, band2.inner_length) == (512, 608)
     assert band2.strip_width == 44
-    assert (band2.sides.cut_length, band2.sides.strips) == (612, 4)
-    assert (band2.top_bottom.cut_length, band2.top_bottom.strips) == (596, 4)
+    assert (band2.sides.cut_length, band2.sides.strips_per_piece, band2.sides.strips) == (612, 2, 4)
+    assert (band2.top_bottom.cut_length, band2.top_bottom.strips_per_piece,
+            band2.top_bottom.strips) == (596, 2, 4)
     assert (band2.strips, band2.length) == (8, 352)
 
 
@@ -421,5 +433,30 @@ def test_cutting_imports_neither_the_strategies_nor_the_schema():
         elif isinstance(node, ast.ImportFrom):
             assert node.level == 0, "cutting.py uses a relative import"
             imported.add(node.module)
-    banned = {"qrep.construct", "qrep.construct.strategies", "qrep.model", "qrep.model.schema"}
+            # `from qrep import model` names the module only through its alias
+            imported.update(f"{node.module}.{alias.name}" for alias in node.names)
+    banned = {
+        "qrep",
+        "qrep.construct",
+        "qrep.construct.strategies",
+        "qrep.model",
+        "qrep.model.schema",
+    }
     assert not imported & banned
+
+
+@pytest.mark.parametrize(
+    "call",
+    [
+        pytest.param(lambda: joined_strip_count(640, U40, -8), id="negative-join-loss"),
+        pytest.param(lambda: with_margin(1008, -10), id="negative-margin"),
+        pytest.param(lambda: purchase_increments(1008, 0), id="zero-increment"),
+        pytest.param(lambda: strip_set_plan(-5, 16, "bb", U40), id="negative-segments"),
+        pytest.param(lambda: border_bands(80, 80, [-16], U40, JOIN, SEAM), id="negative-band"),
+        pytest.param(lambda: border_bands(80, 80, [16], U40, JOIN, -2), id="negative-seam"),
+    ],
+)
+def test_cutting_math_refuses_out_of_range_inputs(call):
+    # Each would otherwise return a silently wrong length or a bare ZeroDivisionError
+    with pytest.raises(ValueError):
+        call()
