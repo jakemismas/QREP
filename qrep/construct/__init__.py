@@ -21,7 +21,6 @@ from qrep.construct.yardage import (
     YardageLine,
     YardageReport,
     compute_purchase_lines,
-    compute_yardage,
 )
 
 __all__ = [
@@ -36,7 +35,6 @@ __all__ = [
     "YardageLine",
     "YardageReport",
     "compute_purchase_lines",
-    "compute_yardage",
     "get_strategy",
     "infer_block_structure",
     "plan_historical",

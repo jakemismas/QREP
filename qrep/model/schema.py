@@ -132,7 +132,8 @@ class Settings(BaseModel):
     """Math defaults, all in eighths unless noted. Overridable per quilt."""
 
     seam_allowance: int = Field(default=2, gt=0)
-    wof: int = Field(default=336, gt=0, description="usable width of fabric, 42in")
+    # Strip cutting assumes 40in usable (MATH.md D-05); backing has its own width.
+    wof: int = Field(default=320, gt=0, description="usable width of fabric for strips, 40in")
     binding_strip_width: int = Field(default=20, gt=0)
     binding_extra: int = Field(default=80, ge=0, description="binding length beyond perimeter")
     backing_margin: int = Field(default=64, ge=0, description="extra per axis for backing, 8in")
@@ -149,6 +150,18 @@ class Settings(BaseModel):
         default=36, ge=0, description="squaring allowance, one-piece or wide backing, 4.5in"
     )
     purchase_increment: int = Field(default=72, gt=0, description="purchase rounding step, 1/4yd")
+    top_margin: int = Field(
+        default=10, ge=0, description="percent added to each quilt-top fabric's strip plan"
+    )
+
+    @model_validator(mode="after")
+    def _wide_back_is_wider(self) -> "Settings":
+        if self.wide_back_width <= self.backing_width:
+            raise ValueError(
+                f"wide_back_width {self.wide_back_width} must exceed backing_width "
+                f"{self.backing_width}"
+            )
+        return self
 
     @property
     def cut_add(self) -> int:
@@ -209,6 +222,17 @@ class Quilt(BaseModel):
         missing = sorted(used - known)
         if missing:
             raise ValueError(f"fabric ids {missing} referenced but not in palette {sorted(known)}")
+        return self
+
+    @model_validator(mode="after")
+    def _binding_strip_fits_the_fabric(self) -> "Quilt":
+        # Each diagonal join uses one strip width (MATH.md F7), so a strip at
+        # least as wide as the usable width yields no binding length.
+        if self.binding.strip_width >= self.settings.wof:
+            raise ValueError(
+                f"binding strip width {self.binding.strip_width} must be narrower than the "
+                f"usable width of fabric {self.settings.wof}"
+            )
         return self
 
     @property

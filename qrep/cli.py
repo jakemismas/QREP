@@ -5,8 +5,9 @@ from pathlib import Path
 import typer
 from pydantic import ValidationError
 
-from qrep.construct import compute_yardage, get_strategy
+from qrep.construct import compute_purchase_lines, get_strategy
 from qrep.export import export_all
+from qrep.export.yardage_report import format_yards
 from qrep.model import QrepSchemaError, load
 from qrep.model.io import save
 from qrep.render import save_render
@@ -75,10 +76,16 @@ def plan(
     typer.echo(f"bias edges: {m.bias_percent:.1%}")
     typer.echo(f"difficulty: {m.difficulty} ({m.heuristic_label})")
     typer.echo(f"time estimate: {m.time_minutes} min ({m.heuristic_label})")
-    yardage = compute_yardage(quilt, result)
+    yardage = compute_purchase_lines(quilt, result)
     for line in yardage.lines:
         label = f"{line.name} ({line.fabric_id})" if line.fabric_id else line.name
-        typer.echo(f"yardage - {label}: {line.quarter_yards / 4} yd")
+        typer.echo(f"yardage - {label}: {format_yards(line.increments, yardage.increment)}")
+    wide = yardage.wide_back
+    if wide is not None:
+        typer.echo(
+            f"yardage - instead of the backing line, {wide.name}: "
+            f"{format_yards(wide.increments, yardage.increment)}"
+        )
     if output is not None:
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(result.model_dump_json(indent=2) + "\n", encoding="utf-8", newline="\n")
@@ -171,3 +178,7 @@ def export(
         raise typer.Exit(1) from None
     for path in written:
         typer.echo(f"wrote {path}")
+
+
+if __name__ == "__main__":
+    app()

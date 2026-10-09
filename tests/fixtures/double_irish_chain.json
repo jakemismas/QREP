@@ -2636,7 +2636,8 @@
     "wide_back_width": 864,
     "backing_pieced_allowance": 72,
     "backing_one_piece_allowance": 36,
-    "purchase_increment": 72
+    "purchase_increment": 72,
+    "top_margin": 10
   },
   "provenance": {
     "source": "authored",

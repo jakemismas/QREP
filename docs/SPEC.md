@@ -219,7 +219,8 @@ MATH.md holds the formulas and vectors. This contract fixes:
 - Lengths are integer eighths of an inch (qrep-design-doc.md, Units). Seam allowance 1/4 in: cut
   size is finished size plus 1/2 in.
 - Strip cutting assumes 40 in usable width of fabric (WOF), configurable: Jake's decision on #91
-  (2026-07-10), kept as the safe default for yields.
+  (2026-07-10), kept as the safe default for yields. `Settings.wof` defaults to 320 e; the
+  benchmark fixture stores 336 e (42 in) until A6 regenerates it (MATH.md section 1.3).
 - Backing has its own width setting, default 42 in, configurable, with a 108 in wide-back option.
   Why: applying 40 in to backing brings back the over-estimate a quilter reported (MATH.md). The
   pattern prints both width assumptions from the settings.
@@ -236,11 +237,16 @@ MATH.md holds the formulas and vectors. This contract fixes:
   MATH.md packages that covers it (F12). One module holds this math
   (qrep/construct/finishing.py), so the cut list, the purchase lines and the pattern print the
   same numbers.
-- Yardage comes from strip yields plus a stated margin, never from area alone; borders are strips
-  joined to length; one purchase-line function serves the CLI, metrics and exports.
-- Values still open for Jake (rounding increment, backing allowance, top-fabric margin, overhang)
-  use MATH.md's defaults until he decides. A reported discrepancy becomes a failing hand-computed
-  test before the fix (MATH.md, section 6).
+- Yardage comes from strip yields plus a stated margin, never from area alone. A top fabric's
+  length is the sum of its cut-line yields (F2), strip-set strips (F3) and joined border strips
+  (F4); its purchase adds a 10 percent margin (`top_margin`, in percent). Binding adds nothing
+  beyond its extra length, and the backing adds its squaring allowance. Each line rounds up on
+  its own to `purchase_increment`, and yards print as mixed fractions of that increment (F13).
+  One purchase-line function (`compute_purchase_lines`) serves the CLI, the waste metric and the
+  exports, and the yardage report prints each line's length needed and purchase length.
+- These defaults stand until Jake changes one, and each is a setting, so a change moves a default,
+  not a formula (MATH.md, section 6 lists the questions). A reported discrepancy becomes a failing
+  hand-computed test before the fix.
 
 ## 8. The quilt model: confidence and provenance
 
