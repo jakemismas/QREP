@@ -1174,12 +1174,59 @@ def test_fixture_guard_fails_an_untrailered_fixture_edit(repo):
 
 
 @needs_git
-def test_fixture_guard_passes_a_trailered_edit_of_a_path_the_record_names(repo):
+@pytest.mark.parametrize(
+    "message",
+    [
+        f"Regenerate the benchmark fixture\n\nWhy: a new model field.\n\n{TRAILER}",
+        # `git interpret-trailers --parse`, the check WORKER.md 4.1 runs, reads
+        # the trailer block before a `---` divider line.
+        f"Regenerate the benchmark fixture\n\n{TRAILER}\n---\nNotes below the divider.",
+    ],
+)
+def test_fixture_guard_passes_a_trailered_edit_of_a_path_the_record_names(repo, message):
     base = _freeze_fixtures(repo)
-    message = f"Regenerate the benchmark fixture\n\nWhy: a new model field.\n\n{TRAILER}"
     head = _commit(repo, message, {FIXTURE: "regenerated\n"})
     result = _run(repo, "golden_guard.py", base, head)
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+@needs_git
+def test_fixture_guard_needs_every_changed_path_named(repo):
+    # The record must name each changed path (E5, criterion 2), so one named
+    # path in the same trailered commit admits no other.
+    base = _freeze_fixtures(repo)
+    head = _commit(
+        repo,
+        f"Regenerate two fixtures\n\n{TRAILER}",
+        {FIXTURE: '{"v": 2}\n', PHOTO: '{"p": 2}\n'},
+    )
+    result = _run(repo, "golden_guard.py", base, head)
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert f"{PHOTO} is not named in {RECORD}" in result.stdout
+    assert f"{FIXTURE} is not named" not in result.stdout
+
+
+@needs_git
+@pytest.mark.parametrize("main_names_photo", [True, False])
+def test_fixture_guard_reads_the_record_at_the_base_not_the_fork_point(repo, main_names_photo):
+    # The record that counts is the base's (main's tip), not the one the branch
+    # forked from: an amendment merged on main first admits the path (the
+    # documented route for a new path), and a name main has since dropped
+    # admits nothing.
+    if main_names_photo:
+        fork_record, base_record = RECORD_TEXT, RECORD_TEXT + f"| {PHOTO} | photoreal | D1 |\n"
+    else:
+        fork_record, base_record = RECORD_TEXT + f"| {PHOTO} | photoreal | D1 |\n", RECORD_TEXT
+    _commit(repo, "Freeze fixtures", {RECORD: fork_record, FIXTURE: '{"v": 1}\n', PHOTO: "{}\n"})
+    fork = _start_branch(repo)
+    head = _commit(repo, f"Re-shoot a photoreal fixture\n\n{TRAILER}", {PHOTO: '{"p": 2}\n'})
+    _git(repo, "checkout", "-q", "main")
+    base = _commit(repo, "Amend the record", {RECORD: base_record})
+    assert _git(repo, "merge-base", base, head) == fork
+    result = _run(repo, "golden_guard.py", base, head)
+    assert result.returncode == (0 if main_names_photo else 1), result.stdout + result.stderr
+    if not main_names_photo:
+        assert f"{PHOTO} is not named in {RECORD}" in result.stdout
 
 
 @needs_git
@@ -1301,13 +1348,85 @@ def test_fixture_guard_fails_a_fixture_regenerated_inside_a_merge(repo):
 
 
 @needs_git
+def test_fixture_guard_checks_the_final_content_of_each_fixture(repo):
+    # Each changed path needs its own sanctioned writer: a merge that rewrites
+    # one of two regenerated fixtures fails for that one alone.
+    _freeze_fixtures(repo)
+    _commit(
+        repo,
+        f"Regenerate two fixtures\n\n{TRAILER}",
+        {FIXTURE: '{"v": 2}\n', PIN: "[2]\n"},
+    )
+    _git(repo, "checkout", "-q", "main")
+    base = _commit(repo, "Other work", {"other.txt": "o\n"})
+    _git(repo, "checkout", "-q", "work")
+    _git(repo, "merge", "-q", "--no-ff", "--no-commit", "main")
+    head = _commit(repo, "Merge main into work", {PIN: "[3]\n"})
+    result = _run(repo, "golden_guard.py", base, head)
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert f"{PIN} ends with content that no commit in the range wrote" in result.stdout
+    assert f"{FIXTURE} ends with content" not in result.stdout
+
+
+@needs_git
+def test_fixture_guard_passes_the_orchestrators_revert_of_a_merged_pull_request(repo):
+    # ORCHESTRATOR.md section 12: revert the merge with -m 1, commit with the
+    # trailer as the last paragraph; the regenerated fixture returns to the
+    # base's copy, and a fixture the PR deleted comes back as a new file.
+    _freeze_fixtures(repo)
+    _commit(repo, f"Regenerate the benchmark fixture\n\n{TRAILER}", {FIXTURE: '{"v": 2}\n'})
+    _git(repo, "rm", "-q", PIN)
+    _commit(repo, f"Retire the legacy pin\n\n{SUPPORT_TRAILER}")
+    _git(repo, "checkout", "-q", "main")
+    _git(repo, "merge", "-q", "--no-ff", "-m", "Merge pull request #12 from work", "work")
+    merge = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "checkout", "-q", "-b", "fix/revert-pr-12")
+    _git(repo, "revert", "-m", "1", "--no-commit", merge)
+    _git(
+        repo,
+        "commit",
+        "-q",
+        "-m",
+        "Revert PR #12 after main went red",
+        "-m",
+        f"This reverts merge commit {merge}. Failing run: https://example.invalid/run/1.",
+        "-m",
+        "Rebaseline: bless policy item 4 (revert of PR #12)",
+    )
+    assert (repo / PIN).exists()
+    result = _run(repo, "golden_guard.py", merge, "HEAD")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert f"1 tracked fixture(s) modified or deleted, each named in {RECORD}" in result.stdout
+
+
+@needs_git
+@pytest.mark.parametrize("path", [CUT, FIXTURE])
+def test_guard_output_escapes_control_characters_in_subjects(repo, tmp_path, path):
+    # A subject is printed to the CI log, where a line that starts with "::" is
+    # a workflow command (::error::, ::add-mask::), so a line break inside a
+    # subject must not reach the log as one.
+    base = _freeze_fixtures(repo)
+    (repo / path).write_text("edited\n", encoding="utf-8")
+    _git(repo, "add", path)
+    message = tmp_path / "message.txt"
+    message.write_bytes(b"Edit by hand\r::error::forged pass\n")
+    _git(repo, "commit", "-q", "--cleanup=verbatim", "-F", str(message))
+    result = _run(repo, "golden_guard.py", base, "HEAD")
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "::error::forged pass" in result.stdout
+    assert not any(line.startswith("::") for line in result.stdout.splitlines())
+
+
+@needs_git
 @pytest.mark.parametrize(
     "message",
     [
         # git reads no trailers from the subject.
         TRAILER,
-        # A trailer block is the message's last paragraph.
+        # A trailer block is the message's last paragraph, before any `---`
+        # divider line (`git interpret-trailers --parse`, WORKER.md 4.1).
         f"Regenerate the benchmark fixture\n\n{TRAILER}\n\nNotes written after it.",
+        f"Regenerate the benchmark fixture\n\n---\n\n{TRAILER}",
         f"Regenerate the benchmark fixture\n\nThe model gained a field.\n{TRAILER}",
         # A trailer that cites no entry cites nothing.
         "Regenerate the benchmark fixture\n\nRebaseline:",
@@ -1355,7 +1474,8 @@ def test_fixture_guard_ignores_commits_that_only_add_fixtures(repo):
 @pytest.mark.parametrize("kind", ["symlink", "directory"])
 def test_fixture_guard_reports_a_record_that_is_not_a_file_as_exit_2(repo, tmp_path, kind):
     # A symlink's blob is its target's name, so reading it as the record could
-    # name any path; a git error exits 2 (the documented exit codes).
+    # name any path; the guard refuses such a record with exit 2, the code it
+    # documents for a usage or git error.
     if kind == "symlink":
         target = tmp_path / "target.txt"
         target.write_bytes(FIXTURE.encode())
