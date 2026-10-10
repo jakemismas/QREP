@@ -1141,6 +1141,8 @@ def test_golden_guard_script_reports_a_head_that_conflicts_with_the_base_as_exit
 RECORD = "docs/sprint-5/REBASELINE.md"
 PHOTO = "tests/fixtures/photoreal/shoot_01.json"
 TRAILER = "Rebaseline: bless policy item 4"
+SUPPORT_TRAILER = "Rebaseline: Support files and CI steps (B6b)"
+UNSANCTIONED = "without [bless] or a Rebaseline: trailer in its own message"
 RECORD_TEXT = (
     "4. A ticket that adds or removes a model field regenerates\n"
     f"   {FIXTURE} in the same PR and cites this item.\n\n"
@@ -1168,17 +1170,27 @@ def test_fixture_guard_fails_an_untrailered_fixture_edit(repo):
     result = _run(repo, "golden_guard.py", base, head)
     assert result.returncode == 1, result.stdout + result.stderr
     assert FIXTURE in result.stdout
-    assert "Regenerate the benchmark fixture" in result.stdout
+    assert f"'Regenerate the benchmark fixture' changes {FIXTURE} {UNSANCTIONED}" in result.stdout
 
 
 @needs_git
-@pytest.mark.parametrize("path", [FIXTURE, PIN])
-def test_fixture_guard_passes_a_trailered_edit_of_a_path_the_record_names(repo, path):
+def test_fixture_guard_passes_a_trailered_edit_of_a_path_the_record_names(repo):
     base = _freeze_fixtures(repo)
     message = f"Regenerate the benchmark fixture\n\nWhy: a new model field.\n\n{TRAILER}"
-    head = _commit(repo, message, {path: "regenerated\n"})
+    head = _commit(repo, message, {FIXTURE: "regenerated\n"})
     result = _run(repo, "golden_guard.py", base, head)
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+@needs_git
+def test_fixture_guard_fails_when_the_base_has_no_record(repo):
+    # No record names anything, so the trailer alone admits nothing.
+    _commit(repo, "Freeze the fixture", {FIXTURE: '{"v": 1}\n'})
+    base = _start_branch(repo)
+    head = _commit(repo, f"Regenerate the benchmark fixture\n\n{TRAILER}", {FIXTURE: "{}\n"})
+    result = _run(repo, "golden_guard.py", base, head)
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert f"{FIXTURE} is not named in {RECORD}" in result.stdout
 
 
 @needs_git
@@ -1214,7 +1226,7 @@ def test_fixture_guard_fails_a_path_that_only_the_heads_record_names(repo, same_
     ("message", "exit_code"),
     [
         ("Retire the legacy pin", 1),
-        (f"Retire the legacy pin\n\n{TRAILER}", 0),
+        (f"Retire the legacy pin\n\n{SUPPORT_TRAILER}", 0),
         ("Retire the legacy pin [bless]", 0),
     ],
 )
@@ -1227,7 +1239,7 @@ def test_fixture_guard_lets_a_deletion_through_only_with_a_trailer_or_bless(
     result = _run(repo, "golden_guard.py", base, head)
     assert result.returncode == exit_code, result.stdout + result.stderr
     if exit_code:
-        assert PIN in result.stdout
+        assert f"changes {PIN} {UNSANCTIONED}" in result.stdout
 
 
 @needs_git
@@ -1299,6 +1311,9 @@ def test_fixture_guard_fails_a_fixture_regenerated_inside_a_merge(repo):
         f"Regenerate the benchmark fixture\n\nThe model gained a field.\n{TRAILER}",
         # A trailer that cites no entry cites nothing.
         "Regenerate the benchmark fixture\n\nRebaseline:",
+        # Only the Rebaseline key counts, not another trailer or a longer key.
+        "Regenerate the benchmark fixture\n\nRefs: #178",
+        "Regenerate the benchmark fixture\n\nRebaseline-note: bless policy item 4",
     ],
 )
 def test_fixture_guard_counts_only_a_rebaseline_trailer_git_parses(repo, message):
@@ -1306,6 +1321,77 @@ def test_fixture_guard_counts_only_a_rebaseline_trailer_git_parses(repo, message
     head = _commit(repo, message, {FIXTURE: '{"v": 2}\n'})
     result = _run(repo, "golden_guard.py", base, head)
     assert result.returncode == 1, result.stdout + result.stderr
+    assert f"changes {FIXTURE} {UNSANCTIONED}" in result.stdout
+
+
+@needs_git
+def test_fixture_guard_fails_a_revert_of_a_bless_that_changed_a_fixture(repo):
+    # Undoing a bless is not a bless (the golden rule), for fixtures too.
+    _freeze_fixtures(repo)
+    _commit(repo, "A6: consolidated refresh [bless]", {FIXTURE: '{"v": 2}\n'})
+    _git(repo, "checkout", "-q", "main")
+    _git(repo, "merge", "-q", "--ff-only", "work")
+    base = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "checkout", "-q", "-b", "undo")
+    _git(repo, "revert", "--no-edit", "HEAD")
+    assert _git(repo, "log", "-1", "--format=%s").startswith('Revert "A6: consolidated')
+    result = _run(repo, "golden_guard.py", base, "HEAD")
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert UNSANCTIONED in result.stdout
+
+
+@needs_git
+def test_fixture_guard_ignores_commits_that_only_add_fixtures(repo):
+    # A new file passes (E5, criterion 2), so the commit that adds one is not
+    # judged beside a sanctioned regeneration of a tracked fixture.
+    base = _freeze_fixtures(repo)
+    _commit(repo, "Add a photoreal fixture", {"tests/fixtures/photoreal/shoot_02.json": "{}\n"})
+    head = _commit(repo, f"Regenerate the benchmark fixture\n\n{TRAILER}", {FIXTURE: "{}\n"})
+    result = _run(repo, "golden_guard.py", base, head)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+@needs_git
+def test_fixture_guard_reads_each_commits_own_message_whatever_bytes_it_holds(repo, tmp_path):
+    # git accepts a 0x01 byte in a message; it must not split one commit's
+    # message into a trailer or into another commit (git reads no trailer here).
+    base = _freeze_fixtures(repo)
+    (repo / FIXTURE).write_text('{"v": 2}\n', encoding="utf-8")
+    _git(repo, "add", FIXTURE)
+    message = tmp_path / "message.txt"
+    message.write_bytes(b"Regenerate the benchmark fixture\n\nNo trailer here\x01" + base.encode())
+    _git(repo, "commit", "-q", "--cleanup=verbatim", "-F", str(message))
+    assert _git(repo, "log", "-1", "--format=%(trailers:key=Rebaseline)") == ""
+    result = _run(repo, "golden_guard.py", base, "HEAD")
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert f"'Regenerate the benchmark fixture' changes {FIXTURE} {UNSANCTIONED}" in result.stdout
+    assert result.stdout.count(UNSANCTIONED) == 1
+
+
+@needs_git
+def test_fixture_guard_passes_the_recovery_from_a_merged_regeneration(repo):
+    # Two regenerations merged as text leave a fixture that no sanctioned commit
+    # wrote; the recovery the failure message gives (commit the base's copy
+    # back, then regenerate, each with the trailer) passes.
+    lines = [f'"k{i}": {i}' for i in range(1, 9)]
+    _commit(repo, "Freeze fixtures", {RECORD: RECORD_TEXT, FIXTURE: "\n".join(lines) + "\n"})
+    _start_branch(repo)
+    _commit(repo, f"Branch regeneration\n\n{TRAILER}", {FIXTURE: "\n".join(["B1", *lines[1:]]) + "\n"})
+    _git(repo, "checkout", "-q", "main")
+    upstream = "\n".join([*lines[:-1], "M8"]) + "\n"
+    base = _commit(repo, f"Upstream regeneration\n\n{TRAILER}", {FIXTURE: upstream})
+    _git(repo, "checkout", "-q", "work")
+    _git(repo, "merge", "-q", "--no-ff", "-m", "Merge main into work", "main")
+    merged = (repo / FIXTURE).read_text(encoding="utf-8")
+    assert merged.splitlines()[::7] == ["B1", "M8"]
+    blocked = _run(repo, "golden_guard.py", base, "HEAD")
+    assert blocked.returncode == 1, blocked.stdout + blocked.stderr
+    assert "a merge commit produced it" in blocked.stdout
+
+    _commit(repo, f"Restore main's copy\n\n{TRAILER}", {FIXTURE: upstream})
+    _commit(repo, f"Regenerate after the merge\n\n{TRAILER}", {FIXTURE: merged})
+    result = _run(repo, "golden_guard.py", base, "HEAD")
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 @needs_git

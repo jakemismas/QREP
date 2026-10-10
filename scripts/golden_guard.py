@@ -41,12 +41,17 @@ outside the rule, as CLAUDE.md states. For each judged file:
     The head's copy never counts, because a pull request could otherwise admit
     a path by listing it in its own diff; a new path needs an amendment Jake
     approves, merged first (REBASELINE.md, Amending this record);
-  - every non-merge commit in <base>..<head> that touches the file must carry
-    [bless] by the golden rule above, or a non-empty `Rebaseline:` trailer as
-    git parses trailers (the last paragraph of the message, never the
-    subject), the same reading as `git interpret-trailers --parse`;
+  - every non-merge commit in <base>..<head> that touches the file, in the
+    same history walk as the golden rule, must carry [bless] by the golden
+    rule above, or a non-empty `Rebaseline:` trailer as git parses trailers:
+    in the message's last paragraph, never the subject, the reading of
+    `git interpret-trailers --parse --no-divider`;
   - the merge must leave the content (or the deletion) that one of those
     commits wrote, so a merge commit cannot regenerate a fixture on its own.
+The guard checks that the record names the path and that the trailer is
+there, not which entry the trailer cites or whether that entry allows this
+kind of change (the support-file rows name paths that only leave): the pull
+request review checks the citation.
 Exit codes: 0 pass, 1 unsanctioned golden or fixture change, 2 usage or git error (for
 example a shallow clone that lacks <base>, git older than 2.38, or a <head>
 that conflicts with <base>, which leaves no merge result to judge).
@@ -247,8 +252,9 @@ def fixture_verdict(
         "entry. A path the record does not name needs an amendment Jake approves, merged "
         "first (REBASELINE.md, Amending this record); listing it in this branch's copy does "
         "not count. If an edit is not approved, undo it in a new commit. Content that a merge "
-        "produced needs the merge resolved with the base's copy of the file and the change "
-        "redone in a new commit with the trailer."
+        "produced needs a sanctioned commit behind it: resolve the merge with the base's copy "
+        "of the file, or, once the merge is committed, commit the base's copy back with the "
+        "trailer; then redo the change in a new commit with the trailer."
     )
 
 
@@ -328,8 +334,9 @@ def changed_frozen_fixtures(repo: Path, base: str, tree: str) -> list[str]:
 
 def record_at(repo: Path, commit: str) -> str:
     """The commit's REBASELINE.md, or "" where it has none, which names nothing."""
-    result = _run_git(repo, "cat-file", "blob", f"{commit}:{RECORD}")
-    return result.stdout if result.returncode == 0 else ""
+    if not _git(repo, "ls-tree", "--full-tree", "-z", commit, "--", RECORD):
+        return ""
+    return _git(repo, "cat-file", "blob", f"{commit}:{RECORD}")
 
 
 def guarded_entries(
@@ -369,21 +376,16 @@ def golden_commits(
     # rev-list is plumbing, so no log.* setting can change its output. Its
     # default history simplification skips side-branch commits whose guarded
     # edits a merge then discarded; those never reach the result.
-    out = _git(
-        repo,
-        "rev-list",
-        "--no-merges",
-        "--no-commit-header",
-        f"--format=%x01%H%x00%s%x00%B%x00%(trailers:key={TRAILER_KEY},valueonly,separator=%x1f)",
-        f"{base}..{head}",
-        "--",
-        *paths,
-    )
+    shas = _git(repo, "rev-list", "--no-merges", f"{base}..{head}", "--", *paths).split()
     commits = []
-    for record in out.split("\x01")[1:]:
-        sha, _, rest = record.partition("\x00")
-        subject, _, rest = rest.partition("\x00")
-        message, _, trailers = rest.rpartition("\x00")
+    for sha in shas:
+        # One field per call: a commit message may hold any byte git accepts,
+        # so no separator inside one combined format can be trusted.
+        subject = _commit_field(repo, sha, "%s")
+        message = _commit_field(repo, sha, "%B")
+        trailers = _commit_field(
+            repo, sha, f"%(trailers:key={TRAILER_KEY},valueonly,separator=%x1f)"
+        )
         raw = _git(
             repo,
             "diff-tree",
@@ -403,9 +405,15 @@ def golden_commits(
             wrote = {path: entry for path, entry in wrote.items() if path in only}
             if not wrote:
                 continue
-        rebaseline = tuple(value for value in trailers.strip("\n").split("\x1f") if value)
+        rebaseline = tuple(value for value in trailers.split("\x1f") if value)
         commits.append(GoldenCommit(sha, subject, tuple(wrote), message, wrote, rebaseline))
     return commits
+
+
+def _commit_field(repo: Path, sha: str, placeholder: str) -> str:
+    """One pretty-format placeholder for one commit, without the newline rev-list adds."""
+    out = _git(repo, "rev-list", "-1", "--no-commit-header", f"--format={placeholder}", sha)
+    return out[:-1] if out.endswith("\n") else out
 
 
 def main(argv: list[str]) -> int:
