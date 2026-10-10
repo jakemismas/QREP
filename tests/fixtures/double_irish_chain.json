@@ -2642,5 +2642,7 @@
   "provenance": {
     "source": "authored",
     "stage_confidence": {}
-  }
+  },
+  "confirmed_blocks": null,
+  "size_basis": null
 }
