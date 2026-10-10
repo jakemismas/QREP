@@ -254,7 +254,7 @@ The quilt model records every value with its source:
 
 | Value | Source | Recorded as |
 |---|---|---|
-| Corners or outer edge, border bands, counts, fabric count, typed finished size | User | User fact, confidence 1.0 |
+| Corners or outer edge, border bands, counts, fabric count, typed or preset finished size | User | User fact, confidence 1.0 |
 | Count, corner and fabric-count suggestions; palette colors | CV | Confidence in [0, 1] |
 | Fabric per square, unit class, fabric per part | CV | Confidence in [0, 1] per square |
 | Grid fit, global and per region | CV | Confidence in [0, 1] |
@@ -271,11 +271,14 @@ unchanged:
 - The size basis: its source (typed, preset or default); the requested width and height (a typed
   size gives one or both, a preset both, a default neither); the achieved width and height; and the
   rounding applied, the step the finished square size snaps to; all in eighths. A typed or preset
-  size records confidence 1.0; a default size keeps the photo estimate's confidence (A10 fills it).
+  size records confidence 1.0; a default size must state the photo estimate's confidence (A10
+  fills the basis for a size you set; #207 records the estimate on every read).
 
-A test walks the schema, records where every stored field comes from, and asserts that every
-CV-derived field has a confidence in [0, 1] and every user fact is recorded at 1.0. The method and
-its reason follow deterministically from the read and carry no confidence of their own.
+A test walks the schema and records where every stored field comes from. It asserts that every
+confidence stays in [0, 1], that every user fact is recorded at 1.0, and that every CV value a read
+stores finds its confidence beside it; until #207 lands, it names the square size and the border
+widths as the values whose scale carries none. The method and its reason follow deterministically
+from the read and carry no confidence of their own.
 
 ## 9. Removed surfaces
 
