@@ -285,7 +285,7 @@ def test_size_basis_accepts_each_source_with_its_requested_sizes():
             {"source": "default", "requested_width": None, "confidence": 0.5},
             "default size records no requested",
         ),
-        ({"source": "guessed"}, "source"),
+        ({"source": "guessed", "confidence": 1.0}, "Input should be 'typed', 'preset' or 'default'"),
         ({"rounding_step": 0}, "rounding_step"),
         ({"achieved_width": 0}, "achieved_width"),
         ({"requested_height": 0}, "requested_height"),
@@ -294,6 +294,12 @@ def test_size_basis_accepts_each_source_with_its_requested_sizes():
 def test_size_basis_refuses_a_source_its_sizes_contradict(overrides, message):
     with pytest.raises(ValidationError, match=message):
         dic_typed_basis(**overrides)
+
+
+def test_misspelled_source_reports_only_the_source():
+    with pytest.raises(ValidationError) as refused:
+        FinishedSizeBasis(source="tpyed", achieved_width=600, achieved_height=720, rounding_step=2)
+    assert [error["loc"] for error in refused.value.errors()] == [("source",)]
 
 
 # Where each stored value comes from (docs/SPEC.md section 8). A CV value names
@@ -387,9 +393,15 @@ CARRIER_ON_MODEL = {
 
 # CV values a read stores with no confidence for part of what they measure:
 # the read scales squares and borders by an assumed resolution but records no
-# size basis (#207). Named here so the walk states the gap instead of passing
-# over it; #207 empties this set.
+# size basis (#207, B2a). Named here so the walk states the gap instead of
+# passing over it; #207 empties this set.
 UNRECORDED_CONFIDENCE = {"GridRegion.cell_size", "BorderBand.width"}
+
+# CV values a read does not store at all: the achieved size lives in the size
+# basis, which no read fills yet (#207). Every other CV value must be stored by
+# read_shaped_quilt and so meet the presence check; a new optional CV field
+# fails until it is stored there or named here.
+NOT_STORED_ON_A_READ = {"FinishedSizeBasis.achieved_width", "FinishedSizeBasis.achieved_height"}
 
 # Every variant of each model that holds user facts, built with overrides.
 USER_FACT_MODELS = {
@@ -511,7 +523,9 @@ def test_every_cv_value_on_a_read_finds_its_confidence():
         for name in type(model).model_fields
         if getattr(model, name) is not None
     }
-    cv_stored = {p for p, s in FIELD_SOURCES.items() if s.startswith("cv:") and p in stored}
+    cv_paths = {p for p, s in FIELD_SOURCES.items() if s.startswith("cv:")}
+    cv_stored = cv_paths & stored
+    assert cv_paths - stored == NOT_STORED_ON_A_READ
     assert {"GridRegion.cells", "BorderBand.width", "Fabric.color"} <= cv_stored
     missing = {
         path

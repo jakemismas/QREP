@@ -224,8 +224,8 @@ class FinishedSizeBasis(BaseModel):
     A typed size gives a width, a height or both; a preset gives both; a
     default sets nothing, and its size is estimated from the photo. A typed
     or preset size is a user fact at confidence 1.0, which it may leave out;
-    a default size must state the estimate's confidence (1.0 only when
-    hand-authored), so a guess is never stored as certain by omission.
+    a default size must state the estimate's confidence, any value in
+    [0, 1], so a guess is never stored as certain by omission.
     """
 
     source: Literal["typed", "preset", "default"]
@@ -241,7 +241,9 @@ class FinishedSizeBasis(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def _user_set_size_is_certain(cls, data):
-        if isinstance(data, dict) and data.get("source") in ("typed", "preset"):
+        # Only a default size must state its confidence, so a missing or
+        # misspelled source reports itself and nothing else.
+        if isinstance(data, dict) and data.get("source") != "default":
             return {"confidence": 1.0, **data}
         return data
 
