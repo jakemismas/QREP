@@ -1,9 +1,11 @@
-"""Fail a change range whose tests/golden/ edits do not come from [bless] commits.
+"""Fail a change range whose tests/golden/ or tests/fixtures/ edits are not sanctioned.
 
 Golden files are frozen output: CLAUDE.md lets them change only through
-`pytest --bless` in a commit whose message carries [bless]. CI runs this on
-every pull request (.github/workflows/guards.yml) so the rule holds even when
-nobody is watching.
+`pytest --bless` in a commit whose message carries [bless]. Tracked fixtures
+are frozen too: CLAUDE.md lets one change or go only when REBASELINE.md names
+its path, in a commit whose message carries [bless] or a `Rebaseline:` trailer
+that cites that entry. CI runs this on every pull request
+(.github/workflows/guards.yml) so the rules hold even when nobody is watching.
 
 Usage (from any folder; the script checks the checkout it lives in, so a run
 of another worktree's copy checks that worktree):
@@ -30,7 +32,28 @@ commit, so one bless cannot excuse another commit's edit:
     conflict, an edit made inside the merge, a criss-cross merge that restores
     an old version, or two blessed versions merged as text.
 A range whose golden edits cancel out passes: nothing frozen changes.
-Exit codes: 0 pass, 1 unblessed golden change, 2 usage or git error (for
+
+The fixture rule judges each tracked file under tests/fixtures/ that the merge
+modifies or deletes; a file the merge adds passes, for the pull request review
+to check, and the gitignored test output under tests/fixtures/_generated/ is
+outside the rule, as CLAUDE.md states. For each judged file:
+  - REBASELINE.md as the base commit holds it must name the file's whole path.
+    The head's copy never counts, because a pull request could otherwise admit
+    a path by listing it in its own diff; a new path needs an amendment Jake
+    approves, merged first (REBASELINE.md, Amending this record);
+  - every non-merge commit in <base>..<head> that touches the file must carry
+    [bless] by the golden rule above, or a non-empty `Rebaseline:` trailer as
+    `git interpret-trailers --parse` reads it, the check WORKER.md runs before
+    each commit: in the last paragraph before any `---` divider line, never in
+    the subject. As for goldens, rev-list's default history simplification
+    leaves out side-branch commits whose edit a merge discarded;
+  - the merge must leave the content (or the deletion) that one of those
+    commits wrote, so a merge commit cannot regenerate a fixture on its own.
+The guard checks that the record names the path and that the trailer is
+there, not which entry the trailer cites or whether that entry allows this
+kind of change (the support-file rows name paths that only leave): the pull
+request review checks the citation.
+Exit codes: 0 pass, 1 unsanctioned golden or fixture change, 2 usage or git error (for
 example a shallow clone that lacks <base>, git older than 2.38, or a <head>
 that conflicts with <base>, which leaves no merge result to judge).
 """
@@ -46,6 +69,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 GUARDED_PATHS = ("tests/golden/",)
+FIXTURE_PATHS = ("tests/fixtures/",)
+FIXTURE_OUTPUT = "tests/fixtures/_generated/"
+RECORD = "docs/sprint-5/REBASELINE.md"
+TRAILER_KEY = "Rebaseline"
 BLESS_MARKER = "[bless]"
 # git's own subjects for undoing or redoing a commit quote the original one.
 REWRAP_PREFIXES = ('Revert "', 'Reapply "')
@@ -77,6 +104,8 @@ class GoldenCommit:
     # or None where it deleted the file. Without it, touching a path counts as
     # writing whatever the path ends with.
     wrote: Mapping[str, str | None] | None = None
+    # The non-empty values of the message's Rebaseline: trailers.
+    rebaseline: tuple[str, ...] = ()
 
 
 def is_bless_subject(subject: str) -> bool:
@@ -111,6 +140,31 @@ def is_bless(commit: GoldenCommit) -> bool:
     return is_bless_subject(commit.subject) or BLESS_MARKER in body
 
 
+def is_sanctioned_fixture_change(commit: GoldenCommit) -> bool:
+    return is_bless(commit) or bool(commit.rebaseline)
+
+
+def shown(text: str) -> str:
+    """Text with control characters escaped, for the log.
+
+    A subject or path holding a line break could otherwise start a log line of
+    its own, which GitHub Actions reads as a workflow command (`::error::`).
+    """
+    return "".join(
+        ch if ch.isprintable() else ch.encode("unicode_escape").decode("ascii") for ch in text
+    )
+
+
+def names_path(record: str, path: str) -> bool:
+    """Whether the record names the path whole, not inside a longer path or name.
+
+    A sentence may end right after the path, so a period counts as the end
+    only when no path character follows it.
+    """
+    pattern = rf"(?<![\w./-]){re.escape(path)}(?![\w/-]|\.[\w/-])"
+    return re.search(pattern, record) is not None
+
+
 def _wrote_final(commit: GoldenCommit, path: str, final: Mapping[str, str | None] | None) -> bool:
     if path not in commit.files:
         return False
@@ -127,23 +181,23 @@ def verdict(
     """Judge the changed golden paths; `final` maps each to its merged "<mode> <blob>"."""
     if not changed:
         return True, "no changes under " + ", ".join(GUARDED_PATHS)
-    listing = "\n".join(f"  {path}" for path in changed)
+    listing = "\n".join(f"  {shown(path)}" for path in changed)
     unblessed = [c for c in commits if not is_bless(c)]
     unexplained = [
         path for path in changed if not any(_wrote_final(c, path, final) for c in commits)
     ]
     if not unblessed and not unexplained:
-        blesses = "\n".join(f"  {c.sha[:12]} {c.subject}" for c in commits)
+        blesses = "\n".join(f"  {c.sha[:12]} {shown(c.subject)}" for c in commits)
         return True, (
             f"{len(changed)} golden file(s) changed, all through {BLESS_MARKER} commits:\n"
             f"{listing}\n{blesses}"
         )
     problems = [
-        f"  {c.sha[:12]} '{c.subject}' edits {', '.join(c.files)} without "
+        f"  {c.sha[:12]} '{shown(c.subject)}' edits {shown(', '.join(c.files))} without "
         f"{BLESS_MARKER} in its own message"
         for c in unblessed
     ] + [
-        f"  {path} ends with content that no commit in the range wrote: a merge commit "
+        f"  {shown(path)} ends with content that no commit in the range wrote: a merge commit "
         f"produced it, outside any {BLESS_MARKER} commit"
         for path in unexplained
     ]
@@ -157,6 +211,62 @@ def verdict(
         "redone in a new commit after the merge. History cannot be rewritten (force-push "
         "is banned), so an approved edit that landed in an unblessed commit needs a new "
         "branch from origin/main with the bless redone in its own commit."
+    )
+
+
+def fixture_verdict(
+    changed: list[str],
+    commits: list[GoldenCommit],
+    named: set[str],
+    final: Mapping[str, str | None] | None = None,
+) -> tuple[bool, str]:
+    """Judge the tracked fixtures the merge modifies or deletes.
+
+    `commits` are the range's non-merge commits that touch them, `named` the
+    ones the base's record names, and `final` maps each to its merged
+    "<mode> <blob>", or None where the merge deletes it.
+    """
+    if not changed:
+        return True, "no tracked file under " + ", ".join(FIXTURE_PATHS) + " modified or deleted"
+    listing = "\n".join(f"  {shown(path)}" for path in changed)
+    unnamed = [path for path in changed if path not in named]
+    unsanctioned = [c for c in commits if not is_sanctioned_fixture_change(c)]
+    unexplained = [
+        path for path in changed if not any(_wrote_final(c, path, final) for c in commits)
+    ]
+    if not unnamed and not unsanctioned and not unexplained:
+        sanctioned = "\n".join(f"  {c.sha[:12]} {shown(c.subject)}" for c in commits)
+        return True, (
+            f"{len(changed)} tracked fixture(s) modified or deleted, each named in {RECORD} at "
+            f"the base and changed only in {BLESS_MARKER} or {TRAILER_KEY}: commits:\n"
+            f"{listing}\n{sanctioned}"
+        )
+    problems = (
+        [f"  {shown(path)} is not named in {RECORD} at the base commit" for path in unnamed]
+        + [
+            f"  {c.sha[:12]} '{shown(c.subject)}' changes {shown(', '.join(c.files))} without "
+            f"{BLESS_MARKER} or a {TRAILER_KEY}: trailer in its own message"
+            for c in unsanctioned
+        ]
+        + [
+            f"  {shown(path)} ends with content that no commit in the range wrote: a merge "
+            "commit produced it"
+            for path in unexplained
+        ]
+    )
+    return False, (
+        f"{len(changed)} tracked fixture(s) modified or deleted:\n{listing}\n"
+        "not through a sanctioned change:\n"
+        + "\n".join(problems)
+        + f"\nA tracked file under {FIXTURE_PATHS[0]} changes or goes only when {RECORD} on "
+        "the base branch names its path, in a commit whose own message carries "
+        f"{BLESS_MARKER} or ends with a `{TRAILER_KEY}: <entry>` trailer that cites that "
+        "entry. A path the record does not name needs an amendment Jake approves, merged "
+        "first (REBASELINE.md, Amending this record); listing it in this branch's copy does "
+        "not count. If an edit is not approved, undo it in a new commit. Content that a merge "
+        "produced needs a sanctioned commit behind it: resolve the merge with the base's copy "
+        "of the file, or, once the merge is committed, commit the base's copy back with the "
+        "trailer; then redo the change in a new commit with the trailer."
     )
 
 
@@ -201,7 +311,7 @@ def merge_result(repo: Path, base: str, head: str) -> str:
         conflicted = sorted({line.split("\t", 1)[1] for line in lines if "\t" in line})
         raise RuntimeError(
             f"{head} does not merge cleanly into {base} (conflicts in "
-            f"{', '.join(conflicted) or 'unlisted files'}), so there is no merge result to "
+            f"{shown(', '.join(conflicted)) or 'unlisted files'}), so there is no merge result to "
             "judge; merge the base into the branch, resolve the conflicts and push"
         )
     if result.returncode != 0:
@@ -220,9 +330,37 @@ def changed_guarded_files(repo: Path, base: str, tree: str) -> list[str]:
     return [path for path in out.split("\x00") if path]
 
 
-def guarded_entries(repo: Path, tree: str) -> dict[str, str]:
+def changed_frozen_fixtures(repo: Path, base: str, tree: str) -> list[str]:
+    """Tracked fixtures that exist at the base and that the merge modifies or deletes."""
+    out = _git(
+        repo, "diff-tree", "-r", "--no-renames", "--name-status", "-z", base, tree, "--",
+        *FIXTURE_PATHS,
+    )
+    fields = out.split("\x00")
+    return [
+        path
+        for status, path in zip(fields[0::2], fields[1::2])
+        if status and status != "A" and not path.startswith(FIXTURE_OUTPUT)
+    ]
+
+
+def record_at(repo: Path, commit: str) -> str:
+    """The commit's REBASELINE.md, or "" where it has none, which names nothing."""
+    listed = _git(repo, "ls-tree", "--full-tree", "-z", commit, "--", RECORD)
+    if not listed:
+        return ""
+    mode = listed.split()[0]
+    if mode not in ("100644", "100755"):
+        # A symlink's blob is its target's name, which could name any path.
+        raise RuntimeError(f"{RECORD} at {commit} is not a regular file (mode {mode})")
+    return _git(repo, "cat-file", "blob", f"{commit}:{RECORD}")
+
+
+def guarded_entries(
+    repo: Path, tree: str, paths: tuple[str, ...] = GUARDED_PATHS
+) -> dict[str, str]:
     """Each guarded file in a tree, as "<mode> <blob>"."""
-    out = _git(repo, "ls-tree", "-r", "--full-tree", "-z", tree, "--", *GUARDED_PATHS)
+    out = _git(repo, "ls-tree", "-r", "--full-tree", "-z", tree, "--", *paths)
     entries = {}
     for record in out.split("\x00"):
         meta, tab, path = record.partition("\t")
@@ -244,24 +382,20 @@ def _written(raw: str) -> dict[str, str | None]:
     return wrote
 
 
-def golden_commits(repo: Path, base: str, head: str) -> list[GoldenCommit]:
+def golden_commits(
+    repo: Path,
+    base: str,
+    head: str,
+    paths: tuple[str, ...] = GUARDED_PATHS,
+    only: set[str] | None = None,
+) -> list[GoldenCommit]:
+    """The range's non-merge commits that touch `paths`, narrowed to `only` when given."""
     # rev-list is plumbing, so no log.* setting can change its output. Its
-    # default history simplification skips side-branch commits whose golden
+    # default history simplification skips side-branch commits whose guarded
     # edits a merge then discarded; those never reach the result.
-    out = _git(
-        repo,
-        "rev-list",
-        "--no-merges",
-        "--no-commit-header",
-        "--format=%x01%H%x00%s%x00%B",
-        f"{base}..{head}",
-        "--",
-        *GUARDED_PATHS,
-    )
+    shas = _git(repo, "rev-list", "--no-merges", f"{base}..{head}", "--", *paths).split()
     commits = []
-    for record in out.split("\x01")[1:]:
-        sha, _, rest = record.partition("\x00")
-        subject, _, message = rest.partition("\x00")
+    for sha in shas:
         raw = _git(
             repo,
             "diff-tree",
@@ -274,11 +408,55 @@ def golden_commits(repo: Path, base: str, head: str) -> list[GoldenCommit]:
             "-z",
             sha,
             "--",
-            *GUARDED_PATHS,
+            *paths,
         )
         wrote = _written(raw)
-        commits.append(GoldenCommit(sha, subject, tuple(wrote), message, wrote))
+        if only is not None:
+            wrote = {path: entry for path, entry in wrote.items() if path in only}
+            if not wrote:
+                continue
+        # One field per call: a commit message may hold any byte git accepts,
+        # so no separator inside one combined format can be trusted.
+        subject = _commit_field(repo, sha, "%s")
+        message = _commit_field(repo, sha, "%B")
+        rebaseline = trailer_values(repo, message)
+        commits.append(GoldenCommit(sha, subject, tuple(wrote), message, wrote, rebaseline))
     return commits
+
+
+def trailer_values(repo: Path, message: str) -> tuple[str, ...]:
+    """The message's non-empty Rebaseline: values, as `git interpret-trailers --parse` reads them.
+
+    That is the check WORKER.md runs before each commit, so a worker and the
+    guard agree on what counts, a `---` divider line included.
+    """
+    # Bytes, not text: text mode on Windows would write CRLF line ends.
+    result = subprocess.run(
+        ["git", "interpret-trailers", "--parse"],
+        cwd=repo,
+        input=message.encode("utf-8"),
+        capture_output=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            "git interpret-trailers --parse failed: "
+            + result.stderr.decode("utf-8", errors="replace").strip()
+        )
+    values = []
+    for line in result.stdout.decode("utf-8", errors="replace").splitlines():
+        key, separator, value = line.partition(":")
+        if separator and key.strip().lower() == TRAILER_KEY.lower() and value.strip():
+            values.append(value.strip())
+    return tuple(values)
+
+
+def _commit_field(repo: Path, sha: str, placeholder: str) -> str:
+    """One pretty-format placeholder for one commit, without the newline rev-list adds."""
+    # The "--" keeps a file named like the sha from making the argument ambiguous.
+    out = _git(
+        repo, "rev-list", "-1", "--no-commit-header", f"--format={placeholder}", sha, "--"
+    )
+    return out[:-1] if out.endswith("\n") else out
 
 
 def main(argv: list[str]) -> int:
@@ -301,11 +479,28 @@ def main(argv: list[str]) -> int:
             final = {path: entries.get(path) for path in changed}
             commits = golden_commits(repo, base_sha, head_sha)
         ok, message = verdict(changed, commits, final)
+
+        frozen = changed_frozen_fixtures(repo, base_sha, tree)
+        fixture_final: dict[str, str | None] = {}
+        fixture_commits: list[GoldenCommit] = []
+        named: set[str] = set()
+        if frozen:
+            entries = guarded_entries(repo, tree, FIXTURE_PATHS)
+            fixture_final = {path: entries.get(path) for path in frozen}
+            fixture_commits = golden_commits(
+                repo, base_sha, head_sha, FIXTURE_PATHS, only=set(frozen)
+            )
+            record = record_at(repo, base_sha)
+            named = {path for path in frozen if names_path(record, path)}
+        fixtures_ok, fixture_message = fixture_verdict(
+            frozen, fixture_commits, named, fixture_final
+        )
     except RuntimeError as err:
         print(f"golden_guard: {err}", file=sys.stderr)
         return 2
     scope = f"merging {head} into {base} in {repo}"
-    print(f"golden_guard ({scope}): {'PASS' if ok else 'FAIL'}: {message}")
+    ok = ok and fixtures_ok
+    print(f"golden_guard ({scope}): {'PASS' if ok else 'FAIL'}: {message}\n{fixture_message}")
     return 0 if ok else 1
 
 
