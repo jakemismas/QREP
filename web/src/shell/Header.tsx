@@ -9,9 +9,13 @@ import { EngineChip, Tooltip, useTheme } from "../ui";
 import { useEngine } from "../engine/useEngine";
 import { useProject } from "../state/project";
 
+// MOCK-NOTES.md:603, its em dash replaced (house text rules).
+const ENGINE_TIP =
+  "The Python engine runs in your browser, and it boots in a few seconds on first load.";
+
 function Logo({ isDesk, onClick }: { isDesk: boolean; onClick: () => void }) {
   return (
-    <Tooltip tip="Back to the start screen">
+    <Tooltip tip="Back to the start screen" placement="below">
       <button
         type="button"
         className="qrep-logo"
@@ -42,7 +46,7 @@ function ProjectName() {
 
   if (!editing) {
     return (
-      <Tooltip tip="Project name — click to rename">
+      <Tooltip tip="Project name: click to rename" placement="below">
         <button
           type="button"
           data-testid="project-name"
@@ -89,7 +93,7 @@ function ThemeToggle() {
   const { skin, toggle } = useTheme();
   const label = skin === "light" ? "Switch to evening mode" : "Switch to daylight mode";
   return (
-    <Tooltip tip={label}>
+    <Tooltip tip={label} placement="below">
       <button
         type="button"
         data-testid="theme-toggle"
@@ -157,7 +161,9 @@ export function Header({
           </button>
         </>
       ) : null}
-      <EngineChip status={engine.status} onRetry={engine.retry} />
+      <Tooltip tip={ENGINE_TIP} placement="below" className="qrep-engine">
+        <EngineChip status={engine.status} onRetry={engine.retry} />
+      </Tooltip>
       <ThemeToggle />
     </header>
   );

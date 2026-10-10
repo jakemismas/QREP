@@ -257,34 +257,29 @@ h1, h2, h3, h4, h5, h6 {
 .q-toast[data-tone="error"] { background: var(--toast-err-bg); color: var(--toast-err-ink); }
 .q-toast__glyph { flex: none; }
 
-/* Tooltip (hover-only, desktop-only, dark in both themes) */
+/* Tooltip (hover or focus, desktop-only, dark in both themes). Tooltip.tsx
+   mounts the tip only while it is open and sets its left and top inside the
+   viewport, so a closed tip takes no layout (ux-17). */
 .q-tip-wrap {
-  position: relative;
   display: inline-flex;
 }
 .q-tip {
-  position: absolute;
-  left: 50%;
-  bottom: 100%;
-  transform: translate(-50%, -9px);
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: max-content;
+  /* 16px: Tooltip.tsx keeps 8px from each viewport edge. */
+  max-width: min(320px, calc(100vw - 16px));
   background: var(--tooltip-bg);
   color: var(--tooltip-ink);
   padding: 7px 12px;
   border-radius: 8px;
   font: 13px var(--sans);
-  white-space: nowrap;
-  max-width: 320px;
+  /* Long tips wrap: the engine chip's runs past 320px on one line. */
+  white-space: normal;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
   z-index: 90;
   pointer-events: none;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.1s ease;
-}
-.q-tip-wrap:hover .q-tip,
-.q-tip-wrap:focus-within .q-tip {
-  opacity: 1;
-  visibility: visible;
 }
 @media (max-width: 719.98px), (pointer: coarse) {
   .q-tip { display: none; }
