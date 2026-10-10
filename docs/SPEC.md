@@ -275,8 +275,10 @@ unchanged:
   fills the basis for a size you set; #207 records the estimate on every read).
 
 A test walks the schema and records where every stored field comes from. It asserts that every
-confidence stays in [0, 1], that every user fact is recorded at 1.0, and that every CV value a read
-stores finds its confidence beside it; until #207 lands, it names the square size and the border
+confidence stays in [0, 1] and that the user facts the model records today, the confirmed block
+structure and a typed or preset size, sit at 1.0; the counts and border bands become user facts
+with the confirmed read (B2a). On a hand-built model shaped like a read, it asserts that every CV
+value finds its confidence beside it; until #207 lands, it names the square size and the border
 widths as the values whose scale carries none. The method and its reason follow deterministically
 from the read and carry no confidence of their own.
 
