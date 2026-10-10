@@ -27,6 +27,7 @@ import hashlib
 import io
 import json
 import re
+import subprocess
 import sys
 import time
 import urllib.error
@@ -39,14 +40,23 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[2]
 MANIFEST = REPO / "corpus" / "manifest.csv"
 ATTRIBUTION = REPO / "corpus" / "ATTRIBUTION.md"
-# Fetches land in the main checkout's ignored corpus/private/cache/ (WORKER.md R1, its
-# private-data exception), so every worktree reads one copy and no fetched image can be staged.
-DEFAULT_CACHE = Path("C:/Users/Jake Mismas/QREP/corpus/private/cache")
+
+
+def default_cache() -> Path:
+    """The main checkout's ignored corpus/private/cache/ (WORKER.md R1, its private-data
+    exception), found through git so every worktree reads one copy and no fetched image can be
+    staged; a worktree's git common dir is the main checkout's .git."""
+    common = subprocess.run(
+        ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
+        cwd=REPO, capture_output=True, text=True, check=True,
+    ).stdout.strip()
+    return Path(common).parent / "corpus" / "private" / "cache"
+
 
 COLUMNS = (
     "file", "license", "source", "object_id", "title", "landing_url", "image_url",
     "rights_flag", "policy_url", "credit", "dimensions_text", "finished_in", "sha256",
-    "file_sha256", "px_w", "px_h", "tier", "class", "capture", "commit_ok",
+    "file_sha256", "px_w", "px_h", "tier", "class", "capture", "commit_ok", "date_end",
 )
 TIERS = ("A", "B", "R", "X")
 IN_SCOPE = ("squares", "hst", "qst", "snowball", "flying_geese")
@@ -139,12 +149,20 @@ class Candidate:
         return cache_name(self.source, self.object_id)
 
     def modern(self) -> bool:
-        return self.date_end is not None and self.date_end >= MODERN_FROM
+        # An undated object may be modern too, so it is skipped with the modern ones.
+        return self.date_end is None or self.date_end >= MODERN_FROM
 
 
 def _years(text: str) -> list[int]:
     # Digit guards rather than word boundaries, so a decade such as 1850s still reads 1850.
-    return [int(y) for y in re.findall(r"(?<!\d)(1[5-9]\d\d|20\d\d)(?!\d)", text)]
+    years = [int(y) for y in re.findall(r"(?<!\d)(1[5-9]\d\d|20\d\d)(?!\d)", text)]
+    # A range written 1925-35 ends in 1935.
+    for start, end in re.findall(r"(?<!\d)(1[5-9]\d\d|20\d\d)\s*-\s*(\d\d)(?!\d)", text):
+        years.append(int(start[:2] + end))
+    # A century ends with its last year: the 19th century with 1900.
+    for number in re.findall(r"(?<!\d)(1[5-9]|20)(?:st|nd|rd|th)\s+century", text, re.IGNORECASE):
+        years.append(int(number) * 100)
+    return years
 
 
 def met_candidate(record: dict) -> Candidate:
@@ -307,13 +325,30 @@ def _number(text: str) -> float:
     return value
 
 
+_FEET = re.compile(rf"(?P<ft>\d+)\s*ft\.?\s*(?:(?P<inch>{_NUM})\s*in\b\.?)?", re.IGNORECASE)
+
+
+def _feet_to_inches(match: re.Match) -> str:
+    inches = int(match["ft"]) * 12 + (_number(match["inch"]) if match["inch"] else 0)
+    return f"{inches:g} in."
+
+
+def orient(size: tuple[float, float], px_w: int, px_h: int) -> tuple[float, float]:
+    """(width, height) turned to match the photo: museums disagree on which number comes
+    first, but the quilt's longer side is the photo's longer side."""
+    width, height = size
+    if (px_w > px_h and width < height) or (px_w < px_h and width > height):
+        return (height, width)
+    return (width, height)
+
+
 def parse_finished_size(text: str) -> tuple[float, float] | None:
     """(width, height) in inches from a museum dimensions text, or None.
 
     Inches win over centimetres. An unlabeled pair reads height x width, the
     museum convention for flat textiles; H. and W. labels win over order. The
     result is approximate: a museum measures the object, not the pattern."""
-    normalized = text.replace("\u00d7", "x").replace("\u00a0", " ")
+    normalized = _FEET.sub(_feet_to_inches, text.replace("\u00d7", "x").replace("\u00a0", " "))
     pairs = list(_PAIR.finditer(normalized))
     chosen = next((m for m in pairs if not m["unit"].lower().startswith("cm")), None)
     chosen = chosen or (pairs[0] if pairs else None)
@@ -537,7 +572,8 @@ def screen_records(source: str, records: list[dict]) -> tuple[list[Candidate], d
         if not names_a_quilt(source, record, candidate):
             skipped["title does not name a quilt"] = skipped.get("title does not name a quilt", 0) + 1
         elif candidate.modern():
-            skipped[f"made {MODERN_FROM} or later"] = skipped.get(f"made {MODERN_FROM} or later", 0) + 1
+            reason = f"made {MODERN_FROM} or later, or undated"
+            skipped[reason] = skipped.get(reason, 0) + 1
         else:
             kept.append(candidate)
     return kept, skipped
@@ -617,7 +653,7 @@ def download(client: Client, cache: Path, sources: list[str]) -> dict:
 
 
 def build_rows(cache: Path, screen_csv: Path, committed: dict[str, tuple[str, str]]) -> list[dict]:
-    """Manifest rows for every screened candidate.
+    """Manifest rows for every screened candidate that still clears.
 
     screen_csv columns: stem, tier, class, commit_ok. committed maps a cache file to the
     committed copy's corpus-relative path and its own sha256."""
@@ -626,7 +662,9 @@ def build_rows(cache: Path, screen_csv: Path, committed: dict[str, tuple[str, st
         decisions = list(csv.DictReader(handle))
     out = []
     for d in decisions:
-        c = by_stem[d["stem"]]
+        c = by_stem.get(d["stem"])
+        if c is None:
+            continue
         source = SOURCES[c.source]
         parsed = parse_finished_size(c.dimensions_text) if c.dimensions_text else None
         file, file_sha = committed.get(c.cache_file, ("private/cache/" + c.cache_file, ""))
@@ -636,10 +674,10 @@ def build_rows(cache: Path, screen_csv: Path, committed: dict[str, tuple[str, st
             "image_url": c.image_url, "rights_flag": source.rights_flag,
             "policy_url": source.policy_url, "credit": c.credit,
             "dimensions_text": c.dimensions_text,
-            "finished_in": format_finished(*parsed) if parsed else "",
+            "finished_in": format_finished(*orient(parsed, c.px_w, c.px_h)) if parsed else "",
             "sha256": c.sha256, "file_sha256": file_sha, "px_w": str(c.px_w),
             "px_h": str(c.px_h), "tier": d["tier"], "class": d["class"],
-            "capture": "museum_scan", "commit_ok": d["commit_ok"],
+            "capture": "museum_scan", "commit_ok": d["commit_ok"], "date_end": str(c.date_end),
         })
     return out
 
@@ -726,11 +764,12 @@ def main(argv: list[str]) -> int:
     parser.add_argument("command", choices=["search", "download", "rows", "verify",
                                             "attribution", "recheck"])
     parser.add_argument("screen_csv", nargs="?", type=Path)
-    parser.add_argument("--cache", type=Path, default=DEFAULT_CACHE)
+    parser.add_argument("--cache", type=Path, default=None)
     parser.add_argument("--source", action="append", choices=sorted(FETCHERS))
     parser.add_argument("--refresh", action="store_true", help="re-request cached API answers")
     args = parser.parse_args(argv)
     sources = args.source or sorted(FETCHERS)
+    args.cache = args.cache or default_cache()
     client = Client()
     if args.command in {"search", "download"}:
         args.cache.mkdir(parents=True, exist_ok=True)

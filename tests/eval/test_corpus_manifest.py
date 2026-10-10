@@ -8,6 +8,8 @@ files, so a row, an image or an annotation that breaks a rule fails here before 
 
 import hashlib
 import json
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 import pytest
@@ -21,7 +23,8 @@ from qrep_eval import annotation as an
 REPO = Path(__file__).resolve().parents[2]
 CORPUS = REPO / "corpus"
 MANIFEST = CORPUS / "manifest.csv"
-ANNOTATIONS = sorted((CORPUS / "annotations").glob("*.json"))
+ANNOTATIONS = sorted((CORPUS / "annotations").rglob("*.json"))
+GOLD = sorted((CORPUS / "gold").rglob("*.json"))
 IMAGES = sorted(p for p in (CORPUS / "images").glob("*") if p.name != ".gitkeep")
 
 
@@ -44,7 +47,7 @@ def test_manifest_has_the_required_columns_in_order():
     assert header == [
         "file", "license", "source", "object_id", "title", "landing_url", "image_url",
         "rights_flag", "policy_url", "credit", "dimensions_text", "finished_in", "sha256",
-        "file_sha256", "px_w", "px_h", "tier", "class", "capture", "commit_ok",
+        "file_sha256", "px_w", "px_h", "tier", "class", "capture", "commit_ok", "date_end",
     ]
     assert tuple(header) == cf.COLUMNS
 
@@ -94,14 +97,24 @@ def test_every_row_points_only_at_allowlisted_hosts():
             cf.check_host(row[column])
 
 
-def test_finished_sizes_keep_their_source_text_and_read_approximate():
+def test_finished_sizes_keep_their_source_text_and_follow_the_photo():
     # Source: plan D3a, criterion 4: parse finished sizes, keep the source text, mark approximate.
+    # The longer side of the quilt is the longer side of the photo.
     for row in rows():
         if row["finished_in"]:
             assert row["finished_in"].startswith("~"), row["file"]
             assert row["dimensions_text"], row["file"]
-            parsed = cf.parse_finished_size(row["dimensions_text"])
-            assert parsed is not None and cf.format_finished(*parsed) == row["finished_in"]
+            width, height = (float(n) for n in row["finished_in"][1:].split(" x "))
+            px_w, px_h = int(row["px_w"]), int(row["px_h"])
+            assert not (px_w > px_h and width < height), row["file"]
+            assert not (px_w < px_h and width > height), row["file"]
+
+
+def test_every_row_predates_the_modern_cutoff():
+    # Source: plan D3a, criterion 3 and data-55: no modern designer quilt. The fetch skips any
+    # object made in 1930 or later, and any undated object, before fetching its image.
+    for row in rows():
+        assert row["date_end"].isdigit() and int(row["date_end"]) < 1930, row["file"]
 
 
 def test_uncommitted_rows_name_their_cache_path():
@@ -366,8 +379,10 @@ def test_the_annotation_model_refuses_malformed_input(change):
 def test_the_committed_schema_is_the_models_export():
     # Source: plan D3a, criterion 7: the model exports corpus/schema/annotation.schema.json, which
     # the dev annotate page (C3a) writes against; a drift between them fails here.
-    committed = (CORPUS / "schema" / "annotation.schema.json").read_text(encoding="utf-8")
-    assert committed == an.schema_text()
+    # Compared as parsed JSON, not text: the Pyodide build of pydantic prints a float bound as 0
+    # where the native build prints 0.0, and the two are the same schema.
+    committed = json.loads((CORPUS / "schema" / "annotation.schema.json").read_text(encoding="utf-8"))
+    assert committed == an.schema()
 
 
 # ---------------------------------------------------------------------------------------------
@@ -391,11 +406,11 @@ def test_the_licensed_photo_rule_refuses_an_annotation_of_a_private_photo():
 
 def test_every_committed_annotation_names_a_licensed_photo():
     # The issue #113 rule, applied by this test until corpus-guard enforces it: every committed
-    # corpus/annotations/*.json names a photo with a CC0-1.0 or PDM-1.0 row whose sha256 and
-    # canvas match, under the photo's own stem.
+    # annotation or gold JSON, in any subfolder, names a photo with a CC0-1.0 or PDM-1.0 row whose
+    # sha256 and canvas match, under the photo's own stem.
     by_file = {row["file"]: row for row in rows()}
     assert ANNOTATIONS
-    for path in ANNOTATIONS:
+    for path in ANNOTATIONS + GOLD:
         problems = an.licensed_photo_problems(an.load(path), path.stem, by_file)
         assert problems == [], (path.name, problems)
 
@@ -412,6 +427,11 @@ def test_tier_a_and_refusal_photos_carry_two_independent_proposals():
         for name in needed:
             codes = {claim.provenance for claim in getattr(doc, name)}
             assert {"proposed-a", "proposed-b"} <= codes, (path.name, name)
+        # A proposal that calls the photo out of scope names its refusal class too; one that
+        # calls a refusal in scope is a disagreement corpus/README.md lists for D3b.
+        refused = {c.provenance for c in doc.construction_class if c.value == "out_of_scope"}
+        named = {c.provenance for c in doc.refusal_class}
+        assert refused == named, path.name
 
 
 # ---------------------------------------------------------------------------------------------
@@ -438,6 +458,8 @@ def test_the_fetch_refuses_any_host_off_the_allowlist(url):
 @pytest.mark.parametrize(
     ("text", "expected"),
     [
+        # Feet and inches: 8 ft 3 1/2 in = 8 x 12 + 3.5 = 99.5 in high; 98 1/4 = 98.25 in wide.
+        ("8 ft. 3 1/2 in. \u00d7 98 1/4 in.", (98.25, 99.5)),
         # Unlabeled pairs read height x width, the museum convention for flat textiles:
         # 82 1/2 = 82.5 in high, 74 in wide.
         ("82 1/2 x 74 in. (209.6 x 188 cm)", (74.0, 82.5)),
@@ -459,6 +481,47 @@ def test_the_fetch_refuses_any_host_off_the_allowlist(url):
 )
 def test_finished_sizes_parse_from_museum_dimensions(text, expected):
     assert cf.parse_finished_size(text) == expected
+
+
+@pytest.mark.parametrize(
+    ("size", "canvas", "expected"),
+    [
+        # Landscape photo (1000 x 800): the longer 80 in side runs across.
+        ((72.0, 80.0), (1000, 800), (80.0, 72.0)),
+        # Portrait photo (800 x 1000): the longer side runs down; already so.
+        ((72.0, 80.0), (800, 1000), (72.0, 80.0)),
+        # Square photo: the museum's order stands.
+        ((72.0, 80.0), (900, 900), (72.0, 80.0)),
+    ],
+)
+def test_finished_sizes_turn_to_match_the_photo(size, canvas, expected):
+    assert cf.orient(size, *canvas) == expected
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        # A two-digit range end: 1925-35 ends in 1935.
+        ("c. 1925-35", 1935),
+        # A century ends with its last year: the 19th century with 1900.
+        ("first half of 19th century", 1900),
+        ("20th century", 2000),
+        ("1850s", 1850),
+    ],
+)
+def test_dates_read_their_last_year(text, expected):
+    assert max(cf._years(text)) == expected
+
+
+def test_undated_and_modern_objects_are_skipped():
+    # By hand: 1929 is kept, 1930 is the first modern year, and no date at all is skipped too.
+    kept, skipped = cf.screen_records("met", [
+        MET_RECORD | {"objectID": 1, "objectEndDate": 1929},
+        MET_RECORD | {"objectID": 2, "objectEndDate": 1930},
+        MET_RECORD | {"objectID": 3, "objectEndDate": None},
+    ])
+    assert [c.object_id for c in kept] == ["1"]
+    assert skipped == {"made 1930 or later, or undated": 2}
 
 
 def test_finished_sizes_format_as_approximate_inches():
@@ -569,7 +632,7 @@ def test_screening_keeps_quilts_made_before_1930_with_cleared_flags():
         MET_RECORD | {"objectID": 15, "isPublicDomain": False},
     ])
     assert [c.object_id for c in kept] == ["11", "13"]
-    assert skipped == {"made 1930 or later": 1, "title does not name a quilt": 1,
+    assert skipped == {"made 1930 or later, or undated": 1, "title does not name a quilt": 1,
                        "isPublicDomain is not true": 1}
     assert [c.title for c in cf.screen_records("smithsonian", [SI_ROW])[0]] == [
         "Double Irish Chain"]
@@ -594,3 +657,85 @@ def test_a_lacma_page_clears_only_when_every_public_domain_flag_is_1():
     assert restricted != LACMA_PAGE
     with pytest.raises(cf.NotCleared):
         cf.lacma_candidate({"object_id": "54904", "html": restricted})
+
+
+# ---------------------------------------------------------------------------------------------
+# Recheck, verify and redirects, with a fake client (no network)
+# ---------------------------------------------------------------------------------------------
+
+
+class FakeClient:
+    def __init__(self, pages):
+        self.pages = pages
+        self.requests = {}
+
+    def get(self, url, headers=None):
+        page = self.pages[url]
+        if isinstance(page, Exception):
+            raise page
+        return page if isinstance(page, bytes) else json.dumps(page).encode()
+
+    def json(self, url, headers=None):
+        return json.loads(self.get(url, headers))
+
+
+def met_row(**changes) -> dict[str, str]:
+    source = cf.SOURCES["met"]
+    return {"file": "private/cache/met-11.jpg", "source": "met", "object_id": "11",
+            "license": source.license, "rights_flag": source.rights_flag,
+            "policy_url": source.policy_url} | changes
+
+
+def pages(record, policy=b"policy page"):
+    return {f"{cf.MET}/v1/objects/11": record, cf.SOURCES["met"].policy_url: policy}
+
+
+def test_the_recheck_passes_an_unchanged_record(tmp_path):
+    assert cf.recheck(FakeClient(pages(MET_RECORD)), [met_row()], tmp_path) == []
+
+
+def test_the_recheck_fails_when_a_flag_no_longer_clears(tmp_path):
+    problems = cf.recheck(FakeClient(pages(MET_RECORD | {"isPublicDomain": False})),
+                          [met_row()], tmp_path)
+    assert len(problems) == 1 and "isPublicDomain" in problems[0]
+
+
+def test_the_recheck_fails_when_a_row_records_another_license(tmp_path):
+    problems = cf.recheck(FakeClient(pages(MET_RECORD)), [met_row(license="PDM-1.0")], tmp_path)
+    assert len(problems) == 1
+
+
+def test_the_recheck_fails_when_a_policy_page_is_gone(tmp_path):
+    gone = urllib.error.HTTPError(cf.SOURCES["met"].policy_url, 404, "Not Found", None, None)
+    problems = cf.recheck(FakeClient(pages(MET_RECORD, gone)), [met_row()], tmp_path)
+    assert len(problems) == 1 and "404" in problems[0]
+
+
+def test_the_recheck_fails_when_a_lacma_page_turns_restricted(tmp_path):
+    source = cf.SOURCES["lacma"]
+    row = {"file": "private/cache/lacma-54904.jpg", "source": "lacma", "object_id": "54904",
+           "license": source.license, "rights_flag": source.rights_flag,
+           "policy_url": source.policy_url}
+    restricted = LACMA_PAGE.replace('\\"publicDomain\\":1,', '\\"publicDomain\\":0,')
+    client = FakeClient({"https://collections.lacma.org/object/54904": restricted.encode(),
+                         source.policy_url: b"policy page"})
+    problems = cf.recheck(client, [row], tmp_path)
+    assert len(problems) == 1 and "publicDomain" in problems[0]
+
+
+def test_verify_finds_a_cached_image_whose_bytes_changed(tmp_path):
+    # By hand: the row binds sha256(b"abc"); the cache holds b"abd", so one problem; then the
+    # right bytes give none, and a missing file gives one.
+    row = met_row(sha256=hashlib.sha256(b"abc").hexdigest())
+    (tmp_path / "met-11.jpg").write_bytes(b"abd")
+    assert len(cf.verify(tmp_path, [row])) == 1
+    (tmp_path / "met-11.jpg").write_bytes(b"abc")
+    assert cf.verify(tmp_path, [row]) == []
+    assert len(cf.verify(tmp_path / "empty", [row])) == 1
+
+
+def test_a_redirect_off_the_allowlist_is_refused():
+    request = urllib.request.Request("https://images.metmuseum.org/x.jpg")
+    with pytest.raises(cf.HostRefused):
+        cf._AllowlistRedirects().redirect_request(
+            request, None, 302, "Found", {}, "https://example.com/x.jpg")

@@ -50,7 +50,7 @@ Rejected, with the reason:
 | Rijksmuseum | Almost no pieced quilts (data-10). |
 | QUILT-1M | A histopathology dataset, not quilt data (data-15). |
 | Fabric-company and designer patterns | Licensed for personal use; private cross-checks only (data-39). |
-| Modern designer quilts | A specific quilt's layout together with its colors can be protected (Boisson v. Banian, 2d Cir. 2001; data-55), and a museum's rights flag clears the photo, not the design. No photo or cell model of one is committed or cached: the fetch skips any object whose record dates it 1930 or later before fetching its image. |
+| Modern designer quilts | A specific quilt's layout together with its colors can be protected (Boisson v. Banian, 2d Cir. 2001; data-55), and a museum's rights flag clears the photo, not the design. No photo or cell model of one is committed or cached: the fetch skips any object whose record dates it 1930 or later, and any object it cannot date, before fetching its image; the manifest's `date_end` records the last year each record gives. |
 
 ### Why traditional block layouts may be hand-authored as truth
 
@@ -100,8 +100,8 @@ python scripts/eval/corpus_fetch.py --recheck         # E4, before a release
 ## v0 counts (2026-10-10)
 
 Records searched: Met 184 (116 kept with `isPublicDomain` true and a primary image), AIC 114
-(all kept; images blocked), Smithsonian 382 CC0 image records (149 kept: quilts made before
-1930; images blocked), LACMA 25 hand-picked from 115 public-domain search results. Screened from
+(113 kept, one undated; images blocked), Smithsonian 382 CC0 image records (140 kept: quilts
+dated before 1930; images blocked), LACMA 25 hand-picked from 115 public-domain search results. Screened from
 the image: 141 photos, Met 116 and LACMA 25.
 
 | Tier | Photos | Share of the 141 | By source | Classes | In the holdout |
@@ -150,7 +150,10 @@ committed copy, with that copy's own hash, because corpus-guard matches committe
 `file_sha256` when it is filled and against `sha256` otherwise. `finished_in` is parsed from
 `dimensions_text` as `~width x height` in inches and is approximate: an unlabeled museum pair
 reads height by width, H. and W. labels win over order, and a depth is dropped. `px_w` and
-`px_h` are the source image's size, which is the annotations' canvas. Text from the museums
+`px_h` are the source image's size, which is the annotations' canvas. Museums disagree on
+which number comes first, so `finished_in` is turned to match the photo: the quilt's longer side
+is the photo's longer side. `date_end` is the last year the record's date gives (a range's end,
+or a century's last year). Text from the museums
 keeps its words; en and em dashes become hyphens under the repo's text rule.
 
 ## Holdout rule
@@ -197,8 +200,9 @@ reveal a modern design (plan section 8.2).
 
 Two passes, proposed-a and proposed-b, each read every eval-set photo (2026-10-10). Each pass
 saw only the cached photos and the format, through `scripts/eval/corpus_screen.py` views whose
-grid labels are source pixels; neither saw the other's answers, the screen's tiers, or any QREP
-output. Each tier A photo got the outer edge, the bands, the field corners where visible, the
+grid labels are source pixels; neither saw the other's answers or any QREP output. Each pass was
+told which photos to frame and count (the screen's tier A) and which to classify only, so the
+split itself carries the screen's call; the classes were the passes' own. Each tier A photo got the outer edge, the bands, the field corners where visible, the
 counts, the class and a fabric count; each refusal got its class. Nothing here is truth until
 D3b verifies it.
 
@@ -220,5 +224,12 @@ Classes that disagree, between the passes or with the screen (`manifest.csv` cla
 | met-13915 | R on_point | applique | on_point |
 | met-854567 | R curve | applique | diamond_star |
 
+Fabric counts differ on one tier A photo: lacma-54871, 6 (proposed-a) against 5 (proposed-b).
+
 lacma-54874 matters most: both passes read it as an in-scope quarter-square-triangle quilt that
-the screen refused for its octagonal rings, so D3b decides whether it moves to tier A.
+the screen refused for its octagonal rings, so D3b decides whether it moves to tier A; it has
+no frame or count proposals yet, because the passes classified it only.
+
+The committed copies under `images/` are downsized; an annotation of one names that copy in
+`photo` but keeps the source image's `sha256` and `canvas`, so a consumer that opens the copy
+scales the coordinates by the copy's size over the canvas.
