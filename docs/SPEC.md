@@ -254,15 +254,33 @@ The quilt model records every value with its source:
 
 | Value | Source | Recorded as |
 |---|---|---|
-| Corners or outer edge, border bands, counts, fabric count, typed finished size | User | User fact, confidence 1.0 |
+| Corners or outer edge, border bands, counts, fabric count, typed or preset finished size | User | User fact, confidence 1.0 |
 | Count, corner and fabric-count suggestions; palette colors | CV | Confidence in [0, 1] |
 | Fabric per square, unit class, fabric per part | CV | Confidence in [0, 1] per square |
 | Grid fit, global and per region | CV | Confidence in [0, 1] |
 | Finished size estimated from the photo | CV guess | Low confidence; printed only as an estimate |
 | Hand-authored models and fixtures | Author | Confidence 1.0 |
 
-A test asserts that every CV-derived field carries a confidence in [0, 1]. The method and its reason
-follow deterministically from the read and carry no confidence of their own.
+Two optional records keep what the user set, so construction and the pattern use it instead of
+re-inferring it. Both are optional under schema_version 1, so a model written without them loads
+unchanged:
+
+- The confirmed block structure: blocks across and down, times squares per block on each axis,
+  recorded as a user fact at confidence 1.0. Construction takes the block period from it (B2a fills
+  it).
+- The size basis: its source (typed, preset or default); the requested width and height (a typed
+  size gives one or both, a preset both, a default neither); the achieved width and height; and the
+  rounding applied, the step the finished square size snaps to; all in eighths. A typed or preset
+  size records confidence 1.0; a default size must state the photo estimate's confidence (A10
+  fills the basis for a size you set; #207 records the estimate on every read).
+
+A test walks the schema and records where every stored field comes from. It asserts that every
+confidence stays in [0, 1] and that the user facts the model records today, the confirmed block
+structure and a typed or preset size, sit at 1.0; the counts and border bands become user facts
+with the confirmed read (B2a). On a hand-built model shaped like a read, it asserts that every CV
+value finds its confidence beside it; until #207 lands, it names the square size and the border
+widths as the values whose scale carries none. The method and its reason follow deterministically
+from the read and carry no confidence of their own.
 
 ## 9. Removed surfaces
 

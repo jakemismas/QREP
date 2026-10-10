@@ -1,12 +1,16 @@
 """Pydantic schema for the QREP quilt model.
 
-All lengths are integer eighths of an inch (see qrep.model.units). Confidence
-lives in exactly two places: provenance.stage_confidence (per CV stage) and
-GridRegion.cell_confidence (per cell). Hand-authored models omit both; the
-effective_* helpers fill in the 1.0 defaults.
+All lengths are integer eighths of an inch (see qrep.model.units). CV
+confidence lives in three places: provenance.stage_confidence (per CV stage),
+GridRegion.cell_confidence (per cell) and FinishedSizeBasis.confidence (a size
+estimated from the photo). Hand-authored models omit the first two; the
+effective_* helpers fill in the 1.0 defaults. User facts (the confirmed block
+structure, a typed or preset size) record confidence 1.0 (docs/SPEC.md
+section 8).
 """
 
 import re
+from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -193,6 +197,72 @@ class QuiltMetadata(BaseModel):
     notes: str = ""
 
 
+class ConfirmedBlocks(BaseModel):
+    """The block structure the user confirmed: blocks across and down, times
+    squares per block on each axis. Construction uses it instead of
+    re-inferring the period, so a few misread squares cannot flip the method."""
+
+    blocks_across: int = Field(gt=0)
+    blocks_down: int = Field(gt=0)
+    squares_across: int = Field(gt=0, description="squares per block across")
+    squares_down: int = Field(gt=0, description="squares per block down")
+    confidence: float = 1.0
+
+    @field_validator("confidence")
+    @classmethod
+    def _user_fact(cls, v: float) -> float:
+        if v != 1.0:
+            raise ValueError(
+                f"a confirmed block structure is a user fact at confidence 1.0, got {v}"
+            )
+        return v
+
+
+class FinishedSizeBasis(BaseModel):
+    """How the finished size was set, so the pattern can say so.
+
+    A typed size gives a width, a height or both; a preset gives both; a
+    default sets nothing, and its size is estimated from the photo. A typed
+    or preset size is a user fact at confidence 1.0, which it may leave out;
+    a default size must state the estimate's confidence, any value in
+    [0, 1], so a guess is never stored as certain by omission.
+    """
+
+    source: Literal["typed", "preset", "default"]
+    requested_width: int | None = Field(default=None, gt=0)
+    requested_height: int | None = Field(default=None, gt=0)
+    achieved_width: int = Field(gt=0)
+    achieved_height: int = Field(gt=0)
+    rounding_step: int = Field(
+        gt=0, description="rounding applied: the finished square size snaps to this step, eighths"
+    )
+    confidence: float = Field(ge=0.0, le=1.0)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _user_set_size_is_certain(cls, data):
+        # Only a default size must state its confidence, so a missing or
+        # misspelled source reports itself and nothing else.
+        if isinstance(data, dict) and data.get("source") != "default":
+            return {"confidence": 1.0, **data}
+        return data
+
+    @model_validator(mode="after")
+    def _source_matches_request(self) -> "FinishedSizeBasis":
+        given = (self.requested_width is not None, self.requested_height is not None)
+        if self.source == "typed" and not any(given):
+            raise ValueError("a typed size needs a requested width or height")
+        if self.source == "preset" and not all(given):
+            raise ValueError("a preset size records both requested width and height")
+        if self.source == "default" and any(given):
+            raise ValueError("a default size records no requested width or height")
+        if self.source != "default" and self.confidence != 1.0:
+            raise ValueError(
+                f"a {self.source} size is a user fact at confidence 1.0, got {self.confidence}"
+            )
+        return self
+
+
 class Quilt(BaseModel):
     schema_version: str = "1"
     metadata: QuiltMetadata
@@ -203,6 +273,10 @@ class Quilt(BaseModel):
     quilting: QuiltingLayer = Field(default_factory=QuiltingLayer)
     settings: Settings = Field(default_factory=Settings)
     provenance: Provenance = Field(default_factory=Provenance)
+    # Optional under schema_version 1, and last, so a model written without
+    # them loads unchanged and older keys keep their serialized order.
+    confirmed_blocks: ConfirmedBlocks | None = None
+    size_basis: FinishedSizeBasis | None = None
 
     @field_validator("schema_version")
     @classmethod
