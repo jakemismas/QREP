@@ -1,8 +1,8 @@
 {
   "ticket": "D1 quilter-voice research (#161)",
   "date": "2026-10-10",
-  "method": "WebSearch and WebFetch, one page at a time per site, run by four research passes inside one session (A finishing numbers, B complaints, C most-made quilts, D pattern trust and clarity), plus one headless Chromium session for the Reddit and X attempts and the Webster text. No login, posting, sign-up or contact; no API, JSON, sitemap or listing pages.",
-  "result_count_definition": "result_count is the number of result blocks the search tool returned for the query, not the engine's total hit count. usable is how many of them were fetched and used.",
+  "method": "Web search and page fetches, one page at a time per site, in four topic passes (A finishing numbers, B complaints, C most-made quilts, D pattern trust and clarity), plus one headless Chromium session (Playwright) for the Reddit and X attempts and the Webster text. No login, posting, sign-up or contact; no API, JSON, sitemap or listing pages.",
+  "result_count_definition": "result_count is the number of results the web search returned for the query, not the engine's total hit count. usable is how many of them were fetched and used.",
   "claim_rule": "A claim cites only sources whose fetch is ok. Claims paraphrase; no claim quotes a page, and no claim names an individual poster. Claims marked excluded back nothing in the reports.",
   "id_prefixes": {
     "A": "finishing numbers",
@@ -11,17 +11,20 @@
     "D": "pattern trust and clarity",
     "M": "attempts and spot checks run directly in this ticket"
   },
+  "distinct_ok_pages_note": "Ten pages were fetched by two or three passes and carry two or three ids (same_page_as); the reports cite one id per page in any list that counts sources.",
   "counts": {
     "queries": 132,
     "sources": 148,
     "sources_ok": 125,
     "claims": 159,
-    "claims_excluded": 1
+    "claims_excluded": 1,
+    "distinct_ok_pages": 114,
+    "distinct_ok_sites": 55
   },
   "queries": [
     {
       "id": "Q-A01",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "how much backing fabric do I need quilt size chart yards 42 inch fabric",
       "date": "2026-10-10",
       "result_count": 9,
@@ -31,7 +34,7 @@
     },
     {
       "id": "Q-A02",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "how many binding strips do I need for quilt size chart 2 1/2 inch strips twin queen king",
       "date": "2026-10-10",
       "result_count": 9,
@@ -41,7 +44,7 @@
     },
     {
       "id": "Q-A03",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "batting package sizes crib twin full queen king Warm & Natural Hobbs dimensions chart",
       "date": "2026-10-10",
       "result_count": 10,
@@ -51,7 +54,7 @@
     },
     {
       "id": "Q-A04",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "reddit quilting how much backing do I need for queen quilt 108 wide yards longarm overhang",
       "date": "2026-10-10",
       "result_count": 9,
@@ -61,7 +64,7 @@
     },
     {
       "id": "Q-A05",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "site:reddit.com r/quilting binding strips how many 2.25 or 2.5 inch queen quilt",
       "date": "2026-10-10",
       "result_count": 9,
@@ -71,7 +74,7 @@
     },
     {
       "id": "Q-A06",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quiltingboard.com how much backing for queen size quilt yards binding yardage",
       "date": "2026-10-10",
       "result_count": 9,
@@ -81,7 +84,7 @@
     },
     {
       "id": "Q-A07",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "Quilting Board forum \"how much backing\" king size quilt 108 wide yards how much extra longarmer wants (allowed_domains quiltingboard.com)",
       "date": "2026-10-10",
       "result_count": 10,
@@ -91,7 +94,7 @@
     },
     {
       "id": "Q-A08",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "site:x.com quilt backing yardage queen how many yards binding",
       "date": "2026-10-10",
       "result_count": 9,
@@ -101,7 +104,7 @@
     },
     {
       "id": "Q-A09",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "how much binding yardage queen quilt (allowed_domains reddit.com)",
       "date": "2026-10-10",
       "result_count": 0,
@@ -111,7 +114,7 @@
     },
     {
       "id": "Q-A10",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "longarm quilter backing batting at least 8 inches larger than top reddit r/longarm (allowed_domains reddit.com)",
       "date": "2026-10-10",
       "result_count": 0,
@@ -121,7 +124,7 @@
     },
     {
       "id": "Q-A11",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "reddit r/quilting how much backing and batting extra for longarm quilter 4 inches each side",
       "date": "2026-10-10",
       "result_count": 10,
@@ -131,7 +134,7 @@
     },
     {
       "id": "Q-A12",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "reddit r/quilting binding 2.25 vs 2.5 inch strips how many yards queen quilt",
       "date": "2026-10-10",
       "result_count": 10,
@@ -141,7 +144,7 @@
     },
     {
       "id": "Q-A13",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quilt backing and binding calculator online defaults usable width overhang binding strip width",
       "date": "2026-10-10",
       "result_count": 9,
@@ -151,7 +154,7 @@
     },
     {
       "id": "Q-A14",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "Quilter's Paradise backing and batting calculator",
       "date": "2026-10-10",
       "result_count": 9,
@@ -161,7 +164,7 @@
     },
     {
       "id": "Q-A15",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "how to add quilt borders measure through center sides first cut strip width finished plus 1/2 inch diagonal seam joining",
       "date": "2026-10-10",
       "result_count": 10,
@@ -171,7 +174,7 @@
     },
     {
       "id": "Q-A16",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quilt binding yardage how many strips 2 1/4 inch add 10 inches perimeter tutorial blog",
       "date": "2026-10-10",
       "result_count": 9,
@@ -181,7 +184,7 @@
     },
     {
       "id": "Q-A17",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "batting sizes chart crib 45x60 twin 72x90 full 81x96 queen 90x108 king 120x120 Hobbs Warm Company Quilters Dream",
       "date": "2026-10-10",
       "result_count": 10,
@@ -191,7 +194,7 @@
     },
     {
       "id": "Q-A18",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "Fairfield Poly-Fil Hobbs batting size guide which batting size for quilt top size overhang recommended",
       "date": "2026-10-10",
       "result_count": 19,
@@ -201,7 +204,7 @@
     },
     {
       "id": "Q-A19",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "118 inch wide quilt backing yardage chart queen king how much to buy",
       "date": "2026-10-10",
       "result_count": 9,
@@ -211,7 +214,7 @@
     },
     {
       "id": "Q-A20",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quilting cotton usable width 40 or 42 inches after selvages how much extra for shrinkage and squaring up yardage",
       "date": "2026-10-10",
       "result_count": 9,
@@ -221,7 +224,7 @@
     },
     {
       "id": "Q-A21",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quilt binding 2 1/4 inch or 2 1/2 inch strips which do I prefer double fold binding tutorial",
       "date": "2026-10-10",
       "result_count": 10,
@@ -231,7 +234,7 @@
     },
     {
       "id": "Q-A22",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "site:reddit.com/r/quilting how much backing fabric queen quilt yards",
       "date": "2026-10-10",
       "result_count": 9,
@@ -241,7 +244,7 @@
     },
     {
       "id": "Q-A23",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "site:reddit.com/r/longarm how much extra backing do you need on each side",
       "date": "2026-10-10",
       "result_count": 9,
@@ -251,7 +254,7 @@
     },
     {
       "id": "Q-A24",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "site:x.com longarm quilter backing batting 4 inches larger each side quilt top",
       "date": "2026-10-10",
       "result_count": 10,
@@ -261,7 +264,7 @@
     },
     {
       "id": "Q-A25",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "site:old.reddit.com quilting binding yardage queen",
       "date": "2026-10-10",
       "result_count": 9,
@@ -271,7 +274,7 @@
     },
     {
       "id": "Q-A26",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "omni calculator quilt backing OR \"quilt calculator\" binding batting border yardage online",
       "date": "2026-10-10",
       "result_count": 9,
@@ -281,7 +284,7 @@
     },
     {
       "id": "Q-A27",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quilt backing calculator enter quilt width length overhang shop tool binding calculator strips needed (extended mode)",
       "date": "2026-10-10",
       "result_count": 9,
@@ -291,7 +294,7 @@
     },
     {
       "id": "Q-A28",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quilt size chart 92 x 115 queen 110 x 108 king finished quilt size standard chart pattern designer",
       "date": "2026-10-10",
       "result_count": 9,
@@ -301,7 +304,7 @@
     },
     {
       "id": "Q-A29",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "Quiltingboard how much binding fabric for a king size quilt 2 1/4 strips how many yards (allowed_domains quiltingboard.com)",
       "date": "2026-10-10",
       "result_count": 10,
@@ -311,7 +314,7 @@
     },
     {
       "id": "Q-A30",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "Jaybird Quilts bias binding how much fabric chart",
       "date": "2026-10-10",
       "result_count": 10,
@@ -321,7 +324,7 @@
     },
     {
       "id": "Q-B01",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quilt backing calculator too much fabric leftover reddit quilting",
       "date": "2026-10-10",
       "result_count": 9,
@@ -331,7 +334,7 @@
     },
     {
       "id": "Q-B02",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quiltingboard pattern errors yardage wrong ran short of fabric",
       "date": "2026-10-10",
       "result_count": 9,
@@ -341,7 +344,7 @@
     },
     {
       "id": "Q-B03",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "site:x.com quilt pattern error yardage wrong",
       "date": "2026-10-10",
       "result_count": 9,
@@ -351,7 +354,7 @@
     },
     {
       "id": "Q-B04",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quilt calculator why results differ from pattern backing binding assumptions FAQ",
       "date": "2026-10-10",
       "result_count": 9,
@@ -361,7 +364,7 @@
     },
     {
       "id": "Q-B05",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "reddit r/quilting pattern instructions confusing errors in pattern beginners",
       "date": "2026-10-10",
       "result_count": 9,
@@ -371,7 +374,7 @@
     },
     {
       "id": "Q-B06",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quiltingboard.com binding came up short how much binding do I need",
       "date": "2026-10-10",
       "result_count": 9,
@@ -381,7 +384,7 @@
     },
     {
       "id": "Q-B07",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "longarm quilter backing too small not square seams pressed open requirements for customers",
       "date": "2026-10-10",
       "result_count": 9,
@@ -391,7 +394,7 @@
     },
     {
       "id": "Q-B08",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quilt pattern pet peeves no cutting diagram unclear instructions designer blog",
       "date": "2026-10-10",
       "result_count": 9,
@@ -401,7 +404,7 @@
     },
     {
       "id": "Q-B09",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "\"quilting\" forum thread \"pattern\" \"yardage was wrong\" OR \"not enough fabric\" OR \"ran out of fabric\" quilters share",
       "date": "2026-10-10",
       "result_count": 9,
@@ -411,7 +414,7 @@
     },
     {
       "id": "Q-B10",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "reddit quilting backing too much calculator OR pattern yardage overestimate (allowed_domains reddit.com)",
       "date": "2026-10-10",
       "result_count": 0,
@@ -421,7 +424,7 @@
     },
     {
       "id": "Q-B11",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quilting board forum pattern mistakes instructions frustrating designers testers (allowed_domains quiltingboard.com)",
       "date": "2026-10-10",
       "result_count": 10,
@@ -431,7 +434,7 @@
     },
     {
       "id": "Q-B12",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quilt pattern tiny print hard to read printing pdf too many pages ink complaint",
       "date": "2026-10-10",
       "result_count": 9,
@@ -441,7 +444,7 @@
     },
     {
       "id": "Q-B13",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quilt backing calculator notes may differ from other calculators assumptions seam allowance extra inches width of fabric 40 inches",
       "date": "2026-10-10",
       "result_count": 9,
@@ -451,7 +454,7 @@
     },
     {
       "id": "Q-B14",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "why do quilt binding calculators give different amounts 2.5 inch strips 2.25 diagonal seams explained",
       "date": "2026-10-10",
       "result_count": 19,
@@ -461,7 +464,7 @@
     },
     {
       "id": "Q-B15",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quilt block finished wrong size pattern block measures smaller than stated unfinished size checkpoint",
       "date": "2026-10-10",
       "result_count": 10,
@@ -471,7 +474,7 @@
     },
     {
       "id": "Q-B16",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quiltingboard backing fabric width 40 inches usable selvage shrink pattern said 44 not enough (allowed_domains quiltingboard.com)",
       "date": "2026-10-10",
       "result_count": 10,
@@ -481,7 +484,7 @@
     },
     {
       "id": "Q-B17",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "r/quilting reddit backing calculator how much backing thread",
       "date": "2026-10-10",
       "result_count": 10,
@@ -491,7 +494,7 @@
     },
     {
       "id": "Q-B18",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "reddit r/quilting pattern error typo OR mistake in the pattern cutting measurements wrong",
       "date": "2026-10-10",
       "result_count": 9,
@@ -501,7 +504,7 @@
     },
     {
       "id": "Q-B19",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "reddit r/quilting binding ran out short of binding calculate",
       "date": "2026-10-10",
       "result_count": 9,
@@ -511,7 +514,7 @@
     },
     {
       "id": "Q-B20",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "r/quilting backing yardage calculator over-estimate I bought too much backing (extended)",
       "date": "2026-10-10",
       "result_count": 9,
@@ -521,7 +524,7 @@
     },
     {
       "id": "Q-B21",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "site:twitter.com quilters pattern instructions wrong pattern quilting frustrated yardage",
       "date": "2026-10-10",
       "result_count": 9,
@@ -531,7 +534,7 @@
     },
     {
       "id": "Q-B22",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quilt backing calculator tool assumes 40 inch usable width 4 inches each side how it calculates",
       "date": "2026-10-10",
       "result_count": 9,
@@ -541,7 +544,7 @@
     },
     {
       "id": "Q-B23",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quilters dislike patterns: too many pages to print, color diagrams not black and white, small text, wasteful layout",
       "date": "2026-10-10",
       "result_count": 9,
@@ -551,7 +554,7 @@
     },
     {
       "id": "Q-B24",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "what makes a good quilt pattern readers frustrations cutting diagram yardage unfinished block size pressing arrows quilt designer blog",
       "date": "2026-10-10",
       "result_count": 9,
@@ -561,7 +564,7 @@
     },
     {
       "id": "Q-B25",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "longarm quilter rant customer backing not square sent too small backing professional longarmer blog problems",
       "date": "2026-10-10",
       "result_count": 9,
@@ -571,7 +574,7 @@
     },
     {
       "id": "Q-B26",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "pattern called for way too much fabric backing yardage more than I needed quilters tips leftover",
       "date": "2026-10-10",
       "result_count": 10,
@@ -581,7 +584,7 @@
     },
     {
       "id": "Q-B27",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quiltingboard How do you calculate yardage needed for backing",
       "date": "2026-10-10",
       "result_count": 9,
@@ -591,7 +594,7 @@
     },
     {
       "id": "Q-B28",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quilt pattern wasteful cutting instructions cutting waste fabric pattern designer should provide cutting layout diagram quilters complain",
       "date": "2026-10-10",
       "result_count": 9,
@@ -601,7 +604,7 @@
     },
     {
       "id": "Q-B29",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quilt pattern finished quilt size smaller than stated pattern says 60 x 72 actually measures quilters complain",
       "date": "2026-10-10",
       "result_count": 9,
@@ -611,7 +614,7 @@
     },
     {
       "id": "Q-B30",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quilt patterns assume knowledge beginners frustrated instructions skip steps no pressing directions forum discussion",
       "date": "2026-10-10",
       "result_count": 9,
@@ -621,7 +624,7 @@
     },
     {
       "id": "Q-B31",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quilt-as-you-go OR pattern review complaints yardage too little OR too much quilt kit shortage fabric short",
       "date": "2026-10-10",
       "result_count": 9,
@@ -631,7 +634,7 @@
     },
     {
       "id": "Q-B32",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "old.reddit.com r/quilting pattern instructions confusing OR error OR yardage",
       "date": "2026-10-10",
       "result_count": 9,
@@ -641,7 +644,7 @@
     },
     {
       "id": "Q-B33",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quilt designer blog I print my pattern black and white friendly diagrams ink-saving pages quilters ask",
       "date": "2026-10-10",
       "result_count": 9,
@@ -651,7 +654,7 @@
     },
     {
       "id": "Q-C01",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "reddit first quilt beginner favorite pattern nine patch rail fence",
       "date": "2026-10-10",
       "result_count": 9,
@@ -661,7 +664,7 @@
     },
     {
       "id": "Q-C02",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "most popular traditional quilt blocks list nine patch churn dash log cabin flying geese",
       "date": "2026-10-10",
       "result_count": 9,
@@ -671,7 +674,7 @@
     },
     {
       "id": "Q-C03",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "site:reddit.com r/quilting what quilt pattern have you made the most times",
       "date": "2026-10-10",
       "result_count": 9,
@@ -681,7 +684,7 @@
     },
     {
       "id": "Q-C04",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "site:x.com quilters favorite quilt pattern finished quilt nine patch irish chain",
       "date": "2026-10-10",
       "result_count": 9,
@@ -691,7 +694,7 @@
     },
     {
       "id": "Q-C05",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quiltingboard most popular quilt pattern what do you make most often",
       "date": "2026-10-10",
       "result_count": 9,
@@ -701,7 +704,7 @@
     },
     {
       "id": "Q-C06",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "reddit r/quilting thread first quilt what pattern (reddit.com domain filter)",
       "date": "2026-10-10",
       "result_count": 0,
@@ -711,7 +714,7 @@
     },
     {
       "id": "Q-C07",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quilting forum favorite traditional quilt pattern poll results nine patch log cabin ohio star",
       "date": "2026-10-10",
       "result_count": 9,
@@ -721,7 +724,7 @@
     },
     {
       "id": "Q-C08",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "best quilt patterns for beginners rail fence nine patch checkerboard half square triangle quilt",
       "date": "2026-10-10",
       "result_count": 9,
@@ -731,7 +734,7 @@
     },
     {
       "id": "Q-C09",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "Marie Webster Quilts Their Story and How to Make Them Project Gutenberg",
       "date": "2026-10-10",
       "result_count": 10,
@@ -741,7 +744,7 @@
     },
     {
       "id": "Q-C10",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "Irish chain quilt set on point diagonal versus straight set look-alike double Irish chain",
       "date": "2026-10-10",
       "result_count": 9,
@@ -751,7 +754,7 @@
     },
     {
       "id": "Q-C11",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "most popular quilt patterns of all time half-square triangle pinwheel churn dash ohio star quilt blog reader favorites",
       "date": "2026-10-10",
       "result_count": 10,
@@ -761,7 +764,7 @@
     },
     {
       "id": "Q-C12",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quilt calculator blocks nine patch four patch checkerboard half-square triangle flying geese quilt size reference",
       "date": "2026-10-10",
       "result_count": 9,
@@ -771,7 +774,7 @@
     },
     {
       "id": "Q-C13",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "Trip Around the World quilt popular classic beginner scrap quilt postage stamp quilt most made",
       "date": "2026-10-10",
       "result_count": 9,
@@ -781,7 +784,7 @@
     },
     {
       "id": "Q-C14",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "Missouri Star Quilt Company popular quilt tutorials Trip Around the World Irish chain Ohio star tutorial",
       "date": "2026-10-10",
       "result_count": 9,
@@ -791,7 +794,7 @@
     },
     {
       "id": "Q-C15",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "classic quilt patterns every quilter should make Churn Dash Ohio Star Flying Geese Bear Paw",
       "date": "2026-10-10",
       "result_count": 10,
@@ -801,7 +804,7 @@
     },
     {
       "id": "Q-C16",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "readers voted favorite quilt block churn dash pinwheel bow tie snowball block poll",
       "date": "2026-10-10",
       "result_count": 10,
@@ -811,7 +814,7 @@
     },
     {
       "id": "Q-C17",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quilt pattern popularity data most downloaded OR most pinned OR most searched quilt block nine patch log cabin",
       "date": "2026-10-10",
       "result_count": 10,
@@ -821,7 +824,7 @@
     },
     {
       "id": "Q-C18",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "on point setting quilts Irish chain Ohio star nine patch set on point diagonal setting common traditional",
       "date": "2026-10-10",
       "result_count": 9,
@@ -831,7 +834,7 @@
     },
     {
       "id": "Q-C19",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "traditional quilt patterns history popular bow tie card trick shoo fly hourglass snowball quilt guide",
       "date": "2026-10-10",
       "result_count": 9,
@@ -841,7 +844,7 @@
     },
     {
       "id": "Q-C20",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "flying geese half square triangle quilt beginner favorite most popular quilt block unit survey OR poll quilters",
       "date": "2026-10-10",
       "result_count": 9,
@@ -851,7 +854,7 @@
     },
     {
       "id": "Q-C21",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quilting blog first quilt nine patch OR rail fence OR four patch readers share their first quilts",
       "date": "2026-10-10",
       "result_count": 9,
@@ -861,7 +864,7 @@
     },
     {
       "id": "Q-C22",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quiltingboard.com thread favorite pattern churn dash OR ohio star OR irish chain go-to quilt",
       "date": "2026-10-10",
       "result_count": 9,
@@ -871,7 +874,7 @@
     },
     {
       "id": "Q-C23",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "sampler quilt popular first quilt sampler block of the month most popular traditional blocks quilt guild",
       "date": "2026-10-10",
       "result_count": 9,
@@ -881,7 +884,7 @@
     },
     {
       "id": "Q-D01",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "reddit quilting what makes a good quilt pattern pet peeves",
       "date": "2026-10-10",
       "result_count": 9,
@@ -891,7 +894,7 @@
     },
     {
       "id": "Q-D02",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quilt pattern tech editing why it matters tested patterns errors",
       "date": "2026-10-10",
       "result_count": 9,
@@ -901,7 +904,7 @@
     },
     {
       "id": "Q-D03",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "how to write a quilt pattern tutorial designer blog cutting instructions diagrams tech editor",
       "date": "2026-10-10",
       "result_count": 9,
@@ -911,7 +914,7 @@
     },
     {
       "id": "Q-D04",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "what to look for when buying a quilt pattern beginner",
       "date": "2026-10-10",
       "result_count": 10,
@@ -921,7 +924,7 @@
     },
     {
       "id": "Q-D05",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quiltingboard forum pattern errors in instructions fabric requirements wrong",
       "date": "2026-10-10",
       "result_count": 9,
@@ -931,7 +934,7 @@
     },
     {
       "id": "Q-D06",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "site:x.com quilt pattern errors instructions unclear",
       "date": "2026-10-10",
       "result_count": 9,
@@ -941,7 +944,7 @@
     },
     {
       "id": "Q-D07",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quilt pattern tester what testers check yardage cutting instructions designer blog",
       "date": "2026-10-10",
       "result_count": 9,
@@ -951,7 +954,7 @@
     },
     {
       "id": "Q-D08",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quilting forum tech editor quilt pattern designers hire proofread",
       "date": "2026-10-10",
       "result_count": 9,
@@ -961,7 +964,7 @@
     },
     {
       "id": "Q-D09",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quilt pattern printing 100 percent scale test square 1 inch check PDF pattern",
       "date": "2026-10-10",
       "result_count": 10,
@@ -971,7 +974,7 @@
     },
     {
       "id": "Q-D10",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quilt border measure through center sides first pattern instructions",
       "date": "2026-10-10",
       "result_count": 10,
@@ -981,7 +984,7 @@
     },
     {
       "id": "Q-D11",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quilt pattern backing batting binding yardage how much extra pattern lists binding strips width of fabric (two result sets)",
       "date": "2026-10-10",
       "result_count": 19,
@@ -991,7 +994,7 @@
     },
     {
       "id": "Q-D12",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quilters complain patterns that do not include backing or binding instructions",
       "date": "2026-10-10",
       "result_count": 9,
@@ -1001,7 +1004,7 @@
     },
     {
       "id": "Q-D13",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quilt pattern pressing arrows nesting seams diagrams pattern should say which way to press",
       "date": "2026-10-10",
       "result_count": 9,
@@ -1011,7 +1014,7 @@
     },
     {
       "id": "Q-D14",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quilt pattern unfinished size cut size finished size block confusion beginners trimmed to",
       "date": "2026-10-10",
       "result_count": 9,
@@ -1021,7 +1024,7 @@
     },
     {
       "id": "Q-D15",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "r/quilting pattern instructions confusing cutting error yardage not enough anyone else",
       "date": "2026-10-10",
       "result_count": 9,
@@ -1031,7 +1034,7 @@
     },
     {
       "id": "Q-D16",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "reddit quilting beginner first quilt pattern recommendations clear instructions",
       "date": "2026-10-10",
       "result_count": 9,
@@ -1041,7 +1044,7 @@
     },
     {
       "id": "Q-D17",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quiltingboard.com pattern instructions errors pattern mistakes designers",
       "date": "2026-10-10",
       "result_count": 9,
@@ -1051,7 +1054,7 @@
     },
     {
       "id": "Q-D18",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "experienced quilter what I look for in a pattern before buying accurate cutting strips subcuts less waste",
       "date": "2026-10-10",
       "result_count": 9,
@@ -1061,7 +1064,7 @@
     },
     {
       "id": "Q-D19",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quilt pattern skill level labels misleading beginner pattern too hard time estimate unrealistic",
       "date": "2026-10-10",
       "result_count": 9,
@@ -1071,7 +1074,7 @@
     },
     {
       "id": "Q-D20",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quilt pattern abbreviations WOF RST HST WOF width of fabric assumed 40 inches pattern notes",
       "date": "2026-10-10",
       "result_count": 9,
@@ -1081,7 +1084,7 @@
     },
     {
       "id": "Q-D21",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quilt pattern layout diagram rows numbered coloring page fabric key helps quilters plan",
       "date": "2026-10-10",
       "result_count": 9,
@@ -1091,7 +1094,7 @@
     },
     {
       "id": "Q-D22",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quilting forum members discuss pattern mistakes I always check pattern before cutting math yardage",
       "date": "2026-10-10",
       "result_count": 9,
@@ -1101,7 +1104,7 @@
     },
     {
       "id": "Q-D23",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "old.reddit.com r/quilting bad pattern instructions diagram wrong",
       "date": "2026-10-10",
       "result_count": 9,
@@ -1111,7 +1114,7 @@
     },
     {
       "id": "Q-D24",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "longarm quilter backing requirements customers backing not square extra inches batting size",
       "date": "2026-10-10",
       "result_count": 9,
@@ -1121,7 +1124,7 @@
     },
     {
       "id": "Q-D25",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quilt calculator binding length formula perimeter plus 10 inches 2.5 inch strips how many",
       "date": "2026-10-10",
       "result_count": 9,
@@ -1131,7 +1134,7 @@
     },
     {
       "id": "Q-D26",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "site:x.com quilters pattern tested tech edited quilt pattern",
       "date": "2026-10-10",
       "result_count": 9,
@@ -1141,7 +1144,7 @@
     },
     {
       "id": "Q-D27",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "fat quarter friendly quilt pattern cutting chart cutting from fat quarters 18 x 21 inches pattern should state",
       "date": "2026-10-10",
       "result_count": 9,
@@ -1151,7 +1154,7 @@
     },
     {
       "id": "Q-D28",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "half square triangles oversize trim down pattern instructions unfinished size checkpoint measure each block",
       "date": "2026-10-10",
       "result_count": 9,
@@ -1161,7 +1164,7 @@
     },
     {
       "id": "Q-D29",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "pdf quilt pattern formatting page count font size black and white printer ink friendly diagrams customers prefer",
       "date": "2026-10-10",
       "result_count": 9,
@@ -1171,7 +1174,7 @@
     },
     {
       "id": "Q-D30",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "reddit.com/r/quilting what do you wish quilt patterns included (allowed_domains reddit.com)",
       "date": "2026-10-10",
       "result_count": 0,
@@ -1181,7 +1184,7 @@
     },
     {
       "id": "Q-D31",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quilting beginner pattern advice thread yardage cutting instructions tips (allowed_domains incl. reddit)",
       "date": "2026-10-10",
       "result_count": 0,
@@ -1191,7 +1194,7 @@
     },
     {
       "id": "Q-D32",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quilt pattern designer tips cutting instructions include seam allowance state finished size every pattern should have",
       "date": "2026-10-10",
       "result_count": 9,
@@ -1201,7 +1204,7 @@
     },
     {
       "id": "Q-D33",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "pattern testing quilt pattern testers sign up call for testers what testers are asked to do check yardage",
       "date": "2026-10-10",
       "result_count": 10,
@@ -1211,7 +1214,7 @@
     },
     {
       "id": "Q-D34",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quilt pattern reviews customers praise well written clear diagrams tested pattern",
       "date": "2026-10-10",
       "result_count": 9,
@@ -1221,7 +1224,7 @@
     },
     {
       "id": "Q-D35",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "traditional quilt block accuracy grain of fabric bias edges triangles cut sizes pattern should note direction of grain piecing",
       "date": "2026-10-10",
       "result_count": 9,
@@ -1231,7 +1234,7 @@
     },
     {
       "id": "Q-D36",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "batting selection quilt pattern should recommend batting type quilting distance loft drape",
       "date": "2026-10-10",
       "result_count": 9,
@@ -1241,7 +1244,7 @@
     },
     {
       "id": "Q-D37",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quilt binding methods double fold straight grain bias binding pattern instructions mitered corners finishing quilt guide",
       "date": "2026-10-10",
       "result_count": 9,
@@ -1251,7 +1254,7 @@
     },
     {
       "id": "Q-D38",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quilt yardage calculator how it rounds extra allowance shrinkage usable width 40 inches fabric requirements",
       "date": "2026-10-10",
       "result_count": 10,
@@ -1261,7 +1264,7 @@
     },
     {
       "id": "Q-D39",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "scant quarter inch seam allowance test block check pattern block size measure why quilts come out small",
       "date": "2026-10-10",
       "result_count": 9,
@@ -1271,7 +1274,7 @@
     },
     {
       "id": "Q-D40",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "how to read a quilt pattern read all instructions first before cutting fabric requirements notes beginner guide",
       "date": "2026-10-10",
       "result_count": 9,
@@ -1281,7 +1284,7 @@
     },
     {
       "id": "Q-D41",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "thequiltshow forum quilt pattern wrong yardage experienced quilters check pattern math before buying fabric",
       "date": "2026-10-10",
       "result_count": 9,
@@ -1291,7 +1294,7 @@
     },
     {
       "id": "Q-D42",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quilt pattern copyright errata version date revision number on pattern how to know latest version",
       "date": "2026-10-10",
       "result_count": 9,
@@ -1301,7 +1304,7 @@
     },
     {
       "id": "Q-D43",
-      "tool": "WebSearch",
+      "tool": "web search",
       "query": "quilter preparing quilt for longarm quilter checklist backing batting label top squared loose threads",
       "date": "2026-10-10",
       "result_count": 9,
@@ -2473,7 +2476,7 @@
       "title": "reddit r/quilting search page",
       "kind": "reddit",
       "accessed": "2026-10-10",
-      "fetch": "failed: WebFetch unable to fetch reddit.com (also a search-result page; not retried)",
+      "fetch": "failed: the page fetch unable to fetch reddit.com (also a search-result page; not retried)",
       "from_query": "Q-C03",
       "claims": []
     },
@@ -5355,7 +5358,7 @@
     },
     {
       "id": "C-C25",
-      "claim": "The 1915 public-domain book's alphabetical list of quilt names includes Double Irish Chain, Nine Patch, New Four Patch, Log Cabin, Churn Dash, Shoo Fly, Hour Glass, Snowball, Wild Goose Chase, Bear's Paws, Jacob's Ladder, Broken Dish, Wind Mill, Sawtooth Patchwork, Double X and Ocean Waves. It does not list Rail Fence, Trip Around the World, Ohio Star, Flying Geese or Bow Tie.",
+      "claim": "The 1915 public-domain book's alphabetical list of quilt names includes Double Irish Chain, Nine Patch, New Four Patch, Log Cabin, Churn Dash, Shoo Fly, Hour Glass, Snowball, Wild Goose Chase, Bear's Paws, Jacob's Ladder, Broken Dish, Pinwheel Square, Wind Mill, Sawtooth Patchwork, Double X and Ocean Waves. It does not list Rail Fence, Trip Around the World, Ohio Star, Flying Geese, Bow Tie or Square in a Square.",
       "sources": [
         "S-M01",
         "S-M02"
@@ -5998,35 +6001,35 @@
     {
       "source": "S-A03",
       "accessed": "2026-10-10",
-      "tool": "WebFetch",
+      "tool": "page fetch",
       "result": "confirmed",
       "note": "Chart rows, 40 in usable width, 4 in per side and 1/4 yd rounding match C-A01 to C-A06."
     },
     {
       "source": "S-C01",
       "accessed": "2026-10-10",
-      "tool": "WebFetch",
+      "tool": "page fetch",
       "result": "corrected",
       "note": "Quarter square triangle is 11 percent; C-C01 read 1 and was corrected. Other percentages match."
     },
     {
       "source": "S-A04",
       "accessed": "2026-10-10",
-      "tool": "WebFetch",
+      "tool": "page fetch",
       "result": "confirmed",
       "note": "2 1/2 in strips, 42 in usable, +10 in; rows match C-A26. The king row (106 x 108) gives 11 strips and 3/4 yd."
     },
     {
       "source": "S-D07",
       "accessed": "2026-10-10",
-      "tool": "WebFetch",
+      "tool": "page fetch",
       "result": "confirmed",
       "note": "100 percent scaling, a 2 in by 1 in test box, Letter paper; matches C-D08 to C-D10."
     },
     {
       "source": "S-C09",
       "accessed": "2026-10-10",
-      "tool": "WebFetch",
+      "tool": "page fetch",
       "result": "partial",
       "note": "The fetch tool saw only part of the book, so S-M02 was loaded in full and searched instead."
     },
@@ -6040,56 +6043,105 @@
     {
       "source": "S-B03",
       "accessed": "2026-10-10",
-      "tool": "WebFetch",
+      "tool": "page fetch",
       "result": "confirmed",
       "note": "Wrong cut sizes are the most frequent correction type over 2005 to 2023; matches C-B27."
     },
     {
       "source": "S-A38",
       "accessed": "2026-10-10",
-      "tool": "WebFetch",
+      "tool": "page fetch",
       "result": "confirmed",
       "note": "42 in, 4 in per side; baby 36 x 52 2 3/4 yd, queen 90 x 108 8 3/8 yd, king 108 x 108 9 7/8 yd, queen wide 2 7/8 yd; matches C-A16."
     },
     {
       "source": "S-A08",
       "accessed": "2026-10-10",
-      "tool": "WebFetch",
+      "tool": "page fetch",
       "result": "confirmed",
       "note": "44 in fabric, 4 in home overhang (6 to 8 longarm), round up by half a yard; rows 40 x 50, 60 x 72, 60 x 80, 72 x 90, 90 x 108 (6 to 6 1/2 yd; 3 1/2 yd wide), 108 x 108 (9 1/2 to 10 yd; 3 1/2 yd wide). Matches C-A09."
     },
     {
       "source": "S-A15",
       "accessed": "2026-10-10",
-      "tool": "WebFetch",
+      "tool": "page fetch",
       "result": "confirmed",
       "note": "Table: crib 45 x 60 4 yd and 2 yd wide; throw 60 x 70 4 3/4 and 2 1/2; twin 70 x 90 6 and 3; queen 90 x 108 pieced not recommended, 3 1/2 wide; king 110 x 110 (backing 118 x 118) pieced not recommended, 3 1/2 wide. Binding example 60 x 70: (260 + 12) / 40 = 6.8 strips. C-A12 mapped rows loosely; the reports use these rows."
     },
     {
       "source": "S-A02",
       "accessed": "2026-10-10",
-      "tool": "WebFetch",
+      "tool": "page fetch",
       "result": "confirmed",
       "note": "Baby 36 x 52 1 5/8 yd (1 panel); lap 50 x 60 2 1/4 (1); twin 70 x 90 5 (2); full 85 x 108 6 (2); queen 90 x 108 6 (2); king 108 x 108 9 (3); fabric 42 to 44 in, add 6 to 8 in. Matches C-A08."
     },
     {
       "source": "S-A40",
       "accessed": "2026-10-10",
-      "tool": "WebFetch",
+      "tool": "page fetch",
       "result": "confirmed",
       "note": "Queen 90 x 108: 396 + 12 = 408 in, 40 in usable, 11 strips of 2 1/2 in, about 3/4 yd. Matches C-A29."
     },
     {
       "source": "S-A06",
       "accessed": "2026-10-10",
-      "tool": "WebFetch",
+      "tool": "page fetch",
       "result": "confirmed",
       "note": "Packages 45 x 60, 72 x 90, 90 x 96, 90 x 108, 124 x 120, the sizes MATH.md F12 uses."
     },
     {
+      "source": "S-A22",
+      "accessed": "2026-10-10",
+      "tool": "page fetch",
+      "result": "confirmed",
+      "note": "Packages crib 45 x 60, throw 60 x 60, throw plus 60 x 72, twin 72 x 96, full 90 x 96, queen 108 x 96, king 120 x 120."
+    },
+    {
+      "source": "S-A33",
+      "accessed": "2026-10-10",
+      "tool": "page fetch",
+      "result": "confirmed",
+      "note": "Packages crib 45 x 60, twin 72 x 90, full 81 x 96, queen 90 x 108, king 120 x 120; at least 4 in per side, 6 in preferred by most longarm quilters."
+    },
+    {
+      "source": "S-A24",
+      "accessed": "2026-10-10",
+      "tool": "page fetch",
+      "result": "confirmed",
+      "note": "Batting about 4 in beyond the top on each side, 8 in added to each dimension."
+    },
+    {
+      "source": "S-B03",
+      "accessed": "2026-10-10",
+      "tool": "page fetch (review pass)",
+      "result": "corrected",
+      "note": "The page is a list of corrections with no statistic; a percentage share that a summary attached to it was dropped from the report. Wrong cut sizes remain the most frequent kind of entry."
+    },
+    {
+      "source": "S-A38",
+      "accessed": "2026-10-10",
+      "tool": "page fetch (review pass)",
+      "result": "confirmed",
+      "note": "Queen 90 x 108 on 108 in wide: one strip cut 100 in long, 2 7/8 yd; the backing at 4 in per side is 98 x 116. Throw 50 x 65 at 42 in: 3 7/8 yd."
+    },
+    {
+      "source": "S-A02",
+      "accessed": "2026-10-10",
+      "tool": "page fetch (review pass)",
+      "result": "confirmed",
+      "note": "King 108 x 108: 9 yd in 3 panels with 6 to 8 in added."
+    },
+    {
+      "source": "S-A08",
+      "accessed": "2026-10-10",
+      "tool": "page fetch (review pass)",
+      "result": "confirmed",
+      "note": "Rule: width + 8 in, length + 8 in (home) or + 12 in (longarm)."
+    },
+    {
       "source": "S-B12",
       "accessed": "2026-10-10",
-      "tool": "WebFetch",
+      "tool": "page fetch",
       "result": "confirmed",
       "note": "40 in usable planning width, patterns written for 44 to 45 in, beginners most at risk; matches C-B06 and C-B09."
     }
@@ -6117,12 +6169,15 @@
           "Bear's Paws",
           "Jacob's Ladder",
           "Broken Dish",
+          "Pinwheel Square",
           "Wind Mill",
           "Sawtooth Patchwork",
           "Double X",
           "Ocean Waves",
-          "Brick Pile"
+          "Brick Pile",
+          "Brickwork Quilt"
         ],
+        "listed_note": "Names only: whether Brick Pile or Brickwork Quilt is a bricks layout was not checked.",
         "not_listed": [
           "Rail Fence",
           "Trip Around the World",
@@ -6130,7 +6185,9 @@
           "Flying Geese",
           "Bow Tie",
           "Checkerboard",
-          "Postage Stamp"
+          "Postage Stamp",
+          "Square in a Square",
+          "Disappearing Nine Patch"
         ]
       }
     }
