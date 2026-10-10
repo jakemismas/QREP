@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "photo": "private/cache/met-13650.jpg",
+  "sha256": "3cd2f2507f1763245e1bb59d998036badf073f9ae74a8c21e3aecf20ba911703",
+  "canvas": [
+    3390,
+    3683
+  ],
+  "construction_class": [
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-b"
+    }
+  ],
+  "refusal_class": [
+    {
+      "value": "curve",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "curve",
+      "provenance": "proposed-b"
+    }
+  ],
+  "finished_size": [
+    {
+      "value": {
+        "width_in": 40.75,
+        "height_in": 44.0,
+        "approximate": true,
+        "source_text": "44 x 40 3/4 in. (111.8 x 103.5 cm)"
+      },
+      "provenance": "source-record"
+    }
+  ],
+  "capture": [
+    {
+      "value": "museum_scan",
+      "provenance": "source-record"
+    }
+  ],
+  "device_class": [
+    {
+      "value": "museum",
+      "provenance": "source-record"
+    }
+  ]
+}

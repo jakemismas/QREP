@@ -1,0 +1,194 @@
+{
+  "schema_version": 1,
+  "photo": "images/lacma-54871.jpg",
+  "sha256": "89f771d81045dcfb801d0f22e1de8855f2a76a73d47967a572b93be469b179db",
+  "canvas": [
+    3873,
+    4096
+  ],
+  "frame": [
+    {
+      "value": {
+        "outer_edge": {
+          "kind": "outer_edge",
+          "corners": {
+            "top_left": {
+              "x": 20.0,
+              "y": 144.0
+            },
+            "top_right": {
+              "x": 3791.0,
+              "y": 138.0
+            },
+            "bottom_right": {
+              "x": 3845.0,
+              "y": 4009.0
+            },
+            "bottom_left": {
+              "x": 75.0,
+              "y": 3918.0
+            }
+          },
+          "bands": [
+            {
+              "width_squares": 0.1
+            },
+            {
+              "width_squares": 2.15
+            },
+            {
+              "width_squares": 0.55
+            }
+          ]
+        },
+        "field": {
+          "kind": "field",
+          "corners": {
+            "top_left": {
+              "x": 218.0,
+              "y": 335.0
+            },
+            "top_right": {
+              "x": 3600.0,
+              "y": 332.0
+            },
+            "bottom_right": {
+              "x": 3654.0,
+              "y": 3804.0
+            },
+            "bottom_left": {
+              "x": 268.0,
+              "y": 3732.0
+            }
+          }
+        }
+      },
+      "provenance": "proposed-a"
+    },
+    {
+      "value": {
+        "outer_edge": {
+          "kind": "outer_edge",
+          "corners": {
+            "top_left": {
+              "x": 18.0,
+              "y": 145.0
+            },
+            "top_right": {
+              "x": 3790.0,
+              "y": 142.0
+            },
+            "bottom_right": {
+              "x": 3843.0,
+              "y": 4003.0
+            },
+            "bottom_left": {
+              "x": 82.0,
+              "y": 3909.0
+            }
+          },
+          "bands": [
+            {
+              "width_squares": 0.15
+            },
+            {
+              "width_squares": 2.2
+            },
+            {
+              "width_squares": 0.55
+            }
+          ]
+        },
+        "field": {
+          "kind": "field",
+          "corners": {
+            "top_left": {
+              "x": 218.0,
+              "y": 332.0
+            },
+            "top_right": {
+              "x": 3608.0,
+              "y": 337.0
+            },
+            "bottom_right": {
+              "x": 3659.0,
+              "y": 3800.0
+            },
+            "bottom_left": {
+              "x": 268.0,
+              "y": 3725.0
+            }
+          }
+        }
+      },
+      "provenance": "proposed-b"
+    }
+  ],
+  "counts": [
+    {
+      "value": {
+        "blocks_across": 10,
+        "squares_per_block_across": 5,
+        "blocks_down": 10,
+        "squares_per_block_down": 5
+      },
+      "provenance": "proposed-a"
+    },
+    {
+      "value": {
+        "blocks_across": 10,
+        "squares_per_block_across": 5,
+        "blocks_down": 10,
+        "squares_per_block_down": 5
+      },
+      "provenance": "proposed-b"
+    }
+  ],
+  "construction_class": [
+    {
+      "value": "squares",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "squares",
+      "provenance": "proposed-b"
+    }
+  ],
+  "fabrics": [
+    {
+      "value": {
+        "count": 6
+      },
+      "provenance": "proposed-a"
+    },
+    {
+      "value": {
+        "count": 5
+      },
+      "provenance": "proposed-b"
+    }
+  ],
+  "finished_size": [
+    {
+      "value": {
+        "width_in": 102.0,
+        "height_in": 103.0,
+        "approximate": true,
+        "source_text": "102 x 103 in. (259.1 x 261.6 cm)"
+      },
+      "provenance": "source-record"
+    }
+  ],
+  "capture": [
+    {
+      "value": "museum_scan",
+      "provenance": "source-record"
+    }
+  ],
+  "device_class": [
+    {
+      "value": "museum",
+      "provenance": "source-record"
+    }
+  ]
+}

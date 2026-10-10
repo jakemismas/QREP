@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "photo": "private/cache/met-16293.jpg",
+  "sha256": "1f86d508580d08a1df8e8d6dd50f7d1b68aca1f26e7a7acc2342688515540112",
+  "canvas": [
+    3801,
+    3869
+  ],
+  "construction_class": [
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-b"
+    }
+  ],
+  "refusal_class": [
+    {
+      "value": "diamond_star",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "diamond_star",
+      "provenance": "proposed-b"
+    }
+  ],
+  "finished_size": [
+    {
+      "value": {
+        "width_in": 103.0,
+        "height_in": 104.0,
+        "approximate": true,
+        "source_text": "104 x 103 in. (264.2 x 261.6 cm)"
+      },
+      "provenance": "source-record"
+    }
+  ],
+  "capture": [
+    {
+      "value": "museum_scan",
+      "provenance": "source-record"
+    }
+  ],
+  "device_class": [
+    {
+      "value": "museum",
+      "provenance": "source-record"
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "photo": "private/cache/lacma-54813.jpg",
+  "sha256": "8f9ad7a6804d36e4deb3d5a04f0045543a1daed464e119f46e877e8c61d45e0f",
+  "canvas": [
+    2822,
+    3255
+  ],
+  "construction_class": [
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-b"
+    }
+  ],
+  "refusal_class": [
+    {
+      "value": "medallion",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "medallion",
+      "provenance": "proposed-b"
+    }
+  ],
+  "finished_size": [
+    {
+      "value": {
+        "width_in": 84.0,
+        "height_in": 93.0,
+        "approximate": true,
+        "source_text": "93 x 84 in. (236.22 x 213.36 cm)"
+      },
+      "provenance": "source-record"
+    }
+  ],
+  "capture": [
+    {
+      "value": "museum_scan",
+      "provenance": "source-record"
+    }
+  ],
+  "device_class": [
+    {
+      "value": "museum",
+      "provenance": "source-record"
+    }
+  ]
+}

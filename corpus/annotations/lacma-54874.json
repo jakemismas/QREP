@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "photo": "private/cache/lacma-54874.jpg",
+  "sha256": "09acdfb4ba2c0c06d7e7158dde5313390e4d82a717bc253596a31fa1750a089e",
+  "canvas": [
+    2573,
+    3243
+  ],
+  "construction_class": [
+    {
+      "value": "qst",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "qst",
+      "provenance": "proposed-b"
+    }
+  ],
+  "finished_size": [
+    {
+      "value": {
+        "width_in": 65.5,
+        "height_in": 84.0,
+        "approximate": true,
+        "source_text": "84 x 65 1/2 in. (213.4 x 166.4 cm)"
+      },
+      "provenance": "source-record"
+    }
+  ],
+  "capture": [
+    {
+      "value": "museum_scan",
+      "provenance": "source-record"
+    }
+  ],
+  "device_class": [
+    {
+      "value": "museum",
+      "provenance": "source-record"
+    }
+  ]
+}

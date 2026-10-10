@@ -1,0 +1,182 @@
+{
+  "schema_version": 1,
+  "photo": "images/lacma-63229.jpg",
+  "sha256": "9943b40684514be268cd201287717f4a59a5ccefe134aaa0ca5eefe87677a095",
+  "canvas": [
+    3994,
+    3744
+  ],
+  "frame": [
+    {
+      "value": {
+        "outer_edge": {
+          "kind": "outer_edge",
+          "corners": {
+            "top_left": {
+              "x": 191.0,
+              "y": 44.0
+            },
+            "top_right": {
+              "x": 3812.0,
+              "y": 62.0
+            },
+            "bottom_right": {
+              "x": 3766.0,
+              "y": 3672.0
+            },
+            "bottom_left": {
+              "x": 137.0,
+              "y": 3681.0
+            }
+          },
+          "bands": [
+            {
+              "width_squares": 1.4
+            }
+          ]
+        },
+        "field": {
+          "kind": "field",
+          "corners": {
+            "top_left": {
+              "x": 568.0,
+              "y": 439.0
+            },
+            "top_right": {
+              "x": 3488.0,
+              "y": 453.0
+            },
+            "bottom_right": {
+              "x": 3404.0,
+              "y": 3302.0
+            },
+            "bottom_left": {
+              "x": 505.0,
+              "y": 3315.0
+            }
+          }
+        }
+      },
+      "provenance": "proposed-a"
+    },
+    {
+      "value": {
+        "outer_edge": {
+          "kind": "outer_edge",
+          "corners": {
+            "top_left": {
+              "x": 191.0,
+              "y": 45.0
+            },
+            "top_right": {
+              "x": 3812.0,
+              "y": 65.0
+            },
+            "bottom_right": {
+              "x": 3767.0,
+              "y": 3673.0
+            },
+            "bottom_left": {
+              "x": 140.0,
+              "y": 3683.0
+            }
+          },
+          "bands": [
+            {
+              "width_squares": 1.45
+            }
+          ]
+        },
+        "field": {
+          "kind": "field",
+          "corners": {
+            "top_left": {
+              "x": 567.0,
+              "y": 442.0
+            },
+            "top_right": {
+              "x": 3484.0,
+              "y": 458.0
+            },
+            "bottom_right": {
+              "x": 3393.0,
+              "y": 3302.0
+            },
+            "bottom_left": {
+              "x": 506.0,
+              "y": 3312.0
+            }
+          }
+        }
+      },
+      "provenance": "proposed-b"
+    }
+  ],
+  "counts": [
+    {
+      "value": {
+        "blocks_across": 1,
+        "squares_per_block_across": 11,
+        "blocks_down": 1,
+        "squares_per_block_down": 11
+      },
+      "provenance": "proposed-a"
+    },
+    {
+      "value": {
+        "blocks_across": 1,
+        "squares_per_block_across": 11,
+        "blocks_down": 1,
+        "squares_per_block_down": 11
+      },
+      "provenance": "proposed-b"
+    }
+  ],
+  "construction_class": [
+    {
+      "value": "snowball",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "snowball",
+      "provenance": "proposed-b"
+    }
+  ],
+  "fabrics": [
+    {
+      "value": {
+        "count": 4
+      },
+      "provenance": "proposed-a"
+    },
+    {
+      "value": {
+        "count": 4
+      },
+      "provenance": "proposed-b"
+    }
+  ],
+  "finished_size": [
+    {
+      "value": {
+        "width_in": 43.5,
+        "height_in": 43.5,
+        "approximate": true,
+        "source_text": "43 1/2 x 43 1/2 in. (110.49 x 110.49 cm)"
+      },
+      "provenance": "source-record"
+    }
+  ],
+  "capture": [
+    {
+      "value": "museum_scan",
+      "provenance": "source-record"
+    }
+  ],
+  "device_class": [
+    {
+      "value": "museum",
+      "provenance": "source-record"
+    }
+  ]
+}
