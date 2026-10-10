@@ -8,7 +8,7 @@
  * It is fixed-positioned and clamped inside the viewport, because a control
  * near the edge would otherwise push half of a centered tip off the screen.
  */
-import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 // The mock's gap between a control and its tip (MOCK-NOTES.md, tooltip section).
 const GAP_PX = 9;
@@ -33,6 +33,18 @@ export function Tooltip({
   const [focused, setFocused] = useState(false);
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
   const open = hovered || focused;
+
+  // A focused control that unmounts (the engine chip's Retry, once pressed)
+  // takes focus with it but fires no blur, so recheck focus on DOM changes.
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    if (!focused || !wrap) return;
+    const observer = new MutationObserver(() => {
+      if (!wrap.matches(":focus-within")) setFocused(false);
+    });
+    observer.observe(wrap, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, [focused]);
 
   useLayoutEffect(() => {
     const wrap = wrapRef.current;
