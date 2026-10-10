@@ -130,6 +130,13 @@ so you can apply it to a case this file does not name.
   `tests/fixtures/double_irish_chain.json` that item 4 of REBASELINE.md's
   bless policy assigns to A1, A2b, A9 and the other tickets it names, the
   trailer is exactly `Rebaseline: bless policy item 4`.
+- Golden-guard (G3 and CI) enforces the trailer rule. It reads REBASELINE.md
+  from the base, main's copy, never from your branch, so a path you add to
+  the record in your own PR stays unnamed until an amendment Jake approves
+  merges first. It judges every non-merge commit that touches the file, and it
+  fails a fixture whose final content a merge commit produced. When a merge of
+  origin/main touches a fixture you regenerate, resolve that file to main's
+  copy in the merge, then regenerate it in a new commit with the trailer.
 - A failing test that REBASELINE.md does not assign to your ticket is a bug:
   fix the code, or stop with BLOCKED. If it also fails on a clean origin/main,
   it is not yours: report the test id and output to the orchestrator.
@@ -140,11 +147,12 @@ so you can apply it to a case this file does not name.
   REBASELINE.md, and he is not awake to approve another. CI's golden-guard job
   passes a golden change only in a commit whose own message carries `[bless]`
   in its subject or anywhere in its body, so a stray `[bless]`, even inside a
-  trailer, makes the guard pass that commit's golden edits. The fixture rule
-  applies before E5 lands: until ticket E5 extends golden-guard to
-  `tests/fixtures/` (its PR waits for Jake), the orchestrator's review checks
-  it, and a revert of your PR reuses your trailer (ORCHESTRATOR.md section
-  12).
+  trailer, makes the guard pass that commit's golden edits. The photoreal
+  fixtures, the legacy pins and the wasm-gate reference can regenerate in
+  place, so a trailer ties each sanctioned fixture change to a record entry,
+  and reading the record from the base keeps a pull request from admitting
+  its own change. A revert of your PR reuses your trailer (ORCHESTRATOR.md
+  section 12).
 
 ### R4. Tests come first, and expected values come from hand computation
 
