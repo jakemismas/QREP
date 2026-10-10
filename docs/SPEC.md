@@ -261,8 +261,21 @@ The quilt model records every value with its source:
 | Finished size estimated from the photo | CV guess | Low confidence; printed only as an estimate |
 | Hand-authored models and fixtures | Author | Confidence 1.0 |
 
-A test asserts that every CV-derived field carries a confidence in [0, 1]. The method and its reason
-follow deterministically from the read and carry no confidence of their own.
+Two optional records keep what the user set, so construction and the pattern use it instead of
+re-inferring it. Both are optional under schema_version 1, so a model written without them loads
+unchanged:
+
+- The confirmed block structure: blocks across and down, times squares per block on each axis,
+  recorded as a user fact at confidence 1.0. Construction takes the block period from it (B2a fills
+  it).
+- The size basis: its source (typed, preset or default); the requested width and height (a typed
+  size gives one or both, a preset both, a default neither); the achieved width and height; and the
+  rounding applied, the step the finished square size snaps to; all in eighths. A typed or preset
+  size records confidence 1.0; a default size keeps the photo estimate's confidence (A10 fills it).
+
+A test walks the schema, records where every stored field comes from, and asserts that every
+CV-derived field has a confidence in [0, 1] and every user fact is recorded at 1.0. The method and
+its reason follow deterministically from the read and carry no confidence of their own.
 
 ## 9. Removed surfaces
 
