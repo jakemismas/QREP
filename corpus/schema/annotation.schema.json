@@ -1,0 +1,674 @@
+{
+  "$defs": {
+    "AnnotatedFrame": {
+      "additionalProperties": false,
+      "description": "The outer edge with its bands from the outside in (no border: no bands),\nand the field corners when they can be seen.",
+      "properties": {
+        "field": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FieldFrame"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "outer_edge": {
+          "$ref": "#/$defs/OuterEdgeFrame"
+        }
+      },
+      "required": [
+        "outer_edge"
+      ],
+      "title": "AnnotatedFrame",
+      "type": "object"
+    },
+    "BorderBand": {
+      "additionalProperties": false,
+      "description": "One border band, its width in finished squares (need not be whole).",
+      "properties": {
+        "width_squares": {
+          "exclusiveMinimum": 0,
+          "title": "Width Squares",
+          "type": "number"
+        }
+      },
+      "required": [
+        "width_squares"
+      ],
+      "title": "BorderBand",
+      "type": "object"
+    },
+    "CaptureClaim": {
+      "additionalProperties": false,
+      "properties": {
+        "provenance": {
+          "enum": [
+            "proposed-a",
+            "proposed-b",
+            "adjudicated",
+            "verified-jake",
+            "hand-authored",
+            "source-record"
+          ],
+          "title": "Provenance",
+          "type": "string"
+        },
+        "value": {
+          "enum": [
+            "museum_scan",
+            "direct_screenshot",
+            "nested_screenshot",
+            "camera"
+          ],
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provenance",
+        "value"
+      ],
+      "title": "CaptureClaim",
+      "type": "object"
+    },
+    "ConstructionClassClaim": {
+      "additionalProperties": false,
+      "properties": {
+        "provenance": {
+          "enum": [
+            "proposed-a",
+            "proposed-b",
+            "adjudicated",
+            "verified-jake",
+            "hand-authored",
+            "source-record"
+          ],
+          "title": "Provenance",
+          "type": "string"
+        },
+        "value": {
+          "enum": [
+            "squares",
+            "hst",
+            "qst",
+            "snowball",
+            "flying_geese",
+            "out_of_scope"
+          ],
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provenance",
+        "value"
+      ],
+      "title": "ConstructionClassClaim",
+      "type": "object"
+    },
+    "Corners": {
+      "additionalProperties": false,
+      "properties": {
+        "bottom_left": {
+          "$ref": "#/$defs/Point"
+        },
+        "bottom_right": {
+          "$ref": "#/$defs/Point"
+        },
+        "top_left": {
+          "$ref": "#/$defs/Point"
+        },
+        "top_right": {
+          "$ref": "#/$defs/Point"
+        }
+      },
+      "required": [
+        "top_left",
+        "top_right",
+        "bottom_right",
+        "bottom_left"
+      ],
+      "title": "Corners",
+      "type": "object"
+    },
+    "Counts": {
+      "additionalProperties": false,
+      "description": "Counts in quilter units: blocks across and down, squares per block.",
+      "properties": {
+        "blocks_across": {
+          "minimum": 1,
+          "title": "Blocks Across",
+          "type": "integer"
+        },
+        "blocks_down": {
+          "minimum": 1,
+          "title": "Blocks Down",
+          "type": "integer"
+        },
+        "squares_per_block_across": {
+          "minimum": 1,
+          "title": "Squares Per Block Across",
+          "type": "integer"
+        },
+        "squares_per_block_down": {
+          "minimum": 1,
+          "title": "Squares Per Block Down",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "blocks_across",
+        "blocks_down",
+        "squares_per_block_across",
+        "squares_per_block_down"
+      ],
+      "title": "Counts",
+      "type": "object"
+    },
+    "CountsClaim": {
+      "additionalProperties": false,
+      "properties": {
+        "provenance": {
+          "enum": [
+            "proposed-a",
+            "proposed-b",
+            "adjudicated",
+            "verified-jake",
+            "hand-authored",
+            "source-record"
+          ],
+          "title": "Provenance",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/Counts"
+        }
+      },
+      "required": [
+        "provenance",
+        "value"
+      ],
+      "title": "CountsClaim",
+      "type": "object"
+    },
+    "DeviceClassClaim": {
+      "additionalProperties": false,
+      "properties": {
+        "provenance": {
+          "enum": [
+            "proposed-a",
+            "proposed-b",
+            "adjudicated",
+            "verified-jake",
+            "hand-authored",
+            "source-record"
+          ],
+          "title": "Provenance",
+          "type": "string"
+        },
+        "value": {
+          "enum": [
+            "museum",
+            "phone",
+            "tablet",
+            "computer",
+            "camera"
+          ],
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provenance",
+        "value"
+      ],
+      "title": "DeviceClassClaim",
+      "type": "object"
+    },
+    "Fabrics": {
+      "additionalProperties": false,
+      "description": "How many fabrics, and optionally each one's pattern role and color.",
+      "properties": {
+        "count": {
+          "minimum": 1,
+          "title": "Count",
+          "type": "integer"
+        },
+        "palette_hex": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Palette Hex",
+          "type": "array"
+        },
+        "roles": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Roles",
+          "type": "array"
+        }
+      },
+      "required": [
+        "count"
+      ],
+      "title": "Fabrics",
+      "type": "object"
+    },
+    "FabricsClaim": {
+      "additionalProperties": false,
+      "properties": {
+        "provenance": {
+          "enum": [
+            "proposed-a",
+            "proposed-b",
+            "adjudicated",
+            "verified-jake",
+            "hand-authored",
+            "source-record"
+          ],
+          "title": "Provenance",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/Fabrics"
+        }
+      },
+      "required": [
+        "provenance",
+        "value"
+      ],
+      "title": "FabricsClaim",
+      "type": "object"
+    },
+    "FieldFrame": {
+      "additionalProperties": false,
+      "description": "The four corners of the pieced field.",
+      "properties": {
+        "corners": {
+          "$ref": "#/$defs/Corners"
+        },
+        "kind": {
+          "const": "field",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "corners"
+      ],
+      "title": "FieldFrame",
+      "type": "object"
+    },
+    "FinishedSize": {
+      "additionalProperties": false,
+      "description": "The finished quilt in inches, width across the photo and height down it.",
+      "properties": {
+        "approximate": {
+          "title": "Approximate",
+          "type": "boolean"
+        },
+        "height_in": {
+          "exclusiveMinimum": 0,
+          "title": "Height In",
+          "type": "number"
+        },
+        "source_text": {
+          "minLength": 1,
+          "title": "Source Text",
+          "type": "string"
+        },
+        "width_in": {
+          "exclusiveMinimum": 0,
+          "title": "Width In",
+          "type": "number"
+        }
+      },
+      "required": [
+        "width_in",
+        "height_in",
+        "approximate",
+        "source_text"
+      ],
+      "title": "FinishedSize",
+      "type": "object"
+    },
+    "FinishedSizeClaim": {
+      "additionalProperties": false,
+      "properties": {
+        "provenance": {
+          "enum": [
+            "proposed-a",
+            "proposed-b",
+            "adjudicated",
+            "verified-jake",
+            "hand-authored",
+            "source-record"
+          ],
+          "title": "Provenance",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/FinishedSize"
+        }
+      },
+      "required": [
+        "provenance",
+        "value"
+      ],
+      "title": "FinishedSizeClaim",
+      "type": "object"
+    },
+    "FrameClaim": {
+      "additionalProperties": false,
+      "properties": {
+        "provenance": {
+          "enum": [
+            "proposed-a",
+            "proposed-b",
+            "adjudicated",
+            "verified-jake",
+            "hand-authored",
+            "source-record"
+          ],
+          "title": "Provenance",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/AnnotatedFrame"
+        }
+      },
+      "required": [
+        "provenance",
+        "value"
+      ],
+      "title": "FrameClaim",
+      "type": "object"
+    },
+    "GoldLayoutClaim": {
+      "additionalProperties": false,
+      "description": "A path under corpus/gold/ (D3b).",
+      "properties": {
+        "provenance": {
+          "enum": [
+            "proposed-a",
+            "proposed-b",
+            "adjudicated",
+            "verified-jake",
+            "hand-authored",
+            "source-record"
+          ],
+          "title": "Provenance",
+          "type": "string"
+        },
+        "value": {
+          "minLength": 1,
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provenance",
+        "value"
+      ],
+      "title": "GoldLayoutClaim",
+      "type": "object"
+    },
+    "Mask": {
+      "additionalProperties": false,
+      "description": "A region the eval ignores, such as an accession label on a slide scan.",
+      "properties": {
+        "polygon": {
+          "items": {
+            "$ref": "#/$defs/Point"
+          },
+          "minItems": 3,
+          "title": "Polygon",
+          "type": "array"
+        },
+        "reason": {
+          "enum": [
+            "label",
+            "occlusion",
+            "other"
+          ],
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "polygon",
+        "reason"
+      ],
+      "title": "Mask",
+      "type": "object"
+    },
+    "MasksClaim": {
+      "additionalProperties": false,
+      "properties": {
+        "provenance": {
+          "enum": [
+            "proposed-a",
+            "proposed-b",
+            "adjudicated",
+            "verified-jake",
+            "hand-authored",
+            "source-record"
+          ],
+          "title": "Provenance",
+          "type": "string"
+        },
+        "value": {
+          "items": {
+            "$ref": "#/$defs/Mask"
+          },
+          "title": "Value",
+          "type": "array"
+        }
+      },
+      "required": [
+        "provenance",
+        "value"
+      ],
+      "title": "MasksClaim",
+      "type": "object"
+    },
+    "OuterEdgeFrame": {
+      "additionalProperties": false,
+      "description": "The four outer-edge corners plus the border bands from the outside in,\nfor a quilt whose field corners are hidden; the engine derives the field.",
+      "properties": {
+        "bands": {
+          "items": {
+            "$ref": "#/$defs/BorderBand"
+          },
+          "title": "Bands",
+          "type": "array"
+        },
+        "corners": {
+          "$ref": "#/$defs/Corners"
+        },
+        "kind": {
+          "const": "outer_edge",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "corners",
+        "bands"
+      ],
+      "title": "OuterEdgeFrame",
+      "type": "object"
+    },
+    "Point": {
+      "additionalProperties": false,
+      "properties": {
+        "x": {
+          "title": "X",
+          "type": "number"
+        },
+        "y": {
+          "title": "Y",
+          "type": "number"
+        }
+      },
+      "required": [
+        "x",
+        "y"
+      ],
+      "title": "Point",
+      "type": "object"
+    },
+    "RefusalClassClaim": {
+      "additionalProperties": false,
+      "properties": {
+        "provenance": {
+          "enum": [
+            "proposed-a",
+            "proposed-b",
+            "adjudicated",
+            "verified-jake",
+            "hand-authored",
+            "source-record"
+          ],
+          "title": "Provenance",
+          "type": "string"
+        },
+        "value": {
+          "enum": [
+            "on_point",
+            "curve",
+            "applique",
+            "medallion",
+            "hexagon",
+            "diamond_star",
+            "other"
+          ],
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provenance",
+        "value"
+      ],
+      "title": "RefusalClassClaim",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "canvas": {
+      "maxItems": 2,
+      "minItems": 2,
+      "prefixItems": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "integer"
+        }
+      ],
+      "title": "Canvas",
+      "type": "array"
+    },
+    "capture": {
+      "items": {
+        "$ref": "#/$defs/CaptureClaim"
+      },
+      "title": "Capture",
+      "type": "array"
+    },
+    "construction_class": {
+      "items": {
+        "$ref": "#/$defs/ConstructionClassClaim"
+      },
+      "title": "Construction Class",
+      "type": "array"
+    },
+    "counts": {
+      "items": {
+        "$ref": "#/$defs/CountsClaim"
+      },
+      "title": "Counts",
+      "type": "array"
+    },
+    "device_class": {
+      "items": {
+        "$ref": "#/$defs/DeviceClassClaim"
+      },
+      "title": "Device Class",
+      "type": "array"
+    },
+    "fabrics": {
+      "items": {
+        "$ref": "#/$defs/FabricsClaim"
+      },
+      "title": "Fabrics",
+      "type": "array"
+    },
+    "finished_size": {
+      "items": {
+        "$ref": "#/$defs/FinishedSizeClaim"
+      },
+      "title": "Finished Size",
+      "type": "array"
+    },
+    "frame": {
+      "items": {
+        "$ref": "#/$defs/FrameClaim"
+      },
+      "title": "Frame",
+      "type": "array"
+    },
+    "gold_layout": {
+      "items": {
+        "$ref": "#/$defs/GoldLayoutClaim"
+      },
+      "title": "Gold Layout",
+      "type": "array"
+    },
+    "masks": {
+      "items": {
+        "$ref": "#/$defs/MasksClaim"
+      },
+      "title": "Masks",
+      "type": "array"
+    },
+    "photo": {
+      "minLength": 1,
+      "title": "Photo",
+      "type": "string"
+    },
+    "refusal_class": {
+      "items": {
+        "$ref": "#/$defs/RefusalClassClaim"
+      },
+      "title": "Refusal Class",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Sha256",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "photo",
+    "sha256",
+    "canvas"
+  ],
+  "title": "Annotation",
+  "type": "object"
+}

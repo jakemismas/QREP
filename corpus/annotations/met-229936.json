@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "photo": "private/cache/met-229936.jpg",
+  "sha256": "74d78d52bb8a310822f7d3b324d429fcca72efc6690cdb053b495ad47c597afd",
+  "canvas": [
+    3247,
+    3697
+  ],
+  "construction_class": [
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-b"
+    }
+  ],
+  "refusal_class": [
+    {
+      "value": "hexagon",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "hexagon",
+      "provenance": "proposed-b"
+    }
+  ],
+  "capture": [
+    {
+      "value": "museum_scan",
+      "provenance": "source-record"
+    }
+  ],
+  "device_class": [
+    {
+      "value": "museum",
+      "provenance": "source-record"
+    }
+  ]
+}

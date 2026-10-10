@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "photo": "images/met-13905.jpg",
+  "sha256": "4012df4197ed6da31bf3cbc658c5648e607914cace693c2cf0812a216beabe59",
+  "canvas": [
+    3658,
+    3759
+  ],
+  "construction_class": [
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-b"
+    }
+  ],
+  "refusal_class": [
+    {
+      "value": "on_point",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "on_point",
+      "provenance": "proposed-b"
+    }
+  ],
+  "finished_size": [
+    {
+      "value": {
+        "width_in": 82.75,
+        "height_in": 84.75,
+        "approximate": true,
+        "source_text": "84 3/4 x 82 3/4 in. (215.3 x 210.2 cm)"
+      },
+      "provenance": "source-record"
+    }
+  ],
+  "capture": [
+    {
+      "value": "museum_scan",
+      "provenance": "source-record"
+    }
+  ],
+  "device_class": [
+    {
+      "value": "museum",
+      "provenance": "source-record"
+    }
+  ]
+}
