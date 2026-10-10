@@ -13,9 +13,14 @@
  * widest then (ux-04), and a check that raced the boot would pass or fail by
  * timing. web/src/engine/worker.ts posts "Loading the Python engine" (25
  * characters) and then imports pyodide/pyodide.mjs; the other labels are
- * "Starting the engine" (19), "Loading engine packages" (23) and "Loading the
- * qrep engine" (23). Stalling that import holds the chip on the 25-character
- * label. The crop screen needs no engine to render its pins.
+ * "Starting the engine" (19), "Loading engine packages" (23), "Loading the
+ * qrep engine" (23) and rpc.ts's fallback "Loading the engine" (18). Stalling
+ * that import holds the chip on the 25-character label. The crop screen needs
+ * no engine to render its pins, so it is checked while it looks for the quilt.
+ *
+ * The 1440 checks pin isMobile and hasTouch off, because C7's iPhone project
+ * runs every @phone spec with both on. The tooltip test carries no @phone tag:
+ * tips are desktop-only (hidden under 720 px and on coarse pointers).
  */
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -33,6 +38,7 @@ const photoFixture = path.join(
 const LONGEST_BOOT_LABEL = "Loading the Python engine";
 const PHONE = { width: 390, height: 844 };
 const DESKTOP = { width: 1440, height: 900 };
+const DESKTOP_OPTIONS = { viewport: DESKTOP, isMobile: false, hasTouch: false };
 const iPhone = devices["iPhone 13"];
 
 async function holdEngineBooting(context: BrowserContext, page: Page) {
@@ -43,19 +49,26 @@ async function holdEngineBooting(context: BrowserContext, page: Page) {
   await expect(page.getByTestId("engine-chip")).toHaveText(LONGEST_BOOT_LABEL);
 }
 
+async function expectScreenInside(page: Page, name: string) {
+  await expectNoHorizontalOverflow(page, name);
+  // ux-04's symptom directly: a header that clipped its own overflow would
+  // keep the page narrow and still cut the theme toggle off.
+  await expect(page.getByTestId("theme-toggle")).toBeInViewport({ ratio: 1 });
+}
+
 async function checkPhotoScreens(context: BrowserContext, page: Page) {
   await holdEngineBooting(context, page);
   await expect(page.getByTestId("start-photo")).toBeVisible();
-  await expectNoHorizontalOverflow(page, "start");
+  await expectScreenInside(page, "start");
 
   await page.getByTestId("start-photo").click();
   await expect(page.getByTestId("photo-dropzone")).toBeVisible();
-  await expectNoHorizontalOverflow(page, "dropzone");
+  await expectScreenInside(page, "dropzone");
 
   await page.getByTestId("photo-file-input").setInputFiles(photoFixture);
   await expect(page.getByTestId("crop-screen")).toBeVisible();
   await expect(page.getByTestId("corner-pin-0")).toBeVisible();
-  await expectNoHorizontalOverflow(page, "crop");
+  await expectScreenInside(page, "crop");
 }
 
 test.describe("layout at 390 x 844 (iPhone emulation)", { tag: "@phone" }, () => {
@@ -76,7 +89,7 @@ test.describe("layout at 390 x 844 (iPhone emulation)", { tag: "@phone" }, () =>
 });
 
 test.describe("layout at 1440 x 900", { tag: "@phone" }, () => {
-  test.use({ viewport: DESKTOP });
+  test.use(DESKTOP_OPTIONS);
 
   test("start screen, dropzone and crop screen stay inside the desktop", async ({
     context,
@@ -84,6 +97,10 @@ test.describe("layout at 1440 x 900", { tag: "@phone" }, () => {
   }) => {
     await checkPhotoScreens(context, page);
   });
+});
+
+test.describe("header tooltips at 1440 x 900", () => {
+  test.use(DESKTOP_OPTIONS);
 
   test("header tooltips open below their controls, inside the viewport", async ({
     context,
@@ -91,24 +108,31 @@ test.describe("layout at 1440 x 900", { tag: "@phone" }, () => {
   }) => {
     await holdEngineBooting(context, page);
     const header = page.locator(".qrep-header");
+    // Tip copy: MOCK-NOTES.md:603 (logo; engine chip, its em dash replaced as
+    // issue #159 words it) and MOCK-NOTES.md:373 (the theme toggle, by skin).
     const controls = [
-      { name: "logo", control: header.getByRole("button", { name: "Back to the start screen" }) },
-      { name: "engine", control: page.getByTestId("engine-chip") },
-      { name: "theme", control: page.getByTestId("theme-toggle") },
+      {
+        name: "logo",
+        control: header.getByRole("button", { name: "Back to the start screen" }),
+        tips: ["Back to the start screen"],
+      },
+      {
+        name: "engine",
+        control: page.getByTestId("engine-chip"),
+        tips: ["The Python engine runs in your browser, and it boots in a few seconds on first load."],
+      },
+      {
+        name: "theme",
+        control: page.getByTestId("theme-toggle"),
+        tips: ["Switch to evening mode", "Switch to daylight mode"],
+      },
     ];
-    for (const { name, control } of controls) {
+    for (const { name, control, tips } of controls) {
       await control.hover();
       const tip = page.getByRole("tooltip");
       await expect(tip).toHaveCount(1);
       await expect(tip).toBeVisible();
-      if (name === "engine") {
-        // MOCK-NOTES.md:603, its em dash replaced (criterion text, issue #159).
-        await expect(tip).toHaveText(
-          "The Python engine runs in your browser, and it boots in a few seconds on first load.",
-        );
-      } else {
-        await expect(tip).toHaveText((await control.getAttribute("aria-label")) ?? "");
-      }
+      expect(tips).toContain(await tip.textContent());
       const controlBox = (await control.boundingBox())!;
       const tipBox = (await tip.boundingBox())!;
       // Below: the tip's top edge is at or under the control's bottom edge.

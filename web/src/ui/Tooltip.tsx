@@ -12,7 +12,7 @@ import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 // The mock's gap between a control and its tip (MOCK-NOTES.md, tooltip section).
 const GAP_PX = 9;
-// The nearest a tip comes to a viewport edge.
+// Matches the 16px that the .q-tip max-width in tokens.css leaves free.
 const EDGE_PX = 8;
 
 export function Tooltip({
@@ -28,31 +28,44 @@ export function Tooltip({
 }) {
   const wrapRef = useRef<HTMLSpanElement>(null);
   const tipRef = useRef<HTMLSpanElement>(null);
-  const [open, setOpen] = useState(false);
+  // Separate flags, so a pointer leaving a keyboard-focused control keeps its tip.
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
+  const open = hovered || focused;
 
   useLayoutEffect(() => {
-    if (!open || !wrapRef.current || !tipRef.current) return;
-    const anchor = wrapRef.current.getBoundingClientRect();
-    const box = tipRef.current.getBoundingClientRect();
-    const viewWidth = document.documentElement.clientWidth;
-    const centered = anchor.left + anchor.width / 2 - box.width / 2;
-    const left = Math.max(EDGE_PX, Math.min(centered, viewWidth - box.width - EDGE_PX));
-    const above = anchor.top - GAP_PX - box.height;
-    const below = anchor.bottom + GAP_PX;
-    // An "above" tip with no room above its control opens below instead.
-    const top = placement === "below" || above < EDGE_PX ? below : above;
-    setPosition({ left, top });
+    const wrap = wrapRef.current;
+    if (!open || !wrap) return;
+    const place = () => {
+      if (!tipRef.current) return;
+      const anchor = wrap.getBoundingClientRect();
+      const box = tipRef.current.getBoundingClientRect();
+      const viewWidth = document.documentElement.clientWidth;
+      const centered = anchor.left + anchor.width / 2 - box.width / 2;
+      const left = Math.max(EDGE_PX, Math.min(centered, viewWidth - box.width - EDGE_PX));
+      const above = anchor.top - GAP_PX - box.height;
+      const below = anchor.bottom + GAP_PX;
+      // Clamped vertically too: with no room above, the tip would leave the screen.
+      const top = placement === "below" || above < EDGE_PX ? below : above;
+      setPosition((prev) => (prev?.left === left && prev.top === top ? prev : { left, top }));
+    };
+    place();
+    // The control can change size while its tip shows (the engine chip's label
+    // shortens when boot finishes), which would leave the tip off-center.
+    const observer = new ResizeObserver(place);
+    observer.observe(wrap);
+    return () => observer.disconnect();
   }, [open, placement, tip]);
 
   return (
     <span
       ref={wrapRef}
       className={className ? `q-tip-wrap ${className}` : "q-tip-wrap"}
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
-      onFocus={() => setOpen(true)}
-      onBlur={() => setOpen(false)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
     >
       {children}
       {open ? (

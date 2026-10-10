@@ -11,6 +11,10 @@
  *   470 on a 390 px phone). Without emulation innerWidth always equals the
  *   viewport width, so this check costs nothing there.
  *
+ * Neither check sees position: fixed boxes, which add nothing to the page's
+ * scroll width: a spec that opens fixed UI (a tooltip, a toast, a modal)
+ * asserts its bounds itself, as layout.spec.ts does for the header tips.
+ *
  * The screenshot lands under test-results/spike/, which CI's web-spike job
  * uploads as spike-artifacts. It is a record for review, never compared:
  * web/src/golden-discipline.test.ts bans snapshot assertions.
@@ -28,7 +32,8 @@ const layoutDir = path.resolve(
   "layout",
 );
 
-// Sub-pixel layout rounding is not overflow.
+// For the failure message's list only: element edges are fractional, while
+// the asserted widths are whole pixels the browser has already rounded.
 const TOLERANCE_PX = 0.5;
 
 export async function expectNoHorizontalOverflow(page: Page, name: string): Promise<void> {
@@ -37,9 +42,12 @@ export async function expectNoHorizontalOverflow(page: Page, name: string): Prom
   const deviceWidth = viewport.width;
 
   await page.evaluate(() => document.fonts.ready);
+  // Screens fade in; disabling animations finishes them, so the record shows
+  // the settled screen and the measurement below sees its final layout.
   await page.screenshot({
     path: path.join(layoutDir, `${name}-${deviceWidth}.png`),
     fullPage: true,
+    animations: "disabled",
   });
 
   const measured = await page.evaluate(
