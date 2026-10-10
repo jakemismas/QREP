@@ -134,7 +134,8 @@ so you can apply it to a case this file does not name.
   is named in REBASELINE.md as main holds it (never your branch's copy, so a
   path you add to the record in your own PR stays unnamed until an amendment
   Jake approves merges first), and each of your commits that touches the file
-  carries a non-empty `Rebaseline:` trailer. It does not check which entry the
+  carries a non-empty `Rebaseline:` trailer (A6's bless commit may carry the
+  `[bless]` marker instead). It does not check which entry the
   trailer cites, or whether that entry lets the file change rather than only
   leave; the review does, so cite the entry that names the path. The guard
   also fails a fixture whose final content a merge commit produced. When you

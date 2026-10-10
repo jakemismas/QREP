@@ -41,11 +41,12 @@ outside the rule, as CLAUDE.md states. For each judged file:
     The head's copy never counts, because a pull request could otherwise admit
     a path by listing it in its own diff; a new path needs an amendment Jake
     approves, merged first (REBASELINE.md, Amending this record);
-  - every non-merge commit in <base>..<head> that touches the file, in the
-    same history walk as the golden rule, must carry [bless] by the golden
-    rule above, or a non-empty `Rebaseline:` trailer as git parses trailers:
-    in the message's last paragraph, never the subject, the reading of
-    `git interpret-trailers --parse --no-divider`;
+  - every non-merge commit in <base>..<head> that touches the file must carry
+    [bless] by the golden rule above, or a non-empty `Rebaseline:` trailer as
+    git's %(trailers) placeholder parses it: in the message's last paragraph,
+    never in the subject or after a `---` line. As for goldens, rev-list's
+    default history simplification leaves out side-branch commits whose edit a
+    merge discarded;
   - the merge must leave the content (or the deletion) that one of those
     commits wrote, so a merge commit cannot regenerate a fixture on its own.
 The guard checks that the record names the path and that the trailer is
@@ -334,8 +335,13 @@ def changed_frozen_fixtures(repo: Path, base: str, tree: str) -> list[str]:
 
 def record_at(repo: Path, commit: str) -> str:
     """The commit's REBASELINE.md, or "" where it has none, which names nothing."""
-    if not _git(repo, "ls-tree", "--full-tree", "-z", commit, "--", RECORD):
+    listed = _git(repo, "ls-tree", "--full-tree", "-z", commit, "--", RECORD)
+    if not listed:
         return ""
+    mode = listed.split()[0]
+    if mode not in ("100644", "100755"):
+        # A symlink's blob is its target's name, which could name any path.
+        raise RuntimeError(f"{RECORD} at {commit} is not a regular file (mode {mode})")
     return _git(repo, "cat-file", "blob", f"{commit}:{RECORD}")
 
 
@@ -379,13 +385,6 @@ def golden_commits(
     shas = _git(repo, "rev-list", "--no-merges", f"{base}..{head}", "--", *paths).split()
     commits = []
     for sha in shas:
-        # One field per call: a commit message may hold any byte git accepts,
-        # so no separator inside one combined format can be trusted.
-        subject = _commit_field(repo, sha, "%s")
-        message = _commit_field(repo, sha, "%B")
-        trailers = _commit_field(
-            repo, sha, f"%(trailers:key={TRAILER_KEY},valueonly,separator=%x1f)"
-        )
         raw = _git(
             repo,
             "diff-tree",
@@ -405,6 +404,13 @@ def golden_commits(
             wrote = {path: entry for path, entry in wrote.items() if path in only}
             if not wrote:
                 continue
+        # One field per call: a commit message may hold any byte git accepts,
+        # so no separator inside one combined format can be trusted.
+        subject = _commit_field(repo, sha, "%s")
+        message = _commit_field(repo, sha, "%B")
+        trailers = _commit_field(
+            repo, sha, f"%(trailers:key={TRAILER_KEY},valueonly,separator=%x1f)"
+        )
         rebaseline = tuple(value for value in trailers.split("\x1f") if value)
         commits.append(GoldenCommit(sha, subject, tuple(wrote), message, wrote, rebaseline))
     return commits
@@ -412,7 +418,10 @@ def golden_commits(
 
 def _commit_field(repo: Path, sha: str, placeholder: str) -> str:
     """One pretty-format placeholder for one commit, without the newline rev-list adds."""
-    out = _git(repo, "rev-list", "-1", "--no-commit-header", f"--format={placeholder}", sha)
+    # The "--" keeps a file named like the sha from making the argument ambiguous.
+    out = _git(
+        repo, "rev-list", "-1", "--no-commit-header", f"--format={placeholder}", sha, "--"
+    )
     return out[:-1] if out.endswith("\n") else out
 
 

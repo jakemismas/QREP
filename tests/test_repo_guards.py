@@ -1352,7 +1352,39 @@ def test_fixture_guard_ignores_commits_that_only_add_fixtures(repo):
 
 
 @needs_git
-def test_fixture_guard_reads_each_commits_own_message_whatever_bytes_it_holds(repo, tmp_path):
+@pytest.mark.parametrize("kind", ["symlink", "directory"])
+def test_fixture_guard_reports_a_record_that_is_not_a_file_as_exit_2(repo, tmp_path, kind):
+    # A symlink's blob is its target's name, so reading it as the record could
+    # name any path; a git error exits 2 (the documented exit codes).
+    if kind == "symlink":
+        target = tmp_path / "target.txt"
+        target.write_bytes(FIXTURE.encode())
+        blob = _git(repo, "hash-object", "-w", str(target))
+        _git(repo, "update-index", "--add", "--cacheinfo", f"120000,{blob},{RECORD}")
+        _commit(repo, "Link the record", {FIXTURE: '{"v": 1}\n'})
+    else:
+        _commit(repo, "Misplace the record", {f"{RECORD}/notes.md": "x\n", FIXTURE: '{"v": 1}\n'})
+    base = _start_branch(repo)
+    head = _commit(repo, f"Regenerate the benchmark fixture\n\n{TRAILER}", {FIXTURE: "{}\n"})
+    result = _run(repo, "golden_guard.py", base, head)
+    assert result.returncode == 2, result.stdout + result.stderr
+    assert "is not a regular file" in result.stderr
+
+
+@needs_git
+def test_fixture_guard_reads_a_commit_whose_sha_names_a_file_too(repo):
+    # git reads a bare sha that also names a file as ambiguous unless a "--"
+    # ends the revisions; the commit must still be judged (exit 1), not crash.
+    base = _freeze_fixtures(repo)
+    head = _commit(repo, "Regenerate the benchmark fixture", {FIXTURE: '{"v": 2}\n'})
+    (repo / head).write_text("untracked\n", encoding="utf-8")
+    result = _run(repo, "golden_guard.py", base, head)
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert f"changes {FIXTURE} {UNSANCTIONED}" in result.stdout
+
+
+@needs_git
+def test_fixture_guard_reads_each_commits_own_message_despite_a_control_byte(repo, tmp_path):
     # git accepts a 0x01 byte in a message; it must not split one commit's
     # message into a trailer or into another commit (git reads no trailer here).
     base = _freeze_fixtures(repo)
