@@ -333,6 +333,21 @@ def test_a_proposal_stands_in_for_truth_only_when_asked():
     assert request.counts.blocks_across == 7 and request.fabric_count is None
 
 
+def test_only_verified_corners_and_counts_count_as_truth_by_default():
+    # Source: plan section 5.D: gate truth for corners, bands and counts is verified-jake only.
+    doc = sample(frame=[sample()["frame"][0] | {"provenance": "hand-authored"}],
+                 counts=[sample()["counts"][0] | {"provenance": "adjudicated"}])
+    with pytest.raises(ValueError):
+        an.to_read_request(parse(doc), "photo.png")
+
+
+@pytest.mark.parametrize("count", [1, 13])
+def test_a_fabric_count_outside_the_reads_range_is_left_to_the_read(count):
+    # Source: qrep/contract.py FABRICS_MIN = 2 and FABRICS_MAX = 12; 1 and 13 fall outside.
+    doc = sample(fabrics=[{"value": {"count": count}, "provenance": "verified-jake"}])
+    assert an.to_read_request(parse(doc), "photo.png").fabric_count is None
+
+
 def test_the_sidecar_view_matches_the_photoreal_shapes():
     # Source: tests/fixtures/photoreal sidecars (quad spans the border; scripts/
     # photoreal_baseline.py:84 adds 2 x border_pitches to cols). By hand from sample():

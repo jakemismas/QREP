@@ -24,7 +24,15 @@ from typing import Literal, TypeVar, get_args
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from qrep.contract import Counts, FieldFrame, OuterEdgeFrame, Point, ReadRequest
+from qrep.contract import (
+    FABRICS_MAX,
+    FABRICS_MIN,
+    Counts,
+    FieldFrame,
+    OuterEdgeFrame,
+    Point,
+    ReadRequest,
+)
 
 SCHEMA_VERSION = 1
 
@@ -42,6 +50,8 @@ PROVENANCES: tuple[str, ...] = get_args(Provenance)
 # from the institution's own record (its dimensions text); nobody judged it, so
 # it is never truth either.
 TRUTH: tuple[str, ...] = ("verified-jake", "adjudicated", "hand-authored")
+# Corners, bands and counts count as truth only when Jake verified them.
+FRAME_TRUTH: tuple[str, ...] = ("verified-jake",)
 
 # The dev annotate page's classes (plan C3a), so its JSON validates here.
 ConstructionClass = Literal["squares", "hst", "qst", "snowball", "flying_geese", "out_of_scope"]
@@ -301,7 +311,7 @@ def to_read_request(
     token: str,
     *,
     frame: Literal["outer_edge", "field"] = "outer_edge",
-    prefer: tuple[str, ...] = TRUTH,
+    prefer: tuple[str, ...] = FRAME_TRUTH,
 ) -> ReadRequest:
     """The read request a user who confirmed this annotation would send.
 
@@ -317,16 +327,21 @@ def to_read_request(
     if chosen is None:
         raise ValueError(f"{annotation.photo}: the {framed.provenance} frame has no field corners")
     fabrics = pick(annotation.fabrics, prefer)
+    count = fabrics.value.count if fabrics else None
+    # A count outside the read's range (one fabric, or a scrappy quilt above 12) leaves the read
+    # to choose, as a user who skips the count would, instead of failing the request.
+    if count is not None and not FABRICS_MIN <= count <= FABRICS_MAX:
+        count = None
     return ReadRequest(
         token=token,
         frame=chosen,
         crop_offset=Point(x=0.0, y=0.0),
         counts=counted.value,
-        fabric_count=fabrics.value.count if fabrics else None,
+        fabric_count=count,
     )
 
 
-def sidecar_view(annotation: Annotation, prefer: tuple[str, ...] = TRUTH) -> dict:
+def sidecar_view(annotation: Annotation, prefer: tuple[str, ...] = FRAME_TRUTH) -> dict:
     """The photoreal sidecar fields this annotation extends, in the sidecar's
     own shapes, so the eval can score both with one code path. quad is the outer
     edge (the sidecar's quad spans its border); grid.border_pitches is the
