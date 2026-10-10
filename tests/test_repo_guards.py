@@ -1,6 +1,8 @@
 """The CI guards in scripts/: golden_guard (every commit that edits
-tests/golden is a [bless] commit, and a merge leaves no golden content that
-no commit wrote) and corpus_guard (no private-tier paths and no unlicensed
+tests/golden is a [bless] commit, every commit that modifies or deletes a
+tracked tests/fixtures file carries [bless] or a Rebaseline: trailer for a
+path the base's REBASELINE.md names, and a merge leaves no guarded content
+that no such commit wrote) and corpus_guard (no private-tier paths and no unlicensed
 corpus files, in the index, in a range's merge result, or in any file version
 the range wrote), plus the shape of the workflow that runs them.
 
@@ -720,6 +722,44 @@ def test_a_golden_deletion_by_a_bless_commit_passes():
     assert golden_guard.verdict([CUT], [commit], final={CUT: None})[0]
 
 
+# tests/fixtures rule (E5): a modified or deleted fixture needs REBASELINE.md at
+# the base to name its path, so a file it names only as part of a longer path,
+# file name or extension stays frozen.
+
+FIXTURE = "tests/fixtures/double_irish_chain.json"
+PIN = "tests/fixtures/legacy_regression/l0_seed42.json"
+OPS = "tests/fixtures/wasm_gate/ops.py"
+
+
+@pytest.mark.parametrize(
+    ("record", "path", "named"),
+    [
+        # Forms REBASELINE.md uses: a table cell, a line reference, a closing
+        # parenthesis, and a path that ends a sentence.
+        (f"| {PIN} | legacy byte pin (observed output) | B6b |", PIN, True),
+        (f"mirrored at {OPS}:38 | As T4 |", OPS, True),
+        (f"settings included ({PIN}), so A1's", PIN, True),
+        (f"regenerates that file in the same PR:\n{FIXTURE}.\n", FIXTURE, True),
+        (f"`{FIXTURE}`", FIXTURE, True),
+        (f"{FIXTURE}", FIXTURE, True),
+        # A longer name that merely contains the path does not name it.
+        (f"{FIXTURE}.bak is a scratch copy", FIXTURE, False),
+        (f"{FIXTURE}l", FIXTURE, False),
+        (f"web/{FIXTURE}", FIXTURE, False),
+        (f"x{FIXTURE}", FIXTURE, False),
+        (PIN, PIN[:-2], False),
+        # A folder names no file inside it.
+        ("tests/fixtures/legacy_regression/ holds the pins", PIN, False),
+        ("", FIXTURE, False),
+        # Characters that a regular expression would read as syntax match literally.
+        ("tests/fixtures/photoreal/shoot (1)+[a].json", "tests/fixtures/photoreal/shoot (1)+[a].json", True),
+        ("tests/fixtures/photoreal/shoot_1_a.json", "tests/fixtures/photoreal/shoot.1.a.json", False),
+    ],
+)
+def test_the_record_names_a_fixture_only_by_its_whole_path(record, path, named):
+    assert golden_guard.names_path(record, path) is named
+
+
 # git-backed runs of the real scripts
 
 
@@ -1091,6 +1131,192 @@ def test_golden_guard_script_reports_a_head_that_conflicts_with_the_base_as_exit
     result = _run(repo, "golden_guard.py", base, head)
     assert result.returncode == 2, result.stdout + result.stderr
     assert "does not merge cleanly" in result.stderr
+
+
+# tests/fixtures under the guard (E5). Expected outcomes come from the rule in
+# CLAUDE.md and E5's acceptance criteria: a tracked fixture changes or goes only
+# in a commit whose own message carries [bless] or a `Rebaseline:` trailer, and
+# only when REBASELINE.md at the base names its path; a new file passes.
+
+RECORD = "docs/sprint-5/REBASELINE.md"
+PHOTO = "tests/fixtures/photoreal/shoot_01.json"
+TRAILER = "Rebaseline: bless policy item 4"
+RECORD_TEXT = (
+    "4. A ticket that adds or removes a model field regenerates\n"
+    f"   {FIXTURE} in the same PR and cites this item.\n\n"
+    "| Path at the recorded commit | What it is | Ticket |\n"
+    "|---|---|---|\n"
+    f"| {PIN} | legacy byte pin (observed output) | B6b |\n"
+)
+
+
+def _freeze_fixtures(repo: Path) -> str:
+    """main gains the record and three tracked fixtures (two named, PHOTO not),
+    then work branches. Returns the base."""
+    _commit(
+        repo,
+        "Freeze fixtures",
+        {RECORD: RECORD_TEXT, FIXTURE: '{"v": 1}\n', PIN: "[1]\n", PHOTO: '{"p": 1}\n'},
+    )
+    return _start_branch(repo)
+
+
+@needs_git
+def test_fixture_guard_fails_an_untrailered_fixture_edit(repo):
+    base = _freeze_fixtures(repo)
+    head = _commit(repo, "Regenerate the benchmark fixture", {FIXTURE: '{"v": 2}\n'})
+    result = _run(repo, "golden_guard.py", base, head)
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert FIXTURE in result.stdout
+    assert "Regenerate the benchmark fixture" in result.stdout
+
+
+@needs_git
+@pytest.mark.parametrize("path", [FIXTURE, PIN])
+def test_fixture_guard_passes_a_trailered_edit_of_a_path_the_record_names(repo, path):
+    base = _freeze_fixtures(repo)
+    message = f"Regenerate the benchmark fixture\n\nWhy: a new model field.\n\n{TRAILER}"
+    head = _commit(repo, message, {path: "regenerated\n"})
+    result = _run(repo, "golden_guard.py", base, head)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+@needs_git
+def test_fixture_guard_fails_a_trailered_edit_of_a_path_the_record_does_not_name(repo):
+    base = _freeze_fixtures(repo)
+    head = _commit(repo, f"Re-shoot a photoreal fixture\n\n{TRAILER}", {PHOTO: '{"p": 2}\n'})
+    result = _run(repo, "golden_guard.py", base, head)
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert f"{PHOTO} is not named in {RECORD}" in result.stdout
+
+
+@needs_git
+@pytest.mark.parametrize("same_commit", [True, False])
+def test_fixture_guard_fails_a_path_that_only_the_heads_record_names(repo, same_commit):
+    # A pull request cannot admit a path by listing it in its own diff: the guard
+    # reads the base's record, never the head's (E5, criterion 2).
+    base = _freeze_fixtures(repo)
+    amended = {RECORD: RECORD_TEXT + f"| {PHOTO} | photoreal fixture | D1 |\n"}
+    edit = {PHOTO: '{"p": 2}\n'}
+    if same_commit:
+        head = _commit(repo, f"Re-shoot a photoreal fixture\n\n{TRAILER}", {**amended, **edit})
+    else:
+        _commit(repo, f"Name the photoreal fixture\n\n{TRAILER}", amended)
+        head = _commit(repo, f"Re-shoot a photoreal fixture\n\n{TRAILER}", edit)
+    assert PHOTO in _git(repo, "show", f"{head}:{RECORD}")
+    result = _run(repo, "golden_guard.py", base, head)
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert f"{PHOTO} is not named in {RECORD}" in result.stdout
+
+
+@needs_git
+@pytest.mark.parametrize(
+    ("message", "exit_code"),
+    [
+        ("Retire the legacy pin", 1),
+        (f"Retire the legacy pin\n\n{TRAILER}", 0),
+        ("Retire the legacy pin [bless]", 0),
+    ],
+)
+def test_fixture_guard_lets_a_deletion_through_only_with_a_trailer_or_bless(
+    repo, message, exit_code
+):
+    base = _freeze_fixtures(repo)
+    _git(repo, "rm", "-q", PIN)
+    head = _commit(repo, message)
+    result = _run(repo, "golden_guard.py", base, head)
+    assert result.returncode == exit_code, result.stdout + result.stderr
+    if exit_code:
+        assert PIN in result.stdout
+
+
+@needs_git
+def test_fixture_guard_passes_a_new_fixture_file(repo):
+    # New files pass, for the pull request review to check (E5, criterion 2),
+    # even when a later commit in the range edits the new file again.
+    base = _freeze_fixtures(repo)
+    new = "tests/fixtures/photoreal/shoot_02.json"
+    _commit(repo, "Add a photoreal fixture", {new: '{"p": 1}\n'})
+    head = _commit(repo, "Fix the new fixture", {new: '{"p": 2}\n'})
+    result = _run(repo, "golden_guard.py", base, head)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+@needs_git
+def test_fixture_guard_passes_a_bless_commit_that_edits_a_named_fixture(repo):
+    base = _freeze_fixtures(repo)
+    head = _commit(repo, "A6: consolidated refresh [bless]", {FIXTURE: '{"v": 2}\n'})
+    result = _run(repo, "golden_guard.py", base, head)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+@needs_git
+def test_a_rebaseline_trailer_does_not_bless_a_golden_edit(repo):
+    # tests/golden/ keeps its rule: [bless] only (E5, criterion 3).
+    base = _freeze_fixtures(repo)
+    head = _commit(repo, f"Re-render the cut list\n\n{TRAILER}", {CUT: "a,b,c\n"})
+    result = _run(repo, "golden_guard.py", base, head)
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "without [bless] in its own message" in result.stdout
+
+
+@needs_git
+def test_fixture_guard_judges_every_commit_that_edits_the_fixture(repo):
+    # A sanctioned commit cannot excuse another commit's edit of the same file.
+    base = _freeze_fixtures(repo)
+    _commit(repo, "Tweak the fixture by hand", {FIXTURE: '{"v": 2}\n'})
+    head = _commit(repo, f"Regenerate the benchmark fixture\n\n{TRAILER}", {FIXTURE: '{"v": 3}\n'})
+    result = _run(repo, "golden_guard.py", base, head)
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "Tweak the fixture by hand" in result.stdout
+
+
+@needs_git
+def test_fixture_guard_fails_a_fixture_regenerated_inside_a_merge(repo):
+    # Only non-merge commits are judged, as for goldens, so content that a merge
+    # commit produced has no sanctioned commit behind it, trailer or not.
+    base_record = _freeze_fixtures(repo)
+    _commit(repo, f"Regenerate the benchmark fixture\n\n{TRAILER}", {FIXTURE: '{"v": 2}\n'})
+    _git(repo, "checkout", "-q", "main")
+    base = _commit(repo, "Other work", {"other.txt": "o\n"})
+    assert base != base_record
+    _git(repo, "checkout", "-q", "work")
+    _git(repo, "merge", "-q", "--no-ff", "--no-commit", "main")
+    head = _commit(repo, f"Merge main into work\n\n{TRAILER}", {FIXTURE: '{"v": 3}\n'})
+    result = _run(repo, "golden_guard.py", base, head)
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert FIXTURE in result.stdout and "merge commit" in result.stdout
+
+
+@needs_git
+@pytest.mark.parametrize(
+    "message",
+    [
+        # git reads no trailers from the subject.
+        TRAILER,
+        # A trailer block is the message's last paragraph.
+        f"Regenerate the benchmark fixture\n\n{TRAILER}\n\nNotes written after it.",
+        f"Regenerate the benchmark fixture\n\nThe model gained a field.\n{TRAILER}",
+        # A trailer that cites no entry cites nothing.
+        "Regenerate the benchmark fixture\n\nRebaseline:",
+    ],
+)
+def test_fixture_guard_counts_only_a_rebaseline_trailer_git_parses(repo, message):
+    base = _freeze_fixtures(repo)
+    head = _commit(repo, message, {FIXTURE: '{"v": 2}\n'})
+    result = _run(repo, "golden_guard.py", base, head)
+    assert result.returncode == 1, result.stdout + result.stderr
+
+
+@needs_git
+def test_fixture_guard_leaves_generated_test_output_alone(repo):
+    # CLAUDE.md puts the gitignored tests/fixtures/_generated/ outside the rule.
+    generated = "tests/fixtures/_generated/booklet.json"
+    _commit(repo, "Track an output by mistake", {generated: "{}\n"})
+    base = _start_branch(repo)
+    head = _commit(repo, "Rewrite the output", {generated: '{"n": 1}\n'})
+    result = _run(repo, "golden_guard.py", base, head)
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 @needs_git
