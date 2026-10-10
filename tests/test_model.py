@@ -159,9 +159,29 @@ def dic_typed_basis(**overrides) -> FinishedSizeBasis:
     return FinishedSizeBasis(**{**values, **overrides})
 
 
+def twin_preset_basis(**overrides) -> FinishedSizeBasis:
+    # Source: qrep/viewer/sizing.py PRESETS, Twin = 70 x 90 in = 560 x 720 eighths.
+    # Achieved by today's reconcile rule (qrep/model/finished_size.py) on the DIC
+    # (45 x 55 squares of 12, one border of 30), at the one-eighth step:
+    #   width cell = round_div(560 x 12, 45 x 12 + 2 x 30) = (6720 + 300) // 600 = 11
+    #   height cell = round_div(720 x 12, 55 x 12 + 2 x 30) = (8640 + 360) // 720 = 12
+    #   cell = min(11, 12) = 11; border = round_div(30 x 11, 12) = (330 + 6) // 12 = 28
+    #   achieved = 45 x 11 + 2 x 28 = 551 by 55 x 11 + 2 x 28 = 661
+    values = {
+        "source": "preset",
+        "requested_width": 560,
+        "requested_height": 720,
+        "achieved_width": 551,
+        "achieved_height": 661,
+        "rounding_step": 1,
+    }
+    return FinishedSizeBasis(**{**values, **overrides})
+
+
 def default_basis(**overrides) -> FinishedSizeBasis:
     # A default size sets nothing, so it records no requested size; the achieved
-    # size is the DIC's 600 x 720 eighths (see dic_typed_basis).
+    # size is the DIC's 600 x 720 eighths (see dic_typed_basis). Callers state
+    # the confidence, which a default basis must carry.
     values = {
         "source": "default",
         "achieved_width": 600,
@@ -197,14 +217,35 @@ def test_new_fields_default_to_none_and_serialize_last():
     assert data["size_basis"] is None
 
 
+# small_quilt() as qrep/model/io.py wrote it before the two optional fields
+# existed (9030fde): every key through provenance, settings at their defaults.
+# Written out by hand, so the current writer does not produce its own input.
+PRE_A9_DOCUMENT = """{
+  "schema_version": "1",
+  "metadata": {"name": "tiny", "notes": ""},
+  "palette": {"fabrics": [
+    {"id": "r", "name": "Red", "color": "#cc3333"},
+    {"id": "w", "name": "White", "color": "#ffffff"}
+  ]},
+  "center": {"kind": "grid", "rows": 2, "cols": 3, "cell_size": 8,
+             "cells": [["r", "w", "r"], ["w", "r", "w"]], "cell_confidence": null},
+  "borders": [{"fabric_id": "w", "width": 4}],
+  "binding": {"fabric_id": "r", "strip_width": 20},
+  "quilting": {"motifs": [], "density": null},
+  "settings": {"seam_allowance": 2, "wof": 320, "binding_strip_width": 20,
+               "binding_extra": 80, "backing_margin": 64, "backing_width": 336,
+               "wide_back_width": 864, "backing_pieced_allowance": 72,
+               "backing_one_piece_allowance": 36, "purchase_increment": 72,
+               "top_margin": 10},
+  "provenance": {"source": "authored", "stage_confidence": {}}
+}"""
+
+
 def test_model_written_before_the_optional_fields_loads_unchanged():
     # Criterion S1-2: schema_version stays major 1, and a model that predates
     # the two optional fields loads as it was.
-    data = json.loads(dumps(small_quilt()))
-    del data["confirmed_blocks"]
-    del data["size_basis"]
-    assert data["schema_version"] == "1"
-    loaded = loads(json.dumps(data))
+    data = json.loads(PRE_A9_DOCUMENT)
+    loaded = loads(PRE_A9_DOCUMENT)
     assert loaded == small_quilt()
     assert loaded.schema_version == "1"
     assert loaded.confirmed_blocks is None
@@ -212,6 +253,7 @@ def test_model_written_before_the_optional_fields_loads_unchanged():
     rewritten = json.loads(dumps(loaded))
     new_keys = ("confirmed_blocks", "size_basis")
     assert {k: v for k, v in rewritten.items() if k not in new_keys} == data
+    assert rewritten["confirmed_blocks"] is None and rewritten["size_basis"] is None
 
 
 @pytest.mark.parametrize(
@@ -225,9 +267,11 @@ def test_confirmed_blocks_refuse_a_count_below_one(field):
 def test_size_basis_accepts_each_source_with_its_requested_sizes():
     # A typed size may give one axis and let the other follow.
     assert dic_typed_basis(requested_height=None).requested_width == 600
-    # A preset has both dimensions (qrep/viewer/sizing.py PRESETS).
-    assert dic_typed_basis(source="preset").requested_height == 720
-    basis = default_basis()
+    assert dic_typed_basis(requested_width=None).requested_height == 720
+    # A preset has both dimensions.
+    preset = twin_preset_basis()
+    assert (preset.requested_width, preset.requested_height) == (560, 720)
+    basis = default_basis(confidence=0.25)
     assert basis.requested_width is None and basis.requested_height is None
 
 
@@ -236,8 +280,11 @@ def test_size_basis_accepts_each_source_with_its_requested_sizes():
     [
         ({"requested_width": None, "requested_height": None}, "typed size needs"),
         ({"source": "preset", "requested_height": None}, "preset size records both"),
-        ({"source": "default"}, "default size records no requested"),
-        ({"source": "default", "requested_width": None}, "default size records no requested"),
+        ({"source": "default", "confidence": 0.5}, "default size records no requested"),
+        (
+            {"source": "default", "requested_width": None, "confidence": 0.5},
+            "default size records no requested",
+        ),
         ({"source": "guessed"}, "source"),
         ({"rounding_step": 0}, "rounding_step"),
         ({"achieved_width": 0}, "achieved_width"),
@@ -250,11 +297,12 @@ def test_size_basis_refuses_a_source_its_sizes_contradict(overrides, message):
 
 
 # Where each stored value comes from (docs/SPEC.md section 8). A CV value names
-# the carrier of its confidence; a user value lives in a model that records it
-# at 1.0. The other kinds carry no confidence of their own: settings and
-# authored values are set by hand, derived values follow deterministically from
-# the read or other fields, format values describe the file, and confidence
-# fields are the carriers. B8 and B2a add their fields here.
+# every carrier of its confidence, joined by "+"; a user value lives in a model
+# that records it at 1.0. The other kinds carry no confidence of their own:
+# settings and authored values are set by hand, derived values follow
+# deterministically from the read or other fields, format values describe the
+# file, provenance values name where a value came from, and confidence fields
+# are the carriers. B8 and B2a add their fields here.
 FIELD_SOURCES = {
     "Quilt.schema_version": "format",
     "QuiltMetadata.name": "derived",
@@ -265,15 +313,16 @@ FIELD_SOURCES = {
     "GridRegion.kind": "format",
     "GridRegion.rows": "cv:stage:grid",
     "GridRegion.cols": "cv:stage:grid",
-    # A read scales squares and borders to inches by an assumed photo
-    # resolution (qrep/vision/pipeline.py ASSUMED_PPI), so their physical size
-    # is the photo's size estimate until the user sets a size (engine-09); the
-    # size basis carries that estimate.
-    "GridRegion.cell_size": "cv:size_estimate",
+    # A read measures squares and borders in pixels (the grid and border
+    # stages) and scales them to eighths by an assumed photo resolution
+    # (qrep/vision/pipeline.py ASSUMED_PPI), so their physical size is also the
+    # photo's size estimate until the user sets a size (engine-09); the size
+    # basis carries that estimate.
+    "GridRegion.cell_size": "cv:stage:grid+size_estimate",
     "GridRegion.cells": "cv:cell",
     "GridRegion.cell_confidence": "confidence",
     "BorderBand.fabric_id": "cv:stage:border",
-    "BorderBand.width": "cv:size_estimate",
+    "BorderBand.width": "cv:stage:border+size_estimate",
     # The read binds in the border fabric it found (qrep/vision/pipeline.py).
     "Binding.fabric_id": "cv:stage:border",
     "Binding.strip_width": "setting",
@@ -294,14 +343,16 @@ FIELD_SOURCES = {
     "Settings.backing_one_piece_allowance": "setting",
     "Settings.purchase_increment": "setting",
     "Settings.top_margin": "setting",
-    "Provenance.source": "format",
+    "Provenance.source": "provenance",
     "Provenance.stage_confidence": "confidence",
     "ConfirmedBlocks.blocks_across": "user",
     "ConfirmedBlocks.blocks_down": "user",
     "ConfirmedBlocks.squares_across": "user",
     "ConfirmedBlocks.squares_down": "user",
     "ConfirmedBlocks.confidence": "confidence",
-    "FinishedSizeBasis.source": "user",
+    # Typed, preset or default: how the size was set, whatever its confidence.
+    "FinishedSizeBasis.source": "provenance",
+    # Only a typed or preset size records a request, always at 1.0.
     "FinishedSizeBasis.requested_width": "user",
     "FinishedSizeBasis.requested_height": "user",
     # Its confidence is 1.0 once the user sets a size (typed or preset).
@@ -311,7 +362,7 @@ FIELD_SOURCES = {
     "FinishedSizeBasis.confidence": "confidence",
 }
 
-KINDS = {"user", "derived", "authored", "setting", "format", "confidence"}
+KINDS = {"user", "derived", "authored", "setting", "format", "provenance", "confidence"}
 
 # Each CV carrier, built with one confidence value; a refused value raises.
 CV_CARRIERS = {
@@ -324,16 +375,72 @@ CV_CARRIERS = {
     "size_estimate": lambda v: default_basis(confidence=v),
 }
 
-# Each model that holds user facts, built from user values with one confidence.
+# Each carrier's confidence on a model, or None where the model lacks it.
+CARRIER_ON_MODEL = {
+    **{
+        f"stage:{stage}": (lambda q, stage=stage: q.provenance.stage_confidence.get(stage))
+        for stage in STAGES
+    },
+    "cell": lambda q: q.center.cell_confidence,
+    "size_estimate": lambda q: q.size_basis.confidence if q.size_basis is not None else None,
+}
+
+# CV values a read stores with no confidence for part of what they measure:
+# the read scales squares and borders by an assumed resolution but records no
+# size basis (#207). Named here so the walk states the gap instead of passing
+# over it; #207 empties this set.
+UNRECORDED_CONFIDENCE = {"GridRegion.cell_size", "BorderBand.width"}
+
+# Every variant of each model that holds user facts, built with overrides.
 USER_FACT_MODELS = {
-    "ConfirmedBlocks": [lambda v: dic_blocks(confidence=v)],
+    "ConfirmedBlocks": [dic_blocks],
     "FinishedSizeBasis": [
-        lambda v: dic_typed_basis(confidence=v),
-        lambda v: dic_typed_basis(source="preset", confidence=v),
+        dic_typed_basis,
+        lambda **o: dic_typed_basis(requested_height=None, **o),
+        lambda **o: dic_typed_basis(requested_width=None, **o),
+        twin_preset_basis,
+        lambda **o: default_basis(**{"confidence": 0.25, **o}),
     ],
 }
 
 CARRIER_FIELDS = {"GridRegion.cell_confidence", "Provenance.stage_confidence"}
+
+
+def read_shaped_quilt() -> Quilt:
+    """A model shaped as a photo read returns it (qrep/vision/pipeline.py, the
+    recovered Quilt): CV provenance with all six stages, a confidence per
+    square, a border band, and none of the optional records."""
+    return Quilt(
+        metadata=QuiltMetadata(name="Recovered quilt"),
+        palette=Palette(
+            fabrics=[
+                Fabric(id="f0", name="Fabric 1", color="#cc3333"),
+                Fabric(id="f1", name="Fabric 2", color="#ffffff"),
+            ]
+        ),
+        center=GridRegion(
+            rows=1, cols=2, cell_size=12, cells=[["f0", "f1"]], cell_confidence=[[0.875, 0.75]]
+        ),
+        borders=[BorderBand(fabric_id="f1", width=30)],
+        binding=Binding(fabric_id="f1"),
+        provenance=Provenance(source="cv", stage_confidence={stage: 0.5 for stage in STAGES}),
+    )
+
+
+def _carriers(source: str) -> list[str]:
+    return source[3:].split("+")
+
+
+def _instances(value) -> list[BaseModel]:
+    """Every model instance inside value, value included."""
+    if isinstance(value, BaseModel):
+        found = [value]
+        for name in type(value).model_fields:
+            found += _instances(getattr(value, name))
+        return found
+    if isinstance(value, list):
+        return [model for item in value for model in _instances(item)]
+    return []
 
 
 def _models_in(annotation) -> list[type[BaseModel]]:
@@ -363,7 +470,9 @@ def test_schema_walk_classifies_every_stored_value():
     assert sorted(set(FIELD_SOURCES) - leaves) == [], "recorded sources with no field"
     for path, source in FIELD_SOURCES.items():
         if source.startswith("cv:"):
-            assert source[3:] in CV_CARRIERS, f"{path}: unknown confidence carrier {source}"
+            for carrier in _carriers(source):
+                assert carrier in CV_CARRIERS, f"{path}: unknown confidence carrier {carrier}"
+                assert carrier in CARRIER_ON_MODEL, f"{path}: carrier {carrier} has no place"
         else:
             assert source in KINDS, f"{path}: unknown source {source}"
     # Only the carriers are labeled confidence, so a CV value cannot hide there.
@@ -374,7 +483,14 @@ def test_schema_walk_classifies_every_stored_value():
 
 @pytest.mark.parametrize(
     "carrier",
-    sorted({source[3:] for source in FIELD_SOURCES.values() if source.startswith("cv:")}),
+    sorted(
+        {
+            carrier
+            for source in FIELD_SOURCES.values()
+            if source.startswith("cv:")
+            for carrier in _carriers(source)
+        }
+    ),
 )
 def test_every_cv_value_has_a_confidence_in_the_unit_interval(carrier):
     build = CV_CARRIERS[carrier]
@@ -385,27 +501,67 @@ def test_every_cv_value_has_a_confidence_in_the_unit_interval(carrier):
             build(outside)
 
 
+def test_every_cv_value_on_a_read_finds_its_confidence():
+    # Criterion S7-6: a CV value is only as honest as the confidence beside it,
+    # so every carrier of every CV value the read stores must be present.
+    quilt = read_shaped_quilt()
+    stored = {
+        f"{type(model).__name__}.{name}"
+        for model in _instances(quilt)
+        for name in type(model).model_fields
+        if getattr(model, name) is not None
+    }
+    cv_stored = {p for p, s in FIELD_SOURCES.items() if s.startswith("cv:") and p in stored}
+    assert {"GridRegion.cells", "BorderBand.width", "Fabric.color"} <= cv_stored
+    missing = {
+        path
+        for path in cv_stored
+        if any(CARRIER_ON_MODEL[c](quilt) is None for c in _carriers(FIELD_SOURCES[path]))
+    }
+    assert missing == UNRECORDED_CONFIDENCE
+    # Once the read records its size estimate, nothing is missing. The read's
+    # size: 2 x 12 + 2 x 30 = 84 wide and 1 x 12 + 2 x 30 = 72 tall.
+    estimated = quilt.model_copy(
+        update={"size_basis": default_basis(achieved_width=84, achieved_height=72, confidence=0.25)}
+    )
+    assert all(
+        CARRIER_ON_MODEL[c](estimated) is not None
+        for path in cv_stored
+        for c in _carriers(FIELD_SOURCES[path])
+    )
+
+
 @pytest.mark.parametrize(
     "model", sorted({path.split(".")[0] for path, s in FIELD_SOURCES.items() if s == "user"})
 )
 def test_every_user_fact_is_recorded_at_confidence_one(model):
+    user_fields = [
+        path.split(".")[1]
+        for path, source in FIELD_SOURCES.items()
+        if source == "user" and path.split(".")[0] == model
+    ]
     builds = USER_FACT_MODELS[model]
     assert builds, model
     for build in builds:
-        assert build(1.0).confidence == 1.0
+        record = build()
+        if all(getattr(record, name) is None for name in user_fields):
+            # Only a default size records no request: no user value sits in it,
+            # and its confidence measures the photo estimate alone.
+            assert getattr(record, "source", None) == "default"
+            continue
+        # Left out, a user fact's confidence is 1.0.
+        assert record.confidence == 1.0
         # In range but below 1.0, only the user-fact rule can refuse it.
         for other in (0.0, 0.875):
             with pytest.raises(ValidationError, match="user fact at confidence 1.0"):
-                build(other)
+                build(confidence=other)
         with pytest.raises(ValidationError, match="confidence"):
-            build(1.125)
-    # Left out, the confidence defaults to 1.0.
-    defaults = {"ConfirmedBlocks": dic_blocks, "FinishedSizeBasis": dic_typed_basis}
-    assert defaults[model]().confidence == 1.0
+            build(confidence=1.125)
 
 
-def test_default_size_estimate_keeps_its_confidence():
+def test_default_size_must_state_its_confidence():
     # docs/SPEC.md section 8: a size estimated from the photo is a low-confidence
-    # guess, so a default basis keeps the confidence it was given.
+    # guess, so a default basis never becomes certain by leaving it out.
+    with pytest.raises(ValidationError, match="confidence"):
+        default_basis()
     assert default_basis(confidence=0.25).confidence == 0.25
-    assert default_basis().confidence == 1.0

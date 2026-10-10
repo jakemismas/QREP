@@ -223,8 +223,9 @@ class FinishedSizeBasis(BaseModel):
 
     A typed size gives a width, a height or both; a preset gives both; a
     default sets nothing, and its size is estimated from the photo. A typed
-    or preset size is a user fact at confidence 1.0; a default size keeps the
-    estimate's confidence (1.0 when hand-authored).
+    or preset size is a user fact at confidence 1.0, which it may leave out;
+    a default size must state the estimate's confidence (1.0 only when
+    hand-authored), so a guess is never stored as certain by omission.
     """
 
     source: Literal["typed", "preset", "default"]
@@ -235,7 +236,14 @@ class FinishedSizeBasis(BaseModel):
     rounding_step: int = Field(
         gt=0, description="rounding applied: the finished square size snaps to this step, eighths"
     )
-    confidence: float = Field(default=1.0, ge=0.0, le=1.0)
+    confidence: float = Field(ge=0.0, le=1.0)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _user_set_size_is_certain(cls, data):
+        if isinstance(data, dict) and data.get("source") in ("typed", "preset"):
+            return {"confidence": 1.0, **data}
+        return data
 
     @model_validator(mode="after")
     def _source_matches_request(self) -> "FinishedSizeBasis":
