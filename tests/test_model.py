@@ -265,14 +265,17 @@ FIELD_SOURCES = {
     "GridRegion.kind": "format",
     "GridRegion.rows": "cv:stage:grid",
     "GridRegion.cols": "cv:stage:grid",
-    # The square's physical size is the photo's size estimate until the user
-    # sets a size (engine-09); the size basis carries that estimate.
+    # A read scales squares and borders to inches by an assumed photo
+    # resolution (qrep/vision/pipeline.py ASSUMED_PPI), so their physical size
+    # is the photo's size estimate until the user sets a size (engine-09); the
+    # size basis carries that estimate.
     "GridRegion.cell_size": "cv:size_estimate",
     "GridRegion.cells": "cv:cell",
     "GridRegion.cell_confidence": "confidence",
     "BorderBand.fabric_id": "cv:stage:border",
-    "BorderBand.width": "cv:stage:border",
-    "Binding.fabric_id": "derived",
+    "BorderBand.width": "cv:size_estimate",
+    # The read binds in the border fabric it found (qrep/vision/pipeline.py).
+    "Binding.fabric_id": "cv:stage:border",
     "Binding.strip_width": "setting",
     "QuiltingMotif.name": "authored",
     "QuiltingMotif.x": "authored",
@@ -301,6 +304,7 @@ FIELD_SOURCES = {
     "FinishedSizeBasis.source": "user",
     "FinishedSizeBasis.requested_width": "user",
     "FinishedSizeBasis.requested_height": "user",
+    # Its confidence is 1.0 once the user sets a size (typed or preset).
     "FinishedSizeBasis.achieved_width": "cv:size_estimate",
     "FinishedSizeBasis.achieved_height": "cv:size_estimate",
     "FinishedSizeBasis.rounding_step": "setting",
@@ -389,9 +393,12 @@ def test_every_user_fact_is_recorded_at_confidence_one(model):
     assert builds, model
     for build in builds:
         assert build(1.0).confidence == 1.0
-        for other in (0.0, 0.875, 1.125):
-            with pytest.raises(ValidationError, match="confidence"):
+        # In range but below 1.0, only the user-fact rule can refuse it.
+        for other in (0.0, 0.875):
+            with pytest.raises(ValidationError, match="user fact at confidence 1.0"):
                 build(other)
+        with pytest.raises(ValidationError, match="confidence"):
+            build(1.125)
     # Left out, the confidence defaults to 1.0.
     defaults = {"ConfirmedBlocks": dic_blocks, "FinishedSizeBasis": dic_typed_basis}
     assert defaults[model]().confidence == 1.0
