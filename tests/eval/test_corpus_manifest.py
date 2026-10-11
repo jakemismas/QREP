@@ -9,6 +9,8 @@ files, so a row, an image or an annotation that breaks a rule fails here before 
 import hashlib
 import io
 import json
+import shutil
+import sys
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -21,6 +23,13 @@ from pydantic import ValidationError
 import corpus_fetch as cf
 from qrep.contract import OuterEdgeFrame, ReadRequest
 from qrep_eval import annotation as an
+
+# The same gate as tests/test_repo_guards.py: Pyodide has no git and no subprocesses, and the
+# native jobs run these tests.
+needs_git = pytest.mark.skipif(
+    sys.platform == "emscripten" or shutil.which("git") is None,
+    reason="needs a git executable and subprocesses",
+)
 
 REPO = Path(__file__).resolve().parents[2]
 CORPUS = REPO / "corpus"
@@ -1164,6 +1173,7 @@ def test_merging_rows_replaces_a_rescreened_photo_and_adds_a_new_one():
                       {"source": "met", "object_id": "11", "tier": "A"}]
 
 
+@needs_git
 def test_views_are_written_only_inside_the_ignored_private_folder(tmp_path):
     # default_cache() is <main checkout>/corpus/private/cache, so cache/views/x.png lies inside
     # the ignored corpus/private/ and passes.
