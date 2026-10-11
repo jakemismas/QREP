@@ -280,11 +280,14 @@ half), a quarter-square triangle (a fabric per quarter: top, right, bottom and l
 corner unit (a fabric for each corner that has a triangle, one leg as a fraction of the side, and
 the square's own fabric as the base) or a flying goose over two adjacent squares (body and sky
 fabrics; pointing up or down it lies across two columns, left or right down two rows). The map
-covers every square exactly once and names only palette fabrics. A corner leg lands on a whole
-eighth at the square's size, and the legs along one side total at most the side. The cells still
-give one fabric per square, for code that reads only the cells. Each unit states its own
-confidence, with no default: in [0, 1] from a read (B4a and B4b write the map), 1.0 when
-hand-authored. A model with a unit map is written as schema_version 1.1, or the later 1.x minor it
+covers every square exactly once and names only palette fabrics. A corner leg is shorter than the
+side and lands on a whole eighth at the square's size, and the legs along one side total at most
+the side. Each square has one spelling: the map is kept in row-major order and corners in one
+order, and a unit that a simpler kind writes is refused (an hst or goose in one fabric, a qst that
+is plain or an hst, a corner in its base fabric). The cells still give one fabric per square, for
+code that reads only the cells. Each unit states its own confidence, with no default: in [0, 1]
+from a read (B4a and B4b write the map). A hand-authored map states 1.0 by convention (CLAUDE.md);
+no validator checks it, because a unit does not record who wrote it. A model with a unit map is written as schema_version 1.1, or the later 1.x minor it
 was read with; a model without one keeps the version it was read with and its bytes, and a missing
 or unknown major version still raises. The model counts each fabric's area exactly with triangles,
 in quadrupled square eighths (qrep/model/unitmap.py), because a quarter of an odd square has a
@@ -296,8 +299,10 @@ confidence stays in [0, 1] and that the user facts the model records today, the 
 structure and a typed or preset size, sit at 1.0; the counts and border bands become user facts
 with the confirmed read (B2a). On a hand-built model shaped like a read, it asserts that every CV
 value finds its confidence beside it; until #207 lands, it names the square size and the border
-widths as the values whose scale carries none. The method and its reason follow deterministically
-from the read and carry no confidence of their own.
+widths as the values whose scale carries none. Until B4a (#139) writes a unit map, it also names
+the unit values as values a read does not store, and checks every unit's confidence on a hand-built
+read that carries a map instead. The method and its reason follow deterministically from the read
+and carry no confidence of their own.
 
 ## 9. Removed surfaces
 
