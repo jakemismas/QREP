@@ -1,0 +1,4 @@
+/* Crop screen; the pins and the size block bring their own sheets. */
+.pf-wrap--mid { max-width: 760px; }
+.pf-detecting { display: flex; align-items: center; gap: 9px; margin-top: 12px; font-size: 14px; color: var(--mut); }
+.pf-corner-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 18px; }

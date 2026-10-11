@@ -1,0 +1,20 @@
+.pf-vision { background: var(--card3); border: 1px dashed var(--line2); border-radius: 12px; padding: 14px 16px; margin-bottom: 16px; }
+.pf-vision-row { display: flex; justify-content: space-between; gap: 12px; font-size: 14.5px; color: var(--ink2); margin-bottom: 9px; }
+.pf-vision-track { height: 12px; background: var(--card); border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+.pf-vision-bar { display: block; height: 100%; width: 45%; background: var(--denim); border-radius: 999px; animation: pfIndeterminate 1.3s ease-in-out infinite; }
+@keyframes pfIndeterminate { 0% { margin-left: -45%; } 100% { margin-left: 100%; } }
+.pf-vision-cached { display: flex; align-items: center; gap: 9px; font-size: 14px; color: var(--sage); margin-bottom: 14px; }
+.pf-check { color: var(--sage); }
+.pf-check path { fill: none; stroke: currentColor; stroke-width: 2.5; }
+.pf-vision-retry { display: inline-flex; align-items: center; margin-bottom: 14px; padding: 10px 16px; border-radius: 10px; border: 1.5px solid var(--accent); background: var(--card); color: var(--accent); font: 600 14.5px var(--sans); cursor: pointer; }
+.pf-vision-retry:hover { background: var(--card2); }
+.pf-stages { display: flex; flex-direction: column; }
+.pf-stage { display: flex; align-items: center; gap: 13px; padding: 11px 2px; border-bottom: 1px dashed var(--line); }
+.pf-stage-icon { width: 22px; height: 22px; flex: none; display: flex; align-items: center; justify-content: center; }
+.pf-stage-check { color: var(--sage); }
+.pf-stage-check path { fill: none; stroke: currentColor; stroke-width: 2.8; }
+.pf-stage-label { flex: 1; font-size: 16px; color: var(--ink2); }
+.pf-stage-meter { width: 86px; height: 9px; background: var(--card3); border: 1px solid var(--line); border-radius: 999px; overflow: hidden; flex: none; }
+.pf-stage-pct { width: 44px; text-align: right; font-size: 13.5px; font-weight: 600; color: var(--mut); flex: none; }
+.pf-progress-actions { display: flex; align-items: center; gap: 16px; margin-top: 18px; }
+.pf-stage-dash { color: var(--faint); font-weight: 700; }

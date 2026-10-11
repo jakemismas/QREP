@@ -24,7 +24,9 @@ import { OpenModal } from "./shell/OpenModal";
 import { PalettePanel } from "./shell/PalettePanel";
 import { SizingPanel } from "./shell/SizingPanel";
 import { PatternPanel } from "./shell/PatternPanel";
-import PhotoFlow, { RoundTripPanel, Lightbox } from "./shell/PhotoFlow";
+import PhotoFlow from "./shell/PhotoFlow";
+import { Lightbox } from "./shell/photo/Lightbox";
+import { RoundTripPanel } from "./shell/photo/RoundTripPanel";
 import { QuiltCanvas, EditorToolbar } from "./viewer";
 
 type PhoneTab = "quilt" | "fabrics" | "sizing" | "pattern";

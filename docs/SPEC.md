@@ -256,7 +256,7 @@ The quilt model records every value with its source:
 |---|---|---|
 | Corners or outer edge, border bands, counts, fabric count, typed or preset finished size | User | User fact, confidence 1.0 |
 | Count, corner and fabric-count suggestions; palette colors | CV | Confidence in [0, 1] |
-| Fabric per square, unit class, fabric per part | CV | Confidence in [0, 1] per square |
+| Fabric per square, unit class, fabric per part | CV | Confidence in [0, 1] per square (its fabric) and per unit (its class and parts) |
 | Grid fit, global and per region | CV | Confidence in [0, 1] |
 | Finished size estimated from the photo | CV guess | Low confidence; printed only as an estimate |
 | Hand-authored models and fixtures | Author | Confidence 1.0 |
@@ -274,13 +274,35 @@ unchanged:
   size records confidence 1.0; a default size must state the photo estimate's confidence (A10
   fills the basis for a size you set; #207 records the estimate on every read).
 
+The grid region's optional unit map says how each square is pieced (qrep/model/unitmap.py). Each
+unit is plain (the square's own fabric), a half-square triangle (its diagonal and a fabric per
+half), a quarter-square triangle (a fabric per quarter: top, right, bottom and left), a snowball
+corner unit (a fabric for each corner that has a triangle, one leg as a fraction of the side, and
+the square's own fabric as the base) or a flying goose over two adjacent squares (body and sky
+fabrics; pointing up or down it lies across two columns, left or right down two rows). The map
+covers every square exactly once and names only palette fabrics. A corner leg is shorter than the
+side and lands on a whole eighth at the square's size, and the legs along one side total at most
+the side. Each square has one spelling: the map is kept in row-major order and corners in one
+order, and a unit that a simpler kind writes is refused (an hst or goose in one fabric, a qst that
+is plain or an hst, a corner in its base fabric). The cells still give one fabric per square, for
+code that reads only the cells. Each unit states its own confidence, with no default: in [0, 1]
+from a read (B4a and B4b write the map). A hand-authored map states 1.0 by convention (CLAUDE.md);
+no validator checks it, because a unit does not record who wrote it. A model with a unit map is written as schema_version 1.1, or the later 1.x minor it
+was read with; a model without one keeps the version it was read with and its bytes, and a missing
+or unknown major version still raises. The model counts each fabric's area exactly with triangles,
+in quadrupled square eighths (qrep/model/unitmap.py), because a quarter of an odd square has a
+doubled area that is not whole; the construction's finished-area check uses it once construction
+reads the map (A3c).
+
 A test walks the schema and records where every stored field comes from. It asserts that every
 confidence stays in [0, 1] and that the user facts the model records today, the confirmed block
 structure and a typed or preset size, sit at 1.0; the counts and border bands become user facts
 with the confirmed read (B2a). On a hand-built model shaped like a read, it asserts that every CV
 value finds its confidence beside it; until #207 lands, it names the square size and the border
-widths as the values whose scale carries none. The method and its reason follow deterministically
-from the read and carry no confidence of their own.
+widths as the values whose scale carries none. Until B4a (#139) writes a unit map, it also names
+the unit values as values a read does not store, and checks every unit's confidence on a hand-built
+read that carries a map instead. The method and its reason follow deterministically from the read
+and carry no confidence of their own.
 
 ## 9. Removed surfaces
 
