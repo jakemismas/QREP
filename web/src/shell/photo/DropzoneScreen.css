@@ -1,4 +1,3 @@
-/* Dropzone screen. */
 .pf-home { background: none; border: none; padding: 2px 0; font: 500 15px var(--sans); color: var(--accent); cursor: pointer; }
 .pf-dropzone { display: flex; flex-direction: column; align-items: center; gap: 10px; border: 2.5px dashed var(--line2); border-radius: 18px; background: var(--card2); padding: 40px 26px; text-align: center; cursor: pointer; }
 .pf-dropzone:hover { border-color: var(--accent); background: var(--card); }

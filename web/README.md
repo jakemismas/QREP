@@ -16,6 +16,7 @@ Run these from `web/`:
 npm ci
 node scripts/vendor.mjs   # the pinned Pyodide runtime and its wheels, into public/
 node scripts/wheel.mjs    # the qrep wheel, into public/wheels/
+npx playwright install chromium   # the browser the end-to-end specs drive
 ```
 
 `vendor.mjs` downloads and checks the files `vendor.lock.json` pins; rerun it
@@ -36,8 +37,10 @@ The wheel carries a stamp of the sources it was built from
 (`public/wheels/qrep-source-hash.json`). `npm run build` runs
 `scripts/wheel-hash.mjs` first, as its prebuild step, and refuses to build
 when the stamp no longer matches `qrep/` and `pyproject.toml`, so a stale
-engine never ships. The Playwright run and the Pyodide test run check the same
-stamp. When the check fails, rerun `node scripts/wheel.mjs`.
+engine never ships. The Pyodide test run checks the same stamp, and the
+Playwright run checks the copy in `dist/wheels/` that the preview serves. When
+a check fails, rerun `node scripts/wheel.mjs`, then `npm run build` before
+Playwright.
 
 ## Test
 
@@ -61,9 +64,11 @@ yourself (never in CI). `SPIKE_BASE_URL` points the specs at a deployed site
 instead.
 
 Playwright runs headless. Specs that check layout or touch carry the `@phone`
-tag, and every screen a change adds or alters calls
+tag. A screen a change adds or visibly changes passes
 `expectNoHorizontalOverflow` (`e2e/helpers/layout.ts`) at 390 x 844 and
-1440 x 900.
+1440 x 900 in that change's own specs; a change that only moves code keeps
+`e2e/layout.spec.ts` green. The editor is checked at 1440 x 900 only until
+C6a removes it, because its header overflows at 390 px (web-02).
 
 ## CSS convention
 
@@ -74,10 +79,14 @@ tag, and every screen a change adds or alters calls
   that several files in a folder share live in that folder's shared sheet,
   as `src/shell/photo/shared.css` does for the photo flow. Each component
   imports the shared sheet before its own, so a component rule wins a tie
-  with a shared one. `src/css-collisions.test.ts` fails when two component
-  stylesheets define the same class selector.
-- Colors, fonts and shadows come from the `var(--*)` tokens in
-  `src/ui/tokens.css`, which theme light and dark. Do not hard-code a color.
+  with a shared one. To adjust a shared class in one component, lead the
+  selector with that component's own class (`.pf-rt .pf-btn--secondary`).
+  `src/css-collisions.test.ts` fails when two component stylesheets, or a
+  component stylesheet and `index.css` or `ui/tokens.css`, lead a selector
+  with the same class.
+- New rules take colors, fonts and shadows from the `var(--*)` tokens in
+  `src/ui/tokens.css`, which theme light and dark. A few `rgba()` tints in
+  the photo-flow sheets predate this rule and moved unchanged.
 - `.btn`, `.btn--primary`, `.btn--secondary` and `.btn--link` in
   `src/index.css` are the one button set. New UI uses them instead of a
   component-specific button class.

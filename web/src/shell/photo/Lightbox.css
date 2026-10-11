@@ -1,4 +1,3 @@
-/* Lightbox: a fixed overlay on a tinted scrim. */
 .pf-lb { position: fixed; inset: 0; z-index: 60; }
 .pf-lb-scrim { position: absolute; inset: 0; background: var(--modal-backdrop); }
 .pf-lb-inner { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 18px; pointer-events: none; }

@@ -1,4 +1,3 @@
-/* Round-trip check panel. */
 .pf-rt { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; padding-top: 12px; border-top: 2px dashed var(--line2); }
 .pf-rt-head { display: flex; align-items: center; gap: 12px; }
 .pf-rt-title { margin: 0; font: 700 17.5px var(--serif); color: var(--denim); }

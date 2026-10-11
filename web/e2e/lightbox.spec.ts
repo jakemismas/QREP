@@ -14,6 +14,7 @@ import { existsSync, mkdirSync } from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
+import { expectNoHorizontalOverflow } from "./helpers/layout";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const generatedDir = path.join(repoRoot, "tests", "fixtures", "_generated");
@@ -36,7 +37,12 @@ test.beforeAll(() => {
   if (!existsSync(l0Path)) throw new Error("fixture render produced no file");
 });
 
-test.describe("compare lightbox in the editor", { tag: "@phone" }, () => {
+// Desktop only, as in layout.spec.ts: at 390 px the editor's header already
+// overflows (web-02, excluded until C6a), so the overflow guard below would
+// fail on the header rather than the lightbox.
+test.describe("compare lightbox in the editor at 1440 x 900", { tag: "@phone" }, () => {
+  test.use({ viewport: { width: 1440, height: 900 }, isMobile: false, hasTouch: false });
+
   test("overlays the viewport with a tinted scrim", async ({ page }) => {
     await page.goto("./");
     await page.getByTestId("start-photo").click();
@@ -52,20 +58,31 @@ test.describe("compare lightbox in the editor", { tag: "@phone" }, () => {
     await expect(lightbox).toBeVisible();
 
     // Source: Lightbox.css .pf-lb { position: fixed; inset: 0 }. A fixed box
-    // with all four insets 0 spans the viewport: x 0, y 0, width and height
-    // equal to the viewport's.
+    // with all four insets 0 spans the viewport less any scrollbar, which is
+    // the root element's client box: x 0, y 0, width clientWidth, height
+    // clientHeight.
     await expect(lightbox).toHaveCSS("position", "fixed");
-    const viewport = page.viewportSize();
-    if (!viewport) throw new Error("this spec needs a fixed viewport");
+    const client = await page.evaluate(() => ({
+      width: document.documentElement.clientWidth,
+      height: document.documentElement.clientHeight,
+    }));
     const box = await lightbox.boundingBox();
-    expect(box).toEqual({ x: 0, y: 0, width: viewport.width, height: viewport.height });
+    expect(box).toEqual({ x: 0, y: 0, width: client.width, height: client.height });
 
     // Source: web/src/ui/tokens.css:33, --modal-backdrop: rgba(18, 12, 6, 0.6),
     // set once for both themes. Its alpha 0.6 is above 0, so the scrim tints
     // the editor instead of the rgba(0, 0, 0, 0) web-03 measured.
     const scrim = lightbox.locator(".pf-lb-scrim");
     await expect(scrim).toHaveCSS("background-color", "rgba(18, 12, 6, 0.6)");
+    // Source: Lightbox.css .pf-lb-scrim { position: absolute; inset: 0 }
+    // inside the fixed root, so the scrim covers the same box as the root.
     await expect(scrim).toHaveCSS("position", "absolute");
+    expect(await scrim.boundingBox()).toEqual(box);
+
+    // web-03's other half: unstyled, the lightbox rendered inline and widened
+    // the page. The guard's scroll checks cannot see a fixed box, so this
+    // proves the editor underneath stays inside 1440 px with it open.
+    await expectNoHorizontalOverflow(page, "editor-lightbox");
 
     // Escape closes it (Lightbox's keydown handler), back to the editor.
     await page.keyboard.press("Escape");

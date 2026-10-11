@@ -1,41 +1,51 @@
 /**
- * One home per class (C1b; web-24, web-01). Every component stylesheet is
- * bundled into the one page stylesheet, so a class selector that two sheets
- * both define styles whatever carries that class, wherever it mounts: the
- * hidden PalettePanel's .pp-* rules restyle the Pattern panel that way
- * (web-01). This test fails when two component stylesheets (every .css file
- * under web/src except ui/tokens.css and index.css, which are the global
- * layer) define the same class selector.
+ * One home per class (C1b; web-24, web-01). Every stylesheet a component
+ * imports is bundled into the one page stylesheet, so a class that two sheets
+ * both style is styled wherever it appears, whichever component mounts it.
+ * That is web-01's shape: the hidden PalettePanel's .pp-* rules restyle the
+ * Pattern panel, which uses the same class names. Those two panels still
+ * inject style strings, which this scan does not read until they move to
+ * .css files; the test guards the stylesheets.
  *
- * Selectors are compared after dropping pseudo-classes, pseudo-elements and
- * attribute conditions, so `.x` in one sheet and `.x:hover` or `.x[data-on]`
- * in another collide: both style the element that carries .x. A selector
- * scoped by another class (`.a .x`, `.a.x`) is a different selector and does
- * not collide with `.x`. Rules inside @media and @supports count; @keyframes
- * steps are not selectors.
+ * A sheet defines the class that leads a selector: its first class once
+ * attribute conditions and the arguments of :not() and :has() are dropped.
+ * `.x`, `.x:hover`, `.x[data-on]`, `div.x`, `:is(.x)` and `.x .y` all define
+ * .x, including inside @media, @supports, @container, @layer and @scope. The
+ * test fails when two component stylesheets (every .css file under web/src
+ * except ui/tokens.css and index.css) define the same class, or a component
+ * stylesheet defines a class that one of those two global sheets defines.
+ * A sheet may still style another sheet's class inside a selector led by its
+ * own class (`.pf-rt .pf-btn--secondary`), because that rule applies only
+ * inside its own component.
  */
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-const srcRoot = path.dirname(fileURLToPath(import.meta.url));
-const GLOBAL_SHEETS = new Set([path.join("ui", "tokens.css"), "index.css"]);
+type Sheet = { name: string; css: string; global?: boolean };
 
-function componentSheets(dir: string): string[] {
+const srcRoot = path.dirname(fileURLToPath(import.meta.url));
+const GLOBAL_SHEETS = ["index.css", "ui/tokens.css"];
+
+function sheetName(file: string): string {
+  return path.relative(srcRoot, file).split(path.sep).join("/");
+}
+
+function cssFiles(dir: string): string[] {
   const out: string[] = [];
   for (const entry of readdirSync(dir)) {
     const full = path.join(dir, entry);
     if (statSync(full).isDirectory()) {
-      out.push(...componentSheets(full));
-    } else if (entry.endsWith(".css") && !GLOBAL_SHEETS.has(path.relative(srcRoot, full))) {
+      out.push(...cssFiles(full));
+    } else if (entry.endsWith(".css")) {
       out.push(full);
     }
   }
   return out;
 }
 
-// Splits on commas outside parentheses, so :not(.a, .b) stays one selector.
+// Splits on commas outside parentheses, so :is(.a, .b) stays one selector.
 function splitSelectorList(list: string): string[] {
   const parts: string[] = [];
   let depth = 0;
@@ -54,23 +64,31 @@ function splitSelectorList(list: string): string[] {
   return parts.map((part) => part.trim()).filter(Boolean);
 }
 
-/** Every rule selector in a sheet, including those nested in @media. */
+/** Every rule selector in a sheet, including those inside grouping at-rules. */
 function ruleSelectors(css: string): string[] {
   const text = css.replace(/\/\*[\s\S]*?\*\//g, "");
   const selectors: string[] = [];
-  // A block is a group (its children are rules), a rule (declarations) or
-  // skipped (keyframes, font-face, and anything nested in those).
+  // A block is a group (its children are rules), a rule (declarations, whose
+  // nested blocks hang off the rule's own selector) or skipped (keyframes,
+  // font-face and anything inside them).
   const stack: ("group" | "rule" | "skip")[] = [];
   let prelude = "";
-  for (const ch of text) {
-    if (ch === "{") {
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i];
+    if (ch === '"' || ch === "'") {
+      // A brace inside a string (content: "{") is not a block.
+      let j = i + 1;
+      while (j < text.length && text[j] !== ch) j += text[j] === "\\" ? 2 : 1;
+      prelude += text.slice(i, j + 1);
+      i = j;
+    } else if (ch === "{") {
       const head = prelude.trim();
       prelude = "";
       const parent = stack[stack.length - 1];
       if (parent === "rule" || parent === "skip") {
         stack.push("skip");
       } else if (head.startsWith("@")) {
-        stack.push(/^@(media|supports)\b/.test(head) ? "group" : "skip");
+        stack.push(/^@(media|supports|container|layer|scope)\b/.test(head) ? "group" : "skip");
       } else {
         selectors.push(...splitSelectorList(head));
         stack.push("rule");
@@ -87,36 +105,33 @@ function ruleSelectors(css: string): string[] {
   return selectors;
 }
 
-const PSEUDO = /::?[\w-]+(\((?:[^()]|\([^()]*\))*\))?/g;
 const ATTRIBUTE = /\[[^\]]*\]/g;
+const NEGATION = /:(not|has)\((?:[^()]|\([^()]*\))*\)/g;
+const CLASS = /\.(-?[_a-zA-Z][\w-]*)/;
 
-/** The selector with its state and attribute conditions dropped, or null
- * when no class is left in it. */
-function classSelectorKey(selector: string): string | null {
-  const key = selector
-    .replace(ATTRIBUTE, "")
-    .replace(PSEUDO, "")
-    .replace(/\s*([>+~])\s*/g, " $1 ")
-    .replace(/\s+/g, " ")
-    .trim();
-  return /\.[A-Za-z_-]/.test(key) ? key : null;
+/** The class a selector defines, or null for a selector with no class. */
+function leadingClass(selector: string): string | null {
+  const match = CLASS.exec(selector.replace(ATTRIBUTE, "").replace(NEGATION, ""));
+  return match ? `.${match[1]}` : null;
 }
 
-/** Class selectors defined by more than one sheet, with the sheets. */
-function collisions(sheets: { name: string; css: string }[]): Map<string, string[]> {
-  const owners = new Map<string, Set<string>>();
+/** Classes that a component sheet defines along with another sheet. */
+function collisions(sheets: Sheet[]): Map<string, string[]> {
+  const homes = new Map<string, Set<string>>();
   for (const sheet of sheets) {
     for (const selector of ruleSelectors(sheet.css)) {
-      const key = classSelectorKey(selector);
-      if (key === null) continue;
-      const names = owners.get(key) ?? new Set<string>();
-      names.add(sheet.name);
-      owners.set(key, names);
+      const name = leadingClass(selector);
+      if (name === null) continue;
+      const owners = homes.get(name) ?? new Set<string>();
+      owners.add(sheet.name);
+      homes.set(name, owners);
     }
   }
+  const globals = new Set(sheets.filter((sheet) => sheet.global).map((sheet) => sheet.name));
   const out = new Map<string, string[]>();
-  for (const [key, names] of owners) {
-    if (names.size > 1) out.set(key, [...names].sort());
+  for (const [name, owners] of homes) {
+    const local = [...owners].filter((owner) => !globals.has(owner));
+    if (local.length > 0 && owners.size > 1) out.set(name, [...owners].sort());
   }
   return out;
 }
@@ -130,47 +145,75 @@ describe("collision detector", () => {
     expect([...found.entries()]).toEqual([[".pp-row", ["PalettePanel.css", "PatternPanel.css"]]]);
   });
 
-  it("flags a state or attribute variant of another sheet's class", () => {
+  it("flags state, attribute, element, :is() and nested-rule forms of a class", () => {
     const found = collisions([
       { name: "a.css", css: ".x { color: red; }" },
       { name: "b.css", css: "@media (max-width: 400px) { .x:hover, .y { color: blue; } }" },
       { name: "c.css", css: ".y[data-on] { color: green; }" },
+      { name: "d.css", css: "div.z { color: red; } @layer base { .w { color: red; } }" },
+      { name: "e.css", css: ":is(.z) span { color: blue; }" },
+      { name: "f.css", css: "@container (min-width: 1px) { .w .v { color: blue; } }" },
     ]);
-    expect([...found.keys()].sort()).toEqual([".x", ".y"]);
+    expect(Object.fromEntries(found)).toEqual({
+      ".x": ["a.css", "b.css"],
+      ".y": ["b.css", "c.css"],
+      ".z": ["d.css", "e.css"],
+      ".w": ["d.css", "f.css"],
+    });
   });
 
-  it("passes one class in one sheet, scoped selectors, and keyframe steps", () => {
+  it("flags a component sheet that restyles a global class", () => {
+    const found = collisions([
+      { name: "index.css", css: ".btn { padding: 8px; }", global: true },
+      { name: "panel.css", css: ".btn:hover { padding: 0; }" },
+    ]);
+    expect([...found.keys()]).toEqual([".btn"]);
+  });
+
+  it("passes a class at home, scoped overrides, keyframes and braces in strings", () => {
+    const panel =
+      "/* .btn { } */ .panel .btn { width: auto; } .panel.btn { margin: 0; } " +
+      ".item:not(.btn) { color: red; } @keyframes spin { from { opacity: 0; } to { opacity: 1; } } " +
+      '.label::before { content: "{"; } .after { color: red; }';
     const found = collisions([
       { name: "shared.css", css: ".btn { width: 100%; } .btn:disabled { opacity: 0.6; }" },
-      {
-        name: "panel.css",
-        css: "/* .btn { } */ .panel .btn { width: auto; } .panel.btn { margin: 0; } @keyframes spin { from { opacity: 0; } to { opacity: 1; } }",
-      },
+      { name: "panel.css", css: panel },
+      { name: "index.css", css: ".q { color: red; }", global: true },
+      { name: "ui/tokens.css", css: ".q:hover { color: blue; }", global: true },
     ]);
     expect([...found.keys()]).toEqual([]);
-  });
-
-  it("keeps a :not() list as one selector", () => {
-    expect(ruleSelectors(".a:not(.b, .c), .d { color: red; }")).toEqual([".a:not(.b, .c)", ".d"]);
-    expect(classSelectorKey(".a:not(.b, .c)")).toBe(".a");
+    // The brace inside the string does not swallow the rule after it.
+    expect(ruleSelectors(panel).map(leadingClass)).toEqual([
+      ".panel",
+      ".panel",
+      ".item",
+      ".label",
+      ".after",
+    ]);
   });
 });
 
 describe("component stylesheets under web/src", () => {
-  const files = componentSheets(srcRoot);
+  const sheets: Sheet[] = cssFiles(srcRoot).map((file) => ({
+    name: sheetName(file),
+    css: readFileSync(file, "utf8"),
+    global: GLOBAL_SHEETS.includes(sheetName(file)),
+  }));
+  const components = sheets.filter((sheet) => !sheet.global);
 
-  it("include the photo-flow sheets", () => {
-    const names = files.map((file) => path.relative(srcRoot, file).split(path.sep).join("/"));
-    expect(names).toContain("shell/photo/shared.css");
-    expect(names).not.toContain("index.css");
-    expect(names).not.toContain("ui/tokens.css");
+  it("include the photo-flow sheets, and every one defines a class", () => {
+    expect(components.map((sheet) => sheet.name)).toContain("shell/photo/shared.css");
+    expect(sheets.filter((sheet) => sheet.global).map((sheet) => sheet.name).sort()).toEqual(
+      [...GLOBAL_SHEETS].sort(),
+    );
+    // A sheet the parser read as empty would pass the next test vacuously.
+    for (const sheet of components) {
+      const defined = ruleSelectors(sheet.css).map(leadingClass).filter(Boolean);
+      expect(defined.length, sheet.name).toBeGreaterThan(0);
+    }
   });
 
-  it("define each class selector in one sheet only", () => {
-    const sheets = files.map((file) => ({
-      name: path.relative(srcRoot, file).split(path.sep).join("/"),
-      css: readFileSync(file, "utf8"),
-    }));
+  it("define each class in one sheet only", () => {
     expect(Object.fromEntries(collisions(sheets))).toEqual({});
   });
 });
