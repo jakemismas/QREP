@@ -76,6 +76,16 @@ function canvasToPngBytes(canvas: HTMLCanvasElement): Promise<Uint8Array> {
   });
 }
 
+/** One reverse_photo run, with its wall time. */
+interface ReverseOutcome {
+  model: QuiltModel;
+  verdict?: string;
+  diagnostics?: Record<string, unknown>;
+  requested?: { width: number | null; height: number | null } | null;
+  achieved?: { width: number; height: number } | null;
+  ms: number;
+}
+
 /** The recovered analysis surfaced to the results screen. */
 export interface PhotoResult {
   modelJson: string;
@@ -164,7 +174,6 @@ function readSizeView(entry: SizeEntryState): SizeView {
   };
 }
 
-/** The photo context value. */
 export interface PhotoSurface {
   photo: PhotoApi;
   uncertainty: UncertaintyApi;
@@ -303,14 +312,7 @@ export function usePhotoState(model: QuiltModel | null): PhotoFlowState {
       payload: Uint8Array | string,
       optionsJson: string,
       token: { cancelled: boolean },
-    ): Promise<{
-      model: QuiltModel;
-      verdict?: string;
-      diagnostics?: Record<string, unknown>;
-      requested?: { width: number | null; height: number | null } | null;
-      achieved?: { width: number; height: number } | null;
-      ms: number;
-    }> => {
+    ): Promise<ReverseOutcome> => {
       for (;;) {
         if (token.cancelled) throw new EngineError("worker", "cancelled");
         try {
@@ -451,14 +453,7 @@ export function usePhotoState(model: QuiltModel | null): PhotoFlowState {
       const optionsJson = Object.keys(options).length ? JSON.stringify(options) : "{}";
       let staged = await ensureStagedToken();
       if (!staged) throw new Error("no staged photo");
-      let outcome: {
-        model: QuiltModel;
-        verdict?: string;
-        diagnostics?: Record<string, unknown>;
-        requested?: { width: number | null; height: number | null } | null;
-        achieved?: { width: number; height: number } | null;
-        ms: number;
-      };
+      let outcome: ReverseOutcome;
       try {
         outcome = await runReverse(staged, optionsJson, token);
       } catch (error) {

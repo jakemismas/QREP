@@ -55,6 +55,11 @@ export function useModelState(): ModelApi {
   const versionRef = useRef(0);
   const pendingRef = useRef<{ json: string; version: number } | null>(null);
   const validatingRef = useRef(false);
+  // The model the latest replaceModel installed. A render's effect can run
+  // after a newer replaceModel (a non-urgent render's effects wait for a
+  // scheduler task, and a keypress can land first); that stale effect must not
+  // send its older model under the newer version.
+  const latestRef = useRef<QuiltModel | null>(null);
 
   const drainValidation = useCallback(() => {
     if (validatingRef.current) return;
@@ -85,12 +90,13 @@ export function useModelState(): ModelApi {
     // for the replaced model is dropped even if it lands before the next render.
     versionRef.current += 1;
     pendingRef.current = null;
+    latestRef.current = next;
     setModel(next);
     if (fresh) setSummary(null);
   }, []);
 
   useEffect(() => {
-    if (!model) return;
+    if (!model || model !== latestRef.current) return;
     pendingRef.current = { json: JSON.stringify(model), version: versionRef.current };
     drainValidation();
   }, [model, drainValidation]);
