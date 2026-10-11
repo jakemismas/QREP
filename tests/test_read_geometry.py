@@ -328,3 +328,8 @@ def test_every_code_is_named_once():
         Diagnosis(code="corner_outside_image", message="x")
     with pytest.raises(ValueError, match="pixels_per_square"):
         Diagnosis(code="too_few_pixels", message="x")
+
+
+def test_a_negative_crop_offset_on_y_is_refused():
+    with pytest.raises(ValueError, match="crop_offset"):
+        read(GRID_40, offset=Point.model_construct(x=0.0, y=-1.0))

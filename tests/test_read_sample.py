@@ -35,6 +35,7 @@ from qrep.vision.read.sample import (
     Squares,
     read_squares,
     to_lab,
+    _inner,
     warp_matrix,
 )
 
@@ -482,3 +483,108 @@ def test_the_read_imports_cv2_only_inside_functions():
         )
     # sample.py reads pixels, so it imports cv2 once, inside read_squares.
     assert lazy == 1
+
+
+def polygon(image, quad, fill):
+    import cv2
+
+    # 4 fractional bits keep the drawn corners within 1/16 px.
+    vertices = np.round(np.array(quad, dtype=float) * 16).astype(np.int32)
+    cv2.fillConvexPoly(image, vertices, fill, shift=4)
+
+
+def test_the_smallest_square_keeps_p_pixels_when_an_axis_downsamples():
+    # Two squares receding along x: x = 400u / (1 + 1.5u), y = 64v / (1 + 1.5u)
+    # for u in 0..2, v in 0..1, so corners (0, 0), (800/4 = 200, 0), (200,
+    # 64/4 = 16), (0, 64). Vertex x: 0, 400/2.5 = 160, 200, so the squares are
+    # 160 and 40 px wide: x scales by max(64/160, 32/40) = 0.8, the P term
+    # binding (without it, 0.4 would cut the far square to 16 px). Heights at
+    # u = 0, 1, 2 are 64, 25.6 and 16, so the bounding heights are 64 and
+    # 25.6 and y keeps max(64/64, 32/25.6) capped at 1. Every scaled side stays
+    # at least min(its length, 32): top 128 and 32, bottom (128, -38.4) 133.6
+    # and (32, -9.6) 33.4, vertical sides unscaled.
+    image = np.zeros((64, 200, 3), dtype=np.uint8)
+    polygon(image, [(0, 0), (160, 0), (160, 25.6), (0, 64)], (64, 64, 64))
+    polygon(image, [(160, 0), (200, 0), (200, 16), (160, 25.6)], (192, 192, 192))
+    frame = FieldFrame(kind="field", corners=corners((0, 0), (200, 0), (200, 16), (0, 64)))
+    result = sample(image, frame, counts(2, 1))
+    # round(200 x 0.8) = 160 px, so x scales by exactly 160/200.
+    assert result.downsample == (0.8, 1.0)
+    assert_lab(result.lab[0, 0], gray(64))
+    assert_lab(result.lab[0, 1], gray(192))
+
+
+def test_a_sheared_grid_downsamples_both_axes_alike():
+    # Two sheared squares, x = 100u + 300v, y = 100v for u in 0..2, v in 0..1:
+    # corners (0, 0), (200, 0), (500, 100), (300, 100). Top and bottom sides
+    # are 100 px, the slanted ones sqrt(300^2 + 100^2) = 316.228. Each
+    # bounding box is 400 x 100 px, so the axis rules would scale x by
+    # max(64/400, 32/400) = 0.16 and y by 0.64, cutting the 100 px sides to
+    # 16 px, under P. Both axes then take min(1, max(64/316.228, 32/100)) =
+    # 0.32, which keeps the shortest side at 32 px: round(500 x 0.32) = 160
+    # and round(100 x 0.32) = 32 px.
+    image = np.zeros((100, 500, 3), dtype=np.uint8)
+    polygon(image, [(0, 0), (100, 0), (400, 100), (300, 100)], (64, 64, 64))
+    polygon(image, [(100, 0), (200, 0), (500, 100), (400, 100)], (192, 192, 192))
+    frame = FieldFrame(kind="field", corners=corners((0, 0), (200, 0), (500, 100), (300, 100)))
+    result = sample(image, frame, counts(2, 1))
+    assert result.downsample == pytest.approx((0.32, 0.32))
+    assert_lab(result.lab[0, 0], gray(64))
+    assert_lab(result.lab[0, 1], gray(192))
+
+
+def test_the_floor_sees_a_short_vertical_side():
+    # The perspective floor case turned to recede along y: x = 3 + 60u / (4 +
+    # v), y = 3 + 90v / (4 + v) for u in 0..3, v in 0..4, so corners (3, 3),
+    # (48, 3), (3 + 180/8, 3 + 360/8) = (25.5, 48) and (3, 48). The shortest
+    # side is vertical, on u = 0 from v = 3 to 4: 45 - 270/7 = 45/7 =
+    # 6.428571; every horizontal side is at least 60/8 = 7.5 px.
+    image = np.full((52, 52, 3), 128, dtype=np.uint8)
+    frame = FieldFrame(kind="field", corners=corners((3, 3), (48, 3), (25.5, 48), (3, 48)))
+    result = sample(image, frame, counts(3, 4))
+    assert result.code == "too_few_pixels"
+    assert result.pixels_per_square == pytest.approx(45 / 7)
+
+
+def test_every_strip_side_is_inset_across_and_along():
+    # Counts 1 x 1 and one band of 1 square at 32 px: each side strip warps by
+    # a translation to 32 x 32 px and samples local pixels 6..25 on both
+    # axes. Each side carries ten black lines at local 11..20, the rest white,
+    # so each reads median 50 and spread 50 (10 black and 10 white of 20):
+    # across the band for top (rows 11..20) and right (columns 75..84), along
+    # it for bottom (columns 43..52) and left (rows 43..52). Without the inset
+    # on that axis a side would keep all 32 lines, 22 of them white: L 100.
+    image = np.full((96, 96, 3), 255, dtype=np.uint8)
+    image[11:21, 32:64] = 0
+    image[32:64, 75:85] = 0
+    image[64:96, 43:53] = 0
+    image[43:53, 0:32] = 0
+    result = sample(image, outer_frame(96, 96, 1.0), counts(1, 1))
+    for strip in result.strips:
+        assert_lab(strip.lab, (50.0, 0.0, 0.0))
+        assert_lab(strip.spread, (50.0, 0.0, 0.0))
+
+
+def test_a_short_strip_keeps_an_inset_of_a_fifth_of_its_length():
+    # Counts 1 x 12 and one band of 2.5 squares at 32 px: 6 x 17 squares over
+    # 192 x 544 px. The top strip is x 80..112, y 0..80, 1 square long and 2.5
+    # wide, warped by a translation to 32 x 80 px. Along it the inset is
+    # capped at 0.2 x 1 x 32 = 6.4 px, so columns 6..25 (x 86..105); columns
+    # 91..100 are black, so 10 black and 10 white: median 50. With the band's
+    # 0.2 x 2.5 x 32 = 16 px instead, the run would be thinner than its insets
+    # and keep only its middle column, 15, which is black: L 0.
+    image = np.full((544, 192, 3), 255, dtype=np.uint8)
+    image[0:80, 91:101] = 0
+    result = sample(image, outer_frame(192, 544, 2.5), counts(1, 12))
+    top = next(s for s in result.strips if (s.band, s.side) == (0, "top"))
+    assert_lab(top.lab, (50.0, 0.0, 0.0))
+
+
+def test_a_run_thinner_than_its_insets_keeps_its_middle_pixel():
+    # Centers sit at i + 0.5. A 32 px run inset 6.4 keeps centers 6.5..25.5:
+    # pixels 6..25. A 2 px run inset 0.9 would keep centers from 0.9 to 1.1,
+    # none, so it keeps its middle pixel, (2 - 1) // 2 = 0. A 1 px run inset
+    # 0.3 keeps its one pixel, whose center 0.5 lies 0.5 from both ends.
+    assert _inner(32, 6.4) == slice(6, 26)
+    assert _inner(2, 0.9) == slice(0, 1)
+    assert _inner(1, 0.3) == slice(0, 1)

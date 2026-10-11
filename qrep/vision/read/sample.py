@@ -13,7 +13,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from qrep.vision.read.diagnosis import Diagnosis
-from qrep.vision.read.geometry import Geometry, Quad, homography
+from qrep.vision.read.geometry import Geometry, Quad, homography, square_sides
 
 # Warped pixels per square: the confirmed-grid prototype's value (plan B2a).
 P = 32
@@ -28,8 +28,9 @@ INSET = 0.2
 # set the final floor.
 MIN_PX_PER_SQUARE = 7
 # Float CIELAB takes 12 bytes a pixel and its conversion holds a few such
-# arrays at once, so the field converts in bands of square rows of at most
-# this many pixels and the peak stays flat whatever the grid size.
+# arrays at once, so the field converts in bands of square rows of about this
+# many pixels (one square row when a row alone holds more), and the peak stays
+# flat whatever the row count. Band strips are small and convert whole.
 CHUNK_PX = 1 << 21
 
 # sRGB to CIELAB with the D65 constants OpenCV documents. The read applies
@@ -123,10 +124,12 @@ def _warp(cv2, image: np.ndarray, quad: Quad, width: int, height: int) -> np.nda
 
 def _inner(n: int, inset_px: float) -> slice:
     """The pixels of a run of n whose centers, at i + 0.5, lie inset_px or
-    more from both ends. Every caller keeps inset_px at most a fifth of the
-    run's length before rounding (n is that length rounded, at least 1), so
-    the slice is never empty and stays inside [0, n)."""
-    return slice(math.ceil(inset_px - 0.5), math.floor(n - inset_px - 0.5) + 1)
+    more from both ends. A run thinner than its two insets keeps its middle
+    pixel, so a sample is never empty whatever the inset knob says."""
+    lo, hi = math.ceil(inset_px - 0.5), math.floor(n - inset_px - 0.5)
+    if hi < lo:
+        lo = hi = (n - 1) // 2
+    return slice(lo, hi + 1)
 
 
 def _median_and_spread(pixels: np.ndarray, axis: int) -> tuple[np.ndarray, np.ndarray]:
@@ -135,13 +138,27 @@ def _median_and_spread(pixels: np.ndarray, axis: int) -> tuple[np.ndarray, np.nd
     return median, spread
 
 
-def _scale(span: tuple[float, float]) -> float:
-    """The area scale for one axis: the largest square shrinks to about 2P px,
-    so the warp decimates by little more than 2 (exp0), but never so far that
-    the smallest square spans fewer than P px. Under strong perspective the
-    far squares keep their pixels and the near ones alias a little instead."""
+def _axis_scale(span: tuple[float, float]) -> float:
     smallest, largest = span
     return min(1.0, max(DOWNSAMPLE_PX / largest, P / smallest))
+
+
+def _downsample(geometry: Geometry) -> tuple[float, float]:
+    """The area scale on x and on y. Each axis shrinks until its largest
+    square spans about 2P px, so the warp decimates by little more than 2
+    (exp0), but never so far that its smallest square spans fewer than P px.
+    A bounding box understates a sheared or foreshortened square's sides, so
+    when the two scales would bring any side under P px (or shorten one that
+    is already under P), both axes take the one scale that keeps every side
+    there: the warp then aliases a little on the largest squares instead."""
+    scale = np.array([_axis_scale(geometry.square_span_x), _axis_scale(geometry.square_span_y)])
+    sides = square_sides(geometry.grid_vertices())
+    lengths = np.linalg.norm(sides, axis=-1)
+    if np.any(np.linalg.norm(sides * scale, axis=-1) < np.minimum(lengths, P) - 1e-9):
+        longest, shortest = geometry.pixels_per_square_max, geometry.pixels_per_square_min
+        uniform = min(1.0, max(DOWNSAMPLE_PX / longest, P / shortest))
+        return (uniform, uniform)
+    return (float(scale[0]), float(scale[1]))
 
 
 def read_squares(image: np.ndarray, geometry: Geometry) -> Squares | Diagnosis:
@@ -167,7 +184,7 @@ def read_squares(image: np.ndarray, geometry: Geometry) -> Squares | Diagnosis:
     x1 = min(geometry.image_width, max(x0 + 1, math.ceil(max(xs))))
     y1 = min(geometry.image_height, max(y0 + 1, math.ceil(max(ys))))
     source = image[y0:y1, x0:x1]
-    scale_x, scale_y = _scale(geometry.square_span_x), _scale(geometry.square_span_y)
+    scale_x, scale_y = _downsample(geometry)
     if scale_x < 1.0 or scale_y < 1.0:
         size = (max(1, round((x1 - x0) * scale_x)), max(1, round((y1 - y0) * scale_y)))
         source = cv2.resize(source, size, interpolation=cv2.INTER_AREA)

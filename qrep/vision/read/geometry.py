@@ -115,6 +115,11 @@ class Geometry:
         u, v = np.meshgrid(np.arange(self.cols) + 0.5, np.arange(self.rows) + 0.5)
         return apply(homography(self.field, self.cols, self.rows), np.stack([u, v], axis=-1))
 
+    def grid_vertices(self) -> np.ndarray:
+        """Every grid vertex of the field in image pixels, shape (rows + 1,
+        cols + 1, 2)."""
+        return _grid_vertices(self.field, self.rows, self.cols)
+
     def field_in_photo(self) -> Quad:
         """The field quad in the decoded photo's pixels (#101)."""
         dx, dy = self.crop_offset
@@ -183,22 +188,33 @@ def _sides(h: np.ndarray, o: float, w: float, big_u: float, big_v: float) -> tup
     )
 
 
+def _grid_vertices(field: Quad, rows: int, cols: int) -> np.ndarray:
+    """Every grid vertex in image pixels, shape (rows + 1, cols + 1, 2)."""
+    u, v = np.meshgrid(np.arange(cols + 1), np.arange(rows + 1))
+    return apply(homography(field, cols, rows), np.stack([u, v], axis=-1))
+
+
+def square_sides(vertices: np.ndarray) -> np.ndarray:
+    """Every square side as a vector in image pixels, shape (n, 2)."""
+    across = vertices[:, 1:] - vertices[:, :-1]
+    down = vertices[1:] - vertices[:-1]
+    return np.concatenate([across.reshape(-1, 2), down.reshape(-1, 2)])
+
+
 def _square_sizes(field: Quad, rows: int, cols: int):
     """The shortest and longest square side, and the (min, max) width and
     height of the squares' bounding boxes, from every grid vertex mapped into
     the image, so a foreshortened far square counts at its own size."""
-    u, v = np.meshgrid(np.arange(cols + 1), np.arange(rows + 1))
-    vertices = apply(homography(field, cols, rows), np.stack([u, v], axis=-1))
-    across = np.linalg.norm(vertices[:, 1:] - vertices[:, :-1], axis=-1)
-    down = np.linalg.norm(vertices[1:] - vertices[:-1], axis=-1)
+    vertices = _grid_vertices(field, rows, cols)
+    lengths = np.linalg.norm(square_sides(vertices), axis=-1)
     corners = np.stack(
         [vertices[:-1, :-1], vertices[:-1, 1:], vertices[1:, 1:], vertices[1:, :-1]], axis=-1
     )
     spans = corners.max(axis=-1) - corners.min(axis=-1)
     span_x, span_y = spans[..., 0], spans[..., 1]
     return (
-        float(min(across.min(), down.min())),
-        float(max(across.max(), down.max())),
+        float(lengths.min()),
+        float(lengths.max()),
         (float(span_x.min()), float(span_x.max())),
         (float(span_y.min()), float(span_y.max())),
     )
