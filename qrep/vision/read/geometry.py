@@ -6,10 +6,10 @@ Coordinates are pixel edges of the staged crop: the image spans [0, W] x
 the web's canvas and of the renderer's sidecar corners. Positions inside the
 quilt are measured in squares: the field's plane runs u from 0 to cols and v
 from 0 to rows, and an outer edge's plane adds the total band width T on
-every side. Every value here follows from user-confirmed inputs, so the
-result is recorded at confidence 1.0 (docs/SPEC.md section 4).
+every side.
 
-Like qrep/contract.py, this module never imports cv2.
+This module imports no cv2 itself. Its parent package, qrep.vision, still
+imports the old pipeline and cv2 with it, until B6b removes them.
 """
 
 import math
@@ -68,6 +68,21 @@ class Band:
 
 @dataclass(frozen=True)
 class Geometry:
+    """The confirmed geometry of one read.
+
+    confidence is the confidence of every user-confirmed input it records
+    (the frame's corners or outer edge, each band, the counts) and of every
+    value derived from them here, so it is always 1.0 (docs/SPEC.md section
+    4). crop_offset places the staged crop in the decoded photo; the web sets
+    it when it cuts the crop, so it is no CV value either.
+
+    pixels_per_square_min and pixels_per_square_max are the shortest and
+    longest side of any square, in source pixels: the shortest sets the pixel
+    floor, because under perspective its square is the worst resolved.
+    square_span_x and square_span_y are the (smallest, largest) width and
+    height of the squares' bounding boxes, which set the downsample per axis.
+    """
+
     frame: FieldFrame | OuterEdgeFrame
     counts: Counts
     corners_source: CornersSource
@@ -83,10 +98,10 @@ class Geometry:
     image_width: int
     image_height: int
     crop_offset: tuple[float, float]
-    # The smallest field edge per square sets the pixel floor (its squares
-    # are the worst resolved); the largest sets the downsample.
     pixels_per_square_min: float
     pixels_per_square_max: float
+    square_span_x: tuple[float, float]
+    square_span_y: tuple[float, float]
     confidence: float = 1.0
 
     def __post_init__(self):
@@ -98,8 +113,7 @@ class Geometry:
     def square_centers(self) -> np.ndarray:
         """Each square's center in image pixels, shape (rows, cols, 2)."""
         u, v = np.meshgrid(np.arange(self.cols) + 0.5, np.arange(self.rows) + 0.5)
-        h = homography(self.field, self.cols, self.rows)
-        return apply(h, np.stack([u, v], axis=-1))
+        return apply(homography(self.field, self.cols, self.rows), np.stack([u, v], axis=-1))
 
     def field_in_photo(self) -> Quad:
         """The field quad in the decoded photo's pixels (#101)."""
@@ -169,6 +183,27 @@ def _sides(h: np.ndarray, o: float, w: float, big_u: float, big_v: float) -> tup
     )
 
 
+def _square_sizes(field: Quad, rows: int, cols: int):
+    """The shortest and longest square side, and the (min, max) width and
+    height of the squares' bounding boxes, from every grid vertex mapped into
+    the image, so a foreshortened far square counts at its own size."""
+    u, v = np.meshgrid(np.arange(cols + 1), np.arange(rows + 1))
+    vertices = apply(homography(field, cols, rows), np.stack([u, v], axis=-1))
+    across = np.linalg.norm(vertices[:, 1:] - vertices[:, :-1], axis=-1)
+    down = np.linalg.norm(vertices[1:] - vertices[:-1], axis=-1)
+    corners = np.stack(
+        [vertices[:-1, :-1], vertices[:-1, 1:], vertices[1:, 1:], vertices[1:, :-1]], axis=-1
+    )
+    spans = corners.max(axis=-1) - corners.min(axis=-1)
+    span_x, span_y = spans[..., 0], spans[..., 1]
+    return (
+        float(min(across.min(), down.min())),
+        float(max(across.max(), down.max())),
+        (float(span_x.min()), float(span_x.max())),
+        (float(span_y.min()), float(span_y.max())),
+    )
+
+
 def confirm(
     frame: FieldFrame | OuterEdgeFrame,
     counts: Counts,
@@ -182,10 +217,15 @@ def confirm(
 
     corners_source says whether the user set the corners or accepted a
     suggestion, so evaluation can separate corner error from read error
-    (data-48). The v2 request carries no such field, so the caller names it.
+    (data-48). The v2 request carries no such field yet (#231), so the caller
+    names it.
     """
     if corners_source not in ("user", "suggestion"):
         raise ValueError(f"corners_source must be 'user' or 'suggestion', got {corners_source!r}")
+    if crop_offset.x < 0 or crop_offset.y < 0:
+        raise ValueError(
+            f"crop_offset must not be negative, got ({crop_offset.x}, {crop_offset.y})"
+        )
     numbers = (
         counts.blocks_across,
         counts.blocks_down,
@@ -239,13 +279,7 @@ def confirm(
         )
         inset += w
     field = _quad(h, total, total, total + cols, total + rows) if bands else outer
-    tl, tr, br, bl = (np.array(corner) for corner in field)
-    per_square = (
-        float(np.linalg.norm(tr - tl)) / cols,
-        float(np.linalg.norm(br - bl)) / cols,
-        float(np.linalg.norm(bl - tl)) / rows,
-        float(np.linalg.norm(br - tr)) / rows,
-    )
+    shortest, longest, span_x, span_y = _square_sizes(field, rows, cols)
     return Geometry(
         frame=frame,
         counts=counts,
@@ -262,6 +296,8 @@ def confirm(
         image_width=width,
         image_height=height,
         crop_offset=(crop_offset.x, crop_offset.y),
-        pixels_per_square_min=min(per_square),
-        pixels_per_square_max=max(per_square),
+        pixels_per_square_min=shortest,
+        pixels_per_square_max=longest,
+        square_span_x=span_x,
+        square_span_y=span_y,
     )

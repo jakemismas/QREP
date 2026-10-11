@@ -120,15 +120,25 @@ def test_square_centers_follow_a_perspective_homography():
             assert tuple(centers[r, c]) == pytest.approx(expected, abs=1e-9)
 
 
-def test_pixels_per_square_are_measured_on_each_field_edge():
-    # The trapezoid above. top |(128, 8) - (8, 8)| = 120 over 4 cols = 30;
-    # bottom |(128, 68) - (8, 128)| = sqrt(120^2 + 60^2) = 134.1641 over 4 =
-    # 33.5410; left |(8, 128) - (8, 8)| = 120 over 3 rows = 40; right
-    # |(128, 68) - (128, 8)| = 60 over 3 = 20. Smallest 20, largest 40.
+def test_pixels_per_square_are_the_shortest_and_longest_square_sides():
+    # The trapezoid above, x = 8 + 240u / (4 + u), y = 8 + 160v / (4 + u).
+    # Grid vertices: x(u) = 8, 56, 88, 110.857143, 128 for u = 0..4, and at
+    # u the rows are 160 / (4 + u) px tall. The shortest side is the top of
+    # square (0, 3): x(4) - x(3) = 120 - 720/7 = 120/7 = 17.142857 (shorter
+    # than any edge average: the right edge gives 60 / 3 = 20). The longest is
+    # the bottom of square (2, 0), from (8, 128) to (56, 8 + 480/5 = 104):
+    # sqrt(48^2 + 24^2) = sqrt(2880) = 53.665631.
     geometry = read(field((8, 8), (128, 8), (128, 68), (8, 128)))
-    assert geometry.pixels_per_square_min == pytest.approx(20)
-    assert geometry.pixels_per_square_max == pytest.approx(40)
-    assert read(GRID_40).pixels_per_square_min == pytest.approx(40)
+    assert geometry.pixels_per_square_min == pytest.approx(120 / 7)
+    assert geometry.pixels_per_square_max == pytest.approx(math.sqrt(2880))
+    # Bounding boxes: square (r, c) is x(c + 1) - x(c) wide, from 48 (c = 0)
+    # down to 120/7 (c = 3), and 160(r + 1)/(4 + c) - 160r/(5 + c) tall, from
+    # 160/7 = 22.857143 (square (0, 3)) to 120 - 64 = 56 (square (2, 0)).
+    assert geometry.square_span_x == pytest.approx((120 / 7, 48))
+    assert geometry.square_span_y == pytest.approx((160 / 7, 56))
+    grid = read(GRID_40)
+    assert (grid.pixels_per_square_min, grid.pixels_per_square_max) == pytest.approx((40, 40))
+    assert grid.square_span_x == pytest.approx((40, 40))
 
 
 def test_a_field_frame_is_its_own_outer_edge_and_has_no_bands():
@@ -196,6 +206,34 @@ def test_each_band_keeps_its_own_geometry():
     approx_quad(left.quad, [(0, 20), (20, 20), (20, 120), (0, 120)])
     assert (left.length_squares, left.width_squares) == (5, 1)
     assert [side.name for side in second.sides] == ["top", "right", "bottom", "left"]
+
+
+def test_unequal_bands_keep_their_order_and_widths():
+    # Bands of 0.5 then 1.5 squares from the outside in, counts 4 x 3: the
+    # outer rectangle is 4 + 4 = 8 by 3 + 4 = 7 squares over 160 x 140 px, so
+    # 20 px per square. Band 0 runs 0 to 0.5 x 20 = 10 px in, band 1 from 10
+    # to (0.5 + 1.5) x 20 = 40 px in. Reversed bands would put band 0's inner
+    # edge at 30 px, and two averaged bands at 20 px.
+    geometry = read(outer((0, 0), (160, 0), (160, 140), (0, 140), 0.5, 1.5), size=(160, 140))
+    first, second = geometry.bands
+    assert (first.width_squares, first.inset_squares) == (0.5, 0)
+    assert (second.width_squares, second.inset_squares) == (1.5, 0.5)
+    approx_quad(first.inner, [(10, 10), (150, 10), (150, 130), (10, 130)])
+    approx_quad(second.outer, first.inner)
+    approx_quad(second.inner, [(40, 40), (120, 40), (120, 100), (40, 100)])
+    # Band 0's top strip runs u 0.5..7.5, v 0..0.5 (x 10..150, y 0..10);
+    # band 1's runs u 2..6, v 0.5..2 (x 40..120, y 10..40).
+    approx_quad(first.side("top").quad, [(10, 0), (150, 0), (150, 10), (10, 10)])
+    assert (first.side("top").length_squares, first.side("top").width_squares) == (7, 0.5)
+    approx_quad(second.side("top").quad, [(40, 10), (120, 10), (120, 40), (40, 40)])
+    assert (second.side("left").length_squares, second.side("left").width_squares) == (3, 1.5)
+
+
+def test_a_negative_crop_offset_is_refused():
+    # The contract refuses it in ReadRequest; a caller that builds the parts
+    # itself gets the same refusal, never a field placed outside the photo.
+    with pytest.raises(ValueError, match="crop_offset"):
+        read(GRID_40, offset=Point.model_construct(x=-1.0, y=0.0))
 
 
 def test_a_fractional_band_width_is_kept():
