@@ -80,7 +80,7 @@ test.describe("photo-flow components in the editor at 1440 x 900", { tag: "@phon
     await expect(page.getByTestId("editor")).toBeVisible();
   });
 
-  test("the Pattern tab's round-trip panel is styled and stays inside its side panel", async ({ page }) => {
+  test("the Pattern tab's round-trip panel is styled and holds its content", async ({ page }) => {
     await page.goto("./");
     await page.getByTestId("open-demo").click();
     await expect(page.getByTestId("editor")).toBeVisible();
@@ -99,18 +99,29 @@ test.describe("photo-flow components in the editor at 1440 x 900", { tag: "@phon
 
     // The page-level guard cannot pass on this tab yet: once its amounts fill
     // in, the yardage table runs past the side panel and the page (web-01,
-    // fixed by C2b), with or without the round-trip rules. So this checks the
-    // panel's own box: inside the side panel, which sits inside the viewport.
+    // fixed by C2b), with or without the round-trip rules. So this checks what
+    // the panel holds: the panel stretches to the side panel's width, so its
+    // own box always fits, but a control that does not wrap spills past its
+    // right edge. Every descendant stays inside the panel, the panel's
+    // content is no wider than the panel, and the panel ends inside 1440 px.
     await page.screenshot({
       path: path.join(layoutDir, "editor-pattern-roundtrip-1440.png"),
       fullPage: true,
       animations: "disabled",
     });
-    const side = await page.locator(".side-panel").boundingBox();
-    const own = await panel.boundingBox();
-    if (!side || !own) throw new Error("side panel or round-trip panel has no box");
-    expect(own.x).toBeGreaterThanOrEqual(side.x);
-    expect(own.x + own.width).toBeLessThanOrEqual(side.x + side.width);
-    expect(side.x + side.width).toBeLessThanOrEqual(1440);
+    const fit = await panel.evaluate((root) => {
+      const box = root.getBoundingClientRect();
+      // Sub-pixel spill from layout rounding is not overflow (as in
+      // helpers/layout.ts).
+      const tolerance = 0.5;
+      const spill = Array.from(root.querySelectorAll("*"))
+        .map((el) => ({ el, r: el.getBoundingClientRect() }))
+        .filter(({ r }) => r.width > 0 && (r.left < box.left - tolerance || r.right > box.right + tolerance))
+        .map(({ el, r }) => `${el.tagName.toLowerCase()}.${el.getAttribute("class") ?? ""} spans ${r.left.toFixed(1)} to ${r.right.toFixed(1)}`);
+      return { spill, scrollWidth: root.scrollWidth, clientWidth: root.clientWidth, right: box.right };
+    });
+    expect(fit.spill, "round-trip panel content past its edges").toEqual([]);
+    expect(fit.scrollWidth).toBeLessThanOrEqual(fit.clientWidth);
+    expect(fit.right).toBeLessThanOrEqual(1440);
   });
 });
