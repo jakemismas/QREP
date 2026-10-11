@@ -21,9 +21,13 @@ imported inside read_pdf, so the module also loads where pypdf is missing.
 It implements every [S] check of section 6 except PS-04 (two generations; A4a, C2a and A6
 carry it) and PS-40 (the web screen; C2's end-to-end test carries it), plus the [M] parts
 that the model JSON can answer. [V] checks are D8's and E4's. PS-39 runs only when a local
-reference directory is passed and reports "not run" otherwise; it reads the .txt, .md and
-.json files there (skipping names that start with "."), and it fails when it reads no
-reference text or when any other file, or a .json it cannot parse, is present.
+reference directory is passed and reports "not run" otherwise. It decodes each .txt, .md and
+.json file there by its byte order mark (UTF-8, UTF-16 LE or BE) or as strict UTF-8, takes
+a .txt or .md file as one chunk and each JSON string as one, and compares runs of 10 words
+within a chunk, never across two. A file that does not open, decode or parse, gives no run
+of 10 words or has another extension counts as unread, as do a folder it cannot list and a
+link to a folder; any unread file, or none read, fails the check. Paths with a component
+that starts with "." are skipped and counted. Its evidence carries counts only.
 
 Text is extracted with pypdf, then normalized as section 6 says: whitespace runs collapse
 to one space and straight double quotes drop out, so 6 1/2" reads 6 1/2. The checker groups
@@ -34,13 +38,18 @@ normalized):
 - Cover: the pattern name is the topmost line at the largest size; a line right below it
   at that size joins it while the joined name still appears in a footer. The finished size
   is the "W x H" pair on the first cover line that holds "Finished size" (any case).
-- Section headings: a line that is exactly the PS-02 heading, optionally "(continued)".
+- Section headings: a line that is exactly the PS-02 heading, optionally "(continued)",
+  and is not a figure label.
 - Footer: the line with "page N of M", the pattern name and "QREP x.y.z", anything at or
   below its baseline, and a line up to 24 pt above it that holds only the name or version.
+- Lines: runs on one baseline form a line, but runs inside a figure's patches, runs within
+  18 pt of them and runs farther out form separate lines, so a step beside a figure keeps
+  its own words.
 - Figure labels: a line whose runs all sit inside a figure's patches, or all within 18 pt
   of them when the line reads as a label (a dimension, number or letter, or a layout chart
-  part "Rows a to b, columns c to d"; never a sentence, step, heading, piece line or make
-  count). Size plays no part.
+  part "Rows a to b, columns c to d"; never a sentence, step, piece line or make count, at
+  any size). A section heading, subheading, fabric heading or row of unit names (a mirror
+  pair's labels) there is a label below 10 pt and a heading at 10 pt or more (L-10).
 - Subheadings: "HST unit 1", "QST unit 1", "Snowball unit 1", "Flying geese unit 1",
   "Unit 1", "Strip set 1" (Making the units) and "Block 1" (Making the blocks).
 - Logical lines (Cutting, units, blocks): a step or subcut that wraps runs on into the next
@@ -80,8 +89,10 @@ normalized):
 from __future__ import annotations
 
 import argparse
+import codecs
 import json
 import math
+import os
 import re
 import sys
 from dataclasses import dataclass, field
@@ -128,6 +139,10 @@ VERSION_RE = re.compile(r"\bQREP (\d+(?:\.\d+)+)\b")
 STEP_RE = re.compile(r"^(\d+)\. (.*)$")
 UNIT_HEAD_RE = re.compile(r"^(?:(HST|QST|Snowball|Flying geese) unit|Unit|Strip set) (\d+)$")
 BLOCK_HEAD_RE = re.compile(r"^Block (\d+)$")
+# One or more unit or block names on a line: one subheading, or the labels of a mirror pair
+# drawn side by side (S5.2) when they share a baseline.
+UNIT_NAME = r"(?:(?:HST|QST|Snowball|Flying geese) unit|Unit|Strip set|Block) \d+"
+NAMES_RE = re.compile(rf"^{UNIT_NAME}(?: {UNIT_NAME})*$")
 FABRIC_HEAD_RE = re.compile(rf"^({LETTER}) ([A-Z][A-Za-z]*(?: [A-Za-z]+){{0,3}})$")
 SUBCUT_RE = re.compile(
     rf"^({LABEL}): subcut \((\d+)\) strips? into \((\d+)\) ({NUM})(?: x ({NUM}))? "
@@ -156,6 +171,9 @@ ALTERNATE_RE = re.compile(r"\balternat(?:e|ive|ively)\b(?! (?:rows?|columns?|blo
 # any size, so a line in this band is a label only when it reads as one (_label_like).
 FIGURE_MARGIN = 18
 CHART_PART_RE = re.compile(r"^Rows \d+ to \d+, columns \d+ to \d+$")
+# L-10: body text is at least 10 pt, so a heading pattern smaller than that beside a figure
+# is one of its labels.
+BODY_MIN = 10
 # The footer is the "page N of M" line and anything at or below its baseline, plus a line
 # up to 24 pt above it that holds nothing but the name or the version (G-02).
 FOOTER_TOLERANCE = 2
@@ -426,29 +444,53 @@ def _in_region(run: Run, regions, pad: float = 0) -> bool:
                for r in regions)
 
 
+def _zone(run: Run, regions) -> tuple:
+    """Where a run sits: inside figure i's patch box, in its 18 pt label band, or out."""
+    for i, r in enumerate(regions):
+        if _in_region(run, [r]):
+            return ("in", i)
+    for i, r in enumerate(regions):
+        if _in_region(run, [r], FIGURE_MARGIN):
+            return ("band", i)
+    return ("out",)
+
+
 def _label_like(line: Line) -> bool:
     """A dimension, row number, letter or layout chart part range set beside a figure, at
-    any size. A sentence, a step, a heading, a piece line or a make count stays body text."""
+    any size. A sentence, a step, a piece line or a make count stays body text at any size.
+    A section heading, unit or block subheading (or unit names side by side) or fabric
+    heading is a heading at the 10 pt body size or larger and a figure label below it (L-10),
+    as the 7 pt names under a mirror pair are (S5.2)."""
     text = line.text
     if CHART_PART_RE.match(text):
         return True
     if re.search(r"[.!?:]$", text) or text.startswith("Make ") or STEP_RE.match(text) \
-            or _heading(text) or UNIT_HEAD_RE.match(text) or BLOCK_HEAD_RE.match(text) \
-            or (FABRIC_HEAD_RE.match(text) and line.swatch is not None) or _piece_line(text):
+            or _piece_line(text):
         return False
+    if _heading(text) or NAMES_RE.match(text) or (FABRIC_HEAD_RE.match(text)
+                                                  and line.swatch is not None):
+        return max(r.size for r in line.runs) < BODY_MIN - 0.05
     return len(re.findall(r"[A-Za-z]{2,}", text)) <= 1
 
 
 def _build_lines(page: Page) -> None:
     runs = sorted(page.runs, key=lambda r: (-r.y, r.x))
-    groups = []
+    baselines = []
     for run in runs:
-        if groups and abs(groups[-1][0].y - run.y) <= max(1.0, 0.25 * run.size):
-            groups[-1].append(run)
+        if baselines and abs(baselines[-1][0].y - run.y) <= max(1.0, 0.25 * run.size):
+            baselines[-1].append(run)
         else:
-            groups.append([run])
+            baselines.append([run])
+    groups = []
+    for baseline in baselines:
+        # A figure beside the text shares its baselines. Runs inside a figure, runs in its
+        # label band and runs farther out form separate lines, so a step keeps its own words
+        # and the figure's labels are read as labels, not as table cells (PS-42).
+        zones = {}
+        for run in sorted(baseline, key=lambda r: r.x):
+            zones.setdefault(_zone(run, page.regions), []).append(run)
+        groups += sorted(zones.values(), key=lambda g: g[0].x)
     for group in groups:
-        group.sort(key=lambda r: r.x)
         raw = group[0].text
         for prev, run in zip(group, group[1:]):
             gap = run.x - (prev.x + prev.width)
@@ -462,8 +504,8 @@ def _build_lines(page: Page) -> None:
                     s.x1 <= first.x + 1 and s.x0 >= first.x - 48 and \
                     s.y0 <= first.y + first.size and s.y1 >= first.y - 0.5 * first.size:
                 line.swatch = s.fill
-        # Position and content decide, never size, so a small sentence beside a figure is
-        # still body text for PS-42.
+        # Position and content decide, so a small sentence beside a figure is still body
+        # text for PS-42; size decides only between a heading and a label (_label_like).
         line.figure = all(_in_region(r, page.regions) for r in group) or (
             all(_in_region(r, page.regions, FIGURE_MARGIN) for r in group)
             and _label_like(line))
@@ -522,7 +564,8 @@ def build_doc(pages: list, model: dict) -> Doc:
     for ln in lines:
         if ln.section == "footer":
             continue
-        h = _heading(ln.text)
+        # A heading's words set small beside a figure are its label, not a new section.
+        h = None if ln.figure else _heading(ln.text)
         if h and ln.page > 1:
             current = h
         ln.section = current if ln.page > 1 else "cover"
@@ -874,7 +917,7 @@ def ps02(doc: Doc, opts):
     problems = []
     order = []
     for ln in doc.lines:
-        h = _heading(ln.text)
+        h = None if ln.figure else _heading(ln.text)
         if h and ln.page == 1:
             problems.append(f"heading {h!r} on the cover page")
         elif h and (not order or order[-1] != h):
@@ -1977,12 +2020,44 @@ def _words(text: str) -> list:
     return re.findall(r"[a-z0-9]+(?:'[a-z]+)?", text.lower())
 
 
-def _reference_text(folder: Path) -> tuple:
-    """(text, files read, files not read) for a reference folder. Names that start with "."
-    are skipped; every other file that is not .txt, .md or parseable .json counts as not
-    read, so PS-39 cannot pass on references it never saw."""
+def _decode(data: bytes) -> str | None:
+    """A reference file's text by its byte order mark (UTF-8, UTF-16 LE or BE), else as
+    strict UTF-8; None when it does not decode. A NUL marks UTF-16 or UTF-32 read without
+    its mark, so that file is unread too, never a stream of one-letter words."""
+    encoding = "utf-8"
+    for bom, codec in ((codecs.BOM_UTF8, "utf-8"), (codecs.BOM_UTF16_LE, "utf-16-le"),
+                       (codecs.BOM_UTF16_BE, "utf-16-be")):
+        if data.startswith(bom):
+            data, encoding = data[len(bom):], codec
+            break
+    try:
+        text = data.decode(encoding)
+    except UnicodeDecodeError:
+        return None
+    return None if "\x00" in text else text
+
+
+def _runs_of_ten(text: str) -> set:
+    words = _words(text)
+    return {tuple(words[i:i + 10]) for i in range(len(words) - 9)}
+
+
+def _reference_runs(path: Path) -> set:
+    """The runs of 10 words in one reference file; empty when it cannot be opened, decoded
+    or parsed. A .txt or .md file is one chunk and each string of a .json file is one, and a
+    run never crosses two chunks: words that line up only across strings are no run."""
+    suffix = path.suffix.lower()
+    if suffix not in (".txt", ".md", ".json"):
+        return set()
+    try:
+        text = _decode(path.read_bytes())
+    except OSError:
+        return set()
+    if text is None:
+        return set()
+    if suffix != ".json":
+        return _runs_of_ten(text)
     chunks = []
-    read = unread = 0
 
     def strings(v):
         if isinstance(v, str):
@@ -1994,53 +2069,71 @@ def _reference_text(folder: Path) -> tuple:
             for x in v:
                 strings(x)
 
-    for path in sorted(folder.rglob("*")):
-        if not path.is_file() or any(p.startswith(".")
-                                     for p in path.relative_to(folder).parts):
-            continue
-        suffix = path.suffix.lower()
-        if suffix in (".txt", ".md"):
-            chunks.append(path.read_text(encoding="utf-8", errors="ignore"))
-        elif suffix == ".json":
-            try:
-                strings(json.loads(path.read_text(encoding="utf-8", errors="ignore")))
-            except ValueError:
-                unread += 1
+    try:
+        strings(json.loads(text))
+    except (ValueError, RecursionError):
+        return set()
+    return set().union(*(_runs_of_ten(c) for c in chunks))
+
+
+def _reference_folder(folder: Path) -> tuple:
+    """(runs of 10 words, files read, files unread, hidden paths skipped) for a reference
+    folder. A path with a component that starts with "." is skipped and counted. Every other
+    file is read only when it gives at least one run of 10 words (_reference_runs); a file
+    that does not, a folder that cannot be listed and a link to a folder, which the walk does
+    not enter, each count as unread, so PS-39 cannot pass on references it never saw."""
+    runs = set()
+    count = {"read": 0, "unread": 0, "skipped": 0}
+
+    def hidden(path) -> bool:
+        return any(p.startswith(".") for p in Path(path).parts[len(folder.parts):])
+
+    def unlisted(error: OSError) -> None:
+        count["skipped" if hidden(error.filename or folder) else "unread"] += 1
+
+    for root, dirs, files in os.walk(folder, onerror=unlisted):
+        for name in dirs:
+            if os.path.islink(os.path.join(root, name)):
+                count["skipped" if hidden(Path(root, name)) else "unread"] += 1
+        for name in files:
+            path = Path(root, name)
+            if hidden(path):
+                count["skipped"] += 1
                 continue
-        else:
-            unread += 1
-            continue
-        read += 1
-    return "\n".join(chunks), read, unread
+            found = _reference_runs(path)
+            count["read" if found else "unread"] += 1
+            runs |= found
+    return runs, count["read"], count["unread"], count["skipped"]
 
 
 @check("PS-39")
 def ps39(doc: Doc, opts):
+    # Counts only: the folder path, the file names and extensions and the matched words are
+    # private and stay off every report.
     folder = opts.get("references")
     if not folder:
         return None, "no local reference directory given (never run in CI)"
     folder = Path(folder)
     if not folder.is_dir():
-        return False, f"reference directory {folder} does not exist"
+        return False, "the reference directory does not exist or is not a folder"
     mine = _words(doc.all_text())
-    text, read, unread = _reference_text(folder)
-    theirs = _words(text)
-    grams = {tuple(theirs[i:i + 10]) for i in range(len(theirs) - 9)}
-    hits = sum(1 for i in range(len(mine) - 9) if tuple(mine[i:i + 10]) in grams)
+    runs, read, unread, skipped = _reference_folder(folder)
+    hits = sum(1 for i in range(len(mine) - 9) if tuple(mine[i:i + 10]) in runs)
     names = [n.strip() for n in opts.get("reference_names") or () if n.strip()]
     named = sum(1 for n in names if n.lower() in doc.all_text().lower())
-    # Counts only: the matched words and the file names are private and stay off every report.
     problems = []
     if unread:
-        problems.append(f"{unread} of {read + unread} reference files could not be read (only "
-                        f".txt, .md and .json are read)")
-    if not theirs:
-        problems.append(f"no reference text was read ({read} files read)")
+        problems.append(f"{unread} of {read + unread} reference files could not be read as "
+                        f"plain text, Markdown or JSON holding a run of 10 words")
+    if not read:
+        problems.append("no reference text was read")
     if hits or named:
         problems.append(f"{hits} runs of 10 words match the references; {named} reference "
                         f"names appear")
-    return _fail_or_pass(problems, f"0 runs of 10 words shared with {len(theirs)} reference "
-                                   f"words in {read} files; {len(names)} names absent")
+    ok, evidence = _fail_or_pass(problems, f"0 runs of 10 words shared with {len(runs)} "
+                                           f"reference runs in {read} files; {len(names)} "
+                                           f"names absent")
+    return ok, f"{evidence}; {skipped} hidden paths skipped"
 
 
 @check("PS-41")

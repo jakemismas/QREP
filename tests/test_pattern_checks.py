@@ -9,9 +9,11 @@ case made by one edit to a passing document.
 """
 
 import ast
+import codecs
 import copy
 import importlib.util
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -211,11 +213,54 @@ def _draw_at(c, item, y):
     return y
 
 
+def _draw_step_beside_fig(c, item, y, cell=14, x0=340):
+    # A 10 pt step at the left margin, wrapped at 260 pt so it ends before x = 314, left of
+    # the figure's 18 pt band (340 - 18 = 322). The figure's top is y + 10, so row r's 7 pt
+    # letters sit at y + 10 - 14 (r + 1) + 4 = y - 14 r: row 0 shares the step's first
+    # baseline, as does a 7 pt dimension label 4 pt past the figure's right edge.
+    _, text, rows, label = item
+    top = y + cell - 4
+    for r, row in enumerate(rows):
+        for k, letter in enumerate(row):
+            _fill(c, letter)
+            c.rect(x0 + k * cell, top - (r + 1) * cell, cell, cell, fill=1, stroke=1)
+            c.setFillColorRGB(0, 0, 0)
+            c.setFont("Helvetica", 7)
+            c.drawCentredString(x0 + k * cell + cell / 2, top - (r + 1) * cell + 4, letter)
+    c.drawString(x0 + len(rows[0]) * cell + 4, y, label)
+    c.setFont("Helvetica", 10)
+    for line in simpleSplit(text, "Helvetica", 10, 260):
+        c.drawString(54, y, line)
+        y -= 14
+    return min(y, top - len(rows) * cell) - 30
+
+
+def _draw_mirror_pair(c, item, y, cell=14):
+    # S5.2: a mirror pair drawn side by side, each unit 2 x 2 patches, the units 12 pt apart
+    # (one figure, as patches within 18 pt cluster), each labeled at 7 pt just below. "side by
+    # side" sets both labels 9 pt below the figure on one baseline; "one per line" sets them
+    # 9 and 17 pt below, inside the 18 pt band, each a line of its own.
+    top = y - 10
+    starts = (220, 220 + 2 * cell + 12)
+    for x0, rows in zip(starts, (("AB", "BA"), ("BA", "AB"))):
+        for r, row in enumerate(rows):
+            for k, letter in enumerate(row):
+                _fill(c, letter)
+                c.rect(x0 + k * cell, top - (r + 1) * cell, cell, cell, fill=1, stroke=1)
+    bottom = top - 2 * cell
+    c.setFillColorRGB(0, 0, 0)
+    c.setFont("Helvetica", 7)
+    for n, x0 in enumerate(starts, start=1):
+        base = bottom - 9 if item[1] == "side by side" else bottom - 9 - 8 * (n - 1)
+        c.drawCentredString(x0 + cell, base, f"QST unit {n}")
+    return bottom - 40
+
+
 DRAW = {"p": _draw_p, "row": _draw_row, "fabric": _draw_fabric, "fig": _draw_fig,
         "fig_left": lambda c, item, y: _draw_fig(c, item, y, x0=54),
         "render": _draw_render, "square": _draw_square, "chart": _draw_chart,
         "outline": _draw_outline, "fat_quarter": _draw_fat_quarter, "gap": _draw_gap,
-        "at": _draw_at}
+        "at": _draw_at, "step_fig": _draw_step_beside_fig, "pair": _draw_mirror_pair}
 
 
 def render(pages, path, *, name=NAME, footer_size=10, odd_page=None, footer_layout="one line"):
@@ -1500,3 +1545,252 @@ def test_ps13_a_quilt_larger_than_a_king_needs_the_statement(tmp_path):
     assert got["PS-13"].status == "pass", got["PS-13"].evidence
     got = results(tmp_path, pages("king package"), model, only=("PS-13",))["PS-13"]
     assert got.status == "fail" and "larger than a king" in got.evidence, got.evidence
+
+
+# ---------------------------------------------------------------- review 3: PS-39 reads text
+
+# The throw's assembly text reads "Sew the blocks in each row together, pressing toward Block
+# 2, and join the rows". COPIED is its first 13 words (sew, the, blocks, in, each, row,
+# together, pressing, toward, block, 2, and, join): 13 - 9 = 4 runs of 10 words, each printed
+# once in the pattern, so 4 runs match. OTHER is 13 words of other text: 4 runs, none printed.
+COPIED = "Sew the blocks in each row together, pressing toward Block 2, and join"
+OTHER = "A different text about something else entirely, with no shared run of words."
+
+
+def _refs(tmp_path, files: dict):
+    refs = tmp_path / "refs"
+    refs.mkdir()
+    for name, data in files.items():
+        (refs / name).parent.mkdir(parents=True, exist_ok=True)
+        (refs / name).write_bytes(data if isinstance(data, bytes) else data.encode("utf-8"))
+    return refs
+
+
+def _ps39(tmp_path, refs, **kw):
+    return results(tmp_path, throw_pages(), references=refs, only=("PS-39",), **kw)["PS-39"]
+
+
+def test_ps39_reads_a_utf16_reference_by_its_byte_order_mark(tmp_path):
+    # PowerShell 5.1's Out-File writes UTF-16 LE behind the mark FF FE. Read as UTF-8 with
+    # errors ignored, each letter becomes a word of its own and no run of 10 matches.
+    data = codecs.BOM_UTF16_LE + (COPIED + "\r\n").encode("utf-16-le")
+    got = _ps39(tmp_path, _refs(tmp_path, {"copy.txt": data}))
+    assert got.status == "fail" and "4 runs of 10 words match" in got.evidence, got.evidence
+    assert "could not be read" not in got.evidence, got.evidence
+
+
+@pytest.mark.parametrize("data", [
+    # UTF-16 LE without its mark is valid UTF-8, a NUL after every letter.
+    COPIED.encode("utf-16-le"),
+    # UTF-32 LE's mark FF FE 00 00 starts with UTF-16 LE's FF FE; read as UTF-16, every
+    # other character is a NUL.
+    codecs.BOM_UTF32_LE + COPIED.encode("utf-32-le"),
+], ids=["utf-16 without a mark", "utf-32"])
+def test_ps39_counts_text_full_of_nuls_as_unread(tmp_path, data):
+    got = _ps39(tmp_path, _refs(tmp_path, {"copy.txt": data}))
+    assert got.status == "fail" and "1 of 1 reference files could not be read" in got.evidence, \
+        got.evidence
+
+
+def test_ps39_counts_a_reference_that_does_not_decode_as_unread(tmp_path):
+    # Windows-1252 writes the e acute as the byte E9, which starts a three-byte UTF-8 sequence
+    # that the space after it breaks, so the file is not UTF-8 and carries no mark.
+    data = ("Notes on a café quilt. " + OTHER).encode("cp1252")
+    got = _ps39(tmp_path, _refs(tmp_path, {"notes.txt": data}))
+    assert got.status == "fail" and "1 of 1 reference files could not be read" in got.evidence, \
+        got.evidence
+    for secret in ("notes", ".txt", "caf", "something else"):
+        assert secret not in got.evidence.lower(), got.evidence
+
+
+def test_ps39_counts_a_reference_with_no_run_of_ten_words_as_unread(tmp_path):
+    # One word gives 1 - 9 < 1 runs of 10 words: nothing to compare, so nothing was read.
+    got = _ps39(tmp_path, _refs(tmp_path, {"word.txt": "Quilting"}))
+    assert got.status == "fail" and "1 of 1 reference files could not be read" in got.evidence, \
+        got.evidence
+    assert "quilting" not in got.evidence.lower(), got.evidence
+
+
+@pytest.mark.parametrize("strings", [
+    # OTHER's 13 words as 13 one-word strings: each string gives 0 runs of 10 words.
+    {"words": OTHER.split()},
+    # COPIED's words split between two lists, odd and even places, so only reading across the
+    # strings in their interleaved order would rebuild the copied run.
+    {"odd": COPIED.split()[0::2], "even": COPIED.split()[1::2]},
+], ids=["one-word strings", "interleaved lists"])
+def test_ps39_never_joins_json_strings_into_a_run(tmp_path, strings):
+    got = _ps39(tmp_path, _refs(tmp_path, {"lexicon.json": json.dumps(strings)}))
+    assert got.status == "fail" and "1 of 1 reference files could not be read" in got.evidence, \
+        got.evidence
+    for secret in ("lexicon", ".json", "sew", "something"):
+        assert secret not in got.evidence.lower(), got.evidence
+
+
+def test_ps39_counts_hidden_paths_as_skipped(tmp_path):
+    # Two paths have a component that starts with ".": the .DS_Store file and the copy inside
+    # .cache. Both are skipped, so the copied run there does not count, and both are counted.
+    refs = _refs(tmp_path, {"notes.txt": OTHER, ".DS_Store": b"\x00\x01",
+                            ".cache/copy.txt": COPIED})
+    got = _ps39(tmp_path, refs)
+    assert got.status == "pass" and "2 hidden paths skipped" in got.evidence, got.evidence
+    for secret in ("ds_store", "cache", "copy", "notes", ".txt"):
+        assert secret not in got.evidence.lower(), got.evidence
+
+
+def test_ps39_a_missing_folder_fails_without_its_path(tmp_path):
+    for refs in (tmp_path / "private-refs", _refs(tmp_path, {"one.txt": OTHER}) / "one.txt"):
+        got = _ps39(tmp_path, refs)
+        assert got.status == "fail", got.evidence
+        for secret in ("private-refs", "one.txt", str(tmp_path).lower()):
+            assert secret not in got.evidence.lower(), got.evidence
+
+
+def test_ps39_counts_a_file_it_cannot_open_as_unread(tmp_path, monkeypatch):
+    # The second file raises PermissionError as a locked file would; it counts as unread
+    # instead of raising, which would print the error and its path.
+    refs = _refs(tmp_path, {"notes.txt": OTHER, "locked.txt": OTHER})
+    read_bytes = pc.Path.read_bytes
+
+    def locked(self):
+        if self.name == "locked.txt":
+            raise PermissionError(13, "Permission denied", str(self))
+        return read_bytes(self)
+
+    monkeypatch.setattr(pc.Path, "read_bytes", locked)
+    got = _ps39(tmp_path, refs)
+    assert got.status == "fail" and "1 of 2 reference files could not be read" in got.evidence, \
+        got.evidence
+    for secret in ("locked", "permission", "raised", str(tmp_path).lower()):
+        assert secret not in got.evidence.lower(), got.evidence
+
+
+def test_ps39_counts_a_folder_it_does_not_enter_as_unread(tmp_path, monkeypatch):
+    # os.walk does not enter a link to a folder. Creating one needs a privilege on Windows,
+    # so os.path.islink, which os.walk reads when it is called, reports "linked" as one.
+    refs = _refs(tmp_path, {"notes.txt": OTHER, "linked/copy.txt": COPIED})
+    islink = os.path.islink
+    monkeypatch.setattr(os.path, "islink", lambda p: os.path.basename(p) == "linked"
+                        or islink(p))
+    got = _ps39(tmp_path, refs)
+    assert got.status == "fail" and "1 of 2 reference files could not be read" in got.evidence, \
+        got.evidence
+    assert "linked" not in got.evidence.lower(), got.evidence
+
+
+def test_ps39_counts_a_folder_it_cannot_list_as_unread(tmp_path, monkeypatch):
+    # A subfolder that refuses to be listed hides the copy inside it; os.walk reports the
+    # error, and the folder counts as unread instead of being passed over.
+    refs = _refs(tmp_path, {"notes.txt": OTHER, "private/copy.txt": COPIED})
+    scandir = os.scandir
+
+    def refuse(path="."):
+        if os.path.basename(os.fspath(path)) == "private":
+            raise PermissionError(13, "Permission denied", os.fspath(path))
+        return scandir(path)
+
+    monkeypatch.setattr(os, "scandir", refuse)
+    got = _ps39(tmp_path, refs)
+    assert got.status == "fail" and "1 of 2 reference files could not be read" in got.evidence, \
+        got.evidence
+    for secret in ("private", "permission", str(tmp_path).lower()):
+        assert secret not in got.evidence.lower(), got.evidence
+
+
+# ---------------------------------------------------------------- review 3: [M] backing coverage
+
+
+def test_backing_plan_counts_the_seam_each_panel_loses():
+    # V-BACK-10, 76 x 85 in (608 x 680 e). F8: Wb = 76 + 8 = 84 in (672 e), Lb = 85 + 8 =
+    # 93 in (744 e). F9: n(D) = ceil((D - s) / (B - s)) with s = 1 in (8 e), B = 42 in (336 e).
+    # Vertical n(672) = ceil(664 / 328) = ceil(2.02) = 3 (two panels cover 2 x 42 - 1 = 83 in,
+    # 1 in short of 84), 3 x 744 + 72 = 2304 e; horizontal n(744) = ceil(736 / 328) =
+    # ceil(2.24) = 3, 3 x 672 + 72 = 2088 e. F10 keeps horizontal (seams across); qy = 2088 /
+    # 72 = 29 exactly -> 29 x 72 = 2088 e (7 1/4 yd). Without the seam, n(672) = ceil(672 /
+    # 336) = 2 would win at 2 x 744 + 72 = 1560 e, 22 qy (5 1/2 yd): D-02's short backing.
+    # V-WIDE-03: Wb 672 and Lb 744 both fit 864 e, so min(672, 744) = 672 e; 672 + 36 = 708 e;
+    # qy ceil(708 / 72) = ceil(9.83) = 10 -> 720 e (2 1/2 yd).
+    plan = pc.backing_plan(sized_model(608, 680))
+    assert (plan["panels"], plan["length"], plan["seams"], plan["yards"], plan["wide"]) == \
+        (3, 672, "across", 2088, 720)
+
+
+def test_backing_plan_wide_back_when_only_the_length_fits():
+    # V-WIDE-04 transposed, 108 x 90 in (864 x 720 e). F8: Wb = 108 + 8 = 116 in (928 e),
+    # Lb = 90 + 8 = 98 in (784 e). F9 and F10: vertical n(928) = ceil(920 / 328) = ceil(2.80)
+    # = 3, 3 x 784 + 72 = 2424 e; horizontal n(784) = ceil(776 / 328) = ceil(2.37) = 3,
+    # 3 x 928 + 72 = 2856 e; keep vertical (seams along), panels of Lb = 784 e; qy
+    # ceil(2424 / 72) = ceil(33.67) = 34 -> 2448 e (8 1/2 yd). Three panels, so F11 shows a
+    # wide line: Wb 928 > 864 and Lb 784 <= 864, so the length is Wb = 928 e; 928 + 36 =
+    # 964 e; qy ceil(964 / 72) = ceil(13.39) = 14 -> 1008 e (3 1/2 yd), V-WIDE-04's figure.
+    plan = pc.backing_plan(sized_model(864, 720))
+    assert (plan["panels"], plan["length"], plan["seams"], plan["yards"], plan["wide"]) == \
+        (3, 784, "along", 2448, 1008)
+
+
+def _drop_item(pages, page, item):
+    pages = copy.deepcopy(pages)
+    pages[page].remove(item)
+    return pages
+
+
+# V-WIDE-02 (throw 60 x 72): Wb 68 in (544 e) and Lb 80 in (640 e) both fit 108 in (864 e), so
+# the length is min(544, 640) = 544 e; 544 + 36 = 580 e; qy ceil(580 / 72) = ceil(8.06) = 9
+# -> 648 e (2 1/4 yd), shown because the pieced backing takes 2 panels (V-BACK-02). Each
+# document breaks the line once: it is gone; it says 2 1/2 yd (10 qy = 720 e, not 9 qy); it
+# names a 110 in width (880 e), not BW = 108 in (864 e).
+PS12_WIDE_EDITS = {
+    "missing": lambda p: _drop_item(p, 1, ROW([(80, 'or 2 1/4 yd of 108" wide backing')])),
+    "yards": lambda p: edit(p, 'or 2 1/4 yd of 108"', 'or 2 1/2 yd of 108"'),
+    "width": lambda p: edit(p, 'yd of 108" wide', 'yd of 110" wide'),
+}
+
+
+@pytest.mark.parametrize("case", sorted(PS12_WIDE_EDITS))
+def test_ps12_fails_on_a_wrong_wide_back_line(tmp_path, case):
+    got = results(tmp_path, PS12_WIDE_EDITS[case](throw_pages()), only=("PS-12",))["PS-12"]
+    # The evidence names F11's line, so a check that raised on the missing line does not pass.
+    assert got.status == "fail" and "MATH.md F11 gives 2 1/4 yd of 108" in got.evidence, \
+        got.evidence
+
+
+# ---------------------------------------------------------------- review 3: figures beside text
+
+
+def test_a_step_sharing_a_baseline_with_figure_labels_stays_a_step(tmp_path):
+    # Strip set 1's step 2 at 10 pt with its figure to the right: the 7 pt patch letters
+    # (inside the figure) and the 7 pt 12 1/2" label (4 pt past its right edge, in the 18 pt
+    # band) share the step's baseline. Each forms its own line, so the letters and the label
+    # are figure labels (7 pt minimum) and the step is 10 pt body text.
+    pages = copy.deepcopy(throw_pages())
+    step = '2. Crosscut (20) 4 1/2" segments, 8 per set. Fig. 1'
+    assert pages[4][7] == P(step) and pages[4][8] == FIG("BBB", "AAA", "BBB")
+    pages[4][7:9] = [("step_fig", step, ("BBB", "AAA", "BBB"), '12 1/2"')]
+    got = results(tmp_path, pages)
+    assert {k: r.evidence for k, r in got.items() if r.status == "fail"} == {}
+
+
+@pytest.mark.parametrize("layout", ["side by side", "one per line"])
+def test_small_unit_names_under_a_mirror_pair_are_figure_labels(tmp_path, layout):
+    # S5.2 draws a mirror pair side by side and labeled; L-10 lets figure labels be 7 pt. The
+    # 7 pt "QST unit 1" and "QST unit 2" under the figure are labels, not subheadings, so QST
+    # unit 1 keeps its pieces, steps, checkpoint and make count.
+    pages = units_pages()
+    assert pages[3][10] == P("QST unit 1", size=12) and pages[3][15] == P('Trim to 3 1/2" square.')
+    pages[3].insert(15, ("pair", layout))
+    checks = UNIT_CHECKS + ("PS-42",)
+    got = results(tmp_path, pages, only=checks)
+    assert {k: r.status for k, r in got.items()} == {k: "pass" for k in checks}, \
+        {k: r.evidence for k, r in got.items()}
+
+
+def test_a_body_size_subheading_beside_a_figure_stays_a_subheading(tmp_path):
+    # L-10: 10 pt and up is body size, so a 12 pt "QST unit 2" 14 pt below a figure at the left
+    # margin (inside its 18 pt band) is still the subheading of the mirror unit. Read as a
+    # label, it would leave no QST unit 2 and fold its make count into QST unit 1.
+    pages = units_pages()
+    assert pages[3][17] == P("QST unit 2", size=12)
+    pages[3][17:17] = [("fig_left", ("AB", "BA")), ("gap", -16)]
+    checks = UNIT_CHECKS + ("PS-42",)
+    got = results(tmp_path, pages, only=checks)
+    assert {k: r.status for k, r in got.items()} == {k: "pass" for k in checks}, \
+        {k: r.evidence for k, r in got.items()}
