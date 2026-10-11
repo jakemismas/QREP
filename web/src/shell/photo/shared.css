@@ -18,7 +18,12 @@
 .pf-tone--amber { background: var(--amber); }
 .pf-tone--accent { background: var(--accent); }
 .pf-link { background: none; border: none; padding: 4px 0; font-size: 15px; color: var(--accent); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
-.pf-photo--gone { display: flex; align-items: center; justify-content: center; width: 240px; height: 180px; color: var(--faint); background: var(--card3); border: 1px dashed var(--line2); }
+.pf-photo--gone { align-items: center; justify-content: center; color: var(--faint); background: var(--card3); }
+/* The results box also carries .pf-photo, whose rule loads after this sheet,
+   so the compound selector outranks it there and keeps the box's display,
+   size and border. The crop and lightbox photo rules also load later and
+   replace the display and size on purpose. */
+.pf-photo--gone, .pf-photo--gone.pf-photo { display: flex; width: 240px; height: 180px; border: 1px dashed var(--line2); }
 .pf-btn { width: 100%; border-radius: 12px; cursor: pointer; font-family: var(--sans); }
 .pf-btn--primary { padding: 16px; font-weight: 600; font-size: 17.5px; background: var(--accent); color: var(--accentInk); border: none; box-shadow: 0 4px 12px var(--shadow); }
 .pf-btn--primary:hover:not(:disabled) { background: var(--accentB); }

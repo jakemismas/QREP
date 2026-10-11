@@ -1,54 +1,44 @@
 /**
- * Compare lightbox in the editor (C1b; web-03). The lightbox's rules used to
- * live in a style string that PhotoFlow injected only while it was mounted,
- * so the editor's "Compare with your photo" rendered it unstyled: position
- * static and a transparent scrim at 834d8be, inline under the canvas. Its
- * stylesheet now ships with the component, so it overlays the viewport
- * wherever it mounts.
+ * Photo-flow components in the editor (C1b; web-03). The lightbox's and the
+ * round-trip panel's rules used to live in a style string that PhotoFlow
+ * injected only while it was mounted, so the editor's "Compare with your
+ * photo" rendered the lightbox unstyled (position static and a transparent
+ * scrim at 834d8be, inline under the canvas) and the Pattern tab's
+ * round-trip panel unstyled too. Their stylesheets now ship with the
+ * components, so both are styled wherever they mount.
  *
- * The L0 upload is the same seeded render photo.spec.ts generates (seed 42,
- * level 0, scale 10), and it reads cleanly, so Open in the editor is offered.
+ * The lightbox spec starts from the synthetic sample photo, which skips the
+ * crop screen and still reaches the results screen's Open in the editor
+ * until C6a removes the editor (REBASELINE.md moves photo.spec.ts's
+ * session-only test to the same entry in C3c).
+ *
+ * Desktop only, as in layout.spec.ts: at 390 px the editor's header already
+ * overflows (web-02, excluded until C6a), so the overflow guard would fail on
+ * the header rather than on these components.
  */
-import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync } from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 import { expectNoHorizontalOverflow } from "./helpers/layout";
 
-const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-const generatedDir = path.join(repoRoot, "tests", "fixtures", "_generated");
-const l0Path = path.join(generatedDir, "photo_e2e_l0.png");
+// Beside the guard's own screenshots, which CI uploads as spike-artifacts.
+const layoutDir = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "test-results",
+  "spike",
+  "layout",
+);
 const REVERSE_TIMEOUT = 300_000;
+const READY_TIMEOUT = 300_000;
 
-test.beforeAll(() => {
-  if (existsSync(l0Path)) return;
-  mkdirSync(generatedDir, { recursive: true });
-  const venvPython = path.join(repoRoot, ".venv", "Scripts", "python.exe");
-  const python = process.env.QREP_PYTHON ?? (existsSync(venvPython) ? venvPython : "python");
-  // qrep.cli has no __main__ guard, so call the renderer the CLI wraps.
-  execFileSync(python, [
-    "-c",
-    "import sys; from pathlib import Path; from qrep.model import load; from qrep.render import save_render; " +
-      "save_render(load(sys.argv[1]), Path(sys.argv[2]), level=0, seed=42, scale=10)",
-    path.join(repoRoot, "tests", "fixtures", "double_irish_chain.json"),
-    l0Path,
-  ]);
-  if (!existsSync(l0Path)) throw new Error("fixture render produced no file");
-});
-
-// Desktop only, as in layout.spec.ts: at 390 px the editor's header already
-// overflows (web-02, excluded until C6a), so the overflow guard below would
-// fail on the header rather than the lightbox.
-test.describe("compare lightbox in the editor at 1440 x 900", { tag: "@phone" }, () => {
+test.describe("photo-flow components in the editor at 1440 x 900", { tag: "@phone" }, () => {
   test.use({ viewport: { width: 1440, height: 900 }, isMobile: false, hasTouch: false });
 
-  test("overlays the viewport with a tinted scrim", async ({ page }) => {
+  test("the compare lightbox overlays the viewport with a tinted scrim", async ({ page }) => {
     await page.goto("./");
     await page.getByTestId("start-photo").click();
-    await page.getByTestId("photo-file-input").setInputFiles(l0Path);
-    await expect(page.getByTestId("crop-screen")).toBeVisible();
-    await page.getByTestId("crop-analyze").click();
+    await page.getByTestId("photo-sample").click();
     await expect(page.getByTestId("photo-results")).toBeVisible({ timeout: REVERSE_TIMEOUT });
     await page.getByTestId("open-in-editor").click();
     await expect(page.getByTestId("editor")).toBeVisible();
@@ -88,5 +78,39 @@ test.describe("compare lightbox in the editor at 1440 x 900", { tag: "@phone" },
     await page.keyboard.press("Escape");
     await expect(lightbox).toHaveCount(0);
     await expect(page.getByTestId("editor")).toBeVisible();
+  });
+
+  test("the Pattern tab's round-trip panel is styled and stays inside its side panel", async ({ page }) => {
+    await page.goto("./");
+    await page.getByTestId("open-demo").click();
+    await expect(page.getByTestId("editor")).toBeVisible();
+    await expect(page.getByTestId("engine-chip")).toHaveAttribute("data-engine-phase", "ready", {
+      timeout: READY_TIMEOUT,
+    });
+    await page.getByRole("tab", { name: "Pattern" }).click();
+    // The strategy cards fill in from bridge calls, so wait for them before
+    // measuring the settled panel.
+    await expect(page.getByTestId("strategy-card-strip")).toBeVisible();
+    const panel = page.getByTestId("roundtrip-panel");
+    await expect(panel).toBeVisible();
+    // Source: RoundTripPanel.css .pf-rt { display: flex; ... }. Unstyled, the
+    // section element computes its default, block.
+    await expect(panel).toHaveCSS("display", "flex");
+
+    // The page-level guard cannot pass on this tab yet: once its amounts fill
+    // in, the yardage table runs past the side panel and the page (web-01,
+    // fixed by C2b), with or without the round-trip rules. So this checks the
+    // panel's own box: inside the side panel, which sits inside the viewport.
+    await page.screenshot({
+      path: path.join(layoutDir, "editor-pattern-roundtrip-1440.png"),
+      fullPage: true,
+      animations: "disabled",
+    });
+    const side = await page.locator(".side-panel").boundingBox();
+    const own = await panel.boundingBox();
+    if (!side || !own) throw new Error("side panel or round-trip panel has no box");
+    expect(own.x).toBeGreaterThanOrEqual(side.x);
+    expect(own.x + own.width).toBeLessThanOrEqual(side.x + side.width);
+    expect(side.x + side.width).toBeLessThanOrEqual(1440);
   });
 });

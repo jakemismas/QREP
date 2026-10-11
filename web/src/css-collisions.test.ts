@@ -3,9 +3,10 @@
  * imports is bundled into the one page stylesheet, so a class that two sheets
  * both style is styled wherever it appears, whichever component mounts it.
  * That is web-01's shape: the hidden PalettePanel's .pp-* rules restyle the
- * Pattern panel, which uses the same class names. Those two panels still
- * inject style strings, which this scan does not read until they move to
- * .css files; the test guards the stylesheets.
+ * Pattern panel, which uses the same class names. Six components still
+ * inject style strings (PalettePanel, PatternPanel, SizingPanel,
+ * EditorToolbar, FabricsPanel and QuiltCanvas), and this scan does not read
+ * them until they move to .css files; the test guards the stylesheets.
  *
  * A sheet defines the class that leads a selector: its first class once
  * attribute conditions and the arguments of :not() and :has() are dropped.
