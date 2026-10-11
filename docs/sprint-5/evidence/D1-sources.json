@@ -2,7 +2,7 @@
   "ticket": "D1 quilter-voice research (#161)",
   "date": "2026-10-10",
   "method": "Web search and page fetches, one page at a time, in four topic passes (A finishing numbers, B complaints, C most-made quilts, D pattern trust and clarity), plus headless Chromium (Playwright from web/node_modules) run four times, one page load after another: the r/quilting search on www.reddit.com (Q-M01), the same search on old.reddit.com after the first was blocked (Q-M02), X search (Q-M03), and the two Webster pages (S-M01, S-M02). No login, posting, sign-up or contact; no API, JSON or sitemap requests. The only search listing pages requested are Q-M01 to Q-M03 and S-C03.",
-  "result_count_definition": "result_count is the number of results the web search returned for the query, not the engine's total hit count. usable is how many of them were fetched and used. result_count is null when no search ran: the search tool refused the domain filter, or the entry is a page load (Q-M01 to Q-M03); outcome says which.",
+  "result_count_definition": "result_count is the number of results the web search returned for the query, not the engine's total hit count; a search that returned two result sets counts both. usable is the number of sources requested from the query's results that were fetched ok and back at least one claim, directly or through a same-page twin (recomputed on 2026-10-11 from the source list). result_count is null when no search ran: the search tool refused the domain filter, or the entry is a page load (Q-M01 to Q-M03); outcome says which.",
   "claim_rule": "A claim cites only sources whose fetch is ok. Claims paraphrase; no claim quotes a page, and no claim names an individual poster. Claims marked excluded back nothing in the reports.",
   "id_prefixes": {
     "A": "finishing numbers",
@@ -17,7 +17,7 @@
     "sources": 148,
     "sources_ok": 125,
     "claims": 164,
-    "claims_excluded": 1,
+    "claims_excluded": 2,
     "distinct_ok_pages": 113,
     "distinct_ok_sites": 55,
     "searches_run": 123,
@@ -61,7 +61,7 @@
       "query": "reddit quilting how much backing do I need for queen quilt 108 wide yards longarm overhang",
       "date": "2026-10-10",
       "result_count": 9,
-      "usable": 3,
+      "usable": 2,
       "source_group": "reddit",
       "note": "no reddit result returned; blog results used"
     },
@@ -71,7 +71,7 @@
       "query": "site:reddit.com r/quilting binding strips how many 2.25 or 2.5 inch queen quilt",
       "date": "2026-10-10",
       "result_count": 9,
-      "usable": 1,
+      "usable": 0,
       "source_group": "reddit",
       "note": "no reddit result returned"
     },
@@ -151,10 +151,10 @@
       "tool": "web search",
       "query": "reddit r/quilting binding 2.25 vs 2.5 inch strips how many yards queen quilt",
       "date": "2026-10-10",
-      "result_count": 10,
+      "result_count": 9,
       "usable": 1,
       "source_group": "reddit",
-      "note": "no reddit result returned"
+      "note": "no reddit result returned Result count corrected on 2026-10-11: the search returned 9 results, not 10."
     },
     {
       "id": "Q-A13",
@@ -302,7 +302,7 @@
       "query": "quilt backing calculator enter quilt width length overhang shop tool binding calculator strips needed",
       "date": "2026-10-10",
       "result_count": 9,
-      "usable": 6,
+      "usable": 5,
       "source_group": "calculator",
       "note": "calculator pages",
       "mode": "extended"
@@ -323,7 +323,7 @@
       "query": "Quiltingboard how much binding fabric for a king size quilt 2 1/4 strips how many yards",
       "date": "2026-10-10",
       "result_count": 10,
-      "usable": 2,
+      "usable": 1,
       "source_group": "forum",
       "note": "quiltingboard binding threads",
       "domain_filter": [
@@ -356,7 +356,7 @@
       "query": "quiltingboard pattern errors yardage wrong ran short of fabric",
       "date": "2026-10-10",
       "result_count": 9,
-      "usable": 5,
+      "usable": 4,
       "source_group": "forum",
       "note": "Returned publisher and designer errata pages, not forum threads."
     },
@@ -396,7 +396,7 @@
       "query": "quiltingboard.com binding came up short how much binding do I need",
       "date": "2026-10-10",
       "result_count": 9,
-      "usable": 2,
+      "usable": 1,
       "source_group": "forum",
       "note": "No forum threads; shop tutorials on binding found."
     },
@@ -426,7 +426,7 @@
       "query": "\"quilting\" forum thread \"pattern\" \"yardage was wrong\" OR \"not enough fabric\" OR \"ran out of fabric\" quilters share",
       "date": "2026-10-10",
       "result_count": 9,
-      "usable": 2,
+      "usable": 0,
       "source_group": "forum",
       "note": "Quilt in a Day forum threads found but both fetches returned 403."
     },
@@ -526,7 +526,7 @@
       "query": "reddit r/quilting pattern error \"pattern\" \"typo\" OR \"mistake in the pattern\" cutting measurements wrong",
       "date": "2026-10-10",
       "result_count": 9,
-      "usable": 2,
+      "usable": 1,
       "source_group": "reddit",
       "note": "No reddit results; designer errata pages instead."
     },
@@ -577,7 +577,7 @@
       "query": "quilters dislike patterns: too many pages to print, color diagrams not black and white, small text, wasteful layout",
       "date": "2026-10-10",
       "result_count": 9,
-      "usable": 2,
+      "usable": 0,
       "source_group": "blog",
       "note": "Two pages fetched; neither described the complaints."
     },
@@ -606,10 +606,10 @@
       "tool": "web search",
       "query": "pattern called for way too much fabric backing yardage \"more than I needed\" quilters tips leftover",
       "date": "2026-10-10",
-      "result_count": 10,
+      "result_count": 9,
       "usable": 1,
       "source_group": "blog",
-      "note": "No complaint of over-estimate found; one backing-width blog."
+      "note": "No complaint of over-estimate found; one backing-width blog. Result count corrected on 2026-10-11: the search returned 9 results, not 10."
     },
     {
       "id": "Q-B27",
@@ -657,7 +657,7 @@
       "query": "quilt-as-you-go OR \"pattern review\" complaints \"yardage\" \"too little\" OR \"too much\" quilt kit shortage fabric short",
       "date": "2026-10-10",
       "result_count": 9,
-      "usable": 1,
+      "usable": 0,
       "source_group": "blog",
       "note": "A podcast page returned 403."
     },
@@ -687,7 +687,7 @@
       "query": "reddit quilting what was your first quilt beginner favorite pattern nine patch rail fence",
       "date": "2026-10-10",
       "result_count": 9,
-      "usable": 2,
+      "usable": 1,
       "source_group": "reddit",
       "note": "No reddit threads returned; shop blogs only"
     },
@@ -717,7 +717,7 @@
       "query": "site:x.com quilters favorite quilt pattern finished quilt nine patch irish chain",
       "date": "2026-10-10",
       "result_count": 9,
-      "usable": 0,
+      "usable": 1,
       "source_group": "x",
       "note": "No x.com results at all"
     },
@@ -751,7 +751,7 @@
       "query": "quilting forum favorite traditional quilt pattern poll results nine patch log cabin ohio star",
       "date": "2026-10-10",
       "result_count": 9,
-      "usable": 1,
+      "usable": 0,
       "source_group": "forum",
       "note": "Found a forum thread (403 on fetch) and the AQS survey"
     },
@@ -771,7 +771,7 @@
       "query": "Marie Webster Quilts Their Story and How to Make Them Project Gutenberg",
       "date": "2026-10-10",
       "result_count": 10,
-      "usable": 3,
+      "usable": 1,
       "source_group": "book",
       "note": "Gutenberg ebook 24682 pages"
     },
@@ -781,7 +781,7 @@
       "query": "Irish chain quilt set on point diagonal versus straight set look-alike double Irish chain",
       "date": "2026-10-10",
       "result_count": 9,
-      "usable": 2,
+      "usable": 1,
       "source_group": "blog",
       "note": "On-point Irish chain evidence"
     },
@@ -790,10 +790,10 @@
       "tool": "web search",
       "query": "most popular quilt patterns of all time half-square triangle pinwheel churn dash ohio star quilt blog reader favorites",
       "date": "2026-10-10",
-      "result_count": 10,
+      "result_count": 9,
       "usable": 0,
       "source_group": "blog",
-      "note": "Mostly spam aggregators"
+      "note": "Mostly spam aggregators Result count corrected on 2026-10-11: the search returned 9 results, not 10."
     },
     {
       "id": "Q-C12",
@@ -850,10 +850,10 @@
       "tool": "web search",
       "query": "quilt pattern popularity data most downloaded OR most pinned OR most searched quilt block nine patch log cabin",
       "date": "2026-10-10",
-      "result_count": 10,
+      "result_count": 9,
       "usable": 1,
       "source_group": "blog",
-      "note": "Found a most-popular article series post"
+      "note": "Found a most-popular article series post Result count corrected on 2026-10-11: the search returned 9 results, not 10."
     },
     {
       "id": "Q-C18",
@@ -861,7 +861,7 @@
       "query": "on point setting quilts Irish chain Ohio star nine patch set on point diagonal setting common traditional",
       "date": "2026-10-10",
       "result_count": 9,
-      "usable": 2,
+      "usable": 1,
       "source_group": "blog",
       "note": "Irish chain on-point pages"
     },
@@ -891,7 +891,7 @@
       "query": "quilting blog \"first quilt\" nine patch OR \"rail fence\" OR \"four patch\" readers share their first quilts",
       "date": "2026-10-10",
       "result_count": 9,
-      "usable": 2,
+      "usable": 1,
       "source_group": "forum",
       "note": "One forum thread (403) and a nine patch workshop post"
     },
@@ -981,7 +981,7 @@
       "query": "quilt pattern tester what testers check yardage cutting instructions designer blog",
       "date": "2026-10-10",
       "result_count": 9,
-      "usable": 2,
+      "usable": 1,
       "source_group": "blog",
       "note": "One result was crochet"
     },
@@ -1101,7 +1101,7 @@
       "query": "quilt pattern skill level labels misleading beginner pattern too hard time estimate unrealistic",
       "date": "2026-10-10",
       "result_count": 9,
-      "usable": 2,
+      "usable": 1,
       "source_group": "blog",
       "note": ""
     },
@@ -1133,7 +1133,7 @@
       "result_count": 9,
       "usable": 2,
       "source_group": "forum",
-      "note": "Reddit mirror result could not be fetched"
+      "note": "A result on a Reddit mirror site pointed to an r/quilting thread. The mirror was not requested; the thread's reddit.com addresses were tried instead (S-D26, then S-D27 on old.reddit.com), and the page fetch tool refused both."
     },
     {
       "id": "Q-D23",
@@ -1363,7 +1363,7 @@
       "result_count": null,
       "usable": 0,
       "source_group": "reddit",
-      "note": "A search listing page, loaded once at 10:19:18 UTC.",
+      "note": "A search listing page, loaded once at 10:19:18 UTC, after the search and page fetch tools had refused Reddit.",
       "outcome": "page load: HTTP 200 with a network-security block page; no threads listed"
     },
     {
@@ -1385,8 +1385,8 @@
       "result_count": null,
       "usable": 0,
       "source_group": "x",
-      "note": "A search listing page, loaded once at 10:19:40 UTC. No request was made to Reddit or X after it.",
-      "outcome": "page load: HTTP 403, empty page; X search needs a login, which this ticket does not use"
+      "note": "A search listing page, loaded once at 10:19:40 UTC. Headless Chromium was used after the search and page fetch tools had refused Reddit. No request was made to Reddit or X after it.",
+      "outcome": "page load: HTTP 403 with an empty page"
     }
   ],
   "sources": [
@@ -1548,8 +1548,7 @@
       "fetch": "ok",
       "from_query": "Q-A07",
       "claims": [
-        "C-A22",
-        "C-A50"
+        "C-A22"
       ]
     },
     {
@@ -3894,9 +3893,10 @@
         "seam": "",
         "binding_extra": "+10 in",
         "strip_width": "2.5 in",
-        "rounding": "strips up to whole; yardage to 1/8",
+        "rounding": "strip counts up to a whole strip; no yardage rounding rule stated",
         "other": "double fold"
-      }
+      },
+      "corrected": "2026-10-11: rounding read 'yardage to 1/8'; the fetches state only that strip counts round up, and the chart's king row prices 27 1/2 in of strips at 3/4 yd."
     },
     {
       "id": "C-A27",
@@ -4441,9 +4441,7 @@
     {
       "id": "C-A50",
       "claim": "Searches for r/quilting, r/longarm, old.reddit and x.com content returned no Reddit or X pages; the search tool also refused reddit.com as a domain filter. No Reddit or X claims are recorded. A forum source (Quiltingboard) is the only community source.",
-      "sources": [
-        "S-A12"
-      ],
+      "sources": [],
       "short_quote": "",
       "detail": {
         "chart_size_label": "",
@@ -4458,7 +4456,8 @@
         "strip_width": "",
         "rounding": "",
         "other": "reddit and x: not found"
-      }
+      },
+      "excluded": "Not a claim from a page: a summary of the search log, which the queries record. It cited S-A12, which does not back it; moved out of the claims on 2026-10-11."
     },
     {
       "id": "C-B01",
@@ -4717,7 +4716,8 @@
         "category": "6 pattern errors and errata",
         "context": "Magazines and independent designers",
         "persona": "any"
-      }
+      },
+      "basis": "Three fetch summaries of the page (10:09, 10:12 and 10:20 UTC) rank wrong cut sizes first. The page itself states no share, and the entries were not hand counted (review-pass fetch, 10:43 UTC)."
     },
     {
       "id": "C-B19",
@@ -4840,7 +4840,8 @@
         "category": "8 cutting instructions",
         "context": "Magazine pattern errata",
         "persona": "any"
-      }
+      },
+      "basis": "Three fetch summaries of the page (10:09, 10:12 and 10:20 UTC) rank wrong cut sizes first. The page itself states no share, and the entries were not hand counted (review-pass fetch, 10:43 UTC)."
     },
     {
       "id": "C-B28",
@@ -5404,18 +5405,19 @@
     },
     {
       "id": "C-C24",
-      "claim": "Trip Around the World, shoo fly, snowball and card trick: no fetched source ranked them as most made. not found.",
+      "claim": "Trip Around the World, shoo fly, snowball, card trick and churn dash: no fetched source ranked or listed them as most made. not found.",
       "sources": [
         "S-C01"
       ],
       "short_quote": "",
       "detail": {
-        "family": "Trip Around the World / shoo fly / snowball / card trick",
+        "family": "Trip Around the World / shoo fly / snowball / card trick / churn dash",
         "evidence_type": "none",
         "rank_or_count": "not found",
         "unit_classes": [],
         "on_point_common": "unknown"
-      }
+      },
+      "corrected": "2026-10-11: churn dash added; the one page first counted for it (S-C16) names a snail trail or monkey wrench quilt (C-C18)."
     },
     {
       "id": "C-C25",
@@ -5646,7 +5648,8 @@
         "rubric_topic": "batting",
         "persona": "finisher",
         "concrete_check": "Check batting size is given as a number with the per-side overage stated."
-      }
+      },
+      "note": "The second half (sources differ, so the assumption should be stated) is a conclusion drawn across the two sources, not what either page says; since 2026-10-11 the reports cite C-D14 and C-D15 for these pages instead."
     },
     {
       "id": "C-D17",
@@ -6098,7 +6101,7 @@
     },
     {
       "id": "C-M03",
-      "claim": "The backing chart's panel column says only whether standard-width fabric must be pieced, not how many panels. The page adds 6 to 8 in to both measurements, takes standard fabric as 42 to 44 in wide, and rounds up to 1/4 yd in its worked example.",
+      "claim": "The backing chart's panel column says only whether standard-width fabric must be pieced, not how many panels. The page adds 6 to 8 in to both measurements and takes standard fabric as 42 to 44 in wide. Its worked example rounds a 76 in length up to 2 1/4 yd per panel, so the chart does not say whether a row's figure is the total or per panel.",
       "sources": [
         "S-A02"
       ],
@@ -6107,15 +6110,15 @@
         "line": "backing pieced",
         "fabric_width": "42 to 44 in",
         "overhang": "6 to 8 in added to each dimension",
-        "rounding": "up to 1/4 yd",
+        "rounding": "up to 1/4 yd, per panel in its worked example",
         "other": "panel column is not a panel count",
-        "recorded_from": "the review-pass spot-check fetch of S-A02"
+        "recorded_from": "the spot-check fetch (10:25 UTC) and the review-pass fetch (10:45 UTC) of S-A02"
       },
       "recorded": "2026-10-11, from the fetch output of 2026-10-10 named in recorded_from"
     },
     {
       "id": "C-M04",
-      "claim": "The backing guide states its allowance two ways: a formula, width + 8 in and length + 8 in for home quilting or + 12 in for longarm quilting; and a note of a 4 in overhang for home quilting and 6 to 8 in for longarm quilting, which does not say whether the 6 to 8 in is per side or in total. It advises rounding up by half a yard when unsure.",
+      "claim": "The backing guide states its allowance two ways: a formula, width + 8 in and length + 8 in for home quilting or + 12 in for longarm quilting; and a note giving a 4 in overhang on all sides for home quilting and 6 to 8 in for longarm quilting, which one fetch summary words as additional overhang. Neither says whether the 6 to 8 in is per side or in total. It advises rounding up by half a yard when unsure.",
       "sources": [
         "S-A08"
       ],
@@ -6125,7 +6128,7 @@
         "fabric_width": "44 in",
         "overhang": "formula: width + 8, length + 8 (home) or + 12 (longarm); note: 4 in home, 6 to 8 in longarm, per side or total not stated",
         "rounding": "half-yard tip",
-        "recorded_from": "the spot-check and review-pass fetches of S-A08"
+        "recorded_from": "the topic A fetch, the spot-check fetch and the review-pass fetch of S-A08"
       },
       "recorded": "2026-10-11, from the fetch output of 2026-10-10 named in recorded_from"
     },
@@ -6196,7 +6199,8 @@
       "accessed": "2026-10-10",
       "tool": "page fetch",
       "result": "confirmed",
-      "note": "Wrong cut sizes are the most frequent correction type over 2005 to 2023; matches C-B27."
+      "note": "Wrong cut sizes are the most frequent correction type over 2005 to 2023; matches C-B27.",
+      "record_note": "The ranking is the fetch summary's reading of the list; Three fetch summaries of the page (10:09, 10:12 and 10:20 UTC) rank wrong cut sizes first. The page itself states no share, and the entries were not hand counted (review-pass fetch, 10:43 UTC)."
     },
     {
       "source": "S-A38",
@@ -6299,6 +6303,38 @@
       "tool": "page fetch",
       "result": "confirmed",
       "note": "40 in usable planning width, patterns written for 44 to 45 in, beginners most at risk; matches C-B06 and C-B09."
+    },
+    {
+      "source": "S-C01",
+      "accessed": "2026-10-10",
+      "tool": "page fetch (review pass)",
+      "result": "confirmed",
+      "note": "Over a thousand respondents; unit shares HST 53, flying geese 33, nine patch 32, square in a square 20, four patch 18, rail 17, corner flips 11, quarter square triangle 11 percent; nine patch the most common first block, then log cabin and Ohio star; stars the favorite block overall. Matches C-C01 to C-C06.",
+      "record_note": "Fetch made at 10:43:36 UTC and left out of spot_checks until 2026-10-11."
+    },
+    {
+      "source": "S-M02",
+      "accessed": "2026-10-10",
+      "tool": "page fetch (review pass)",
+      "result": "partial",
+      "note": "The fetch returned the text only up to the table of contents, without the name list; C-C25 rests on the full load above.",
+      "record_note": "Fetch made at 10:43:45 UTC and left out of spot_checks until 2026-10-11."
+    },
+    {
+      "source": "S-A03",
+      "accessed": "2026-10-10",
+      "tool": "page fetch (review pass)",
+      "result": "confirmed",
+      "note": "About 40 in usable from 42 in after trimming selvages, so divide by 40; turning the backing can save half a yard; chart rows crib, throw and twin as in C-A01 to C-A03.",
+      "record_note": "Fetch made at 10:44:23 UTC and left out of spot_checks until 2026-10-11."
+    },
+    {
+      "source": "S-B36",
+      "accessed": "2026-10-10",
+      "tool": "page fetch (review pass)",
+      "result": "confirmed",
+      "note": "A post prefers half a yard too much over two inches short, and one plans on 40 in usable; matches C-B02 and C-B09.",
+      "record_note": "Fetch made at 10:45:00 UTC and left out of spot_checks until 2026-10-11."
     }
   ],
   "public_domain_name_sources": [
@@ -6350,7 +6386,7 @@
   "revisions": [
     {
       "date": "2026-10-11",
-      "note": "Review fixes on PR #210 with no new fetch: query texts set to the exact text sent (37 entries), tool refusals and page loads given a null result_count and an outcome, the Reddit and X page loads recorded with their URLs and order, the C&T article's two URLs linked, C-A12 and C-C18 corrected, and C-M01 to C-M05 added from fetch outputs of 2026-10-10 that the claims had left out."
+      "note": "Review fixes on PR #210 with no new fetch: query texts set to the exact text sent (37 entries), tool refusals and page loads given a null result_count and an outcome, the Reddit and X page loads recorded with their URLs and order, the C&T article's two URLs linked, C-A12 and C-C18 corrected, and C-M01 to C-M05 added from fetch outputs of 2026-10-10 that the claims had left out. Self-review of the fix: C-A26's rounding, C-A50 (moved out of the claims), C-C24 (churn dash), C-M03 and C-M04 corrected against the same fetch outputs. Also: four result counts corrected (Q-A12, Q-B26, Q-C11, Q-C17), usable recomputed from the source list, four review-pass fetches added to spot_checks, the basis of the S-B03 ranking recorded (C-B18, C-B27), and C-D16 noted as a cross-source conclusion."
     }
   ]
 }

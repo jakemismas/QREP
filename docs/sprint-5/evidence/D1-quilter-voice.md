@@ -4,9 +4,9 @@
 | --- | --- |
 | Date | 2026-10-10 (research); 2026-10-11 (review fixes, with no new fetch) |
 | Ticket | D1, issue #161 (parent #104) |
-| Command | None that runs QREP. Web search and page fetches, plus headless Chromium (Playwright from `web/node_modules`, which WORKER.md R10 allows) run four times: once for each of the three Reddit and X search pages, and once for the two Webster 1915 pages |
+| Command | None that runs QREP. Web search and page fetches, plus headless Chromium (Playwright from `web/node_modules`) launched four times, one browser at a time: once for each of the three Reddit and X search pages, and once for the two Webster 1915 pages |
 | Research base | 9030fdede146b1c23fea8dc15cb68f1a3fc0173b (origin/main when the research ran; no QREP number is measured here) |
-| Inputs | The query log, source list and claim ledger in [D1-sources.json](D1-sources.json): 132 queries (123 searches run, 6 refused by the search tool, 3 page loads), 148 fetches (125 ok, covering 113 distinct pages; 23 failed), 164 claims (1 excluded) |
+| Inputs | The query log, source list and claim ledger in [D1-sources.json](D1-sources.json): 132 queries (123 searches run, 6 refused by the search tool, 3 page loads), 148 sources requested (125 fetched ok, covering 113 distinct pages; 23 failed), 25 spot checks, 164 claims (2 excluded) |
 | Companion | [D1-review-rubric.md](D1-review-rubric.md), the rubric the D8 panel scores a PDF against |
 
 Cited quilter voices stand in for the review and the discrepancy case that Jake's mother cannot
@@ -33,16 +33,18 @@ source says, and is marked as such.
 4. Running short is reported in five sources: a shop's account and a forum thread [S-B04, S-B12],
    and three errata pages that correct yardage upward [S-B02, S-B03, S-B39]; three more describe a
    related difficulty (section 5, category 2). By this report's arithmetic, some published charts
-   also under-buy: at their own stated widths and allowances, five of six rows of one backing chart
-   and one row of another cannot cover the quilt they name, and four more rows of the second fall
-   short at the low end of their range or at its longarm rule (DIS-03); three charts list 108 in
-   wide backing that cannot span the backing they state (DIS-04); and two binding figures buy
-   1/2 in less fabric than their own strip count uses (DIS-06). These support MATH.md's seam-aware
-   panel count (F9), its omission of a 108 in line for a king (F11, V-WIDE-05) and its
+   also under-buy at their own stated widths and allowances. In one backing chart, one row cannot
+   cover its quilt, two more fall short at the low end of their range, and two more fall short under
+   its longarm formula but not under every reading of the page. In another, five of six rows fall
+   short if each figure is the row's total, which that chart does not settle (DIS-03). Three charts
+   list 108 in wide backing that cannot span the backing they state (DIS-04), and two binding
+   figures buy 1/2 in less fabric than their own strip count uses (DIS-06). These support MATH.md's
+   seam-aware panel count (F9), its omission of a 108 in line for a king (F11, V-WIDE-05) and its
    strips-times-width binding line (F7).
-5. Wrong cut sizes are the most frequent kind of entry in one magazine's corrections record from
-   2005 to 2023 [S-B03]. Quilters respond by checking the arithmetic, making a test
-   block and looking for corrections pages (sections 5 and 7).
+5. Wrong cut sizes appear often in one magazine's corrections record from 2005 to 2023, and three
+   fetch summaries of it rank them first; the page states no share, and its entries were not hand
+   counted [S-B03]. Quilters respond by checking the arithmetic, making a test block and looking
+   for corrections pages (sections 5 and 7).
 6. By the evidence found (lists, recommendations and one reader survey, not counts of finished
    quilts), the most-made traditional squares and triangle quilts are the nine patch (5 sites),
    then half-square triangle quilts, flying geese and the four patch (4 sites each, in survey
@@ -59,25 +61,27 @@ source says, and is marked as such.
 The research ran as four topic passes (A finishing numbers, B complaints, C most-made quilts and
 name sources, D pattern trust and clarity), each fetching one page at a time, with no login,
 posting, sign-up or contact, and no API, JSON or sitemap requests. The only search listing pages
-requested were the Reddit and X pages listed under "Reddit and X" below. Fifteen sources that later
-sections rely on were fetched a second time to check the claims drawn from them, four of them twice
+requested were the Reddit and X pages listed under "Reddit and X" below. Sixteen sources that later
+sections rely on were fetched a second time to check the claims drawn from them, six of them twice
 (D1-sources.json, `spot_checks`). The checks corrected one survey percentage and dropped a
 percentage share that a fetch summary had attached to a corrections list; the Webster name list was
 rewritten from the book's full text [S-M02], and one claim from a knitting source was excluded. The
-review of the first draft found five
-figures that fetches had returned but no claim recorded; they are now claims C-M01 to C-M05, and
-C-A12 is corrected to its page's table.
+review of the first draft found five figures that fetches had returned but no claim recorded; they
+are now claims C-M01 to C-M05, and C-A12 is corrected to its page's table. Page fetches return a
+summary of a page, not its text, so a ranking such as "most frequent" is the summary's reading
+unless the report says it was counted.
 
 Result count is the number of results the web search returned for a query, not the engine's total
-hit count. Every search that ran returned at least one result; "nothing used" counts searches none
-of whose results was fetched and used.
+hit count; three searches returned two result sets, and both count. Every search that ran returned
+at least one result. "Nothing used" counts searches none of whose results became a source that
+backs a claim.
 
 | Source group | Queries | Searches run | Refused by the search tool | Page loads | Results returned | Searches with nothing used | Pages fetched ok |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| r/quilting and related subreddits | 27 | 19 | 6 | 2 | 174 | 10 | 0 |
-| X | 8 | 7 | 0 | 1 | 64 | 5 | 0 |
-| Forums | 20 | 20 | 0 | 0 | 184 | 6 | 13 (QuiltingBoard 12, The Quilt Show 1) |
-| Designer, shop and publisher blogs | 62 | 62 | 0 | 0 | 583 | 16 | 88 (designer 27, shop 43, publisher 18) |
+| r/quilting and related subreddits | 27 | 19 | 6 | 2 | 173 | 11 | 0 |
+| X | 8 | 7 | 0 | 1 | 64 | 4 | 0 |
+| Forums | 20 | 20 | 0 | 0 | 184 | 8 | 13 (QuiltingBoard 12, The Quilt Show 1) |
+| Designer, shop and publisher blogs | 62 | 62 | 0 | 0 | 580 | 18 | 88 (designer 27, shop 43, publisher 18) |
 | Calculator sites | 14 | 14 | 0 | 0 | 147 | 7 | 12 |
 | Public-domain books | 1 | 1 | 0 | 0 | 10 | 0 | 5 (one work) |
 | Other pages (extension office, magazines, newsletters), from the queries above | | | | | | | 7 |
@@ -91,23 +95,28 @@ pages the passes did not draw on. Five forum fetches (four Quilt in a Day thread
 group) returned HTTP 403.
 
 **Reddit and X.** Every automated request to Reddit or X was refused or blocked, so they contribute
-no claim. In order, on 2026-10-10:
+no claim. In time order on 2026-10-10 (UTC, when each request started):
 
-- The web search refused reddit.com as a domain filter six times, so those searches never ran
-  (Q-A09, Q-A10, Q-B10, Q-C06, Q-D30, Q-D31). The other Reddit and X group searches, `site:`
-  searches included, ran and returned no reddit.com or x.com page.
-- The page fetch tool refused three Reddit addresses before sending any request: an r/quilting
-  search listing page (S-C03), then one r/quilting thread on www.reddit.com (S-D26) and the same
-  thread on old.reddit.com (S-D27), a second host tried after the first refusal.
-- Headless Chromium loaded three search listing pages, one after another about ten seconds apart:
-  the r/quilting search on www.reddit.com, which returned a network-security block page (Q-M01);
-  the same search on old.reddit.com, a retry on another host after that block, which returned HTTP
-  403 and the same block page (Q-M02); and X search, which returned HTTP 403 and an empty page,
-  because X search needs a login, which this ticket does not use (Q-M03).
+- 10:09:54. The page fetch tool refused an r/quilting search listing page before sending any
+  request (S-C03).
+- 10:09:56 to 10:14:13. The web search refused reddit.com as a domain filter six times, so those
+  searches never ran (Q-C06, Q-B10, Q-A09, Q-A10, Q-D30, Q-D31).
+- 10:14:17 and 10:14:18. The page fetch tool refused one r/quilting thread on www.reddit.com
+  (S-D26), then the same thread on old.reddit.com (S-D27), a second host tried after the first
+  refusal. The thread came from a Reddit mirror site in a search result (Q-D22); the mirror was not
+  requested.
+- 10:19:18 to 10:19:40. After both tools had refused Reddit, headless Chromium loaded three search
+  listing pages, one after another: the r/quilting search on www.reddit.com, which returned a
+  network-security block page (Q-M01); the same search on old.reddit.com, a retry on another host
+  after that block, which returned HTTP 403 and the same block page (Q-M02); and X search, which
+  returned HTTP 403 and an empty page (Q-M03).
 
-No request went to Reddit or X after Q-M03. Two of these attempts tried a second Reddit host after
-the first was refused or blocked (S-D27, Q-M02). A retry after a block is a workaround, not use of
-a site the way a person would (ORCHESTRATOR.md section 15); both are recorded here as they happened.
+The other Reddit and X group searches, `site:` searches included, ran and returned no reddit.com or
+x.com page. No request went to Reddit or X after Q-M03. Some of these steps followed an earlier
+refusal or block: S-D27 and Q-M02 tried a second Reddit host, and Q-M01 to Q-M03 used a browser
+after the search and page fetch tools had refused Reddit. Retrying after a refusal or block is not
+using a site the way a person would (ORCHESTRATOR.md section 15); all of these are recorded here as
+they happened.
 
 ## 3. Standard sizes: what quilters and calculator sites state
 
@@ -121,22 +130,22 @@ rounding behind it are in the source table below, which marks what a source does
 
 | Source | What it is | Fabric width | Overhang or extra length | Rounding and other |
 | --- | --- | --- | --- | --- |
-| [S-A02] | Designer backing chart | 42 to 44 in | 6 to 8 in added to each dimension | Up to 1/4 yd; its panel column says only whether to piece, not how many panels (C-M03) |
+| [S-A02] | Designer backing chart | 42 to 44 in | 6 to 8 in added to each dimension | Up to 1/4 yd per panel in its worked example; its panel column says only whether to piece, not how many panels (C-M03) |
 | [S-A03] | Shop backing chart | 40 in usable from a 42 in bolt; 108 in | 4 in per side | Up to 1/4 yd; 1/2 in seams; seams run lengthwise |
-| [S-A04] | Shop binding chart | 42 in | +10 in | 2 1/2 in strips; strips rounded up, yardage to 1/8 yd |
-| [S-A05] | Shop binding table | 42 in | About 1/4 yd buffer | 2 1/2 in strips |
+| [S-A04] | Shop binding chart | 42 in | +10 in | Strips rounded up; yardage rounding not stated; 2 1/2 in strips |
+| [S-A05] | Shop binding table | 42 in | About 1/4 yd buffer | Strips rounded up; yardage rounding not stated; 2 1/2 in strips |
 | [S-A07] | Shop guide, 108 in backing | 108 in | 4 in per side (longarm) | Not stated |
 | [S-A08] | Shop calculator guide | 44 in; 108 in | Width + 8 in; length + 8 in (home) or + 12 in (longarm). A note also gives 6 to 8 in for longarm without saying per side or total (C-M04) | Round up by half a yard when unsure |
-| [S-A10] | Shop article, 90 x 90 queen | 44 to 45 in fabric, 42 in usable | 4 to 5 in per side; binding +15 to 20 in | 10 to 15 percent extra for shrinkage; 2 1/2 in binding strips |
+| [S-A10] | Shop article, 90 x 90 queen | 44 to 45 in fabric, 42 in usable | 4 to 5 in per side; binding +15 to 20 in | Not stated; 10 to 15 percent extra for shrinkage; 2 1/2 in binding strips |
 | [S-A12] | Forum thread | 108 in | 4 to 5 in per side (6 in for some longarm quilters) | Not stated |
 | [S-A13] | Forum thread | 108 in | Not stated | Not stated |
 | [S-A15] | Shop calculator article | 44 in (pieced); 108 in; 40 in for binding | Its backing column is the top + 8 in each way; binding +10 to 12 in | Not stated; 2 1/2 in binding strips |
-| [S-A16] | Longarm guide | 40 to 42 in usable | 5 in per side | +1/4 yd for shrinkage and squaring; 1/2 in seams |
+| [S-A16] | Longarm guide | 40 to 42 in usable | 5 in per side | Not stated; +1/4 yd for shrinkage and squaring; 1/2 in seams |
 | [S-A26] | Shop guide, 108 in backing | 108 in | 4 in per side (machine), 6 to 8 in per side (longarm) | Not stated |
-| [S-A29] | Shop binding tutorial | 40 in | +20 in | 2 1/2 in strips, diagonal joins |
-| [S-A30] | Designer binding guide | Not stated | +20 in | 2 1/2 in strips |
+| [S-A29] | Shop binding tutorial | 40 in | +20 in | Not stated; 2 1/2 in strips, diagonal joins |
+| [S-A30] | Designer binding guide | Not stated | +20 in | Not stated; 2 1/2 in strips |
 | [S-A38] | Calculator | 42 in; 108 in | 4 in per side | No rule stated, figures in eighths of a yard; suggests 10 percent extra |
-| [S-A40] | Shop binding guide | 40 in | +12 in | 2 1/2 in strips, strips rounded up |
+| [S-A40] | Shop binding guide | 40 in | +12 in | Strips rounded up; yardage rounding not stated; 2 1/2 in strips |
 
 ### 3.1 Backing, pieced
 
@@ -177,7 +186,8 @@ squaring.
 
 By this report's arithmetic, S-A03's crib and throw figures (63 and 81 in) cut the backing's
 length (60 and 73 in) from the bolt; turning the piece so the 108 in width spans the length needs
-only the backing's width (44 and 58 in), which is how F11 reaches 1 1/2 and 1 3/4 yd. One calculator
+only the backing's width (44 and 58 in) plus F11's 4 1/2 in allowance, which is how F11 reaches
+1 1/2 and 1 3/4 yd. One calculator
 offers 118 in wide backing [S-A35] and one guide mentions it [S-A26]; neither gives a yardage
 (C-A25).
 
@@ -250,28 +260,33 @@ this report's, done by hand on the sources' stated figures; the sources do not s
   directions and buys the smaller [S-A27], as F10 does, so QREP's new crib and throw numbers sit
   3/4 yd below the first chart. PS-12's seam-direction line is what tells the reader why.
 - **DIS-03 (A1; F9).** Published backing rows that cannot cover their own quilt at their own
-  width and allowance. Each case takes the most generous reading: the widest fabric the source
-  allows, the smallest allowance, no seam loss, and the cheaper of panels across the width or
-  across the length (inches):
-  - [S-A02], 42 to 44 in, 6 to 8 in added to each dimension, reading each figure as the row's total
-    yardage. The page's panel column is not used, because the page says it shows only whether to
-    piece (C-M03). Lap 50 x 60 has a 56 x 66 backing; two panels are needed either way, the cheaper
-    2 x 56 = 112 in against 2 1/4 yd = 81 in. Twin 70 x 90, 76 x 96: 2 x 96 = 192 in (or
-    3 x 76 = 228) against 5 yd = 180 in. Full 85 x 108, 91 x 114: 3 x 91 = 273 in (or
-    3 x 114 = 342) against 6 yd = 216 in. Queen 90 x 108, 96 x 114: 3 x 96 = 288 in (or
-    3 x 114 = 342) against 216 in. King 108 x 108, 114 x 114: 3 x 114 = 342 in against 9 yd =
-    324 in. Only the baby row covers: its 42 x 58 backing fits one 44 in panel 58 in long, within
-    1 5/8 yd (58 1/2 in).
+  width and allowance, by this report's arithmetic. Each case takes the widest fabric the source
+  allows, no seam loss, and the cheaper of panels across the width or across the length (inches);
+  the reading of each source's allowance is stated with it:
+  - [S-A02], 42 to 44 in, 6 to 8 in added to each dimension (6 in used). The page does not say
+    whether a row's figure is the row's total or per panel: its worked example rounds a length up
+    "per panel", and its panel column says only whether to piece, not how many panels (C-M03).
+    Reading each figure as the row's total: lap 50 x 60 has a 56 x 66 backing; two panels are
+    needed either way, the cheaper 2 x 56 = 112 in against 2 1/4 yd = 81 in. Twin 70 x 90,
+    76 x 96: 2 x 96 = 192 in (or 3 x 76 = 228) against 5 yd = 180 in. Full 85 x 108, 91 x 114:
+    3 x 91 = 273 in (or 3 x 114 = 342) against 6 yd = 216 in. Queen 90 x 108, 96 x 114:
+    3 x 96 = 288 in (or 3 x 114 = 342) against 216 in. King 108 x 108, 114 x 114: 3 x 114 =
+    342 in against 9 yd = 324 in. Only the baby row covers: its 42 x 58 backing fits one 44 in
+    panel 58 in long, within 1 5/8 yd (58 1/2 in). If the figures are per panel, the rows cannot be
+    checked, because the page gives no panel count.
   - [S-A08], 44 in. The page states its allowance two ways (C-M04): a formula, width + 8 in and
-    length + 8 in (home) or + 12 in (longarm), and a note of 6 to 8 in for longarm quilting that
-    does not say per side or total. MATH.md F8 reads the page as 12 in each way for longarm. The
-    cases below use the formula, the smallest of these readings, so each shortfall also holds under
-    the larger ones. Queen 90 x 108 at 6 to 6 1/2 yd (at most 234 in): the 98 x 116 backing needs
-    three panels either way, because two give at most 88 in, so 3 x 98 = 294 in (8 1/6 yd) turned
-    or 3 x 116 = 348 in. At the low end of their ranges, crib 40 x 50 (48 x 58) needs 2 x 48 =
-    96 in against 2 1/2 yd = 90 in, and king 108 x 108 (116 x 116) needs 3 x 116 = 348 in against
-    9 1/2 yd = 342 in. At the longarm rule, twin 60 x 80 (68 x 92) needs 2 x 92 = 184 in against
-    5 yd = 180 in, and full 72 x 90 (80 x 102) needs 2 x 102 = 204 in against 5 1/2 yd = 198 in.
+    length + 8 in (home) or + 12 in (longarm), and a note of 4 in on all sides for home quilting
+    and 6 to 8 in for longarm quilting that does not say per side or total. For home quilting the
+    two agree (+8 in each way). At that allowance, queen 90 x 108 at 6 to 6 1/2 yd (at most 234 in)
+    has a 98 x 116 backing that needs three panels either way, because two give at most 88 in, so
+    3 x 98 = 294 in (8 1/6 yd) turned or 3 x 116 = 348 in. At the low end of their ranges, crib
+    40 x 50 (48 x 58) needs 2 x 48 = 96 in against 2 1/2 yd = 90 in, and king 108 x 108
+    (116 x 116) needs 3 x 116 = 348 in against 9 1/2 yd = 342 in. Under the longarm formula, twin
+    60 x 80 (68 x 92) needs 2 x 92 = 184 in against 5 yd = 180 in, and full 72 x 90 (80 x 102)
+    needs 2 x 102 = 204 in against 5 1/2 yd = 198 in. These two also fall short under MATH.md F8's
+    reading of the page (12 in more each way) and under 6 to 8 in per side, but not if the note's
+    6 to 8 in is a total: the twin then needs at most 2 x 68 = 136 in turned, and the full at most
+    2 x 98 = 196 in, both within the stated yardage.
   These support the seam-aware panel count of F9 and the "running short" reports (section 5).
 - **DIS-04 (A1; F11, V-WIDE-05).** Three charts offer 108 in wide backing that cannot span the
   backing they state. Two list 3 1/2 yd for a king whose backing is wider than 108 in both ways:
@@ -290,7 +305,7 @@ this report's, done by hand on the sources' stated figures; the sources do not s
   exactly 3/4 yd would find 1/2 in short. F7 buys strips x w rounded up
   (1 yd at 1/4 yd rounding), so QREP's line is 1/4 yd higher on purpose.
 - **DIS-07 (A1; Q3).** Rounding increments split: 1/4 yd [S-A03, S-A35, S-A21], 1/8 yd [S-A36,
-  S-A37, S-A04], figures in eighths with no stated rule [S-A38], and a half-yard tip [S-A08].
+  S-A37], figures in eighths with no stated rule [S-A38, S-A04], and a half-yard tip [S-A08].
 - **DIS-08 (A1; Q2).** Backing allowances: +9 in per seamed backing and 1/8 to 1/4 yd for crooked
   cuts [S-A27], +1/4 yd for shrinkage and squaring [S-A16], 5 to 15 percent [S-A36, S-A38, S-A10].
   The default +9 in and +4 1/2 in sit at the low end of what quilters add.
@@ -321,8 +336,9 @@ Counts are distinct fetched sources (pages or threads) per category; a page that
 counts once. Each count is split by kind of source. Quilter reports are forum threads, blog
 comments and a shop's or longarm quilter's account of a problem met. Errata pages are a publisher's
 or designer's own corrections. Calculator and guide pages state what a tool or guide assumes, so
-they are indirect evidence of a complaint. Each category names the MATH.md section 6 question or
-PATTERN-SPEC check it bears on.
+they are indirect evidence of a complaint. A page is classed by the claim drawn from it in that
+category, so one page can be a quilter report in one category and an indirect guide page in
+another. Each category names the MATH.md section 6 question or PATTERN-SPEC check it bears on.
 
 | # | Category | Sources | What the sources say | Bears on |
 | --- | --- | --- | --- | --- |
@@ -330,13 +346,13 @@ PATTERN-SPEC check it bears on.
 | 2 | Running short | 8: 5 report a shortfall (a shop's account and a forum thread, 3 errata pages); 3 describe a related difficulty | Shortfall: a published pattern listed backing and batting far below what the quilt needed, corrected on the publisher's errata page [S-B02]; a monthly pattern was half a yard short on one fabric until the designer posted a corrected cutting sheet [S-B04]; errata pages correct yardage upward [S-B03, S-B39]; patterns written for 44 to 45 in fabric run short on today's 40 to 42 in, worst for newer quilters [S-B12]. Related difficulty: a 79 in top could not get a one-piece backing at 40 in usable [S-B27], quilters whose top is just wider than the backing fabric look for ways to widen it [S-B26], and working out yardage after changing a pattern is hard [S-B01] | Q2, Q4, Q7, F9 |
 | 3 | Width-of-fabric assumptions | 9: 3 quilter reports (forum threads); 6 calculator and guide pages, indirect | Experienced quilters plan on 40 in even from fabric labeled 44 [S-B12, S-B36, S-B27]. Indirect: calculators and a publisher assume 40, 42 to 44 or a changeable 43 in [S-B15, S-B35, S-B16, S-B17, S-B18]; prewashing and trimming selvages take more [S-B06, S-B16, S-B18] | Q7, U = 40, B = 42 |
 | 4 | Binding length and strip count | 4: 1 quilter report (blog comments); 3 calculator and guide pages, indirect | Joining the ends is a step some need a video for [S-B01]. Indirect: strip count changes with strip width, and guides differ on the extra (+10 or +12 in) [S-B20, S-B34]; a calculator fixed at 2 1/2 in strips over 40 in gives a different count for another width [S-B15] | F6, F7 |
-| 5 | Calculators disagree | 5, all indirect: calculator and guide pages; no quilter report found | Overhang varies from 0 to 8 in per side; one adds 1 in per seam, one rounds up to 1/8 yd, one adds a buffer for crooked cuts; each page states its own assumptions, none says why it differs from the others, and one says its results are only a starting point [S-B15, S-B16, S-B17, S-B18, S-B35] | Q2, Q3, Q5, Q7; PS-14 |
+| 5 | Calculators disagree | 5, all indirect: calculator and guide pages; no quilter report found | Overhang varies from 0 to 8 in per side; one adds 1 in per seam, one rounds up to 1/8 yd, one adds a buffer for crooked cuts; each page states its own assumptions, and one says its results are only a starting point [S-B15, S-B16, S-B17, S-B18, S-B35] | Q2, Q3, Q5, Q7; PS-14 |
 | 6 | Pattern errors and errata | 8: 4 quilter reports (forum threads and a shop's account); 4 errata pages | Errata pages list wrong cut sizes, wrong counts, mislabeled diagrams and missing templates [S-B02, S-B03, S-B24, S-B39]; quilters find a wrong dimension after cutting everything [S-B10, S-B33]; they learn of corrections by searching or from a shop [S-B04, S-B10]; precut kit pieces 1/4 in off broke triangle units [S-B09] | PS-16, PS-19, PS-23 |
 | 7 | Unclear instructions | 5: 3 quilter reports (blog comments, a forum thread); 2 errata or revision pages | Pressing direction, nesting and the scant 1/4 in confuse [S-B01]; patterns assume the buyer knows layering, quilting and binding [S-B11]; readers mistake unfinished for finished sizes [S-B13]; designers clarify assembly text and switch to cut-large-and-trim [S-B24, S-B28] | PS-15, PS-22, PS-29 |
-| 8 | Cutting instructions | 3: 1 quilter report (blog comments); 2 errata or revision pages | Wrong cut sizes are the most frequent correction in one magazine's record [S-B03]; cutting must be exact or nothing fits [S-B01]; a pattern was revised to cut triangles oversized and trim [S-B28] | PS-16, PS-23 (L-06) |
+| 8 | Cutting instructions | 3: 1 quilter report (blog comments); 2 errata or revision pages | Wrong cut sizes appear often in one magazine's corrections record, and three fetch summaries rank them first; the page states no share [S-B03]; cutting must be exact or nothing fits [S-B01]; a pattern was revised to cut triangles oversized and trim [S-B28] | PS-16, PS-23 (L-06) |
 | 9 | Size mismatch | 4: 2 quilter reports (blog comments, a forum thread); 1 correction; 1 guide page, indirect | A finished size printed 20 in off [S-B28]; blocks finishing small from printer scaling, seam error or finished-versus-unfinished confusion [S-B13, S-B14]; kit pieces cut wrong [S-B09] | PS-07, PS-26, PS-38 |
 | 10 | Format and print | 2, all indirect: guide pages | Fit-to-page printing shrinks templates; print at 100 percent and measure the test box [S-B21, S-B13] | PS-38 |
-| 11 | Longarm backing | 6: 5 longarm quilters' guides and service checklists; 1 calculator, indirect | Backing should be 8 to 10 in larger than the top [S-B05, S-B06, S-B23, S-B37, S-B38]; uneven or badly sewn seams and selvages in seams cause sag and puckers [S-B05, S-B06, S-B23]; seams pressed open; a short backing costs extra to extend [S-B38, S-B16] | Q5, F8, F9 |
+| 11 | Longarm backing | 6: 5 quilter reports (longarm quilters' accounts, in their guides and service checklists, of problems they meet with customers' backings); 1 calculator, indirect | Backing should be 8 to 10 in larger than the top [S-B05, S-B06, S-B23, S-B37, S-B38]; uneven or badly sewn seams and selvages in seams cause sag and puckers [S-B05, S-B06, S-B23]; seams pressed open; a short backing costs extra to extend [S-B38, S-B16] | Q5, F8, F9 |
 
 Not found: complaints about tiny text, color-only diagrams, page counts or wasteful cutting layouts,
 and any direct report of a binding that came out short.
@@ -345,9 +361,9 @@ and any direct report of a binding that came out short.
 
 "Most-made" here means most often listed, recommended or chosen as a favorite: no source counts
 finished quilts. Ranked by the number of independent sites (fetched ok) that list the family as
-popular, a beginner favorite or a classic (two pages from one site count once; a post about one
-finished quilt is not a listing), then by its share in a quilting publisher's reader survey of over
-1,000 quilters [S-C01]. Families tied on both share a rank and are listed alphabetically. The
+popular, a favorite or a classic, or recommend it for beginners (two pages from one site count
+once; a post that only shows one finished quilt does not count), then by its share in a quilting
+publisher's reader survey of over 1,000 quilters [S-C01]. Families tied on both share a rank and are listed alphabetically. The
 evidence is lists, recommendations and one survey; no source counts finished quilts, and Reddit,
 where such counts would come from, could not be read. Scope follows plan section 2.3.
 
@@ -357,7 +373,7 @@ where such counts would come from, could not be read. Scope follows plan section
 | 2 | Half-square triangle quilts (pinwheel, broken dishes, sawtooth) | 4 | 53 percent | Favorite unit [S-C01]; lists [S-C02, S-C11, S-C12] | Half-square triangles | In | Broken Dish, Pinwheel Square, Wind Mill, Sawtooth Patchwork, Bear's Paws |
 | 3 | Flying geese | 4 | 33 percent | Second favorite unit [S-C01]; lists and tutorials [S-C02, S-C16, S-C27] | Stitch-and-flip corners (or HSTs) | In | Not under this name; Wild Goose Chase is listed |
 | 4 | Four patch | 4 | 18 percent | Survey [S-C01]; lists [S-C02, S-C11, S-C12] | Squares | In | New Four Patch |
-| 5= | Irish chain (single, double) | 4 | None | Favorite, set straight [S-C14], on the same site as a post that says chains can be set on point [S-C18]; classic beginner quilt, set straight [S-C16]; magazine top 10 [S-C17]; throw tutorial, set straight [S-C26]. Straight-set examples at 3 sites | Squares, merged runs | In when set straight; on point is out | Double Irish Chain |
+| 5= | Irish chain (single, double) | 4 | None | Favorite, set straight [S-C14], on the same site as a post that says chains can be set on point [S-C18]; classic beginner quilt, set straight [S-C16]; magazine top 10 [S-C17]; a designer's own throw pattern that recommends it for beginners with some experience, set straight [S-C26]. Straight-set examples at 3 sites. Without S-C26 it would have 3 sites and rank 8th, below rail fence | Squares, merged runs | In when set straight; on point is out | Double Irish Chain |
 | 5= | Log cabin | 4 | None (a popular write-in and the second most common first block) | Survey [S-C01]; lists [S-C02, S-C11, S-C12]; classic list on the same shop site as S-C11 [S-C16] | Log strips | Read, no quilter's method yet | Log Cabin |
 | 7 | Rail fence | 3 | 17 percent (rail unit) | Survey [S-C01]; first in two beginner lists [S-C11, S-C12] | Merged runs (bars) | In | Not listed |
 | 8 | Hourglass and quarter-square triangle quilts | 2 | 11 percent | Survey [S-C01]; common-block list [S-C02] | Quarter-square triangles | In | Hour Glass |
@@ -367,7 +383,7 @@ where such counts would come from, could not be read. Scope follows plan section
 | 12 | Square in a square | 1 | 20 percent | Survey [S-C01] | Stitch-and-flip corners | In | Not listed |
 | 13= | Bow tie | 1 | None | Traditional roundup [S-C20] | Squares, stitch-and-flip corner | In | Not listed |
 | 13= | Ohio star | 1 | None (stars won favorite block overall, Ohio star named most) | Survey [S-C01] | Squares, QSTs | In | Not listed |
-| 13= | Sampler | 1 | None | Historically as common as one-block quilts; no block names given [S-C25] | Mixed | Out: plan section 2.3 does not list samplers, and a sampler's blocks all differ, while the block method assumes repeated block types (PATTERN-SPEC M-03) | Not applicable |
+| 13= | Sampler | 1 | None | Historically as common as one-block quilts; no block names given [S-C25] | Mixed | In when every block uses in-scope units (squares, HSTs, QSTs, stitch-and-flip corners) set straight; out when any block has curves, applique or an on-point setting (plan section 2.3) | Not applicable |
 
 Not found as most-made: churn dash, Trip Around the World, shoo fly, snowball and card trick
 (C-C24). The page first counted for churn dash names a snail trail or monkey wrench quilt and never
@@ -430,8 +446,8 @@ Has made many traditional quilts and has been burned by printed errors. Checks f
 against finished sizes, then piece counts against the layout.
 - Reads the whole pattern, does rough math, and makes a test block before cutting everything
   [S-D03, S-D11, S-D33].
-- Knows wrong cut sizes are the most frequent entry in a magazine's corrections record [S-B03]
-  and has found one only after cutting [S-B10, S-B33].
+- Knows wrong cut sizes appear often in a magazine's corrections record [S-B03] and has found one
+  only after cutting [S-B10, S-B33].
 - Report's analysis: QREP's strip-first cutting with per-strip yields (PATTERN-SPEC PS-16) is what
   lets this persona do that rough math by hand; no source asks for that format by name.
 - Prefers cutting triangle units oversized and trimming, with a stated trim-to size [S-D23,
@@ -446,19 +462,22 @@ against finished sizes, then piece counts against the layout.
 
 Often sends quilts to a longarm quilter, or quilts at home on a domestic machine. Checks first: the
 backing, binding and batting lines in the fabric list, then Finishing.
-- Wants the overhang stated per side: 4 in is the norm, longarm quilters ask for 4 to 8 in, home
-  quilting needs 2 to 4 [S-A03, S-D35, S-D20, S-A26, S-A25].
+- Checks the overhang per side against what longarm quilters ask: at least 4 in all round [S-D35],
+  5 in [S-D20] or 6 to 8 in [S-A26]. Charts most often use 4 in [S-A03, S-A25], and home quilting
+  needs 2 to 4 in [S-A25, S-A14, S-A17].
 - Plans on 40 in usable width with selvages trimmed [S-A03, S-B12, S-B27].
 - Wants a square backing with seams pressed open and selvages out of the seams [S-B05, S-B23,
   S-D35, S-B38].
 - Is told crosswise backing seams can save half a yard on small quilts and lengthwise seams wear
-  better on bed quilts [S-D10], so looks for the seam direction.
-- Is offered 108 in wide backing by shop guides for sizes from crib up [S-A03, S-A07, S-A26].
+  better on bed quilts [S-D10].
+- Is offered 108 in wide backing by shop guides from crib size up, two of them through king
+  [S-A03, S-A07] and one through queen [S-A26].
   Report's analysis: some charts list it for kings it cannot span (DIS-04), so a missing 108 in
   line needs a stated reason (rubric R-05).
 - Wants the binding strip width, strip count, join method, corner method and extra length stated
   [S-D31, S-A40, S-D21, S-A43].
-- Wants the batting size with its overhang and the package that covers it [S-A25, S-D35, S-D20].
+- Checks the batting size, the top plus about 4 in per side [S-A24, S-A25], and the package that
+  covers it [S-A25].
 - Would rather buy half a yard over than come up two inches short [S-B36, S-B12].
 
 ## 8. V-MOM-01
@@ -472,12 +491,12 @@ before any fix (MATH.md Q1).
 ## 9. Limits
 
 - No Reddit or X content: every automated request to them was refused or blocked (section 2).
-- Four sites supply six or more distinct pages each: lindas.com 9, quiltingdaily.com 8,
-  missouriquiltco.com 6 and mrsquilty.com 6 (QuiltingBoard supplies 12 threads, each with several
-  posters). A few shops and one publisher weigh more than their count of sources suggests.
-- Page fetches return a summary of each page, not its full text. Fifteen sources were fetched a
-  second time and checked, four of them twice (D1-sources.json, `spot_checks`); the claims from
-  the rest are as the research passes recorded them.
+- Five sites supply six or more distinct pages each: QuiltingBoard 12 (threads, each with several
+  posters), lindas.com 9, quiltingdaily.com 8, missouriquiltco.com 6 and mrsquilty.com 6. A few
+  shops and one publisher weigh more than their count of sources suggests.
+- Page fetches return a summary of each page, not its full text. Sixteen sources were fetched a
+  second time and checked, six of them twice (D1-sources.json, `spot_checks`); the claims from the
+  rest are as the research passes recorded them.
 - The most-made ranking counts lists and recommendations, not finished quilts.
 - Size figures rarely use MATH.md's exact dimensions; "nearest" rows are context, not
   like-for-like comparisons.
