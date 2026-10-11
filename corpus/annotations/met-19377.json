@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "photo": "private/cache/met-13894.jpg",
-  "sha256": "c3dde70797f302b12d148992c69ce7a3ad230ae1f89e661ecfed22728065f046",
+  "photo": "private/cache/met-19377.jpg",
+  "sha256": "932a21cd93a38ffb6e42aeca8cc3d6943fcb1a53f7b2ec7700b53f905619a19d",
   "canvas": [
-    3215,
-    3700
+    4000,
+    3749
   ],
   "construction_class": [
     {
@@ -18,21 +18,21 @@
   ],
   "refusal_class": [
     {
-      "value": "other",
+      "value": "applique",
       "provenance": "proposed-a"
     },
     {
-      "value": "other",
+      "value": "applique",
       "provenance": "proposed-b"
     }
   ],
   "finished_size": [
     {
       "value": {
-        "width_in": 80.0,
-        "height_in": 92.5,
+        "width_in": 77.62,
+        "height_in": 77.0,
         "approximate": true,
-        "source_text": "92 1/2 x 80 in. (235 x 203.2 cm)"
+        "source_text": "77 x 77 5/8 in. (195.6 x 197.2 cm)"
       },
       "provenance": "source-record"
     }

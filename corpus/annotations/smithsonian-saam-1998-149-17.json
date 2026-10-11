@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "photo": "private/cache/smithsonian-saam-1998-149-17.jpg",
+  "sha256": "aa05079a4dfdb3c04b8dc84e057bba7a4ff447d9f2e04376650e7cbbefdfdb8f",
+  "canvas": [
+    3000,
+    2725
+  ],
+  "construction_class": [
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-b"
+    }
+  ],
+  "refusal_class": [
+    {
+      "value": "on_point",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "on_point",
+      "provenance": "proposed-b"
+    }
+  ],
+  "finished_size": [
+    {
+      "value": {
+        "width_in": 114.0,
+        "height_in": 104.0,
+        "approximate": true,
+        "source_text": "114 \u00d7 104 in. (289.6 \u00d7 264.2 cm)"
+      },
+      "provenance": "source-record"
+    }
+  ],
+  "capture": [
+    {
+      "value": "museum_scan",
+      "provenance": "source-record"
+    }
+  ],
+  "device_class": [
+    {
+      "value": "museum",
+      "provenance": "source-record"
+    }
+  ]
+}

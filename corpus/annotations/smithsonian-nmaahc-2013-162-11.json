@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "photo": "private/cache/smithsonian-nmaahc-2013-162-11.jpg",
+  "sha256": "95577ba77f37c52aa01a162fa811d5062e480b4858a38d2104fe3745413ebad6",
+  "canvas": [
+    2466,
+    3000
+  ],
+  "construction_class": [
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-b"
+    }
+  ],
+  "refusal_class": [
+    {
+      "value": "applique",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "applique",
+      "provenance": "proposed-b"
+    }
+  ],
+  "finished_size": [
+    {
+      "value": {
+        "width_in": 39.5,
+        "height_in": 48.5,
+        "approximate": true,
+        "source_text": "H x W x D (with mount): 48 1/2 \u00d7 39 1/2 \u00d7 1 1/2 in. (123.2 \u00d7 100.3 \u00d7 3.8 cm); H x W (without mount): 45 \u00d7 36 5/8 in. (114.3 \u00d7 93 cm)"
+      },
+      "provenance": "source-record"
+    }
+  ],
+  "capture": [
+    {
+      "value": "museum_scan",
+      "provenance": "source-record"
+    }
+  ],
+  "device_class": [
+    {
+      "value": "museum",
+      "provenance": "source-record"
+    }
+  ]
+}

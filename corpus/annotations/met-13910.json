@@ -18,11 +18,11 @@
   ],
   "refusal_class": [
     {
-      "value": "other",
+      "value": "on_point",
       "provenance": "proposed-a"
     },
     {
-      "value": "other",
+      "value": "on_point",
       "provenance": "proposed-b"
     }
   ],

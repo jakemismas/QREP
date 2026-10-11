@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "photo": "private/cache/smithsonian-saam-1998-8-3.jpg",
+  "sha256": "22e23797d65bbeb071c3ceb1795c2d49d40fde36f01fb4dad0242a5f7f4f3452",
+  "canvas": [
+    2466,
+    3000
+  ],
+  "construction_class": [
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-b"
+    }
+  ],
+  "refusal_class": [
+    {
+      "value": "diamond_star",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "diamond_star",
+      "provenance": "proposed-b"
+    }
+  ],
+  "finished_size": [
+    {
+      "value": {
+        "width_in": 70.75,
+        "height_in": 86.12,
+        "approximate": true,
+        "source_text": "86 1/8 x 70 3/4 x 1/4 in. (218.8 x 179.7 x 0.5 cm.)"
+      },
+      "provenance": "source-record"
+    }
+  ],
+  "capture": [
+    {
+      "value": "museum_scan",
+      "provenance": "source-record"
+    }
+  ],
+  "device_class": [
+    {
+      "value": "museum",
+      "provenance": "source-record"
+    }
+  ]
+}

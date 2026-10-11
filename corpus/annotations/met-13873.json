@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "photo": "private/cache/met-13873.jpg",
+  "sha256": "dbb651f53436dff4ca28c4b3b276f1e878a054082680d1151098c352c7839efc",
+  "canvas": [
+    512,
+    768
+  ],
+  "construction_class": [
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-b"
+    }
+  ],
+  "refusal_class": [
+    {
+      "value": "on_point",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "on_point",
+      "provenance": "proposed-b"
+    }
+  ],
+  "finished_size": [
+    {
+      "value": {
+        "width_in": 106.0,
+        "height_in": 106.75,
+        "approximate": true,
+        "source_text": "106 x 106 3/4 in. (269.2 x 271.1 cm)"
+      },
+      "provenance": "source-record"
+    }
+  ],
+  "capture": [
+    {
+      "value": "museum_scan",
+      "provenance": "source-record"
+    }
+  ],
+  "device_class": [
+    {
+      "value": "museum",
+      "provenance": "source-record"
+    }
+  ],
+  "masks": [
+    {
+      "value": [
+        {
+          "polygon": [
+            {
+              "x": 463.0,
+              "y": 156.0
+            },
+            {
+              "x": 485.0,
+              "y": 156.0
+            },
+            {
+              "x": 485.0,
+              "y": 266.0
+            },
+            {
+              "x": 463.0,
+              "y": 266.0
+            }
+          ],
+          "reason": "label"
+        }
+      ],
+      "provenance": "proposed-a"
+    },
+    {
+      "value": [
+        {
+          "polygon": [
+            {
+              "x": 463.0,
+              "y": 155.0
+            },
+            {
+              "x": 487.0,
+              "y": 155.0
+            },
+            {
+              "x": 487.0,
+              "y": 268.0
+            },
+            {
+              "x": 463.0,
+              "y": 268.0
+            }
+          ],
+          "reason": "label"
+        }
+      ],
+      "provenance": "proposed-b"
+    }
+  ]
+}

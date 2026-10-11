@@ -1,0 +1,127 @@
+{
+  "schema_version": 1,
+  "photo": "private/cache/met-13596.jpg",
+  "sha256": "3ceb4eeb83a38a3d78576eb4282554ddd1c51644e8c212502800ec995672996e",
+  "canvas": [
+    2041,
+    2305
+  ],
+  "construction_class": [
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-b"
+    }
+  ],
+  "refusal_class": [
+    {
+      "value": "curve",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "curve",
+      "provenance": "proposed-b"
+    }
+  ],
+  "finished_size": [
+    {
+      "value": {
+        "width_in": 18.5,
+        "height_in": 21.0,
+        "approximate": true,
+        "source_text": "18 1/2 x 21 in. (47 x 53.3 cm)"
+      },
+      "provenance": "source-record"
+    }
+  ],
+  "capture": [
+    {
+      "value": "museum_scan",
+      "provenance": "source-record"
+    }
+  ],
+  "device_class": [
+    {
+      "value": "museum",
+      "provenance": "source-record"
+    }
+  ],
+  "masks": [
+    {
+      "value": [
+        {
+          "polygon": [
+            {
+              "x": 1640.0,
+              "y": 2245.0
+            },
+            {
+              "x": 1955.0,
+              "y": 2245.0
+            },
+            {
+              "x": 1955.0,
+              "y": 2300.0
+            },
+            {
+              "x": 1640.0,
+              "y": 2300.0
+            }
+          ],
+          "reason": "label"
+        },
+        {
+          "polygon": [
+            {
+              "x": 193.0,
+              "y": 2125.0
+            },
+            {
+              "x": 236.0,
+              "y": 2125.0
+            },
+            {
+              "x": 236.0,
+              "y": 2202.0
+            },
+            {
+              "x": 193.0,
+              "y": 2202.0
+            }
+          ],
+          "reason": "label"
+        }
+      ],
+      "provenance": "proposed-a"
+    },
+    {
+      "value": [
+        {
+          "polygon": [
+            {
+              "x": 1640.0,
+              "y": 2240.0
+            },
+            {
+              "x": 1960.0,
+              "y": 2240.0
+            },
+            {
+              "x": 1960.0,
+              "y": 2303.0
+            },
+            {
+              "x": 1640.0,
+              "y": 2303.0
+            }
+          ],
+          "reason": "label"
+        }
+      ],
+      "provenance": "proposed-b"
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "photo": "private/cache/smithsonian-saam-1987-80.jpg",
+  "sha256": "32a50e92f3e8b34535bbee03c0339bcd7f2c595e7aecc019e40b75824d426569",
+  "canvas": [
+    2543,
+    3000
+  ],
+  "construction_class": [
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-b"
+    }
+  ],
+  "refusal_class": [
+    {
+      "value": "curve",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "curve",
+      "provenance": "proposed-b"
+    }
+  ],
+  "finished_size": [
+    {
+      "value": {
+        "width_in": 72.25,
+        "height_in": 85.0,
+        "approximate": true,
+        "source_text": "85 x 72 1/4 in. (215.9 x 183.5 cm.)"
+      },
+      "provenance": "source-record"
+    }
+  ],
+  "capture": [
+    {
+      "value": "museum_scan",
+      "provenance": "source-record"
+    }
+  ],
+  "device_class": [
+    {
+      "value": "museum",
+      "provenance": "source-record"
+    }
+  ]
+}

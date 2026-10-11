@@ -32,7 +32,7 @@ Accepted:
 | Source | Rights flag stored in each row | License recorded | Policy |
 |---|---|---|---|
 | The Metropolitan Museum of Art (collection API: search v1.1, object records v1) | `isPublicDomain=true` | CC0-1.0 (the Met dedicates its open-access images CC0) | https://www.metmuseum.org/about-the-met/policies-and-documents/image-resources |
-| Smithsonian Open Access (api.si.edu) | `media.usage.access=CC0` | CC0-1.0 | https://www.si.edu/openaccess |
+| Smithsonian Open Access (api.si.edu; images from ids.si.edu and its own media bucket on registry.opendata.aws) | `media.usage.access=CC0` | CC0-1.0 | https://www.si.edu/openaccess |
 | Art Institute of Chicago (api.artic.edu, with the AIC-User-Agent header) | `is_public_domain=true` | PDM-1.0 (AIC marks the work public domain) | https://www.artic.edu/image-licensing |
 | LACMA (hand-picked after a screened sample) | `publicDomain=1` (its object page flag; restricted objects carry 0 and offer no download) | PDM-1.0, cited with www.lacma.org as LACMA asks | https://www.lacma.org/about/contact-us/terms-use |
 
@@ -84,46 +84,63 @@ python scripts/eval/corpus_fetch.py --recheck         # E4, before a release
   artworks whose title matches quilt, and Smithsonian CC0 image records titled quilt or typed as
   a quilt (many carry only a pattern name, such as Double Irish Chain, as their title). Titles
   set the order of screening; the tier comes from the image.
-- **Blocked on 2026-10-10:** two image hosts refused scripted downloads, so v0 holds Met and
-  LACMA images only, and the AIC and Smithsonian candidates wait in the cache's candidate list.
-  The Smithsonian image host, ids.si.edu, served a certificate that expired on 2026-10-09
-  (`SEC_E_CERT_EXPIRED`); the fetch never turns certificate checks off. AIC's image server,
-  www.artic.edu/iiif, answered every request, info.json included, with a Cloudflare challenge
-  (HTTP 403, `Cf-Mitigated: challenge`); the fetch does not work around bot protection. Rerun
-  `download --source smithsonian` or `--source aic` when the hosts serve scripted clients again,
-  then screen the new images.
-- **The recheck** re-reads every row's live record and fails when its rights flag no longer
-  clears, the record is gone, or a policy page answers 404 or 410. The policy pages answered
-  scripted reads with 403 or 429 on 2026-10-10, so a blocked page is left to the release's human
-  check.
+- **Image hosts on 2026-10-11:** the Smithsonian image host, ids.si.edu, served a certificate that
+  expired on 2026-10-09 (`SEC_E_CERT_EXPIRED`) until it was renewed (valid from 2026-10-10). Its
+  `ids/download` address redirects most images to Smithsonian Open Access's own media bucket,
+  `smithsonian-open-access.s3-us-west-2.amazonaws.com`, which
+  https://registry.opendata.aws/smithsonian-open-access documents as the program's CC0 media store;
+  the allowlist admits that one bucket host and no other amazonaws.com host. 138 of the 140
+  Smithsonian candidates are fetched; two Cooper Hewitt scans (chndm 1938-27-1 and 1938-57-1213,
+  186 and 191 megapixels) exceed Pillow's decompression-bomb limit and are not cached, because the
+  fetch does not lift that limit. AIC's image server, www.artic.edu/iiif, answers every request
+  with a Cloudflare challenge (HTTP 403, `Cf-Mitigated: challenge`), and the fetch does not work
+  around bot protection, so the AIC candidates wait in the cache's candidate list (#208).
+- **The recheck** re-reads every row's live record and fails when the record cannot be read, when
+  its rights flag differs from the row's own `rights_flag`, or when a policy page the rows cite
+  does not answer HTTP 200 at its own URL. It fails closed: there is no manual escape. On
+  2026-10-11 a scripted read got 429 from the Met's policy page, 403 from Smithsonian Open
+  Access's and 200 from LACMA's, so the recheck fails on two policy pages until #219 is resolved.
 
-## v0 counts (2026-10-10)
+## v0 counts (2026-10-11)
 
 Records searched: Met 184 (116 kept with `isPublicDomain` true and a primary image), AIC 114
 (113 kept, one undated; images blocked), Smithsonian 382 CC0 image records (140 kept: quilts
-dated before 1930; images blocked), LACMA 25 hand-picked from 115 public-domain search results. Screened from
-the image: 141 photos, Met 116 and LACMA 25.
+dated before 1930; 138 images fetched), LACMA 25 hand-picked from 115 public-domain search
+results. Screened from the image: 279 photos, Met 116, Smithsonian 138 and LACMA 25.
 
-| Tier | Photos | Share of the 141 | By source | Classes | In the holdout |
+| Tier | Photos | Share of the 279 | By source | Classes | In the holdout |
 |---|---|---|---|---|---|
-| A | 5 | 3.5 percent | LACMA 5 | squares 3, hst 1, snowball 1 | 0 |
-| B | 14 | 9.9 percent | Met 10, LACMA 4 | squares 7, qst 3, flying_geese 3, snowball 1 | 4 |
-| R | 117 | 83.0 percent | Met 102, LACMA 15 | other 52, applique 24, on_point 12, diamond_star 10, medallion 9, curve 6, hexagon 4 | 41 |
-| X | 5 | 3.5 percent | Met 4, LACMA 1 | partial_view 4, unreadable 1 | 3 |
+| A | 13 | 4.7 percent | LACMA 5, Smithsonian 8 | squares 8, hst 2, qst 2, snowball 1 | 2 |
+| B | 31 | 11.1 percent | LACMA 6, Met 11, Smithsonian 14 | squares 14, flying_geese 6, hst 6, qst 4, snowball 1 | 8 |
+| R | 131 | 47.0 percent | LACMA 12, Met 57, Smithsonian 62 | applique 39, on_point 32, medallion 20, curve 15, diamond_star 15, hexagon 10 | 42 |
+| X | 104 | 37.3 percent | LACMA 2, Met 48, Smithsonian 54 | whole_cloth 53, outside_classes 30, partial_view 10, not_a_quilt 10, unreadable 1 | 38 |
 
-In scope (tiers A and B): 19 of 141, 13.5 percent. The setup screen expected about 15 tier A
-photos across all four sources; with the AIC and Smithsonian images blocked, v0 finds 5, all
-LACMA. Of the 52 `other` refusals, most are whole-cloth quilts, which look nothing like an
-in-scope quilt.
+In scope (tiers A and B): 44 of 279, 15.8 percent. The setup screen expected about 15 tier A
+photos across all four sources; with the AIC images blocked, v0 finds 13. The Smithsonian Double
+Irish Chain 2013.67.2 (`smithsonian-saam-2013-67-2`) is an on-point refusal. The NMAH slide
+scans, color slides photographed on a blue board inside a black film surround, are
+`smithsonian-nmah-556281` to `556284`, `556288` and `556592`; the three in-scope ones (556283,
+556284 and 556288) are tier B, and neither proposal pass found an accession label inside them
+to mask. The masks in v0 cover the labels, captions, rulers and color bars that the passes found
+on nine refusal photos.
 
-**The v0 eval set** is the annotated subset: every tier A photo (5) and 44 refusals, weighted
-toward look-alikes of in-scope quilts: all 12 on point, all 10 diamond stars, all 6 curves,
-all 4 hexagons, the 6 in-scope designs refused for a pieced border or a mixed set (met-13885,
-met-13894, met-13910, lacma-54874, lacma-54905, lacma-60154), and 3 each of medallion and
-applique (the first three stems in sort order). The other 73 refusals stay in the manifest's
-refusal pool, unannotated. Committed copies (`images/`): the 5 tier A photos, one tier B
-(met-854571) and two on-point refusals (met-13905, lacma-58735), for the examples and the smoke
-tests.
+The first screen (2026-10-10) used a seventh refusal class, `other`, which plan D3a does not
+list. The 52 photos it held were screened again from the image on 2026-10-11 with the six
+classes only: 45 fit none of them and moved to tier X (whole_cloth 34, outside_classes 7,
+not_a_quilt 4), 3 read as in scope with a stress and moved to tier B (lacma-54874, lacma-54905,
+met-13894), and 4 took a refusal class (met-13596 curve, met-13885 medallion, met-13910
+on_point, met-701310 applique). Whether the whole-cloth and other unclassed refusals belong back in
+the refusal tier under a seventh class is a question for Jake on PR #214.
+
+**The v0 eval set** is the rows whose `eval_set` column reads `v0`: every tier A photo (13) and
+78 refusals, weighted toward look-alikes of in-scope quilts: every on_point (32), curve (15),
+diamond_star (15) and hexagon (10) refusal, plus the first three medallion and the first three
+applique stems in sort order (lacma-54813, lacma-54852, met-13865, met-13867, met-13870,
+met-13874). The holdout takes 2 of the 13 tier A photos and 25 of the 78 refusals, so the
+development side holds 11 and 53. Every tier A and refusal photo has an annotation, whether or
+not it is in the eval set. Committed copies (`images/`): five tier A photos (all LACMA), one
+tier B (met-854571) and two on-point refusals (met-13905, lacma-58735), for the examples and the
+smoke tests.
 
 ## Tiers and classes
 
@@ -132,10 +149,10 @@ records a tier and a class:
 
 | Tier | Meaning | Classes |
 |---|---|---|
-| A | Clean and in scope: the whole quilt, frontal and flat, pieced on a straight square grid from squares (merged runs included), half-square or quarter-square triangles, snowball corners or flying geese, with plain border bands | squares, hst, qst, snowball, flying_geese |
-| B | In scope but a stress case: scrappy, log cabin or Trip Around the World, or photo problems (tilt, folds, drape, low resolution, slide scans with accession labels, which a mask covers) | as tier A |
-| R | Refusal: a look-alike that QREP must refuse | on_point, curve, applique, medallion, hexagon, diamond_star, other |
-| X | Excluded from every eval set | partial_view, duplicate, not_a_quilt, unreadable |
+| A | Clean and in scope: the whole quilt, frontal and flat, pieced on one straight uniform square grid from squares (merged runs included), half-square or quarter-square triangles, snowball corners or flying geese, with plain border bands; sashing and cornerstones count when they sit on that grid | squares, hst, qst, snowball, flying_geese |
+| B | In scope but a stress case: scrappy, log cabin or Trip Around the World, or photo problems (tilt, folds, drape, low resolution), and the NMAH slide scans, whose labels a mask covers when one shows | as tier A |
+| R | Refusal: a look-alike that QREP must refuse, in one of the six classes plan D3a lists | on_point, curve, applique, medallion, hexagon, diamond_star |
+| X | Excluded from every eval set; whole_cloth has no piecing to read, and outside_classes is out of scope with none of the six refusal classes | partial_view, duplicate, not_a_quilt, unreadable, whole_cloth, outside_classes |
 
 The class names the unit that sets the read's difficulty: `squares` when only squares are used,
 otherwise the triangle or stitch-and-flip unit that covers more of the quilt. A museum photo's
@@ -153,7 +170,8 @@ reads height by width, H. and W. labels win over order, and a depth is dropped. 
 `px_h` are the source image's size, which is the annotations' canvas. Museums disagree on
 which number comes first, so `finished_in` is turned to match the photo: the quilt's longer side
 is the photo's longer side. `date_end` is the last year the record's date gives (a range's end,
-or a century's last year). Text from the museums
+a century's last year, or a decade's last year). `eval_set` reads `v0` for a row in the v0
+eval set and is empty otherwise. Text from the museums
 keeps its words; en and em dashes become hyphens under the repo's text rule.
 
 ## Holdout rule
@@ -170,11 +188,15 @@ gate (plan section 8.2).
 One file per photo, `annotations/<photo stem>.json`, valid against
 `schema/annotation.schema.json`. It names its photo by the manifest's `file` value and the
 source image's `sha256`, and records `canvas` as that image's `[width, height]`. Coordinates are
-source-image pixels, so a read request built from an annotation has a zero crop offset; a
-consumer that reads a downsized or decoded copy scales by its own factors.
+source-image pixels, whichever file `photo` names, so
+`qrep_eval.annotation.to_read_request` takes the pixel size of the image it stages and scales
+the corners from the canvas to it, with a zero crop offset. Those identity fields are not
+claims: they bind the file to its manifest row, and the licensed-photo check compares each one
+with that row.
 
 Each annotated field (frame, counts, construction_class, refusal_class, fabrics,
-finished_size, capture, device_class, masks, gold_layout) is a list of claims, each a value
+finished_size, capture, device_class, masks, gold_layout, and the photoreal sidecar's quad,
+grid, repeat_cells and character) is a list of claims, each a value
 with a provenance code:
 
 | Code | Meaning | Gate truth |
@@ -198,38 +220,68 @@ reveal a modern design (plan section 8.2).
 
 ## v0 proposals and the disagreements for D3b
 
-Two passes, proposed-a and proposed-b, each read every eval-set photo (2026-10-10). Each pass
-saw only the cached photos and the format, through `scripts/eval/corpus_screen.py` views whose
-grid labels are source pixels; neither saw the other's answers or any QREP output. Each pass was
-told which photos to frame and count (the screen's tier A) and which to classify only, so the
-split itself carries the screen's call; the classes were the passes' own. Each tier A photo got the outer edge, the bands, the field corners where visible, the
-counts, the class and a fabric count; each refusal got its class. Nothing here is truth until
-D3b verifies it.
+Two passes, proposed-a and proposed-b, each read every tier A photo, every refusal and the three
+tier B slide scans. Each pass saw only the cached photos and the format, through
+`scripts/eval/corpus_screen.py` views whose grid labels are source pixels; neither saw the
+other's answers or any QREP output. Each pass was told which photos to frame and count (the
+screen's tier A) and which to classify only, so the split itself carries the screen's call; the
+classes were the passes' own. Each tier A photo got the outer edge, the bands, the field corners
+where visible, the counts, the class and a fabric count; every other photo got its class, and a
+mask over any label, caption, ruler or color bar in frame. Nothing here is truth until D3b
+verifies it.
 
-The five tier A photos agree on counts and class in both passes; their outer corners lie within
-1 percent of the image diagonal of each other and their bands within 0.25 squares. Two need a
-closer look in D3b: lacma-54904's border is about 6 squares deep at the top and bottom but about
-3 at the sides, which one band width cannot express (both passes recorded an average), and
-lacma-60126's stair-step bricks have no repeating block, so both passes count it as one block of
-21 by 26 squares.
+The proposals come from two rounds. Round 1 (2026-10-10) classified 38 refusals that keep its
+claims. Round 2 (2026-10-11) framed and counted all 13 tier A photos, the five LACMA ones again
+with a brief that counts sashing and cornerstones on the grid as part of the field, and
+classified 96 photos: 93 refusals and the three slide scans. In round 2 a helper script that
+both passes kept in one shared scratch folder was overwritten, so pass A's answers for 38 photos
+were written into pass B's folder for a few minutes before pass B wrote its own. Those 38 pass B
+files were set aside, and a fresh pass B, which never saw them, classified the 38 photos again;
+those are the proposed-b claims.
+
+The 13 tier A photos agree on counts in both passes, and their outer corners lie within 0.25
+percent of the image diagonal of each other. Points for D3b:
+
+- lacma-63267 is 19 by 23 squares: sashing about one square wide runs between the blocks and
+  down both sides, so equal blocks are impossible and both passes record one block per axis.
+  The stair-step quilts (lacma-60126, smithsonian-saam-1998-149-21, smithsonian-saam-2013-67-17)
+  and the sashed four-patch smithsonian-saam-2013-67-9 are recorded the same way.
+- lacma-54904's border is about 6 squares deep at the top and bottom but about 3 at the sides,
+  which one band width cannot express (both passes recorded an average).
+- smithsonian-saam-2016-57-2 has a sawtooth row inside its border: pass A records it as a 0.9
+  square band (three bands), pass B folds it into a 3.0 square band (two bands). A pieced row
+  may also put the quilt out of tier A.
+- Fabric counts differ on four photos: smithsonian-nmah-556322 (9 against 10),
+  smithsonian-saam-2013-67-9 (8 against 7), smithsonian-saam-2016-57-2 (2 against 3) and
+  smithsonian-saam-2017-24-27 (4 against 3).
 
 Classes that disagree, between the passes or with the screen (`manifest.csv` class):
 
 | Photo | Screen | proposed-a | proposed-b |
 |---|---|---|---|
-| lacma-54874 | R other | qst | qst |
 | lacma-59557 | R on_point | on_point | hst |
+| lacma-63229 | A snowball | hst | hst |
 | met-13870 | R medallion | applique | medallion |
-| met-13885 | R other | on_point | other |
+| met-13873 | R applique | on_point | on_point |
 | met-13915 | R on_point | applique | on_point |
 | met-854567 | R curve | applique | diamond_star |
+| met-855674 | R applique | medallion | applique |
+| smithsonian-nmaahc-2013-215-4 | R applique | curve | curve |
+| smithsonian-nmah-556469 | R medallion | medallion | applique |
+| smithsonian-nmah-556492 | R applique | medallion | applique |
+| smithsonian-nmah-556599 | R applique | medallion | applique |
+| smithsonian-saam-1998-149-19 | R medallion | medallion | applique |
+| smithsonian-saam-1998-149-2 | R medallion | medallion | applique |
+| smithsonian-saam-1998-149-30 | R medallion | on_point | hst |
+| smithsonian-saam-1998-149-32 | R medallion | applique | applique |
+| smithsonian-saam-1998-149-5 | R medallion | medallion | applique |
+| smithsonian-saam-2016-57-2 | A hst | squares | squares |
+| smithsonian-saam-2016-57-7 | R on_point | on_point | qst |
 
-Fabric counts differ on one tier A photo: lacma-54871, 6 (proposed-a) against 5 (proposed-b).
-
-lacma-54874 matters most: both passes read it as an in-scope quarter-square-triangle quilt that
-the screen refused for its octagonal rings, so D3b decides whether it moves to tier A; it has
-no frame or count proposals yet, because the passes classified it only.
+Three refusals (lacma-59557, smithsonian-saam-1998-149-30, smithsonian-saam-2016-57-7) are read
+in scope by one pass, so D3b decides whether each moves to tier A; they have no frame or count
+proposals yet, because the passes classified them only.
 
 The committed copies under `images/` are downsized; an annotation of one names that copy in
-`photo` but keeps the source image's `sha256` and `canvas`, so a consumer that opens the copy
-scales the coordinates by the copy's size over the canvas.
+`photo` but keeps the source image's `sha256` and `canvas`, so `to_read_request` takes the size
+of the image it stages and scales the corners from the canvas to it.

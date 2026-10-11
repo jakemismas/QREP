@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "photo": "private/cache/smithsonian-nmah-556469.jpg",
+  "sha256": "5c57657eb11e2672b8716b883f266e29f03499262177425f1657e71f28cb2a14",
+  "canvas": [
+    3428,
+    3840
+  ],
+  "construction_class": [
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-b"
+    }
+  ],
+  "refusal_class": [
+    {
+      "value": "medallion",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "applique",
+      "provenance": "proposed-b"
+    }
+  ],
+  "capture": [
+    {
+      "value": "museum_scan",
+      "provenance": "source-record"
+    }
+  ],
+  "device_class": [
+    {
+      "value": "museum",
+      "provenance": "source-record"
+    }
+  ]
+}

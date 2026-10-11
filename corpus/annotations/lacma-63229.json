@@ -17,21 +17,21 @@
               "y": 44.0
             },
             "top_right": {
-              "x": 3812.0,
-              "y": 62.0
+              "x": 3811.0,
+              "y": 64.0
             },
             "bottom_right": {
               "x": 3766.0,
-              "y": 3672.0
+              "y": 3673.0
             },
             "bottom_left": {
               "x": 137.0,
-              "y": 3681.0
+              "y": 3684.0
             }
           },
           "bands": [
             {
-              "width_squares": 1.4
+              "width_squares": 2.9
             }
           ]
         },
@@ -39,20 +39,20 @@
           "kind": "field",
           "corners": {
             "top_left": {
-              "x": 568.0,
-              "y": 439.0
+              "x": 567.0,
+              "y": 437.0
             },
             "top_right": {
-              "x": 3488.0,
-              "y": 453.0
+              "x": 3478.0,
+              "y": 456.0
             },
             "bottom_right": {
-              "x": 3404.0,
-              "y": 3302.0
+              "x": 3385.0,
+              "y": 3300.0
             },
             "bottom_left": {
-              "x": 505.0,
-              "y": 3315.0
+              "x": 506.0,
+              "y": 3314.0
             }
           }
         }
@@ -65,25 +65,25 @@
           "kind": "outer_edge",
           "corners": {
             "top_left": {
-              "x": 191.0,
-              "y": 45.0
+              "x": 189.0,
+              "y": 46.0
             },
             "top_right": {
-              "x": 3812.0,
-              "y": 65.0
+              "x": 3814.0,
+              "y": 64.0
             },
             "bottom_right": {
-              "x": 3767.0,
+              "x": 3768.0,
               "y": 3673.0
             },
             "bottom_left": {
-              "x": 140.0,
-              "y": 3683.0
+              "x": 138.0,
+              "y": 3685.0
             }
           },
           "bands": [
             {
-              "width_squares": 1.45
+              "width_squares": 2.85
             }
           ]
         },
@@ -91,20 +91,20 @@
           "kind": "field",
           "corners": {
             "top_left": {
-              "x": 567.0,
+              "x": 568.0,
               "y": 442.0
             },
             "top_right": {
-              "x": 3484.0,
+              "x": 3480.0,
               "y": 458.0
             },
             "bottom_right": {
-              "x": 3393.0,
-              "y": 3302.0
+              "x": 3398.0,
+              "y": 3298.0
             },
             "bottom_left": {
-              "x": 506.0,
-              "y": 3312.0
+              "x": 508.0,
+              "y": 3301.0
             }
           }
         }
@@ -115,30 +115,30 @@
   "counts": [
     {
       "value": {
-        "blocks_across": 1,
-        "squares_per_block_across": 11,
-        "blocks_down": 1,
-        "squares_per_block_down": 11
+        "blocks_across": 11,
+        "squares_per_block_across": 2,
+        "blocks_down": 11,
+        "squares_per_block_down": 2
       },
       "provenance": "proposed-a"
     },
     {
       "value": {
-        "blocks_across": 1,
-        "squares_per_block_across": 11,
-        "blocks_down": 1,
-        "squares_per_block_down": 11
+        "blocks_across": 11,
+        "squares_per_block_across": 2,
+        "blocks_down": 11,
+        "squares_per_block_down": 2
       },
       "provenance": "proposed-b"
     }
   ],
   "construction_class": [
     {
-      "value": "snowball",
+      "value": "hst",
       "provenance": "proposed-a"
     },
     {
-      "value": "snowball",
+      "value": "hst",
       "provenance": "proposed-b"
     }
   ],

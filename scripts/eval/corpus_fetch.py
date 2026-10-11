@@ -310,7 +310,8 @@ def si_candidate(row: dict) -> Candidate:
     return Candidate(
         "smithsonian", record_id, clean_text((nonrep.get("title") or {}).get("content", "")),
         link, full[0] if full else medium.get("content", ""),
-        clean_text("; ".join(_texts(freetext.get("creditLine")))),
+        # Some records carry no credit line; the holding museum's name still credits the image.
+        clean_text("; ".join(_texts(freetext.get("creditLine"))) or nonrep.get("data_source") or ""),
         clean_text("; ".join(dims)), max(years) if years else None,
     )
 

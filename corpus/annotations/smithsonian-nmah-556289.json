@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "photo": "private/cache/smithsonian-nmah-556289.jpg",
+  "sha256": "e49c1670b95fb5f572db57cd835056fe3392f2cf106d0069fa36c02c469215aa",
+  "canvas": [
+    1946,
+    2142
+  ],
+  "construction_class": [
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-b"
+    }
+  ],
+  "refusal_class": [
+    {
+      "value": "medallion",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "medallion",
+      "provenance": "proposed-b"
+    }
+  ],
+  "capture": [
+    {
+      "value": "museum_scan",
+      "provenance": "source-record"
+    }
+  ],
+  "device_class": [
+    {
+      "value": "museum",
+      "provenance": "source-record"
+    }
+  ],
+  "masks": [
+    {
+      "value": [
+        {
+          "polygon": [
+            {
+              "x": 80.0,
+              "y": 88.0
+            },
+            {
+              "x": 1404.0,
+              "y": 88.0
+            },
+            {
+              "x": 1404.0,
+              "y": 124.0
+            },
+            {
+              "x": 80.0,
+              "y": 124.0
+            }
+          ],
+          "reason": "other"
+        }
+      ],
+      "provenance": "proposed-a"
+    },
+    {
+      "value": [
+        {
+          "polygon": [
+            {
+              "x": 82.0,
+              "y": 96.0
+            },
+            {
+              "x": 1405.0,
+              "y": 96.0
+            },
+            {
+              "x": 1405.0,
+              "y": 124.0
+            },
+            {
+              "x": 82.0,
+              "y": 124.0
+            }
+          ],
+          "reason": "other"
+        }
+      ],
+      "provenance": "proposed-b"
+    }
+  ]
+}

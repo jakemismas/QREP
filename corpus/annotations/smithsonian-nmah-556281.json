@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "photo": "private/cache/smithsonian-nmah-556281.jpg",
+  "sha256": "913fc97614f395d3f8fc28d19e362e63acd22a1ad808f0dc93ece6212531443b",
+  "canvas": [
+    4990,
+    4968
+  ],
+  "construction_class": [
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-b"
+    }
+  ],
+  "refusal_class": [
+    {
+      "value": "curve",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "curve",
+      "provenance": "proposed-b"
+    }
+  ],
+  "capture": [
+    {
+      "value": "museum_scan",
+      "provenance": "source-record"
+    }
+  ],
+  "device_class": [
+    {
+      "value": "museum",
+      "provenance": "source-record"
+    }
+  ]
+}

@@ -13,20 +13,20 @@
           "kind": "outer_edge",
           "corners": {
             "top_left": {
-              "x": 20.0,
+              "x": 16.0,
               "y": 144.0
             },
             "top_right": {
-              "x": 3791.0,
+              "x": 3795.0,
               "y": 138.0
             },
             "bottom_right": {
-              "x": 3845.0,
+              "x": 3847.0,
               "y": 4009.0
             },
             "bottom_left": {
-              "x": 75.0,
-              "y": 3918.0
+              "x": 84.0,
+              "y": 3905.0
             }
           },
           "bands": [
@@ -34,10 +34,10 @@
               "width_squares": 0.1
             },
             {
-              "width_squares": 2.15
+              "width_squares": 2.2
             },
             {
-              "width_squares": 0.55
+              "width_squares": 0.7
             }
           ]
         },
@@ -45,19 +45,19 @@
           "kind": "field",
           "corners": {
             "top_left": {
-              "x": 218.0,
-              "y": 335.0
+              "x": 221.0,
+              "y": 336.0
             },
             "top_right": {
-              "x": 3600.0,
-              "y": 332.0
+              "x": 3606.0,
+              "y": 334.0
             },
             "bottom_right": {
-              "x": 3654.0,
+              "x": 3659.0,
               "y": 3804.0
             },
             "bottom_left": {
-              "x": 268.0,
+              "x": 264.0,
               "y": 3732.0
             }
           }
@@ -72,30 +72,30 @@
           "corners": {
             "top_left": {
               "x": 18.0,
-              "y": 145.0
+              "y": 144.0
             },
             "top_right": {
-              "x": 3790.0,
-              "y": 142.0
+              "x": 3791.0,
+              "y": 141.0
             },
             "bottom_right": {
-              "x": 3843.0,
-              "y": 4003.0
+              "x": 3847.0,
+              "y": 4009.0
             },
             "bottom_left": {
-              "x": 82.0,
-              "y": 3909.0
+              "x": 84.0,
+              "y": 3905.0
             }
           },
           "bands": [
             {
-              "width_squares": 0.15
+              "width_squares": 0.1
             },
             {
-              "width_squares": 2.2
+              "width_squares": 2.15
             },
             {
-              "width_squares": 0.55
+              "width_squares": 0.65
             }
           ]
         },
@@ -103,20 +103,20 @@
           "kind": "field",
           "corners": {
             "top_left": {
-              "x": 218.0,
-              "y": 332.0
+              "x": 221.0,
+              "y": 336.0
             },
             "top_right": {
-              "x": 3608.0,
-              "y": 337.0
+              "x": 3606.0,
+              "y": 343.0
             },
             "bottom_right": {
               "x": 3659.0,
-              "y": 3800.0
+              "y": 3806.0
             },
             "bottom_left": {
-              "x": 268.0,
-              "y": 3725.0
+              "x": 264.0,
+              "y": 3732.0
             }
           }
         }
@@ -163,7 +163,7 @@
     },
     {
       "value": {
-        "count": 5
+        "count": 6
       },
       "provenance": "proposed-b"
     }

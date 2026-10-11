@@ -176,12 +176,13 @@ def test_committed_images_are_few_small_licensed_and_bound_to_their_rows():
 
 
 def eval_set() -> dict[str, list[dict[str, str]]]:
-    """The v0 eval set: the manifest rows that carry an annotation, by tier. The manifest keeps
-    every screened photo; the eval set is the annotated subset (corpus/README.md)."""
-    annotated = {an.load(path).photo for path in ANNOTATIONS}
+    """The v0 eval set by tier: the rows whose eval_set column reads v0 (corpus/README.md). Every
+    refusal carries proposals, so the set is marked in the manifest rather than read off which
+    photos are annotated."""
     chosen: dict[str, list[dict[str, str]]] = {}
     for row in rows():
-        if row["file"] in annotated:
+        assert row["eval_set"] in {"", "v0"}, row["file"]
+        if row["eval_set"] == "v0":
             chosen.setdefault(row["tier"], []).append(row)
     return chosen
 
@@ -193,7 +194,18 @@ def test_the_v0_eval_set_holds_every_tier_a_photo_and_at_least_30_refusals():
     tier_a = [row["file"] for row in rows() if row["tier"] == "A"]
     assert tier_a and sorted(r["file"] for r in chosen.get("A", [])) == sorted(tier_a)
     assert len(chosen.get("R", [])) >= 30
-    assert "X" not in chosen
+    assert set(chosen) == {"A", "R"}
+    annotated = {an.load(path).photo for path in ANNOTATIONS}
+    assert all(row["file"] in annotated for tier in chosen.values() for row in tier)
+
+
+def test_every_tier_a_and_refusal_photo_is_annotated():
+    # Source: plan D3a, criterion 8: proposals on every tier A photo and the class on every
+    # refusal photo, so each of those rows has an annotation file.
+    annotated = {an.load(path).photo for path in ANNOTATIONS}
+    missing = [row["file"] for row in rows() if row["tier"] in {"A", "R"}
+               and row["file"] not in annotated]
+    assert missing == []
 
 
 def test_eval_refusals_are_weighted_toward_on_point_look_alikes():
@@ -233,6 +245,129 @@ def test_holdout_rule_reads_the_first_8_hex_digits(prefix, expected):
 def test_holdout_rule_refuses_a_malformed_hash(bad):
     with pytest.raises(ValueError):
         an.in_holdout(bad)
+
+
+# The v0 holdout, frozen here so that rewriting a row's sha256 cannot move a photo into or out
+# of it unnoticed. Each entry is the photo stem and the first 8 hex digits of its source
+# image's sha256, copied from corpus/manifest.csv; the comment is the hand check that the
+# prefix read as an integer is a multiple of 3 (plan D3a, criterion 9).
+HOLDOUT_V0 = {
+    "lacma-30012": "856dc71b",  # 2238564123 = 3 x 746188041
+    "lacma-33726": "54f1e8d3",  # 1425139923 = 3 x 475046641
+    "lacma-52522": "0ceea295",  # 216965781 = 3 x 72321927
+    "lacma-54813": "8f9ad7a6",  # 2409289638 = 3 x 803096546
+    "lacma-56077": "182ebed9",  # 405716697 = 3 x 135238899
+    "lacma-59557": "7f23591f",  # 2133023007 = 3 x 711007669
+    "lacma-63255": "9d548225",  # 2639561253 = 3 x 879853751
+    "met-13617": "b40a8ebe",  # 3020590782 = 3 x 1006863594
+    "met-13622": "18ac9758",  # 413964120 = 3 x 137988040
+    "met-13854": "43e7b5c1",  # 1139258817 = 3 x 379752939
+    "met-13861": "c3d6319d",  # 3285594525 = 3 x 1095198175
+    "met-13864": "93b7e9f7",  # 2478303735 = 3 x 826101245
+    "met-13869": "74f85543",  # 1962431811 = 3 x 654143937
+    "met-13870": "b62c90a4",  # 3056373924 = 3 x 1018791308
+    "met-13872": "4318202d",  # 1125654573 = 3 x 375218191
+    "met-13875": "778dd41a",  # 2005783578 = 3 x 668594526
+    "met-13876": "389f6adb",  # 949971675 = 3 x 316657225
+    "met-13878": "e6a50127",  # 3869573415 = 3 x 1289857805
+    "met-13881": "23f7ca65",  # 603441765 = 3 x 201147255
+    "met-13884": "1ce68721",  # 484869921 = 3 x 161623307
+    "met-13889": "0caf8b07",  # 212830983 = 3 x 70943661
+    "met-13894": "c3dde707",  # 3286099719 = 3 x 1095366573
+    "met-13904": "4feba375",  # 1340842869 = 3 x 446947623
+    "met-13912": "7263f300",  # 1919152896 = 3 x 639717632
+    "met-14129": "d8c3c83a",  # 3636709434 = 3 x 1212236478
+    "met-14200": "22af3259",  # 581907033 = 3 x 193969011
+    "met-14827": "ede5f2b1",  # 3991270065 = 3 x 1330423355
+    "met-16295": "dca29cc8",  # 3701644488 = 3 x 1233881496
+    "met-16683": "ee568b59",  # 3998649177 = 3 x 1332883059
+    "met-18956": "bcfbec09",  # 3170626569 = 3 x 1056875523
+    "met-219121": "261086c7",  # 638617287 = 3 x 212872429
+    "met-219512": "b3c7134d",  # 3016168269 = 3 x 1005389423
+    "met-221867": "37c59fbd",  # 935698365 = 3 x 311899455
+    "met-227076": "e74912b3",  # 3880325811 = 3 x 1293441937
+    "met-229930": "2a73b20d",  # 712225293 = 3 x 237408431
+    "met-669875": "9b0ee59a",  # 2601444762 = 3 x 867148254
+    "met-70388": "4ad5ea1c",  # 1255533084 = 3 x 418511028
+    "met-70390": "2bdf33d0",  # 736048080 = 3 x 245349360
+    "met-814560": "63182601",  # 1662526977 = 3 x 554175659
+    "met-854563": "63264ab9",  # 1663453881 = 3 x 554484627
+    "met-854565": "c552dd40",  # 3310542144 = 3 x 1103514048
+    "met-854566": "dfe01b7e",  # 3756006270 = 3 x 1252002090
+    "met-854567": "82ae71ea",  # 2192470506 = 3 x 730823502
+    "met-854570": "658f4754",  # 1703888724 = 3 x 567962908
+    "met-855677": "0c8f684d",  # 210724941 = 3 x 70241647
+    "met-864828": "d5e715ba",  # 3588691386 = 3 x 1196230462
+    "met-864830": "4e441dd7",  # 1313086935 = 3 x 437695645
+    "met-864831": "41c60dc9",  # 1103498697 = 3 x 367832899
+    "smithsonian-chndm-1951-46-1": "c008767b",  # 3221780091 = 3 x 1073926697
+    "smithsonian-chndm-1955-14-6": "f48ddb4d",  # 4102937421 = 3 x 1367645807
+    "smithsonian-chndm-1957-78-1": "e479df9d",  # 3833192349 = 3 x 1277730783
+    "smithsonian-chndm-1960-73-2": "56831019",  # 1451429913 = 3 x 483809971
+    "smithsonian-chndm-1962-184-1": "0b586bdc",  # 190344156 = 3 x 63448052
+    "smithsonian-chndm-1973-25-1": "c2e37250",  # 3269685840 = 3 x 1089895280
+    "smithsonian-chndm-1975-16-2": "9e6f3b05",  # 2658089733 = 3 x 886029911
+    "smithsonian-chndm-1978-167-1": "ebdbf413",  # 3957060627 = 3 x 1319020209
+    "smithsonian-nmaahc-2017-108-5": "c700d109",  # 3338719497 = 3 x 1112906499
+    "smithsonian-nmah-556181": "577b5820",  # 1467701280 = 3 x 489233760
+    "smithsonian-nmah-556246": "60b39ef2",  # 1622384370 = 3 x 540794790
+    "smithsonian-nmah-556267": "a0f0a14e",  # 2700124494 = 3 x 900041498
+    "smithsonian-nmah-556283": "266161c2",  # 643916226 = 3 x 214638742
+    "smithsonian-nmah-556322": "69b552af",  # 1773490863 = 3 x 591163621
+    "smithsonian-nmah-556330": "9c36d51b",  # 2620839195 = 3 x 873613065
+    "smithsonian-nmah-556331": "d16b8a80",  # 3513485952 = 3 x 1171161984
+    "smithsonian-nmah-556351": "27bce2e7",  # 666690279 = 3 x 222230093
+    "smithsonian-nmah-556592": "1b43625d",  # 457400925 = 3 x 152466975
+    "smithsonian-nmah-556599": "913509bd",  # 2436172221 = 3 x 812057407
+    "smithsonian-nmah-640707": "82392d4a",  # 2184785226 = 3 x 728261742
+    "smithsonian-saam-1987-80": "32a50e92",  # 849677970 = 3 x 283225990
+    "smithsonian-saam-1998-149-1": "43d209cb",  # 1137838539 = 3 x 379279513
+    "smithsonian-saam-1998-149-11": "779e7664",  # 2006873700 = 3 x 668957900
+    "smithsonian-saam-1998-149-13": "094a5032",  # 155865138 = 3 x 51955046
+    "smithsonian-saam-1998-149-14": "c817de92",  # 3357007506 = 3 x 1119002502
+    "smithsonian-saam-1998-149-15": "4b2a2634",  # 1261053492 = 3 x 420351164
+    "smithsonian-saam-1998-149-16": "19754b98",  # 427117464 = 3 x 142372488
+    "smithsonian-saam-1998-149-17": "aa05079a",  # 2852456346 = 3 x 950818782
+    "smithsonian-saam-1998-149-19": "366cd0d4",  # 913101012 = 3 x 304367004
+    "smithsonian-saam-1998-149-28": "923f2ccb",  # 2453613771 = 3 x 817871257
+    "smithsonian-saam-1998-149-30": "3a2e2497",  # 976102551 = 3 x 325367517
+    "smithsonian-saam-1998-149-5": "e1ab510f",  # 3786101007 = 3 x 1262033669
+    "smithsonian-saam-1998-149-7": "6d80bca3",  # 1837153443 = 3 x 612384481
+    "smithsonian-saam-2013-67-10": "5faf0c51",  # 1605307473 = 3 x 535102491
+    "smithsonian-saam-2016-5-42": "a61f67c6",  # 2787076038 = 3 x 929025346
+    "smithsonian-saam-2016-57-10": "24282828",  # 606611496 = 3 x 202203832
+    "smithsonian-saam-2016-57-2": "bff136de",  # 3220256478 = 3 x 1073418826
+    "smithsonian-saam-2016-57-9": "ccbe4ca6",  # 3435023526 = 3 x 1145007842
+    "smithsonian-saam-2017-24-2": "b30f1ecd",  # 3004112589 = 3 x 1001370863
+    "smithsonian-saam-2017-24-3": "7d06fefb",  # 2097610491 = 3 x 699203497
+    "smithsonian-saam-2017-24-32": "e5e6e64f",  # 3857114703 = 3 x 1285704901
+    "smithsonian-saam-2017-24-4": "14c4bc73",  # 348437619 = 3 x 116145873
+}
+
+
+def test_the_holdout_is_pinned_photo_by_photo():
+    # Source: plan D3a, criterion 9. Membership by the rule must equal the pinned set, each pinned
+    # prefix must still be its row's, and each pinned prefix must be a multiple of 3 by plain
+    # integer arithmetic, independent of an.in_holdout.
+    by_stem = {Path(row["file"]).stem: row for row in rows()}
+    assert {stem for stem, row in by_stem.items() if an.in_holdout(row["sha256"])} == set(HOLDOUT_V0)
+    for stem, prefix in HOLDOUT_V0.items():
+        assert by_stem[stem]["sha256"][:8] == prefix, stem
+        assert int(prefix, 16) % 3 == 0, stem
+
+
+def test_readme_reports_the_holdout_count_of_each_tier():
+    # The README's v0 counts table ends each tier row with its holdout count; they must be the
+    # pinned set's counts, so a stale table fails here.
+    by_stem = {Path(row["file"]).stem: row for row in rows()}
+    expected = {tier: sum(by_stem[s]["tier"] == tier for s in HOLDOUT_V0) for tier in cf.TIERS}
+    text = (CORPUS / "README.md").read_text(encoding="utf-8")
+    reported = {}
+    for line in text.splitlines():
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if len(cells) >= 3 and cells[0] in cf.TIERS and cells[-1].isdigit() and cells[1].isdigit():
+            reported[cells[0]] = int(cells[-1])
+    assert reported == expected
 
 
 def test_readme_fixes_the_holdout_rule_and_the_source_lists():
@@ -563,7 +698,7 @@ def test_annotation_finished_sizes_match_their_rows():
 
 def test_tier_a_and_refusal_photos_carry_two_independent_proposals():
     # Source: plan D3a, criterion 8: proposed-a and proposed-b for corners, bands, counts and
-    # class on every tier A photo, and the class on every refusal photo of the eval set.
+    # class on every tier A photo, and the class on every refusal photo.
     by_file = {row["file"]: row for row in rows()}
     for path in ANNOTATIONS:
         doc = an.load(path)

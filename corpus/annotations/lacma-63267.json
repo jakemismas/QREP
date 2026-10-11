@@ -13,20 +13,20 @@
           "kind": "outer_edge",
           "corners": {
             "top_left": {
-              "x": 75.0,
+              "x": 80.0,
               "y": 128.0
             },
             "top_right": {
-              "x": 3334.0,
-              "y": 124.0
+              "x": 3333.0,
+              "y": 127.0
             },
             "bottom_right": {
-              "x": 3320.0,
-              "y": 3954.0
+              "x": 3318.0,
+              "y": 3955.0
             },
             "bottom_left": {
-              "x": 65.0,
-              "y": 3950.0
+              "x": 74.0,
+              "y": 3942.0
             }
           },
           "bands": [
@@ -39,20 +39,20 @@
           "kind": "field",
           "corners": {
             "top_left": {
-              "x": 95.0,
+              "x": 98.0,
               "y": 150.0
             },
             "top_right": {
-              "x": 3312.0,
+              "x": 3306.0,
               "y": 146.0
             },
             "bottom_right": {
-              "x": 3298.0,
+              "x": 3300.0,
               "y": 3932.0
             },
             "bottom_left": {
-              "x": 87.0,
-              "y": 3928.0
+              "x": 91.0,
+              "y": 3923.0
             }
           }
         }
@@ -69,16 +69,16 @@
               "y": 125.0
             },
             "top_right": {
-              "x": 3338.0,
-              "y": 128.0
+              "x": 3334.0,
+              "y": 127.0
             },
             "bottom_right": {
               "x": 3322.0,
-              "y": 3945.0
+              "y": 3955.0
             },
             "bottom_left": {
-              "x": 64.0,
-              "y": 3935.0
+              "x": 66.0,
+              "y": 3950.0
             }
           },
           "bands": [
@@ -91,20 +91,20 @@
           "kind": "field",
           "corners": {
             "top_left": {
-              "x": 97.0,
-              "y": 147.0
+              "x": 98.0,
+              "y": 150.0
             },
             "top_right": {
-              "x": 3302.0,
+              "x": 3311.0,
               "y": 147.0
             },
             "bottom_right": {
-              "x": 3302.0,
-              "y": 3920.0
+              "x": 3300.0,
+              "y": 3930.0
             },
             "bottom_left": {
-              "x": 92.0,
-              "y": 3918.0
+              "x": 95.0,
+              "y": 3925.0
             }
           }
         }
@@ -115,19 +115,19 @@
   "counts": [
     {
       "value": {
-        "blocks_across": 3,
-        "squares_per_block_across": 5,
-        "blocks_down": 4,
-        "squares_per_block_down": 5
+        "blocks_across": 1,
+        "squares_per_block_across": 19,
+        "blocks_down": 1,
+        "squares_per_block_down": 23
       },
       "provenance": "proposed-a"
     },
     {
       "value": {
-        "blocks_across": 3,
-        "squares_per_block_across": 5,
-        "blocks_down": 4,
-        "squares_per_block_down": 5
+        "blocks_across": 1,
+        "squares_per_block_across": 19,
+        "blocks_down": 1,
+        "squares_per_block_down": 23
       },
       "provenance": "proposed-b"
     }

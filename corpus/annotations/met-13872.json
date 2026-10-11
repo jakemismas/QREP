@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "photo": "private/cache/met-13872.jpg",
+  "sha256": "4318202dacac59c8b59e288d0edebdcf128392f7fd2f65cf61b48710f952fb00",
+  "canvas": [
+    2153,
+    2137
+  ],
+  "construction_class": [
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-b"
+    }
+  ],
+  "refusal_class": [
+    {
+      "value": "applique",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "applique",
+      "provenance": "proposed-b"
+    }
+  ],
+  "finished_size": [
+    {
+      "value": {
+        "width_in": 84.31,
+        "height_in": 83.75,
+        "approximate": true,
+        "source_text": "83 3/4 x 84 5/16 in. (212.7 x 214.2 cm)"
+      },
+      "provenance": "source-record"
+    }
+  ],
+  "capture": [
+    {
+      "value": "museum_scan",
+      "provenance": "source-record"
+    }
+  ],
+  "device_class": [
+    {
+      "value": "museum",
+      "provenance": "source-record"
+    }
+  ],
+  "masks": [
+    {
+      "value": [
+        {
+          "polygon": [
+            {
+              "x": 1690.0,
+              "y": 2075.0
+            },
+            {
+              "x": 2130.0,
+              "y": 2075.0
+            },
+            {
+              "x": 2130.0,
+              "y": 2136.0
+            },
+            {
+              "x": 1690.0,
+              "y": 2136.0
+            }
+          ],
+          "reason": "label"
+        }
+      ],
+      "provenance": "proposed-a"
+    },
+    {
+      "value": [
+        {
+          "polygon": [
+            {
+              "x": 1690.0,
+              "y": 2075.0
+            },
+            {
+              "x": 2140.0,
+              "y": 2075.0
+            },
+            {
+              "x": 2140.0,
+              "y": 2132.0
+            },
+            {
+              "x": 1690.0,
+              "y": 2132.0
+            }
+          ],
+          "reason": "label"
+        }
+      ],
+      "provenance": "proposed-b"
+    }
+  ]
+}

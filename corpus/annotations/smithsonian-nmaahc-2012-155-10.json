@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "photo": "private/cache/smithsonian-nmaahc-2012-155-10.jpg",
+  "sha256": "04071dafed319f445a71f4a980c59e71b5be4d97d4ad0242c0c3bda3322d9e56",
+  "canvas": [
+    2527,
+    3000
+  ],
+  "construction_class": [
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-b"
+    }
+  ],
+  "refusal_class": [
+    {
+      "value": "applique",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "applique",
+      "provenance": "proposed-b"
+    }
+  ],
+  "finished_size": [
+    {
+      "value": {
+        "width_in": 58.88,
+        "height_in": 72.0,
+        "approximate": true,
+        "source_text": "H x W x D: 72 \u00d7 58 7/8 \u00d7 1/8 in. (182.9 \u00d7 149.5 \u00d7 0.3 cm)"
+      },
+      "provenance": "source-record"
+    }
+  ],
+  "capture": [
+    {
+      "value": "museum_scan",
+      "provenance": "source-record"
+    }
+  ],
+  "device_class": [
+    {
+      "value": "museum",
+      "provenance": "source-record"
+    }
+  ]
+}
