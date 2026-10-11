@@ -1,25 +1,28 @@
 {
   "ticket": "D1 quilter-voice research (#161)",
   "date": "2026-10-10",
-  "method": "Web search and page fetches, one page at a time per site, in four topic passes (A finishing numbers, B complaints, C most-made quilts, D pattern trust and clarity), plus one headless Chromium session (Playwright) for the Reddit and X attempts and the Webster text. No login, posting, sign-up or contact; no API, JSON, sitemap or listing pages.",
-  "result_count_definition": "result_count is the number of results the web search returned for the query, not the engine's total hit count. usable is how many of them were fetched and used.",
+  "method": "Web search and page fetches, one page at a time, in four topic passes (A finishing numbers, B complaints, C most-made quilts, D pattern trust and clarity), plus headless Chromium (Playwright from web/node_modules) run four times, one page load after another: the r/quilting search on www.reddit.com (Q-M01), the same search on old.reddit.com after the first was blocked (Q-M02), X search (Q-M03), and the two Webster pages (S-M01, S-M02). No login, posting, sign-up or contact; no API, JSON or sitemap requests. The only search listing pages requested are Q-M01 to Q-M03 and S-C03.",
+  "result_count_definition": "result_count is the number of results the web search returned for the query, not the engine's total hit count. usable is how many of them were fetched and used. result_count is null when no search ran: the search tool refused the domain filter, or the entry is a page load (Q-M01 to Q-M03); outcome says which.",
   "claim_rule": "A claim cites only sources whose fetch is ok. Claims paraphrase; no claim quotes a page, and no claim names an individual poster. Claims marked excluded back nothing in the reports.",
   "id_prefixes": {
     "A": "finishing numbers",
     "B": "complaints",
     "C": "most-made quilts and name sources",
     "D": "pattern trust and clarity",
-    "M": "attempts and spot checks run directly in this ticket"
+    "M": "attempts, spot checks and review-fix claims recorded directly in this ticket"
   },
-  "distinct_ok_pages_note": "Ten pages were fetched by two or three passes and carry two or three ids (same_page_as); the reports cite one id per page in any list that counts sources.",
+  "distinct_ok_pages_note": "Ten pages were fetched two or three times and carry two or three ids (same_page_as); the reports cite one id per page in any list that counts sources. One of them, a C&T Publishing article, was fetched at two URLs (S-A27, and S-B35 with S-D32). Nine distinct ok pages back no claim: S-A42, S-B19, S-B25, S-B30, S-B31, S-C09, S-C10, S-D06 and S-D16 (whose one claim, C-D42, is excluded).",
   "counts": {
     "queries": 132,
     "sources": 148,
     "sources_ok": 125,
-    "claims": 159,
+    "claims": 164,
     "claims_excluded": 1,
-    "distinct_ok_pages": 114,
-    "distinct_ok_sites": 55
+    "distinct_ok_pages": 113,
+    "distinct_ok_sites": 55,
+    "searches_run": 123,
+    "searches_refused": 6,
+    "page_loads": 3
   },
   "queries": [
     {
@@ -85,12 +88,15 @@
     {
       "id": "Q-A07",
       "tool": "web search",
-      "query": "Quilting Board forum \"how much backing\" king size quilt 108 wide yards how much extra longarmer wants (allowed_domains quiltingboard.com)",
+      "query": "Quilting Board forum \"how much backing\" king size quilt 108 wide yards how much extra longarmer wants",
       "date": "2026-10-10",
       "result_count": 10,
       "usable": 3,
       "source_group": "forum",
-      "note": "quiltingboard threads returned"
+      "note": "quiltingboard threads returned",
+      "domain_filter": [
+        "quiltingboard.com"
+      ]
     },
     {
       "id": "Q-A08",
@@ -105,22 +111,30 @@
     {
       "id": "Q-A09",
       "tool": "web search",
-      "query": "how much binding yardage queen quilt (allowed_domains reddit.com)",
+      "query": "r/quilting how many yards for binding queen quilt 2.5 inch strips reddit",
       "date": "2026-10-10",
-      "result_count": 0,
+      "result_count": null,
       "usable": 0,
       "source_group": "reddit",
-      "note": "API error: reddit.com not accessible to the search tool; query text approximated: r/quilting how many yards for binding queen quilt 2.5 inch strips reddit"
+      "note": "No search ran, so nothing was returned. Query text corrected on 2026-10-11 to the exact text sent.",
+      "domain_filter": [
+        "reddit.com"
+      ],
+      "outcome": "refused by the search tool (reddit.com is not accessible to it); no search ran"
     },
     {
       "id": "Q-A10",
       "tool": "web search",
-      "query": "longarm quilter backing batting at least 8 inches larger than top reddit r/longarm (allowed_domains reddit.com)",
+      "query": "longarm quilter backing batting at least 8 inches larger than top reddit r/longarm",
       "date": "2026-10-10",
-      "result_count": 0,
+      "result_count": null,
       "usable": 0,
       "source_group": "reddit",
-      "note": "API error: reddit.com not accessible to the search tool"
+      "note": "No search ran, so nothing was returned.",
+      "domain_filter": [
+        "reddit.com"
+      ],
+      "outcome": "refused by the search tool (reddit.com is not accessible to it); no search ran"
     },
     {
       "id": "Q-A11",
@@ -285,12 +299,13 @@
     {
       "id": "Q-A27",
       "tool": "web search",
-      "query": "quilt backing calculator enter quilt width length overhang shop tool binding calculator strips needed (extended mode)",
+      "query": "quilt backing calculator enter quilt width length overhang shop tool binding calculator strips needed",
       "date": "2026-10-10",
       "result_count": 9,
       "usable": 6,
       "source_group": "calculator",
-      "note": "calculator pages"
+      "note": "calculator pages",
+      "mode": "extended"
     },
     {
       "id": "Q-A28",
@@ -305,12 +320,15 @@
     {
       "id": "Q-A29",
       "tool": "web search",
-      "query": "Quiltingboard how much binding fabric for a king size quilt 2 1/4 strips how many yards (allowed_domains quiltingboard.com)",
+      "query": "Quiltingboard how much binding fabric for a king size quilt 2 1/4 strips how many yards",
       "date": "2026-10-10",
       "result_count": 10,
       "usable": 2,
       "source_group": "forum",
-      "note": "quiltingboard binding threads"
+      "note": "quiltingboard binding threads",
+      "domain_filter": [
+        "quiltingboard.com"
+      ]
     },
     {
       "id": "Q-A30",
@@ -415,22 +433,29 @@
     {
       "id": "Q-B10",
       "tool": "web search",
-      "query": "reddit quilting backing too much calculator OR pattern yardage overestimate (allowed_domains reddit.com)",
+      "query": "reddit quilting \"backing\" \"too much\" calculator OR pattern \"yardage\" overestimate",
       "date": "2026-10-10",
-      "result_count": 0,
+      "result_count": null,
       "usable": 0,
       "source_group": "reddit",
-      "note": "Search API refused: reddit.com not accessible to the crawler. No results."
+      "note": "No search ran, so nothing was returned.",
+      "domain_filter": [
+        "reddit.com"
+      ],
+      "outcome": "refused by the search tool (reddit.com is not accessible to it); no search ran"
     },
     {
       "id": "Q-B11",
       "tool": "web search",
-      "query": "quilting board forum pattern mistakes instructions frustrating designers testers (allowed_domains quiltingboard.com)",
+      "query": "quilting board forum \"pattern\" mistakes \"instructions\" frustrating designers testers",
       "date": "2026-10-10",
       "result_count": 10,
       "usable": 4,
       "source_group": "forum",
-      "note": "Several QuiltingBoard threads on pattern mistakes."
+      "note": "Several QuiltingBoard threads on pattern mistakes.",
+      "domain_filter": [
+        "quiltingboard.com"
+      ]
     },
     {
       "id": "Q-B12",
@@ -445,7 +470,7 @@
     {
       "id": "Q-B13",
       "tool": "web search",
-      "query": "quilt backing calculator notes may differ from other calculators assumptions seam allowance extra inches width of fabric 40 inches",
+      "query": "quilt backing calculator notes \"may differ\" from other calculators assumptions seam allowance extra inches width of fabric 40 inches",
       "date": "2026-10-10",
       "result_count": 9,
       "usable": 0,
@@ -475,17 +500,20 @@
     {
       "id": "Q-B16",
       "tool": "web search",
-      "query": "quiltingboard backing fabric width 40 inches usable selvage shrink pattern said 44 not enough (allowed_domains quiltingboard.com)",
+      "query": "quiltingboard backing fabric width 40 inches usable selvage shrink pattern said 44 not enough",
       "date": "2026-10-10",
       "result_count": 10,
       "usable": 3,
       "source_group": "forum",
-      "note": "Good QuiltingBoard threads on usable width."
+      "note": "Good QuiltingBoard threads on usable width.",
+      "domain_filter": [
+        "quiltingboard.com"
+      ]
     },
     {
       "id": "Q-B17",
       "tool": "web search",
-      "query": "r/quilting reddit backing calculator how much backing thread",
+      "query": "r/quilting reddit \"backing\" calculator \"how much backing\" thread",
       "date": "2026-10-10",
       "result_count": 10,
       "usable": 0,
@@ -495,7 +523,7 @@
     {
       "id": "Q-B18",
       "tool": "web search",
-      "query": "reddit r/quilting pattern error typo OR mistake in the pattern cutting measurements wrong",
+      "query": "reddit r/quilting pattern error \"pattern\" \"typo\" OR \"mistake in the pattern\" cutting measurements wrong",
       "date": "2026-10-10",
       "result_count": 9,
       "usable": 2,
@@ -515,17 +543,18 @@
     {
       "id": "Q-B20",
       "tool": "web search",
-      "query": "r/quilting backing yardage calculator over-estimate I bought too much backing (extended)",
+      "query": "\"r/quilting\" backing yardage calculator over-estimate \"I bought too much backing\"",
       "date": "2026-10-10",
       "result_count": 9,
       "usable": 4,
       "source_group": "calculator",
-      "note": "No reddit results but surfaced four calculator pages."
+      "note": "No reddit results but surfaced four calculator pages.",
+      "mode": "extended"
     },
     {
       "id": "Q-B21",
       "tool": "web search",
-      "query": "site:twitter.com quilters pattern instructions wrong pattern quilting frustrated yardage",
+      "query": "site:twitter.com quilters pattern instructions wrong \"pattern\" quilting frustrated yardage",
       "date": "2026-10-10",
       "result_count": 9,
       "usable": 0,
@@ -535,7 +564,7 @@
     {
       "id": "Q-B22",
       "tool": "web search",
-      "query": "quilt backing calculator tool assumes 40 inch usable width 4 inches each side how it calculates",
+      "query": "quilt backing calculator tool \"assumes\" 40 inch usable width 4 inches each side how it calculates",
       "date": "2026-10-10",
       "result_count": 9,
       "usable": 0,
@@ -565,7 +594,7 @@
     {
       "id": "Q-B25",
       "tool": "web search",
-      "query": "longarm quilter rant customer backing not square sent too small backing professional longarmer blog problems",
+      "query": "longarm quilter rant customer backing not square sent too small \"backing\" professional longarmer blog problems",
       "date": "2026-10-10",
       "result_count": 9,
       "usable": 2,
@@ -575,7 +604,7 @@
     {
       "id": "Q-B26",
       "tool": "web search",
-      "query": "pattern called for way too much fabric backing yardage more than I needed quilters tips leftover",
+      "query": "pattern called for way too much fabric backing yardage \"more than I needed\" quilters tips leftover",
       "date": "2026-10-10",
       "result_count": 10,
       "usable": 1,
@@ -585,7 +614,7 @@
     {
       "id": "Q-B27",
       "tool": "web search",
-      "query": "quiltingboard How do you calculate yardage needed for backing",
+      "query": "quiltingboard \"How do you calculate yardage needed for backing\"",
       "date": "2026-10-10",
       "result_count": 9,
       "usable": 1,
@@ -595,7 +624,7 @@
     {
       "id": "Q-B28",
       "tool": "web search",
-      "query": "quilt pattern wasteful cutting instructions cutting waste fabric pattern designer should provide cutting layout diagram quilters complain",
+      "query": "quilt pattern wasteful cutting instructions \"cutting\" waste fabric pattern designer should provide cutting layout diagram quilters complain",
       "date": "2026-10-10",
       "result_count": 9,
       "usable": 0,
@@ -615,7 +644,7 @@
     {
       "id": "Q-B30",
       "tool": "web search",
-      "query": "quilt patterns assume knowledge beginners frustrated instructions skip steps no pressing directions forum discussion",
+      "query": "quilt patterns \"assume\" knowledge beginners frustrated instructions skip steps no pressing directions forum discussion",
       "date": "2026-10-10",
       "result_count": 9,
       "usable": 0,
@@ -625,7 +654,7 @@
     {
       "id": "Q-B31",
       "tool": "web search",
-      "query": "quilt-as-you-go OR pattern review complaints yardage too little OR too much quilt kit shortage fabric short",
+      "query": "quilt-as-you-go OR \"pattern review\" complaints \"yardage\" \"too little\" OR \"too much\" quilt kit shortage fabric short",
       "date": "2026-10-10",
       "result_count": 9,
       "usable": 1,
@@ -635,7 +664,7 @@
     {
       "id": "Q-B32",
       "tool": "web search",
-      "query": "old.reddit.com r/quilting pattern instructions confusing OR error OR yardage",
+      "query": "old.reddit.com r/quilting pattern \"instructions\" confusing OR \"error\" OR \"yardage\"",
       "date": "2026-10-10",
       "result_count": 9,
       "usable": 0,
@@ -645,7 +674,7 @@
     {
       "id": "Q-B33",
       "tool": "web search",
-      "query": "quilt designer blog I print my pattern black and white friendly diagrams ink-saving pages quilters ask",
+      "query": "quilt designer blog \"I print my pattern\" black and white friendly diagrams ink-saving pages quilters ask",
       "date": "2026-10-10",
       "result_count": 9,
       "usable": 0,
@@ -655,7 +684,7 @@
     {
       "id": "Q-C01",
       "tool": "web search",
-      "query": "reddit first quilt beginner favorite pattern nine patch rail fence",
+      "query": "reddit quilting what was your first quilt beginner favorite pattern nine patch rail fence",
       "date": "2026-10-10",
       "result_count": 9,
       "usable": 2,
@@ -705,12 +734,16 @@
     {
       "id": "Q-C06",
       "tool": "web search",
-      "query": "reddit r/quilting thread first quilt what pattern (reddit.com domain filter)",
+      "query": "reddit r/quilting thread \"first quilt\" what pattern did you start with beginners advice",
       "date": "2026-10-10",
-      "result_count": 0,
+      "result_count": null,
       "usable": 0,
       "source_group": "reddit",
-      "note": "Tool error: reddit.com domain not accessible"
+      "note": "No search ran, so nothing was returned.",
+      "domain_filter": [
+        "reddit.com"
+      ],
+      "outcome": "refused by the search tool (reddit.com is not accessible to it); no search ran"
     },
     {
       "id": "Q-C07",
@@ -795,7 +828,7 @@
     {
       "id": "Q-C15",
       "tool": "web search",
-      "query": "classic quilt patterns every quilter should make Churn Dash Ohio Star Flying Geese Bear Paw",
+      "query": "Craftsy OR Prairie Point OR Quilting Daily classic quilt patterns every quilter should make Churn Dash Ohio Star Flying Geese Bear Paw",
       "date": "2026-10-10",
       "result_count": 10,
       "usable": 0,
@@ -845,7 +878,7 @@
     {
       "id": "Q-C20",
       "tool": "web search",
-      "query": "flying geese half square triangle quilt beginner favorite most popular quilt block unit survey OR poll quilters",
+      "query": "flying geese half square triangle quilt beginner favorite \"most popular\" quilt block unit survey OR poll quilters",
       "date": "2026-10-10",
       "result_count": 9,
       "usable": 1,
@@ -855,7 +888,7 @@
     {
       "id": "Q-C21",
       "tool": "web search",
-      "query": "quilting blog first quilt nine patch OR rail fence OR four patch readers share their first quilts",
+      "query": "quilting blog \"first quilt\" nine patch OR \"rail fence\" OR \"four patch\" readers share their first quilts",
       "date": "2026-10-10",
       "result_count": 9,
       "usable": 2,
@@ -865,7 +898,7 @@
     {
       "id": "Q-C22",
       "tool": "web search",
-      "query": "quiltingboard.com thread favorite pattern churn dash OR ohio star OR irish chain go-to quilt",
+      "query": "quiltingboard.com thread favorite pattern churn dash OR \"ohio star\" OR \"irish chain\" what's your go-to quilt",
       "date": "2026-10-10",
       "result_count": 9,
       "usable": 0,
@@ -955,7 +988,7 @@
     {
       "id": "Q-D08",
       "tool": "web search",
-      "query": "quilting forum tech editor quilt pattern designers hire proofread",
+      "query": "quilting forum \"tech editor\" quilt pattern designers hire proofread",
       "date": "2026-10-10",
       "result_count": 9,
       "usable": 0,
@@ -985,7 +1018,7 @@
     {
       "id": "Q-D11",
       "tool": "web search",
-      "query": "quilt pattern backing batting binding yardage how much extra pattern lists binding strips width of fabric (two result sets)",
+      "query": "quilt pattern backing batting binding yardage how much extra pattern lists binding strips width of fabric",
       "date": "2026-10-10",
       "result_count": 19,
       "usable": 1,
@@ -1025,7 +1058,7 @@
     {
       "id": "Q-D15",
       "tool": "web search",
-      "query": "r/quilting pattern instructions confusing cutting error yardage not enough anyone else",
+      "query": "r/quilting \"pattern\" instructions confusing \"cutting\" error yardage not enough anyone else",
       "date": "2026-10-10",
       "result_count": 9,
       "usable": 2,
@@ -1045,7 +1078,7 @@
     {
       "id": "Q-D17",
       "tool": "web search",
-      "query": "quiltingboard.com pattern instructions errors pattern mistakes designers",
+      "query": "quiltingboard.com pattern instructions errors \"pattern\" mistakes designers",
       "date": "2026-10-10",
       "result_count": 9,
       "usable": 0,
@@ -1095,7 +1128,7 @@
     {
       "id": "Q-D22",
       "tool": "web search",
-      "query": "quilting forum members discuss pattern mistakes I always check pattern before cutting math yardage",
+      "query": "quilting forum members discuss pattern mistakes \"I always check\" pattern before cutting math yardage",
       "date": "2026-10-10",
       "result_count": 9,
       "usable": 2,
@@ -1135,7 +1168,7 @@
     {
       "id": "Q-D26",
       "tool": "web search",
-      "query": "site:x.com quilters pattern tested tech edited quilt pattern",
+      "query": "site:x.com quilters pattern \"tested\" \"tech edited\" quilt pattern",
       "date": "2026-10-10",
       "result_count": 9,
       "usable": 0,
@@ -1175,22 +1208,32 @@
     {
       "id": "Q-D30",
       "tool": "web search",
-      "query": "reddit.com/r/quilting what do you wish quilt patterns included (allowed_domains reddit.com)",
+      "query": "reddit.com/r/quilting what do you wish quilt patterns included",
       "date": "2026-10-10",
-      "result_count": 0,
+      "result_count": null,
       "usable": 0,
       "source_group": "reddit",
-      "note": "Tool error: reddit domain not accessible"
+      "note": "No search ran, so nothing was returned.",
+      "domain_filter": [
+        "reddit.com"
+      ],
+      "outcome": "refused by the search tool (reddit.com is not accessible to it); no search ran"
     },
     {
       "id": "Q-D31",
       "tool": "web search",
-      "query": "quilting beginner pattern advice thread yardage cutting instructions tips (allowed_domains incl. reddit)",
+      "query": "quilting beginner pattern advice thread yardage cutting instructions tips",
       "date": "2026-10-10",
-      "result_count": 0,
+      "result_count": null,
       "usable": 0,
       "source_group": "reddit",
-      "note": "Tool error: reddit domain not accessible"
+      "note": "No search ran, so nothing was returned.",
+      "domain_filter": [
+        "reddit.com",
+        "quiltingboard.com",
+        "thequiltshow.com"
+      ],
+      "outcome": "refused by the search tool (reddit.com is not accessible to it); no search ran"
     },
     {
       "id": "Q-D32",
@@ -1215,7 +1258,7 @@
     {
       "id": "Q-D34",
       "tool": "web search",
-      "query": "quilt pattern reviews customers praise well written clear diagrams tested pattern",
+      "query": "quilt pattern reviews customers praise \"well written\" \"clear diagrams\" tested pattern",
       "date": "2026-10-10",
       "result_count": 9,
       "usable": 0,
@@ -1315,32 +1358,35 @@
     {
       "id": "Q-M01",
       "tool": "headless Chromium (Playwright)",
-      "query": "r/quilting search: backing calculator (www.reddit.com/r/quilting/search)",
+      "query": "https://www.reddit.com/r/quilting/search/?q=backing+calculator&restrict_sr=1",
       "date": "2026-10-10",
-      "result_count": 0,
+      "result_count": null,
       "usable": 0,
       "source_group": "reddit",
-      "note": "Page returned a network-security block; no threads listed. Not retried with any workaround."
+      "note": "A search listing page, loaded once at 10:19:18 UTC.",
+      "outcome": "page load: HTTP 200 with a network-security block page; no threads listed"
     },
     {
       "id": "Q-M02",
       "tool": "headless Chromium (Playwright)",
-      "query": "r/quilting search: backing calculator (old.reddit.com/r/quilting/search)",
+      "query": "https://old.reddit.com/r/quilting/search?q=backing+calculator&restrict_sr=on",
       "date": "2026-10-10",
-      "result_count": 0,
+      "result_count": null,
       "usable": 0,
       "source_group": "reddit",
-      "note": "HTTP 403 with the same network-security block."
+      "note": "A retry of the Q-M01 search on another Reddit host after Q-M01 was blocked, at 10:19:30 UTC. A search listing page.",
+      "outcome": "page load: HTTP 403 with the same network-security block page"
     },
     {
       "id": "Q-M03",
       "tool": "headless Chromium (Playwright)",
-      "query": "X search: quilt backing calculator (x.com/search)",
+      "query": "https://x.com/search?q=quilt%20backing%20calculator&src=typed_query",
       "date": "2026-10-10",
-      "result_count": 0,
+      "result_count": null,
       "usable": 0,
       "source_group": "x",
-      "note": "HTTP 403, empty page; X search needs a login, which this ticket does not use."
+      "note": "A search listing page, loaded once at 10:19:40 UTC. No request was made to Reddit or X after it.",
+      "outcome": "page load: HTTP 403, empty page; X search needs a login, which this ticket does not use"
     }
   ],
   "sources": [
@@ -1365,7 +1411,8 @@
       "fetch": "ok",
       "from_query": "Q-A01",
       "claims": [
-        "C-A08"
+        "C-A08",
+        "C-M03"
       ]
     },
     {
@@ -1401,7 +1448,8 @@
       "claims": [
         "C-A26",
         "C-A44",
-        "C-A47"
+        "C-A47",
+        "C-M01"
       ]
     },
     {
@@ -1450,7 +1498,8 @@
       "fetch": "ok",
       "from_query": "Q-A04",
       "claims": [
-        "C-A09"
+        "C-A09",
+        "C-M04"
       ]
     },
     {
@@ -1701,7 +1750,12 @@
       "from_query": "Q-A20",
       "claims": [
         "C-A44",
-        "C-A45"
+        "C-A45",
+        "C-M05"
+      ],
+      "same_page_as": [
+        "S-B35",
+        "S-D32"
       ]
     },
     {
@@ -1845,7 +1899,8 @@
       "claims": [
         "C-A16",
         "C-A44",
-        "C-A45"
+        "C-A45",
+        "C-M02"
       ]
     },
     {
@@ -2380,7 +2435,8 @@
       "fetch": "ok",
       "from_query": "Q-B27",
       "same_page_as": [
-        "S-D32"
+        "S-D32",
+        "S-A27"
       ],
       "claims": [
         "C-B01",
@@ -2476,7 +2532,7 @@
       "title": "reddit r/quilting search page",
       "kind": "reddit",
       "accessed": "2026-10-10",
-      "fetch": "failed: the page fetch unable to fetch reddit.com (also a search-result page; not retried)",
+      "fetch": "failed: the page fetch tool refused reddit.com before any request; a search listing page",
       "from_query": "Q-C03",
       "claims": []
     },
@@ -2970,7 +3026,9 @@
       "accessed": "2026-10-10",
       "fetch": "ok",
       "from_query": "Q-D19",
-      "claims": []
+      "claims": [
+        "C-D42"
+      ]
     },
     {
       "id": "S-D17",
@@ -3091,7 +3149,7 @@
       "title": "r/quilting thread: what have I done",
       "kind": "reddit",
       "accessed": "2026-10-10",
-      "fetch": "failed: fetch blocked for www.reddit.com",
+      "fetch": "failed: the page fetch tool refused www.reddit.com before any request",
       "from_query": "Q-D22",
       "claims": []
     },
@@ -3101,7 +3159,7 @@
       "title": "r/quilting thread: what have I done (old.reddit)",
       "kind": "reddit",
       "accessed": "2026-10-10",
-      "fetch": "failed: fetch blocked for old.reddit.com",
+      "fetch": "failed: the page fetch tool refused old.reddit.com before any request; tried on old.reddit.com after the www.reddit.com refusal (S-D26)",
       "from_query": "Q-D22",
       "claims": []
     },
@@ -3164,7 +3222,8 @@
       "fetch": "ok",
       "from_query": "Q-D38",
       "same_page_as": [
-        "S-B35"
+        "S-B35",
+        "S-A27"
       ],
       "claims": [
         "C-D12",
@@ -3509,25 +3568,26 @@
     },
     {
       "id": "C-A12",
-      "claim": "Calculator article table: throw 60x70 needs 4.75 yd of 44 in or 2.5 yd wideback; twin 70x90 6 yd pieced or 3 yd wideback; queen 90x108 about 3.5 yd wideback.",
+      "claim": "Calculator article table, backing column the top plus 8 in each way: crib 45 x 60 (backing 53 x 68) 4 yd of 44 in fabric pieced or 2 yd of 108 in; throw 60 x 70 (68 x 78) 4 3/4 or 2 1/2 yd; twin 70 x 90 (78 x 98) 6 or 3 yd; queen 90 x 108 (98 x 116) pieced not recommended, 3 1/2 yd of 108 in; king 110 x 110 (118 x 118) pieced not recommended, 3 1/2 yd of 108 in.",
       "sources": [
         "S-A15"
       ],
       "short_quote": "",
       "detail": {
-        "chart_size_label": "Throw/Twin/Queen",
-        "chart_dims": "60x70, 70x90, 90x108",
-        "nearest_size": "throw 60 x 72 nearest; twin 70 x 90 exact; queen 90 x 108 exact",
+        "chart_size_label": "Crib/Throw/Twin/Queen/King",
+        "chart_dims": "45x60, 60x70, 70x90, 90x108, 110x110",
+        "nearest_size": "crib 36 x 52 nearest; throw 60 x 72 nearest; twin 70 x 90 exact; queen 90 x 108 exact; king 110 x 108 nearest (110 x 110)",
         "line": "backing pieced and wide",
-        "figure": "4.75 / 6 yd pieced; 2.5 / 3 / 3.5 yd wide",
+        "figure": "pieced: 4, 4 3/4, 6 yd, not recommended, not recommended; wide: 2, 2 1/2, 3, 3 1/2, 3 1/2 yd",
         "fabric_width": "44 in; 108 in",
-        "overhang": "8 in total for longarm; 4 in total for home (as stated)",
+        "overhang": "backing column is the top + 8 in each way (4 in per side)",
         "seam": "",
         "binding_extra": "",
         "strip_width": "",
         "rounding": "",
         "other": ""
-      }
+      },
+      "corrected": "2026-10-11: rewritten to the table rows its spot check recorded; the earlier text mapped three rows loosely."
     },
     {
       "id": "C-A13",
@@ -5241,7 +5301,7 @@
       ],
       "short_quote": "",
       "detail": {
-        "family": "churn dash / flying geese / log cabin",
+        "family": "snail trail or monkey wrench / flying geese / log cabin",
         "evidence_type": "recommendation",
         "rank_or_count": "three of five classics",
         "unit_classes": [
@@ -5251,7 +5311,8 @@
           "log strips"
         ],
         "on_point_common": "no"
-      }
+      },
+      "corrected": "2026-10-11: family was churn dash; the page names a snail trail or monkey wrench quilt, not a churn dash."
     },
     {
       "id": "C-C19",
@@ -5995,6 +6056,95 @@
         "persona": "experienced",
         "concrete_check": "Check the notes say to press, not iron, and show pressing arrows."
       }
+    },
+    {
+      "id": "C-M01",
+      "claim": "The binding chart's Full/Double row: 82 x 96, 9 strips, 5/8 yd, on the chart's 2 1/2 in strips, 42 in usable width and +10 in.",
+      "sources": [
+        "S-A04"
+      ],
+      "short_quote": "",
+      "detail": {
+        "chart_size_label": "Full/Double",
+        "chart_dims": "82 x 96",
+        "nearest_size": "full 84 x 90 nearest (82 x 96)",
+        "line": "binding",
+        "figure": "9 strips; 5/8 yd",
+        "fabric_width": "42 in",
+        "binding_extra": "+10 in",
+        "strip_width": "2.5 in",
+        "recorded_from": "the spot-check fetch of S-A04"
+      },
+      "recorded": "2026-10-11, from the fetch output of 2026-10-10 named in recorded_from"
+    },
+    {
+      "id": "C-M02",
+      "claim": "The calculator's presets give strip counts: baby 36 x 52 two strips, throw 50 x 65 two, queen 90 x 108 three strips cut 98 in long, king 108 x 108 three; on 108 in fabric the queen takes one strip cut 100 in long. It states no rounding rule; its figures are in eighths of a yard.",
+      "sources": [
+        "S-A38"
+      ],
+      "short_quote": "",
+      "detail": {
+        "chart_size_label": "Baby/Throw/Queen/King",
+        "chart_dims": "36x52, 50x65, 90x108, 108x108",
+        "line": "backing pieced and wide",
+        "figure": "2, 2, 3 (98 in long), 3 strips; wide queen 1 strip 100 in long",
+        "fabric_width": "42 in; 108 in",
+        "overhang": "4 in per side",
+        "rounding": "no rule stated; eighths of a yard",
+        "recorded_from": "the review-pass spot-check fetch of S-A38"
+      },
+      "recorded": "2026-10-11, from the fetch output of 2026-10-10 named in recorded_from"
+    },
+    {
+      "id": "C-M03",
+      "claim": "The backing chart's panel column says only whether standard-width fabric must be pieced, not how many panels. The page adds 6 to 8 in to both measurements, takes standard fabric as 42 to 44 in wide, and rounds up to 1/4 yd in its worked example.",
+      "sources": [
+        "S-A02"
+      ],
+      "short_quote": "",
+      "detail": {
+        "line": "backing pieced",
+        "fabric_width": "42 to 44 in",
+        "overhang": "6 to 8 in added to each dimension",
+        "rounding": "up to 1/4 yd",
+        "other": "panel column is not a panel count",
+        "recorded_from": "the review-pass spot-check fetch of S-A02"
+      },
+      "recorded": "2026-10-11, from the fetch output of 2026-10-10 named in recorded_from"
+    },
+    {
+      "id": "C-M04",
+      "claim": "The backing guide states its allowance two ways: a formula, width + 8 in and length + 8 in for home quilting or + 12 in for longarm quilting; and a note of a 4 in overhang for home quilting and 6 to 8 in for longarm quilting, which does not say whether the 6 to 8 in is per side or in total. It advises rounding up by half a yard when unsure.",
+      "sources": [
+        "S-A08"
+      ],
+      "short_quote": "",
+      "detail": {
+        "line": "backing pieced",
+        "fabric_width": "44 in",
+        "overhang": "formula: width + 8, length + 8 (home) or + 12 (longarm); note: 4 in home, 6 to 8 in longarm, per side or total not stated",
+        "rounding": "half-yard tip",
+        "recorded_from": "the spot-check and review-pass fetches of S-A08"
+      },
+      "recorded": "2026-10-11, from the fetch output of 2026-10-10 named in recorded_from"
+    },
+    {
+      "id": "C-M05",
+      "claim": "A publisher's backing method plans on 40 in width and adds 4 in (small quilts) to 8 in (large) to the width and length. For a seamed backing it divides one dimension by 40 and rounds up for the number of pieces, multiplies by the other dimension, adds 9 in and divides by 36; it computes both seam directions and buys the smaller, adds 1/8 to 1/4 yd for crooked cuts, and trims selvages before joining.",
+      "sources": [
+        "S-A27"
+      ],
+      "short_quote": "",
+      "detail": {
+        "line": "backing pieced",
+        "fabric_width": "40 in",
+        "overhang": "4 to 8 in added to each dimension",
+        "seam": "+9 in per seamed backing",
+        "other": "both seam directions, buy the smaller",
+        "recorded_from": "the topic A fetch of S-A27"
+      },
+      "recorded": "2026-10-11, from the fetch output of 2026-10-10 named in recorded_from"
     }
   ],
   "spot_checks": [
@@ -6017,7 +6167,8 @@
       "accessed": "2026-10-10",
       "tool": "page fetch",
       "result": "confirmed",
-      "note": "2 1/2 in strips, 42 in usable, +10 in; rows match C-A26. The king row (106 x 108) gives 11 strips and 3/4 yd."
+      "note": "2 1/2 in strips, 42 in usable, +10 in; rows match C-A26. The king row (106 x 108) gives 11 strips and 3/4 yd.",
+      "record_note": "The same fetch also returned the Full/Double row, 82 x 96, 9 strips, 5/8 yd, which C-A26 left out; recorded on 2026-10-11 as C-M01."
     },
     {
       "source": "S-D07",
@@ -6066,14 +6217,16 @@
       "accessed": "2026-10-10",
       "tool": "page fetch",
       "result": "confirmed",
-      "note": "Table: crib 45 x 60 4 yd and 2 yd wide; throw 60 x 70 4 3/4 and 2 1/2; twin 70 x 90 6 and 3; queen 90 x 108 pieced not recommended, 3 1/2 wide; king 110 x 110 (backing 118 x 118) pieced not recommended, 3 1/2 wide. Binding example 60 x 70: (260 + 12) / 40 = 6.8 strips. C-A12 mapped rows loosely; the reports use these rows."
+      "note": "Table: crib 45 x 60 4 yd and 2 yd wide; throw 60 x 70 4 3/4 and 2 1/2; twin 70 x 90 6 and 3; queen 90 x 108 pieced not recommended, 3 1/2 wide; king 110 x 110 (backing 118 x 118) pieced not recommended, 3 1/2 wide. Binding example 60 x 70: (260 + 12) / 40 = 6.8 strips. C-A12 mapped rows loosely; the reports use these rows.",
+      "record_note": "C-A12 corrected on 2026-10-11 to these rows."
     },
     {
       "source": "S-A02",
       "accessed": "2026-10-10",
       "tool": "page fetch",
       "result": "confirmed",
-      "note": "Baby 36 x 52 1 5/8 yd (1 panel); lap 50 x 60 2 1/4 (1); twin 70 x 90 5 (2); full 85 x 108 6 (2); queen 90 x 108 6 (2); king 108 x 108 9 (3); fabric 42 to 44 in, add 6 to 8 in. Matches C-A08."
+      "note": "Baby 36 x 52 1 5/8 yd (1 panel); lap 50 x 60 2 1/4 (1); twin 70 x 90 5 (2); full 85 x 108 6 (2); queen 90 x 108 6 (2); king 108 x 108 9 (3); fabric 42 to 44 in, add 6 to 8 in. Matches C-A08.",
+      "record_note": "The same fetch says the panel column only shows whether to piece standard-width fabric; recorded on 2026-10-11 as C-M03, and the reports no longer read it as a count."
     },
     {
       "source": "S-A40",
@@ -6122,7 +6275,8 @@
       "accessed": "2026-10-10",
       "tool": "page fetch (review pass)",
       "result": "confirmed",
-      "note": "Queen 90 x 108 on 108 in wide: one strip cut 100 in long, 2 7/8 yd; the backing at 4 in per side is 98 x 116. Throw 50 x 65 at 42 in: 3 7/8 yd."
+      "note": "Queen 90 x 108 on 108 in wide: one strip cut 100 in long, 2 7/8 yd; the backing at 4 in per side is 98 x 116. Throw 50 x 65 at 42 in: 3 7/8 yd.",
+      "record_note": "The same fetch gave strip counts for each preset; recorded on 2026-10-11 as C-M02."
     },
     {
       "source": "S-A02",
@@ -6136,7 +6290,8 @@
       "accessed": "2026-10-10",
       "tool": "page fetch (review pass)",
       "result": "confirmed",
-      "note": "Rule: width + 8 in, length + 8 in (home) or + 12 in (longarm)."
+      "note": "Rule: width + 8 in, length + 8 in (home) or + 12 in (longarm).",
+      "record_note": "The earlier fetch of this page (the S-A08 entry above) read a 6 to 8 in longarm overhang; both statements are recorded on 2026-10-11 as C-M04."
     },
     {
       "source": "S-B12",
@@ -6190,6 +6345,12 @@
           "Disappearing Nine Patch"
         ]
       }
+    }
+  ],
+  "revisions": [
+    {
+      "date": "2026-10-11",
+      "note": "Review fixes on PR #210 with no new fetch: query texts set to the exact text sent (37 entries), tool refusals and page loads given a null result_count and an outcome, the Reddit and X page loads recorded with their URLs and order, the C&T article's two URLs linked, C-A12 and C-C18 corrected, and C-M01 to C-M05 added from fetch outputs of 2026-10-10 that the claims had left out."
     }
   ]
 }
