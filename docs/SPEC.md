@@ -281,12 +281,15 @@ corner unit (a fabric for each corner that has a triangle, one leg as a fraction
 the square's own fabric as the base) or a flying goose over two adjacent squares (body and sky
 fabrics; pointing up or down it lies across two columns, left or right down two rows). The map
 covers every square exactly once and names only palette fabrics. A corner leg lands on a whole
-eighth at the square's size, and the legs along one side total at most the side. Each unit carries
-its own confidence: in [0, 1] from a read (B4a and B4b write the map), 1.0 when hand-authored. A
-model with a unit map is written as schema_version 1.1; a model without one keeps its version and
-its bytes, and a missing or unknown major version still raises. The finished-area check stays
-exact with triangles: it counts quadrupled square eighths, because a quarter of an odd square has
-a doubled area that is not whole.
+eighth at the square's size, and the legs along one side total at most the side. The cells still
+give one fabric per square, for code that reads only the cells. Each unit states its own
+confidence, with no default: in [0, 1] from a read (B4a and B4b write the map), 1.0 when
+hand-authored. A model with a unit map is written as schema_version 1.1, or the later 1.x minor it
+was read with; a model without one keeps the version it was read with and its bytes, and a missing
+or unknown major version still raises. The model counts each fabric's area exactly with triangles,
+in quadrupled square eighths (qrep/model/unitmap.py), because a quarter of an odd square has a
+doubled area that is not whole; the construction's finished-area check uses it once construction
+reads the map (A3c).
 
 A test walks the schema and records where every stored field comes from. It asserts that every
 confidence stays in [0, 1] and that the user facts the model records today, the confirmed block
