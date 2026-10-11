@@ -27,7 +27,8 @@ import { formatCmEquivalent } from "../model/sizeEntry";
 import { verdictStory } from "../model/verdictStory";
 import { PRESETS } from "../model/sizing";
 import type { QuiltModel } from "../model/types";
-import { usePhoto, useRoundTrip, useUncertainty } from "./photoApi";
+import { usePhoto, useUncertainty } from "../state/photo";
+import { useRoundTrip } from "../state/pattern";
 import type { PhotoApi } from "./photoApi";
 
 type Tone = "sage" | "amber" | "accent";
