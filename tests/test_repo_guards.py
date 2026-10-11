@@ -1400,21 +1400,63 @@ def test_fixture_guard_passes_the_orchestrators_revert_of_a_merged_pull_request(
 
 
 @needs_git
-@pytest.mark.parametrize("path", [CUT, FIXTURE])
-def test_guard_output_escapes_control_characters_in_subjects(repo, tmp_path, path):
+@pytest.mark.parametrize(
+    ("path", "message", "exit_code"),
+    [
+        (CUT, b"Edit by hand\r::error::forged ##[error]x\n", 1),
+        (FIXTURE, b"Edit by hand\r::error::forged ##[error]x\n", 1),
+        # Pass lines print subjects too: a bless, and a trailered regeneration.
+        (CUT, b"Re-render [bless]\r::error::forged ##[add-mask]x\n", 0),
+        (FIXTURE, b"Regenerate\r::error::forged ##[add-mask]x\n\n" + TRAILER.encode() + b"\n", 0),
+    ],
+)
+def test_guard_output_escapes_control_characters_in_subjects(
+    repo, tmp_path, path, message, exit_code
+):
     # A subject is printed to the CI log, where a line that starts with "::" is
-    # a workflow command (::error::, ::add-mask::), so a line break inside a
-    # subject must not reach the log as one.
+    # a workflow command (::error::, ::add-mask::) and the runner reads the
+    # older ##[command] form anywhere in a line, so neither may reach the log.
     base = _freeze_fixtures(repo)
     (repo / path).write_text("edited\n", encoding="utf-8")
     _git(repo, "add", path)
-    message = tmp_path / "message.txt"
-    message.write_bytes(b"Edit by hand\r::error::forged pass\n")
-    _git(repo, "commit", "-q", "--cleanup=verbatim", "-F", str(message))
+    message_file = tmp_path / "message.txt"
+    message_file.write_bytes(message)
+    _git(repo, "commit", "-q", "--cleanup=verbatim", "-F", str(message_file))
+    result = _run(repo, "golden_guard.py", base, "HEAD")
+    assert result.returncode == exit_code, result.stdout + result.stderr
+    assert "::error::forged" in result.stdout
+    assert not any(line.startswith("::") for line in result.stdout.splitlines())
+    assert "##[" not in result.stdout
+
+
+@needs_git
+@pytest.mark.parametrize(
+    "message",
+    [
+        # git does not end a line at a lone CR, so this message is one
+        # paragraph, its subject, and git reads no trailer from it.
+        b"Regenerate the benchmark fixture\r\r" + TRAILER.encode() + b"\n",
+        # git ends a trailer line only at a newline, so the Rebaseline text
+        # after \v is part of the Note trailer's value.
+        b"Regenerate the benchmark fixture\n\nNote: see\v" + TRAILER.encode() + b"\n",
+    ],
+)
+def test_fixture_guard_reads_trailers_from_the_stored_message_bytes(repo, tmp_path, message):
+    base = _freeze_fixtures(repo)
+    (repo / FIXTURE).write_text('{"v": 2}\n', encoding="utf-8")
+    _git(repo, "add", FIXTURE)
+    message_file = tmp_path / "message.txt"
+    message_file.write_bytes(message)
+    _git(repo, "commit", "-q", "--cleanup=verbatim", "-F", str(message_file))
+    parsed = subprocess.run(
+        ["git", "interpret-trailers", "--parse"], input=message, capture_output=True
+    ).stdout
+    assert not any(
+        line.lower().startswith(b"rebaseline:") for line in parsed.split(b"\n")
+    ), parsed
     result = _run(repo, "golden_guard.py", base, "HEAD")
     assert result.returncode == 1, result.stdout + result.stderr
-    assert "::error::forged pass" in result.stdout
-    assert not any(line.startswith("::") for line in result.stdout.splitlines())
+    assert f"changes {FIXTURE} {UNSANCTIONED}" in result.stdout
 
 
 @needs_git

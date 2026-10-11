@@ -148,11 +148,13 @@ def shown(text: str) -> str:
     """Text with control characters escaped, for the log.
 
     A subject or path holding a line break could otherwise start a log line of
-    its own, which GitHub Actions reads as a workflow command (`::error::`).
+    its own, which GitHub Actions reads as a workflow command (`::error::`), and
+    the runner reads its older `##[command]` form anywhere in a line.
     """
-    return "".join(
+    escaped = "".join(
         ch if ch.isprintable() else ch.encode("unicode_escape").decode("ascii") for ch in text
     )
+    return escaped.replace("##[", "##\\[")
 
 
 def names_path(record: str, path: str) -> bool:
@@ -418,23 +420,41 @@ def golden_commits(
         # One field per call: a commit message may hold any byte git accepts,
         # so no separator inside one combined format can be trusted.
         subject = _commit_field(repo, sha, "%s")
-        message = _commit_field(repo, sha, "%B")
-        rebaseline = trailer_values(repo, message)
+        stored = _run_git_bytes(
+            repo, "rev-list", "-1", "--no-commit-header", "--format=%B", sha, "--"
+        )
+        stored = stored[:-1] if stored.endswith(b"\n") else stored
+        # The golden rule keeps its text-mode reading, where a lone CR or CRLF
+        # ends a line; trailers come from git's own bytes, so a CR that git
+        # does not read as a line end cannot make a paragraph break for them.
+        message = (
+            stored.decode("utf-8", errors="replace").replace("\r\n", "\n").replace("\r", "\n")
+        )
+        rebaseline = trailer_values(repo, stored)
         commits.append(GoldenCommit(sha, subject, tuple(wrote), message, wrote, rebaseline))
     return commits
 
 
-def trailer_values(repo: Path, message: str) -> tuple[str, ...]:
+def _run_git_bytes(repo: Path, *args: str) -> bytes:
+    result = subprocess.run(["git", *args], cwd=repo, capture_output=True)
+    if result.returncode != 0:
+        stderr = result.stderr.decode("utf-8", errors="replace").strip()
+        raise RuntimeError(f"git {' '.join(args)} failed: {stderr}")
+    return result.stdout
+
+
+def trailer_values(repo: Path, message: bytes) -> tuple[str, ...]:
     """The message's non-empty Rebaseline: values, as `git interpret-trailers --parse` reads them.
 
     That is the check WORKER.md runs before each commit, so a worker and the
-    guard agree on what counts, a `---` divider line included.
+    guard agree on what counts: a trailer after a `---` divider line does not,
+    though `git log --format=%(trailers)` would list it.
     """
-    # Bytes, not text: text mode on Windows would write CRLF line ends.
+    # The commit's own bytes, untranslated, so git sees the line ends it stored.
     result = subprocess.run(
         ["git", "interpret-trailers", "--parse"],
         cwd=repo,
-        input=message.encode("utf-8"),
+        input=message,
         capture_output=True,
     )
     if result.returncode != 0:
@@ -443,7 +463,9 @@ def trailer_values(repo: Path, message: str) -> tuple[str, ...]:
             + result.stderr.decode("utf-8", errors="replace").strip()
         )
     values = []
-    for line in result.stdout.decode("utf-8", errors="replace").splitlines():
+    # git ends a trailer line only at "\n"; str.splitlines would also split at
+    # \v, \f, \x1c to \x1e, \x85 and U+2028/U+2029 inside another trailer's value.
+    for line in result.stdout.decode("utf-8", errors="replace").split("\n"):
         key, separator, value = line.partition(":")
         if separator and key.strip().lower() == TRAILER_KEY.lower() and value.strip():
             values.append(value.strip())

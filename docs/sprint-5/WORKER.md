@@ -133,15 +133,16 @@ so you can apply it to a case this file does not name.
 - Golden-guard (G3 and CI) checks the mechanical half of that rule: the path
   is named in REBASELINE.md as main holds it (never your branch's copy, so a
   path you add to the record in your own PR stays unnamed until an amendment
-  Jake approves merges first), and each of your commits that touches the file
-  carries a non-empty `Rebaseline:` trailer, read the way the
-  `git interpret-trailers --parse` check in 4.1 reads it. It does not check
-  which entry the trailer cites, or whether that entry lets the file change
-  rather than only leave; the review does, so cite the entry that names the
-  path. The guard
-  also fails a fixture whose final content a merge commit produced. When you
-  merge origin/main into a branch that regenerates a fixture main also
-  changed, run `git merge --no-commit origin/main`, check out main's copy of
+  Jake approves merges first), and each of your commits that touches a
+  tracked fixture your PR modifies or deletes carries a non-empty
+  `Rebaseline:` trailer, read the way the `git interpret-trailers --parse`
+  check in 4.1 reads it: a trailer after a `---` line does not count, even
+  though `git log --format=%(trailers)` lists it. It does not check which
+  entry the trailer cites, or whether that entry lets the file change rather
+  than only leave; the review does, so cite the entry that names the path.
+  The guard also fails a fixture whose final content a merge commit
+  produced. When you merge origin/main into a branch that regenerates a
+  fixture main also changed, run `git merge --no-commit origin/main`, check out main's copy of
   that file, commit the merge, then regenerate it in a new commit with the
   trailer. If the merge is already committed, commit main's copy back with
   the trailer, then regenerate in a second commit with the trailer.
