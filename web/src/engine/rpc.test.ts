@@ -89,7 +89,7 @@ describe("EngineClient", () => {
       ok: false,
       error: { kind: "validation", message: "model failed validation: palette" },
     });
-    const error = await call.catch((e) => e);
+    const error = (await call.catch((e) => e)) as EngineError;
     expect(error).toBeInstanceOf(EngineError);
     expect(error.kind).toBe("validation");
     expect(error.message).toContain("palette");
@@ -140,7 +140,10 @@ describe("EngineClient", () => {
     const inFlight = client.call("plan", "{}", "strip");
     const queued = client.call("validate", "{}");
     client.restart();
-    const errors = await Promise.all([inFlight.catch((e) => e), queued.catch((e) => e)]);
+    const errors = (await Promise.all([
+      inFlight.catch((e) => e),
+      queued.catch((e) => e),
+    ])) as EngineError[];
     for (const error of errors) {
       expect(error).toBeInstanceOf(EngineError);
       expect(error.kind).toBe("worker");
