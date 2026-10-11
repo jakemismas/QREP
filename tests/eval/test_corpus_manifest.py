@@ -225,6 +225,35 @@ def test_eval_refusals_are_weighted_toward_on_point_look_alikes():
     assert max(counts, key=counts.get) == "on_point"
 
 
+def test_the_eval_set_column_follows_the_readme_rule_row_by_row():
+    # Source: corpus/README.md, the v0 eval set: every tier A photo, every tier R photo in
+    # on_point, curve, diamond_star or hexagon, and the first three tier R medallion stems and
+    # the first three tier R applique stems in sort order of the photo stem; every other row is
+    # empty. The rule is applied here from tier, class and stem alone, so a row marked by hand
+    # against it fails.
+    stems = {klass: sorted(Path(row["file"]).stem for row in rows()
+                           if row["tier"] == "R" and row["class"] == klass)
+             for klass in ("medallion", "applique")}
+    first_three = set(stems["medallion"][:3]) | set(stems["applique"][:3])
+    for row in rows():
+        chosen = (row["tier"] == "A"
+                  or (row["tier"] == "R"
+                      and row["class"] in {"on_point", "curve", "diamond_star", "hexagon"})
+                  or (row["tier"] == "R" and Path(row["file"]).stem in first_three))
+        assert row["eval_set"] == ("v0" if chosen else ""), row["file"]
+
+
+def test_the_rows_criterion_5_names_carry_their_tiers():
+    # Source: plan D3a, criterion 5: the Smithsonian Double Irish Chain 2013.67.2 is an on-point
+    # refusal, and the NMAH slide scans go to tier B; the in-scope slide scans are 556283, 556284
+    # and 556288 (corpus/README.md).
+    by_stem = {Path(row["file"]).stem: row for row in rows()}
+    chain = by_stem["smithsonian-saam-2013-67-2"]
+    assert (chain["tier"], chain["class"]) == ("R", "on_point")
+    for stem in ("smithsonian-nmah-556283", "smithsonian-nmah-556284", "smithsonian-nmah-556288"):
+        assert by_stem[stem]["tier"] == "B", stem
+
+
 # ---------------------------------------------------------------------------------------------
 # Holdout rule
 # ---------------------------------------------------------------------------------------------
@@ -365,17 +394,22 @@ def test_the_holdout_is_pinned_photo_by_photo():
         assert int(prefix, 16) % 3 == 0, stem
 
 
-def test_readme_reports_the_holdout_count_of_each_tier():
-    # The README's v0 counts table ends each tier row with its holdout count; they must be the
-    # pinned set's counts, so a stale table fails here.
+def test_readme_reports_each_tiers_photo_and_holdout_counts():
+    # The README's v0 counts table gives each tier row's photo count in its Photos column and ends
+    # the row with its holdout count; they must be the manifest's row count for that tier and the
+    # pinned set's count, so a stale table fails here.
     by_stem = {Path(row["file"]).stem: row for row in rows()}
-    expected = {tier: sum(by_stem[s]["tier"] == tier for s in HOLDOUT_V0) for tier in cf.TIERS}
+    expected = {
+        tier: (sum(row["tier"] == tier for row in rows()),
+               sum(by_stem[s]["tier"] == tier for s in HOLDOUT_V0))
+        for tier in cf.TIERS
+    }
     text = (CORPUS / "README.md").read_text(encoding="utf-8")
     reported = {}
     for line in text.splitlines():
         cells = [c.strip() for c in line.strip().strip("|").split("|")]
         if len(cells) >= 3 and cells[0] in cf.TIERS and cells[-1].isdigit() and cells[1].isdigit():
-            reported[cells[0]] = int(cells[-1])
+            reported[cells[0]] = (int(cells[1]), int(cells[-1]))
     assert reported == expected
 
 
@@ -495,19 +529,46 @@ def test_the_field_frame_maps_when_its_corners_were_confirmed():
 def test_corners_scale_from_the_canvas_to_the_staged_image():
     # A committed copy downsized from a 3873 x 4096 scan to 756 x 800. The corners are in order
     # and convex on that canvas (top left 30 < top right 3840 across, 40 < 4000 down the left).
-    # By hand, bottom right (3845, 4009):
-    # x = 3845 * 756 / 3873 = 2,906,820 / 3873; 3873 * 750 = 2,904,750, remainder 2,070, and
-    # 2,070 / 3873 = 0.5345, so x = 750.5345.
-    # y = 4009 * 800 / 4096 = 3,207,200 / 4096; 4096 * 783 = 3,207,168, remainder 32, and
-    # 32 / 4096 = 0.0078125, so y = 783.0078125.
+    # Every x scales by 756 / 3873 and every y by 800 / 4096. By hand:
+    # top left (30, 40): x = 22,680 / 3873; 3873 * 5 = 19,365, remainder 3,315, and
+    # 3,315 / 3873 = 0.8559, so x = 5.8559; y = 32,000 / 4096 = 7.8125 (4096 * 7 = 28,672,
+    # remainder 3,328, 3,328 / 4096 = 0.8125).
+    # top right (3840, 35): x = 2,903,040 / 3873; 3873 * 749 = 2,900,877, remainder 2,163, and
+    # 2,163 / 3873 = 0.5585, so x = 749.5585; y = 28,000 / 4096; 4096 * 6 = 24,576, remainder
+    # 3,424, and 3,424 / 4096 = 0.8359375, so y = 6.8359375.
+    # bottom right (3845, 4009): x = 2,906,820 / 3873; 3873 * 750 = 2,904,750, remainder 2,070,
+    # and 2,070 / 3873 = 0.5345, so x = 750.5345; y = 3,207,200 / 4096; 4096 * 783 = 3,207,168,
+    # remainder 32, and 32 / 4096 = 0.0078125, so y = 783.0078125.
+    # bottom left (25, 4000): x = 18,900 / 3873; 3873 * 4 = 15,492, remainder 3,408, and
+    # 3,408 / 3873 = 0.8799, so x = 4.8799; y = 3,200,000 / 4096; 4096 * 781 = 3,198,976,
+    # remainder 1,024, and 1,024 / 4096 = 0.25, so y = 781.25.
     edge = {"kind": "outer_edge", "bands": [], "corners": {
         "top_left": {"x": 30, "y": 40}, "top_right": {"x": 3840, "y": 35},
         "bottom_right": {"x": 3845, "y": 4009}, "bottom_left": {"x": 25, "y": 4000}}}
     doc = sample(canvas=[3873, 4096],
                  frame=[{"value": {"outer_edge": edge}, "provenance": "verified-jake"}])
-    corner = an.to_read_request(parse(doc), "copy.jpg", (756, 800)).frame.corners.bottom_right
-    assert corner.x == pytest.approx(750.5345, abs=1e-3)
-    assert corner.y == pytest.approx(783.0078125, abs=1e-3)
+    corners = an.to_read_request(parse(doc), "copy.jpg", (756, 800)).frame.corners
+    expected = {"top_left": (5.8559, 7.8125), "top_right": (749.5585, 6.8359375),
+                "bottom_right": (750.5345, 783.0078125), "bottom_left": (4.8799, 781.25)}
+    for name, (x, y) in expected.items():
+        corner = getattr(corners, name)
+        assert corner.x == pytest.approx(x, abs=1e-3), name
+        assert corner.y == pytest.approx(y, abs=1e-3), name
+
+
+def test_a_staged_size_must_keep_the_canvas_shape():
+    # Canvas 3873 x 4096: 3873 / 4096 = 0.94556. A 756 x 800 copy: 756 / 800 = 0.945, a gap of
+    # (0.94556 - 0.945) / 0.94556 = 0.06 percent, under 1 percent, so it scales. A swapped or
+    # wrong size, 846 x 800: 846 / 800 = 1.0575, a gap of (1.0575 - 0.94556) / 0.94556 = 11.8
+    # percent, over 1 percent, so it is refused.
+    edge = {"kind": "outer_edge", "bands": [], "corners": {
+        "top_left": {"x": 30, "y": 40}, "top_right": {"x": 3840, "y": 35},
+        "bottom_right": {"x": 3845, "y": 4009}, "bottom_left": {"x": 25, "y": 4000}}}
+    doc = parse(sample(canvas=[3873, 4096],
+                       frame=[{"value": {"outer_edge": edge}, "provenance": "verified-jake"}]))
+    assert isinstance(an.to_read_request(doc, "copy.jpg", (756, 800)), ReadRequest)
+    with pytest.raises(ValueError, match="shape"):
+        an.to_read_request(doc, "copy.jpg", (846, 800))
 
 
 def test_a_proposal_stands_in_for_truth_only_when_asked():
@@ -570,6 +631,33 @@ def test_a_stored_sidecar_claim_wins_over_the_derived_value():
     assert an.sidecar_view(parse(doc))["character"] == "no_pattern"
 
 
+# A quad on the 1000 x 800 canvas, in order (120 < 880 across the top, 130 < 870 across the
+# bottom, 70 < 720 down the left, 80 < 730 down the right) and convex: its four turns' cross
+# products are 760 x 660 - 10 x 750 = 494,100, -10 x 640 + 650 x 750 = 481,100,
+# 740 x 660 - 10 x 750 = 480,900 and 10 x 640 + 650 x 750 = 493,900, all positive.
+PROPOSED_QUAD = [[120, 70], [880, 80], [870, 730], [130, 720]]
+
+
+def test_a_stored_proposal_never_overrides_a_verified_derivation():
+    # With prefer (verified-jake, proposed-a), the verified-jake frame (the only frame) ranks 0
+    # and the proposed-a quad ranks 1; 1 is after 0, so the quad derives from the frame: OUTER's
+    # corners, top left first, clockwise.
+    doc = parse(sample(frame=[sample()["frame"][0]],
+                       quad=[{"value": PROPOSED_QUAD, "provenance": "proposed-a"}]))
+    view = an.sidecar_view(doc, prefer=("verified-jake", "proposed-a"))
+    assert view["quad"] == [[100.0, 50.0], [900.0, 60.0], [890.0, 750.0], [110.0, 740.0]]
+    # With the order turned, the proposed-a quad ranks 0, before the frame's 1, so it wins.
+    view = an.sidecar_view(doc, prefer=("proposed-a", "verified-jake"))
+    assert view["quad"] == [[120.0, 70.0], [880.0, 80.0], [870.0, 730.0], [130.0, 720.0]]
+
+
+def test_a_stored_claim_stands_when_nothing_derives_its_field():
+    # No frame derives a quad, so the proposed-a quad stands whatever its rank.
+    doc = parse(sample(frame=[], quad=[{"value": PROPOSED_QUAD, "provenance": "proposed-a"}]))
+    view = an.sidecar_view(doc, prefer=("verified-jake", "proposed-a"))
+    assert view["quad"] == [[120.0, 70.0], [880.0, 80.0], [870.0, 730.0], [130.0, 720.0]]
+
+
 def outer(**corners) -> dict:
     return OUTER | {"corners": OUTER["corners"] | corners}
 
@@ -585,6 +673,13 @@ def outer(**corners) -> dict:
         # A corner off the 1000 x 800 canvas (x = 1001).
         {"frame": [{"value": {"outer_edge": OUTER | {"corners": OUTER["corners"] | {
             "top_right": {"x": 1001, "y": 60}}}}, "provenance": "proposed-b"}]},
+        # A corner below the 1000 x 800 canvas (y = 801); the quad stays in order and convex
+        # (bottom right (890, 801) is still below top right (900, 60) and right of bottom left
+        # (110, 740)), so only the canvas refuses it.
+        {"frame": [{"value": {"outer_edge": outer(bottom_right={"x": 890, "y": 801})},
+                    "provenance": "proposed-b"}]},
+        # A repeat of zero squares down and minus five across: each must be at least 1.
+        {"repeat_cells": [{"value": [0, -5], "provenance": "proposed-a"}]},
         # Three roles for a count of two.
         {"fabrics": [{"value": {"count": 2, "roles": ["a", "b", "c"]},
                       "provenance": "proposed-a"}]},
@@ -630,6 +725,21 @@ def test_the_annotation_model_refuses_malformed_input(change):
         parse(sample(**change))
 
 
+def test_a_convex_clockwise_quad_with_rotated_labels_is_refused():
+    # OUTER's corners moved one label on: top left (900, 60), top right (890, 750), bottom right
+    # (110, 740), bottom left (100, 50). Traced in that order it is still convex and clockwise;
+    # each turn's cross product (b - a) x (c - a) is positive:
+    # (900,60)->(890,750)->(110,740): -10 x 680 - 690 x -790 = -6,800 + 545,100 = 538,300;
+    # (890,750)->(110,740)->(100,50): -780 x -700 - -10 x -790 = 546,000 - 7,900 = 538,100;
+    # (110,740)->(100,50)->(900,60): -10 x -680 - -690 x 790 = 6,800 + 545,100 = 551,900;
+    # (100,50)->(900,60)->(890,750): 800 x 700 - 10 x 790 = 560,000 - 7,900 = 552,100.
+    # Only the order check refuses it: top left x 900 is not left of top right x 890.
+    rotated = outer(top_left={"x": 900, "y": 60}, top_right={"x": 890, "y": 750},
+                    bottom_right={"x": 110, "y": 740}, bottom_left={"x": 100, "y": 50})
+    with pytest.raises(ValidationError, match="out of order"):
+        parse(sample(frame=[{"value": {"outer_edge": rotated}, "provenance": "proposed-b"}]))
+
+
 def test_the_committed_schema_is_the_models_export():
     # Source: plan D3a, criterion 7: the model exports corpus/schema/annotation.schema.json, which
     # the dev annotate page (C3a) writes against; a drift between them fails here.
@@ -659,6 +769,10 @@ def test_the_licensed_photo_rule_refuses_an_annotation_of_a_private_photo():
     # The sample's canvas is [1000, 800]; a row of 999 x 800 binds another size.
     other_size = {k: v | {"px_w": "999"} for k, v in licensed.items()}
     problems = an.licensed_photo_problems(parse(sample()), "met-1", other_size)
+    assert len(problems) == 1 and "canvas" in problems[0]
+    # The same with only the height off: a row of 1000 x 799 against the canvas's 800.
+    other_height = {k: v | {"px_h": "799"} for k, v in licensed.items()}
+    problems = an.licensed_photo_problems(parse(sample()), "met-1", other_height)
     assert len(problems) == 1 and "canvas" in problems[0]
 
 
@@ -756,6 +870,14 @@ def test_the_fetch_refuses_any_host_off_the_allowlist(url):
         ("H. 80 x W. 70 in. (203.2 x 177.8 cm)", (70.0, 80.0)),
         # Labels win over order.
         ("W. 70 x H. 80 in.", (70.0, 80.0)),
+        # One label alone wins too. A width first: 70 in wide, so the other, 80 in, is the height.
+        ("W. 70 x 80 in.", (70.0, 80.0)),
+        # A height second: 80 in high, so the first, 70 in, is the width.
+        ("70 x H. 80 in.", (70.0, 80.0)),
+        # A height first: 80 in high, so the second, 70 in, is the width.
+        ("H. 80 x 70 in.", (70.0, 80.0)),
+        # A width second: 70 in wide, so the first, 80 in, is the height.
+        ("80 x W. 70 in.", (70.0, 80.0)),
         # L. (length) reads as the height: a museum that gives L x W for a flat textile names
         # its long side, which hangs down, so 80 in is the height and 70 in the width.
         ("L. 80 x W. 70 in.", (70.0, 80.0)),
@@ -805,6 +927,18 @@ def test_finished_sizes_turn_to_match_the_photo(size, canvas, expected):
         ("1850s", 1859),
         # A plain year stays as written.
         ("1848", 1848),
+        # A decade range with a two-digit end: the 30s after 1920s are 1930 to 1930 + 9 = 1939.
+        ("1920s-30s", 1939),
+        # A slash writes a range: 1929/30 ends in 19 + 30 = 1930.
+        ("1929/30", 1930),
+        # A "00s" decade is also how a century is written, so 1900s reads the century's last
+        # year, 1900 + 99 = 1999, erring toward the modern skip.
+        ("1900s", 1999),
+        # A two-digit end below the start's last two digits (05 < 95) crosses into the next
+        # century: (18 + 1) x 100 + 5 = 1905.
+        ("1895-05", 1905),
+        # A curly apostrophe reads as a straight one: 1920 + 9 = 1929.
+        ("1920\u2019s", 1929),
     ],
 )
 def test_dates_read_their_last_year(text, expected):
@@ -1038,11 +1172,16 @@ def test_the_recheck_fails_when_a_flag_no_longer_clears(tmp_path):
 
 def test_the_recheck_compares_the_live_flag_with_the_rows_own_flag(tmp_path):
     # The record still clears (isPublicDomain true), but the row recorded another flag string, so
-    # the row no longer states what the record says.
+    # two problems: the row's flag is not the one SOURCES sets for the Met, and the row no longer
+    # states what the record says.
     problems = cf.recheck(FakeClient(pages(MET_RECORD)),
                           [met_row(rights_flag="isPublicDomain=yes")], tmp_path)
-    assert problems == ["private/cache/met-11.jpg: rights flag changed from isPublicDomain=yes "
-                        "to isPublicDomain=true"]
+    assert problems == [
+        "private/cache/met-11.jpg: rights_flag isPublicDomain=yes is not isPublicDomain=true, "
+        "the rights_flag met sets",
+        "private/cache/met-11.jpg: rights flag changed from isPublicDomain=yes "
+        "to isPublicDomain=true",
+    ]
 
 
 def test_the_recheck_fails_when_a_row_records_another_license(tmp_path):
@@ -1074,13 +1213,70 @@ def test_the_recheck_fails_closed_on_a_policy_page(tmp_path, policy, says):
 
 
 def test_the_recheck_reads_each_policy_page_the_rows_cite_once(tmp_path):
-    # Two Met rows cite one policy page, so it is requested once; it is the row's URL that is
-    # read, whatever the code's own constant says.
+    # Two Met rows cite one policy page, so it is requested once.
     both = [met_row(), met_row(file="private/cache/met-12.jpg", object_id="12")]
     client = FakeClient(pages(MET_RECORD) | {
         f"{cf.MET}/v1/objects/12": MET_RECORD | {"objectID": 12}})
     assert cf.recheck(client, both, tmp_path) == []
     assert [url for url, _ in client.sent].count(MET_POLICY) == 1
+
+
+def test_the_recheck_reads_the_policy_url_the_row_cites_and_reports_its_drift(tmp_path):
+    # The row cites a policy URL that is not the Met's in SOURCES: the recheck requests the row's
+    # URL, never the constant, and reports that the row's policy_url differs from the source's.
+    moved = "https://www.metmuseum.org/policies/image-resources"
+    client = FakeClient({MET_OBJECT: MET_RECORD, moved: b"policy page"})
+    problems = cf.recheck(client, [met_row(policy_url=moved)], tmp_path)
+    requested = [url for url, _ in client.sent]
+    assert moved in requested and MET_POLICY not in requested
+    assert problems == [f"private/cache/met-11.jpg: policy_url {moved} is not {MET_POLICY}, "
+                        "the policy_url met sets"]
+
+
+SI_SEARCH = f"{cf.SI_API}/search?" + cf._query(
+    {"q": cf.SI_QUERY, "rows": "1000", "start": "0", "api_key": cf.SI_DEMO_KEY})
+SI_IMAGE = "https://ids.si.edu/ids/download?id=NMAH-1.jpg"
+
+
+def si_row(**changes) -> dict[str, str]:
+    license, flag, policy = SOURCE_TERMS["smithsonian"]
+    return {"file": "private/cache/smithsonian-nmah-1.jpg", "source": "smithsonian",
+            "object_id": "nmah_1", "license": license, "rights_flag": flag,
+            "policy_url": policy, "image_url": SI_IMAGE} | changes
+
+
+def two_media() -> dict:
+    """SI_ROW whose own medium (NMAH-1, the row's image) is restricted, beside a second image
+    medium (NMAH-2) that is CC0."""
+    record = json.loads(json.dumps(SI_ROW))
+    media = record["content"]["descriptiveNonRepeating"]["online_media"]["media"]
+    media[0]["usage"]["access"] = "Usage conditions apply"
+    media.append({"type": "Images", "usage": {"access": "CC0"},
+                  "content": "https://ids.si.edu/ids/deliveryService?id=NMAH-2",
+                  "resources": [{"label": "High-resolution JPEG",
+                                 "url": "https://ids.si.edu/ids/download?id=NMAH-2.jpg"}]})
+    return record
+
+
+def test_the_recheck_reports_a_smithsonian_row_with_no_live_record(tmp_path):
+    # The search answers with nmah_1 only, so the row for nmah_2 has no live record: one problem,
+    # and the Smithsonian policy page answers 200.
+    client = FakeClient({SI_SEARCH: {"response": {"rows": [SI_ROW]}},
+                         SOURCE_TERMS["smithsonian"][2]: b"policy page"})
+    row = si_row(file="private/cache/smithsonian-nmah-2.jpg", object_id="nmah_2")
+    problems = cf.recheck(client, [row], tmp_path)
+    assert problems == ["private/cache/smithsonian-nmah-2.jpg: no live record (withdrawn, or no "
+                        "longer flagged)"]
+
+
+def test_the_recheck_reads_the_medium_that_serves_the_rows_image(tmp_path):
+    # The record still holds a CC0 medium, but the row's image is NMAH-1, now restricted, so the
+    # live flag renders media.usage.access=Usage conditions apply against the row's CC0.
+    client = FakeClient({SI_SEARCH: {"response": {"rows": [two_media()]}},
+                         SOURCE_TERMS["smithsonian"][2]: b"policy page"})
+    problems = cf.recheck(client, [si_row()], tmp_path)
+    assert problems == ["private/cache/smithsonian-nmah-1.jpg: rights flag changed from "
+                        "media.usage.access=CC0 to media.usage.access=Usage conditions apply"]
 
 
 def test_the_recheck_fails_when_a_lacma_page_turns_restricted(tmp_path):
@@ -1110,6 +1306,21 @@ def test_the_recheck_fails_when_a_lacma_page_turns_restricted(tmp_path):
 )
 def test_the_live_flag_renders_what_the_record_says(source, record, expected):
     assert cf.live_flag(source, record) == expected
+
+
+def test_a_smithsonian_live_flag_reads_the_medium_of_the_rows_image():
+    # two_media(): NMAH-1 is restricted, NMAH-2 is CC0. The row's image matches NMAH-1 by its
+    # resource URL or by its delivery URL (content), so either reads the restricted value.
+    record = two_media()
+    restricted = "media.usage.access=Usage conditions apply"
+    assert cf.live_flag("smithsonian", record, SI_IMAGE) == restricted
+    assert cf.live_flag("smithsonian", record,
+                        "https://ids.si.edu/ids/deliveryService?id=NMAH-1") == restricted
+    # No medium serves the URL, or no URL is given: any CC0 image medium reads CC0, as
+    # si_candidate clears a record.
+    assert cf.live_flag("smithsonian", record, "https://ids.si.edu/ids/download?id=X.jpg") == (
+        "media.usage.access=CC0")
+    assert cf.live_flag("smithsonian", record) == "media.usage.access=CC0"
 
 
 def test_verify_finds_a_cached_image_whose_bytes_changed(tmp_path):
@@ -1162,15 +1373,39 @@ def test_rows_refuse_a_screen_decision_with_no_fetched_candidate(tmp_path):
 
 def test_merging_rows_replaces_a_rescreened_photo_and_adds_a_new_one():
     # By hand: met 11 is screened again (tier B to A), so its new row replaces the old; aic 22 is
-    # not screened again and stays; lacma 2048 is new and is added: three rows.
-    old = [{"source": "met", "object_id": "11", "tier": "B"},
-           {"source": "aic", "object_id": "22", "tier": "A"}]
+    # not screened again and stays; lacma 2048 is new and is added: three rows. Neither new row
+    # names an eval_set: met 11 keeps its old row's "v0", and lacma 2048, a new photo, gets "".
+    old = [{"source": "met", "object_id": "11", "tier": "B", "eval_set": "v0"},
+           {"source": "aic", "object_id": "22", "tier": "A", "eval_set": ""}]
     new = [{"source": "met", "object_id": "11", "tier": "A"},
            {"source": "lacma", "object_id": "2048", "tier": "R"}]
     merged = sorted(cf.merge_rows(old, new), key=lambda r: (r["source"], r["object_id"]))
-    assert merged == [{"source": "aic", "object_id": "22", "tier": "A"},
-                      {"source": "lacma", "object_id": "2048", "tier": "R"},
-                      {"source": "met", "object_id": "11", "tier": "A"}]
+    assert merged == [{"source": "aic", "object_id": "22", "tier": "A", "eval_set": ""},
+                      {"source": "lacma", "object_id": "2048", "tier": "R", "eval_set": ""},
+                      {"source": "met", "object_id": "11", "tier": "A", "eval_set": "v0"}]
+
+
+def test_a_rescreen_without_an_eval_set_column_keeps_the_old_eval_set(tmp_path):
+    # A fetched met 11 (80 x 72 in., 1000 x 800 px) whose old row is in the v0 eval set.
+    cf.save_candidates(tmp_path, [cf.Candidate(
+        "met", "11", "Quilt", "https://www.metmuseum.org/art/collection/search/11",
+        "https://images.metmuseum.org/x.jpg", "Gift", "80 x 72 in.", 1850,
+        sha256="a" * 64, px_w=1000, px_h=800)])
+    old = [{"source": "met", "object_id": "11", "tier": "B", "eval_set": "v0"}]
+    # A four-column decision says nothing about the eval set: build_rows leaves it None, and the
+    # merge keeps the old row's v0.
+    four = tmp_path / "four.csv"
+    four.write_text("stem,tier,class,commit_ok\nmet-11,A,squares,no\n", encoding="utf-8")
+    (built,) = cf.build_rows(tmp_path, four, {})
+    assert built["eval_set"] is None
+    (merged,) = cf.merge_rows(old, [built])
+    assert (merged["tier"], merged["eval_set"]) == ("A", "v0")
+    # A five-column decision with an empty eval_set says the photo leaves the set: "".
+    five = tmp_path / "five.csv"
+    five.write_text("stem,tier,class,commit_ok,eval_set\nmet-11,A,squares,no,\n",
+                    encoding="utf-8")
+    (merged,) = cf.merge_rows(old, cf.build_rows(tmp_path, five, {}))
+    assert merged["eval_set"] == ""
 
 
 @needs_git

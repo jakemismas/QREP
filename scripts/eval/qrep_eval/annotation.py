@@ -24,7 +24,7 @@ licensed_photo_problems checks each of them against that row.
 import json
 import re
 from pathlib import Path
-from typing import Literal, TypeVar, get_args
+from typing import Annotated, Literal, TypeVar, get_args
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -206,7 +206,7 @@ class GridClaim(_Claim):
 class RepeatCellsClaim(_Claim):
     """The sidecar's repeat_cells: [down, across] squares per block, or None for one block."""
 
-    value: tuple[int, int] | None
+    value: tuple[Annotated[int, Field(ge=1)], Annotated[int, Field(ge=1)]] | None
 
 
 class CharacterClaim(_Claim):
@@ -410,9 +410,10 @@ def to_read_request(
     """The read request a user who confirmed this annotation would send.
 
     token names the staged image and image_size is its (width, height) in
-    pixels: the canvas for the source image, or a committed copy's own size.
-    The corners are scaled from canvas pixels to the staged image's pixels,
-    because a request's corners index the image it stages. frame chooses what
+    pixels: the canvas for the source image, or a committed copy's own size,
+    whose aspect ratio must be the canvas's within 1 percent. The corners are
+    scaled from canvas pixels to the staged image's pixels, because a
+    request's corners index the image it stages. frame chooses what
     the user confirmed: the outer edge with its bands, or the field corners.
     prefer orders the provenance codes to accept; the default accepts gate
     truth only, so a proposal never stands in for truth unless the caller asks.
@@ -431,6 +432,15 @@ def to_read_request(
         count = None
     if min(image_size) < 1:
         raise ValueError(f"image size {image_size} must be at least 1 pixel each way")
+    # A downsized copy keeps the canvas's shape; a size whose shape differs by more than 1
+    # percent is usually (height, width) passed as (width, height), which would stretch the
+    # corners off the quilt.
+    image_ratio = image_size[0] / image_size[1]
+    canvas_ratio = annotation.canvas[0] / annotation.canvas[1]
+    if abs(image_ratio - canvas_ratio) / canvas_ratio > 0.01:
+        raise ValueError(
+            f"image size {image_size} is not the shape of the canvas {annotation.canvas}; "
+            "pass (width, height)")
     sx, sy = image_size[0] / annotation.canvas[0], image_size[1] / annotation.canvas[1]
     c = chosen.corners
     scaled = Corners(**{
@@ -450,7 +460,11 @@ def to_read_request(
 def sidecar_view(annotation: Annotation, prefer: tuple[str, ...] = FRAME_TRUTH) -> dict:
     """The photoreal sidecar fields, in the sidecar's own shapes, so the eval
     can score both with one code path. A stored quad, grid, repeat_cells or
-    character claim wins; otherwise each is derived: quad is the outer edge
+    character claim wins when its provenance ranks at or before, in prefer,
+    the provenance of the claim the derived value comes from (frame for quad,
+    counts for grid and repeat_cells, construction_class for character), or
+    when there is no derived value, so a proposal never overrides a verified
+    derivation. Otherwise each is derived: quad is the outer edge
     (the sidecar's quad spans its border); grid.border_pitches is the bands'
     total width in squares, or None when no frame gives the bands;
     repeat_cells is [down, across] squares per block, or None for one block per
@@ -483,16 +497,26 @@ def sidecar_view(annotation: Annotation, prefer: tuple[str, ...] = FRAME_TRUTH) 
             view["repeat_cells"] = [n.squares_per_block_down, n.squares_per_block_across]
     if built is not None and built.value != "out_of_scope":
         view["character"] = "squares" if built.value == "squares" else "non_square"
-    stored = {name: pick(getattr(annotation, name), prefer)
-              for name in ("quad", "grid", "repeat_cells", "character")}
-    if stored["quad"] is not None:
+    # out_of_scope derives no character, so a stored character stands against it.
+    derived_from = {
+        "quad": framed, "grid": counted, "repeat_cells": counted,
+        "character": built if built is not None and built.value != "out_of_scope" else None,
+    }
+    stored = {}
+    for name, source in derived_from.items():
+        claim = pick(getattr(annotation, name), prefer)
+        if claim is not None and (
+            source is None or prefer.index(claim.provenance) <= prefer.index(source.provenance)
+        ):
+            stored[name] = claim
+    if "quad" in stored:
         view["quad"] = [list(point) for point in stored["quad"].value]
-    if stored["grid"] is not None:
+    if "grid" in stored:
         view["grid"] = stored["grid"].value.model_dump()
-    if stored["repeat_cells"] is not None:
+    if "repeat_cells" in stored:
         cells = stored["repeat_cells"].value
         view["repeat_cells"] = list(cells) if cells is not None else None
-    if stored["character"] is not None:
+    if "character" in stored:
         view["character"] = stored["character"].value
     return view
 

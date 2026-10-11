@@ -719,9 +719,11 @@
               "minItems": 2,
               "prefixItems": [
                 {
+                  "minimum": 1,
                   "type": "integer"
                 },
                 {
+                  "minimum": 1,
                   "type": "integer"
                 }
               ],

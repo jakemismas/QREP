@@ -183,16 +183,35 @@ class Candidate:
         return self.date_end is None or self.date_end >= MODERN_FROM
 
 
+def _decade_end(first: int) -> int:
+    # A decade ends with its last year: the 1850s with 1859, because date_end is the last year
+    # the record's date gives (corpus/README.md). A "00s" decade is also how a century is
+    # written (the 1900s), so it reads the century's last year: the later end errs toward the
+    # modern skip.
+    return first + (99 if first % 100 == 0 else 9)
+
+
+def _two_digit_end(start: str, end: str) -> int:
+    # An end below the start's last two digits crosses into the next century: 1895-05 is 1905.
+    century = int(start[:2]) + (1 if int(end) < int(start[2:]) else 0)
+    return century * 100 + int(end)
+
+
 def _years(text: str) -> list[int]:
     # Digit guards rather than word boundaries, so a decade such as 1850s still reads 1850.
     years = [int(y) for y in re.findall(r"(?<!\d)(1[5-9]\d\d|20\d\d)(?!\d)", text)]
-    # A decade ends with its last year: the 1850s with 1859, because date_end is the last year
-    # the record's date gives (corpus/README.md).
-    for decade in re.findall(r"(?<!\d)(1[5-9]\d0|20\d0)'?s\b", text):
-        years.append(int(decade) + 9)
-    # A range written 1925-35 ends in 1935; museum records write the dash as a hyphen or an en dash.
-    for start, end in re.findall(r"(?<!\d)(1[5-9]\d\d|20\d\d)\s*[-\u2013]\s*(\d\d)(?!\d)", text):
-        years.append(int(start[:2] + end))
+    # Records write the decade's apostrophe straight or curly (1920's, 1920\u2019s).
+    for decade in re.findall(r"(?<!\d)(1[5-9]\d0|20\d0)['\u2019]?s\b", text):
+        years.append(_decade_end(int(decade)))
+    # A decade range with a two-digit end, 1920s-30s, ends with the later decade's last year.
+    for start, end in re.findall(
+        r"(?<!\d)(1[5-9]\d0|20\d0)['\u2019]?s\s*[-\u2013/]\s*(\d0)['\u2019]?s\b", text
+    ):
+        years.append(_decade_end(_two_digit_end(start, end)))
+    # A range written 1925-35 ends in 1935; museum records write the dash as a hyphen or an en
+    # dash, and some write a range as 1929/30.
+    for start, end in re.findall(r"(?<!\d)(1[5-9]\d\d|20\d\d)\s*[-\u2013/]\s*(\d\d)(?!\d)", text):
+        years.append(_two_digit_end(start, end))
     # A century ends with its last year: the 19th century with 1900.
     for number in re.findall(r"(?<!\d)(1[5-9]|20)(?:st|nd|rd|th)\s+century", text, re.IGNORECASE):
         years.append(int(number) * 100)
@@ -392,9 +411,9 @@ def parse_finished_size(text: str) -> tuple[float, float] | None:
 
     Inches win over centimetres. An unlabeled pair reads height x width, the
     museum convention for flat textiles; H., W. and L. labels win over order,
-    and L. (length) reads as the height, because a museum that gives L x W for
-    a flat textile measures its long side down. The result is approximate: a
-    museum measures the object, not the pattern."""
+    one label alone included, and L. (length) reads as the height, because a
+    museum that gives L x W for a flat textile measures its long side down. The
+    result is approximate: a museum measures the object, not the pattern."""
     normalized = _FEET.sub(_feet_to_inches, text.replace("\u00d7", "x").replace("\u00a0", " "))
     pairs = list(_PAIR.finditer(normalized))
     chosen = next((m for m in pairs if not m["unit"].lower().startswith("cm")), None)
@@ -404,7 +423,9 @@ def parse_finished_size(text: str) -> tuple[float, float] | None:
     scale = 1 / 2.54 if chosen["unit"].lower().startswith("cm") else 1.0
     a, b = (round(_number(chosen[k]) * scale, 2) for k in ("a", "b"))
     labels = tuple((chosen[k] or "").upper().replace("L", "H") for k in ("l1", "l2"))
-    if labels == ("W", "H"):
+    # A width first, or a height second, puts the width first whether or not the other number
+    # carries a label.
+    if labels in {("W", "H"), ("W", ""), ("", "H")}:
         return (a, b)
     return (b, a)
 
@@ -715,11 +736,15 @@ def download(client: Client, cache: Path, sources: list[str]) -> dict:
 def build_rows(cache: Path, screen_csv: Path, committed: dict[str, tuple[str, str]]) -> list[dict]:
     """Manifest rows for every screened candidate that still clears.
 
-    screen_csv columns: stem, tier, class, commit_ok. committed maps a cache file to the
-    committed copy's corpus-relative path and its own sha256."""
+    screen_csv columns: stem, tier, class, commit_ok, and optionally eval_set. Without an
+    eval_set column each row's eval_set is None, which merge_rows reads as "keep the old
+    row's", so a re-screen never drops a photo from the eval set unasked. committed maps a
+    cache file to the committed copy's corpus-relative path and its own sha256."""
     by_stem = {Path(c.cache_file).stem: c for c in load_candidates(cache) if c.sha256}
     with screen_csv.open(encoding="utf-8", newline="") as handle:
-        decisions = list(csv.DictReader(handle))
+        reader = csv.DictReader(handle)
+        decisions = list(reader)
+        has_eval_set = "eval_set" in (reader.fieldnames or [])
     missing = [d["stem"] for d in decisions if d["stem"] not in by_stem]
     if missing:
         # A decision for a photo that is not fetched (or no longer clears) is a screening error,
@@ -741,7 +766,7 @@ def build_rows(cache: Path, screen_csv: Path, committed: dict[str, tuple[str, st
             "sha256": c.sha256, "file_sha256": file_sha, "px_w": str(c.px_w),
             "px_h": str(c.px_h), "tier": d["tier"], "class": d["class"],
             "capture": "museum_scan", "commit_ok": d["commit_ok"], "date_end": str(c.date_end),
-            "eval_set": d.get("eval_set", ""),
+            "eval_set": (d["eval_set"] or "") if has_eval_set else None,
         })
     return out
 
@@ -753,9 +778,17 @@ def committed_copies(rows: Iterable[dict[str, str]]) -> dict[str, tuple[str, str
 
 
 def merge_rows(old: Iterable[dict[str, str]], new: Iterable[dict[str, str]]) -> list[dict]:
-    """old with each photo that new screens replaced by its new row, and new photos added."""
+    """old with each photo that new screens replaced by its new row, and new photos added.
+
+    A new row whose eval_set is None (or absent) keeps the old row's eval_set, and a new photo
+    gets "", because a screen that says nothing about the eval set must not change it."""
     merged = {(r["source"], r["object_id"]): r for r in old}
-    merged.update({(r["source"], r["object_id"]): r for r in new})
+    for row in new:
+        key = (row["source"], row["object_id"])
+        if row.get("eval_set") is None:
+            previous = merged.get(key) or {}
+            row = row | {"eval_set": previous.get("eval_set") or ""}
+        merged[key] = row
     return list(merged.values())
 
 
@@ -771,20 +804,27 @@ def verify(cache: Path, rows: list[dict[str, str]]) -> list[str]:
     return problems
 
 
-def live_flag(source: str, record: dict) -> str:
+def live_flag(source: str, record: dict, image_url: str | None = None) -> str:
     """The record's own rights value, written as a manifest rights_flag, whether or not it clears.
 
     A flag that clears renders exactly as SOURCES gives it, so a row whose flag still holds
-    compares equal; anything else renders what the record says, so a change names itself."""
+    compares equal; anything else renders what the record says, so a change names itself.
+    image_url is the row's image; a Smithsonian record reads the access of the medium that
+    serves it, because a record can hold a CC0 medium beside the restricted one the row uses."""
     if source in ("met", "aic"):
         key = "isPublicDomain" if source == "met" else "is_public_domain"
         return f"{key}={json.dumps(record[key]) if key in record else 'missing'}"
     if source == "smithsonian":
-        # As si_candidate clears a record on any CC0 image medium, any CC0 medium reads CC0;
-        # otherwise the first medium's value shows what the record says now.
-        accesses = [(m.get("usage") or {}).get("access") for m in _si_media(record)
-                    if m.get("type") == "Images"]
-        access = "CC0" if "CC0" in accesses else (accesses[0] if accesses else None)
+        images = [m for m in _si_media(record) if m.get("type") == "Images"]
+        own = [m for m in images if image_url is not None and (
+            m.get("content") == image_url
+            or any(r.get("url") == image_url for r in m.get("resources") or []))]
+        accesses = [(m.get("usage") or {}).get("access") for m in own or images]
+        # With no medium serving the row's image, as si_candidate clears a record on any CC0
+        # image medium, any CC0 medium reads CC0; otherwise the first medium's value shows what
+        # the record says now.
+        access = accesses[0] if own else (
+            "CC0" if "CC0" in accesses else (accesses[0] if accesses else None))
         return f"media.usage.access={access if access is not None else 'missing'}"
     if source == "lacma":
         flags = _PUBLIC_DOMAIN.findall(record["html"])
@@ -811,13 +851,15 @@ def _live_flags(
     A row in neither map has no live record."""
     flags: dict[tuple[str, str], str] = {}
     errors: dict[tuple[str, str], str] = {}
+    image_urls = {(r["source"], r["object_id"]): r.get("image_url") or None for r in rows}
 
     def read(source: str, wanted: list[str], fetch: Callable[[], list[dict]]) -> None:
         # The flag is rendered inside the guard too, so a record of an unexpected shape is that
         # row's problem rather than a traceback that hides every other row's result.
         try:
             by_id = {_record_id(source, record): record for record in fetch()}
-            found = {oid: live_flag(source, by_id[oid]) for oid in wanted if oid in by_id}
+            found = {oid: live_flag(source, by_id[oid], image_urls[(source, oid)])
+                     for oid in wanted if oid in by_id}
         except Exception as err:  # noqa: BLE001 - one unreadable record must not hide the rest
             reason = f"{type(err).__name__}: {err}"
             errors.update({(source, object_id): reason for object_id in wanted})
@@ -861,9 +903,10 @@ def recheck(client: Client, rows: list[dict[str, str]], cache: Path) -> list[str
     """Re-read each row's rights value from its live record and every policy page the rows
     cite; any change is a problem.
 
-    A row passes when its live record renders, through live_flag, to the row's own rights_flag
-    and its license is the one its source sets. A record that cannot be fetched, or is missing,
-    is a problem. A policy page passes only on HTTP 200 at the URL the row cites: any error
+    A row passes when its live record renders, through live_flag with the row's image_url, to
+    the row's own rights_flag, and its license, rights_flag and policy_url are the ones its
+    source sets in SOURCES. A record that cannot be fetched, or is missing, is a problem. A
+    policy page passes only on HTTP 200 at the URL the row cites: any error
     status (403 and 429 included), any redirect and any unreachable page is a problem. The
     recheck fails closed, with nothing left to a human check, because a policy page that blocks
     scripted reads is one whose terms the recheck cannot confirm."""
@@ -875,9 +918,12 @@ def recheck(client: Client, rows: list[dict[str, str]], cache: Path) -> list[str
         if source is None:
             problems.append(f"{file}: unknown source {row['source']!r}")
             continue
-        if row["license"] != source.license:
-            problems.append(f"{file}: license {row['license']} is not {source.license}, "
-                            f"the license {source.name} sets")
+        for column, expected in (("license", source.license),
+                                 ("rights_flag", source.rights_flag),
+                                 ("policy_url", source.policy_url)):
+            if row[column] != expected:
+                problems.append(f"{file}: {column} {row[column]} is not {expected}, "
+                                f"the {column} {source.name} sets")
         if key in errors:
             problems.append(f"{file}: live record unreadable ({errors[key]})")
         elif key not in flags:

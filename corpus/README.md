@@ -118,7 +118,8 @@ results. Screened from the image: 279 photos, Met 116, Smithsonian 138 and LACMA
 In scope (tiers A and B): 44 of 279, 15.8 percent. The setup screen expected about 15 tier A
 photos across all four sources; with the AIC images blocked, v0 finds 13. The Smithsonian Double
 Irish Chain 2013.67.2 (`smithsonian-saam-2013-67-2`) is an on-point refusal. The NMAH slide
-scans, color slides photographed on a blue board inside a black film surround, are
+scans, color slides inside a black film surround (on a blue board, except 556592 on black
+with a ruler), are
 `smithsonian-nmah-556281` to `556284`, `556288` and `556592`; the three in-scope ones (556283,
 556284 and 556288) are tier B, and neither proposal pass found an accession label inside them
 to mask. The masks in v0 cover the labels, captions, rulers and color bars that the passes found
@@ -201,7 +202,7 @@ with a provenance code:
 
 | Code | Meaning | Gate truth |
 |---|---|---|
-| proposed-a, proposed-b | Two independent agent proposals, made in passes that never saw each other or any QREP output | Never |
+| proposed-a, proposed-b | Two independent proposals (proposer A, proposer B), made in passes that never saw each other or any QREP output | Never |
 | verified-jake | Jake confirmed it on the dev annotate page | Yes: corners, bands and counts |
 | adjudicated | Jake decided a disputed square on zoom tiles | Yes, with hand-authored, for squares |
 | hand-authored | A drafted gold layout (D3b) | Yes, with adjudicated |
@@ -234,10 +235,12 @@ The proposals come from two rounds. Round 1 (2026-10-10) classified 38 refusals 
 claims. Round 2 (2026-10-11) framed and counted all 13 tier A photos, the five LACMA ones again
 with a brief that counts sashing and cornerstones on the grid as part of the field, and
 classified 96 photos: 93 refusals and the three slide scans. In round 2 a helper script that
-both passes kept in one shared scratch folder was overwritten, so pass A's answers for 38 photos
-were written into pass B's folder for a few minutes before pass B wrote its own. Those 38 pass B
-files were set aside, and a fresh pass B, which never saw them, classified the 38 photos again;
-those are the proposed-b claims.
+both classifying agents kept in one shared scratch folder was overwritten, so pass A's answers
+for 38 photos were written into pass B's folder for a few minutes before pass B wrote its own.
+Those 38 pass B files were set aside, and a fresh pass B, which never saw them, classified the
+38 photos again; those are the proposed-b claims. The tier A frames and counts came from four
+other agents, two per pass, each writing only its own pass's folder; none of their files is
+identical to the other pass's, so their agreement on counts is the passes' own.
 
 The 13 tier A photos agree on counts in both passes, and their outer corners lie within 0.25
 percent of the image diagonal of each other. Points for D3b:
@@ -251,6 +254,11 @@ percent of the image diagonal of each other. Points for D3b:
 - smithsonian-saam-2016-57-2 has a sawtooth row inside its border: pass A records it as a 0.9
   square band (three bands), pass B folds it into a 3.0 square band (two bands). A pieced row
   may also put the quilt out of tier A.
+- Band widths differ by up to 0.1 square on six photos (proposed-a against proposed-b):
+  lacma-54871 2.2/2.15 and 0.7/0.65, lacma-54904 0.5/0.4 and 4.7/4.8, lacma-63229 2.9/2.85,
+  smithsonian-chndm-1973-45-1 0.25/0.3, 1.3/1.35 and 1.5/1.45, smithsonian-saam-1998-149-21
+  1.4/1.5, and smithsonian-saam-2017-24-27 1.05/1.1; at a 4 inch square, 0.1 square is 0.4 inch,
+  beyond G1's quarter inch, so D3b verifies each.
 - Fabric counts differ on four photos: smithsonian-nmah-556322 (9 against 10),
   smithsonian-saam-2013-67-9 (8 against 7), smithsonian-saam-2016-57-2 (2 against 3) and
   smithsonian-saam-2017-24-27 (4 against 3).
