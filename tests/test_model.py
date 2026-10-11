@@ -584,9 +584,12 @@ def test_every_cv_unit_value_finds_its_confidence():
     for path in UNIT_VALUES:
         for carrier in _carriers(FIELD_SOURCES[path]):
             assert CARRIER_ON_MODEL[carrier](quilt) is not None, path
-    # Two geese, one of every other kind, all at the read's 0.625.
-    assert CARRIER_ON_MODEL["unit:goose"](quilt) == [0.625, 0.625]
-    assert CARRIER_ON_MODEL["unit:corner"](quilt) == [0.625]
+    # Two geese and one of every other kind, each at the read's 0.625, not
+    # the 1.0 of a hand-authored map.
+    counts = {"plain": 1, "hst": 1, "qst": 1, "corner": 1, "goose": 2}
+    assert {kind: CARRIER_ON_MODEL[f"unit:{kind}"](quilt) for kind in UNIT_KINDS} == {
+        kind: [0.625] * n for kind, n in counts.items()
+    }
     # The read without a map stores none of them.
     assert all(CARRIER_ON_MODEL[f"unit:{kind}"](read_shaped_quilt()) is None for kind in UNIT_KINDS)
 

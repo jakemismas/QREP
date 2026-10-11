@@ -333,6 +333,15 @@ class Quilt(BaseModel):
             self.schema_version = UNIT_MAP_SCHEMA_VERSION
         return self
 
+    @model_serializer(mode="wrap")
+    def _write_unit_map_version(self, handler):
+        # model_copy and assignment skip the validator above, so the writer
+        # applies the same rule and a file with a map never says "1".
+        data = handler(self)
+        if self.center.unit_map is not None and data.get("schema_version") in ("1", "1.0"):
+            data["schema_version"] = UNIT_MAP_SCHEMA_VERSION
+        return data
+
     @model_validator(mode="after")
     def _binding_strip_fits_the_fabric(self) -> "Quilt":
         # Each diagonal join uses one strip width (MATH.md F7), so a strip at
