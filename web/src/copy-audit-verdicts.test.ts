@@ -107,7 +107,7 @@ describe("verdict/pill consistency invariants", () => {
 
 describe("S8 entry copy present verbatim", () => {
   it("dropzone sub-copy", () => {
-    const source = readFileSync(path.join(srcRoot, "shell", "PhotoFlow.tsx"), "utf8");
+    const source = readFileSync(path.join(srcRoot, "shell", "photo", "DropzoneScreen.tsx"), "utf8");
     expect(source).toContain("photo, a screenshot, or a shop listing picture all work");
   });
   it("start-screen lede honest size line", () => {
