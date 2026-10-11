@@ -29,17 +29,21 @@ the text runs into lines itself, because pypdf's plain extraction puts each tabl
 line of its own. The phrases it parses, all taken from PATTERN-SPEC and MATH.md (shown
 normalized):
 
-- Cover: the pattern name is the topmost line at the largest size, with the lines right
-  below it at that size when it wraps.
+- Cover: the pattern name is the topmost line at the largest size; a line right below it
+  at that size joins it while the joined name still appears in a footer.
 - Section headings: a line that is exactly the PS-02 heading, optionally "(continued)".
-- Footer: the line with "page N of M", the pattern name and "QREP x.y.z", plus anything at
-  or below its baseline.
+- Footer: the line with "page N of M", the pattern name and "QREP x.y.z", anything at or
+  below its baseline, and a line up to 24 pt above it that holds only the name or version.
+- Figure labels: text inside a figure's patches, or within 18 pt of them when it is
+  smaller than 10 pt or reads as a label (a dimension, number or letter; never a sentence,
+  step, heading, piece line or make count).
 - Subheadings: "HST unit 1", "QST unit 1", "Snowball unit 1", "Flying geese unit 1",
   "Unit 1", "Strip set 1" (Making the units) and "Block 1" (Making the blocks).
-- Logical lines (Cutting, units, blocks): a line that wraps runs on into the next one
-  unless it ends in ".", ":" or a "Fig. N" citation, is a heading, subheading, fabric
-  heading or piece line, or the next line starts a step, subheading, subcut, strip cut,
-  "Make N", "Trim to" or "Fig. N".
+- Logical lines (Cutting, units, blocks): a step or subcut that wraps runs on into the next
+  line until it ends in ".", ":" or a "Fig. N" citation, or the next line starts a step,
+  subheading, subcut, fabric heading, "Make N", "Trim to" or "Fig. N" (in Cutting, also a
+  strip cut); a break between "Fig." and its number always runs on. Other lines stand
+  alone.
 - Steps: lines that start "N. "; a step runs on until the next structural line.
 - Cutting: a fabric heading is a letter and name with a swatch to its left; a strip group
   reads "Cut (N) W x WOF strips.", "Set aside (N) W x WOF strips (A1) for strip set 1."
@@ -137,16 +141,18 @@ MIRROR_RE = re.compile(r"mirror image of (?:(HST|QST|Snowball|Flying geese) )?un
 DATE_RES = (re.compile(r"\b\d{4}-\d{2}-\d{2}\b"), re.compile(r"\b\d{1,2}/\d{1,2}/\d{2,4}\b"),
             re.compile(r"\b(?:January|February|March|April|May|June|July|August|September|"
                        r"October|November|December) \d{1,2}(?:, \d{4})?\b"))
-# Bare "alternate" stays out: "alternate rows" describes a layout, not a second method.
-ALTERNATE_RE = re.compile(r"\balternative(?:ly)?\b|\balternate (?:method|way|technique)\b|"
-                          r"\bor you can\b|\boptionally\b|\banother (?:method|way|technique)\b",
-                          re.IGNORECASE)
+# "Alternate rows" and the like describe a layout, not a second method.
+ALTERNATE_RE = re.compile(r"\balternat(?:e|ive|ively)\b(?! (?:rows?|columns?|blocks?|sides?|"
+                          r"directions?)\b)|\bor you can\b|\boptionally\b|"
+                          r"\banother (?:method|way|technique)\b", re.IGNORECASE)
 # A figure's dimension labels sit just outside its patches, and only labels are this small:
 # body text is at least 10 pt (L-10), so it never counts as a label.
 FIGURE_MARGIN = 18
 FIGURE_LABEL_MAX = 10
-# The footer is the "page N of M" line and anything at or below its baseline.
+# The footer is the "page N of M" line and anything at or below its baseline, plus a line
+# up to 24 pt above it that holds nothing but the name or the version (G-02).
 FOOTER_TOLERANCE = 2
+FOOTER_ZONE = 24
 
 
 # ---------------------------------------------------------------- numbers and text
@@ -407,11 +413,23 @@ def _figure_regions(page: Page, palette: list) -> list:
     return [tuple(c) for c in clusters if c[2] - c[0] > 24 and c[3] - c[1] > 24]
 
 
-def _in_region(run: Run, regions) -> bool:
-    """Inside a figure, or a label smaller than body text within 18 pt of one."""
-    pad = FIGURE_MARGIN if run.size < FIGURE_LABEL_MAX else 0
+def _in_region(run: Run, regions, pad=None) -> bool:
+    """Inside a figure, or text smaller than body text within 18 pt of one."""
+    if pad is None:
+        pad = FIGURE_MARGIN if run.size < FIGURE_LABEL_MAX else 0
     return any(r[0] - pad <= run.x <= r[2] + pad and r[1] - pad <= run.y <= r[3] + pad
                for r in regions)
+
+
+def _label_like(line: Line) -> bool:
+    """A dimension, row number or letter set beside a figure, at any size. A sentence, a
+    step, a heading, a piece line or a make count stays body text."""
+    text = line.text
+    if re.search(r"[.!?:]$", text) or text.startswith("Make ") or STEP_RE.match(text) \
+            or _heading(text) or UNIT_HEAD_RE.match(text) or BLOCK_HEAD_RE.match(text) \
+            or (FABRIC_HEAD_RE.match(text) and line.swatch is not None) or _piece_line(text):
+        return False
+    return len(re.findall(r"[A-Za-z]{2,}", text)) <= 1
 
 
 def _build_lines(page: Page) -> None:
@@ -431,13 +449,15 @@ def _build_lines(page: Page) -> None:
                 raw += " "
             raw += run.text
         line = Line(page.number, group[0].y, group, raw, normalize(raw))
-        line.figure = all(_in_region(r, page.regions) for r in group)
         first = group[0]
         for s in page.shapes:
             if s.fill is not None and not s.image and s.w <= 24 and s.h <= 24 and \
                     s.x1 <= first.x + 1 and s.x0 >= first.x - 48 and \
                     s.y0 <= first.y + first.size and s.y1 >= first.y - 0.5 * first.size:
                 line.swatch = s.fill
+        line.figure = all(_in_region(r, page.regions) for r in group) or (
+            all(_in_region(r, page.regions, FIGURE_MARGIN) for r in group)
+            and _label_like(line))
         page.lines.append(line)
 
 
@@ -471,6 +491,7 @@ def _heading(text: str) -> str | None:
 def build_doc(pages: list, model: dict) -> Doc:
     palette = [_rgb(f["color"]) for f in model["palette"]["fabrics"]]
     lines = []
+    zone = []
     for page in pages:
         page.regions = _figure_regions(page, palette)
         _build_lines(page)
@@ -478,7 +499,16 @@ def build_doc(pages: list, model: dict) -> Doc:
         for ln in page.lines:
             if footer_y is not None and ln.y <= footer_y + FOOTER_TOLERANCE:
                 ln.section = "footer"
+            elif footer_y is not None and ln.y <= footer_y + FOOTER_ZONE:
+                zone.append(ln)
         lines += page.lines
+    footer_text = " | ".join(ln.text for ln in lines if ln.section == "footer") + " | " + \
+        " | ".join(ln.text for ln in zone)
+    name = _cover_name([ln for ln in lines if ln.page == 1 and ln.section != "footer"],
+                       footer_text)
+    for ln in zone:
+        if _footer_only(ln.text, name):
+            ln.section = "footer"
     current = "cover"
     for ln in lines:
         if ln.section == "footer":
@@ -487,20 +517,26 @@ def build_doc(pages: list, model: dict) -> Doc:
         if h and ln.page > 1:
             current = h
         ln.section = current if ln.page > 1 else "cover"
-    cover = [ln for ln in lines if ln.page == 1 and ln.section == "cover"]
-    return Doc(pages, lines, _cover_name(cover), model)
+    return Doc(pages, lines, name, model)
 
 
-def _cover_name(cover: list) -> str:
-    """The topmost cover line at the largest size, joined with the lines right below it at
-    that size, so a name that wraps reads whole."""
+def _footer_only(text: str, name: str) -> bool:
+    """A line that holds nothing but footer items: the name, page N of M, the version."""
+    rest = VERSION_RE.sub(" ", FOOTER_RE.sub(" ", text.replace(name, " ") if name else text))
+    return not re.search(r"[A-Za-z0-9]", rest)
+
+
+def _cover_name(cover: list, footer_text: str) -> str:
+    """The topmost cover line at the largest size. A line right below it at that size joins
+    it only while the joined name still appears in a footer, so a name that wraps reads
+    whole and a same-size subtitle stays out."""
     sizes = [max(r.size for r in ln.runs) for ln in cover]
     if not sizes:
         return ""
     first = next(i for i, s in enumerate(sizes) if s >= max(sizes) - 0.5)
-    parts = []
-    for ln, size in zip(cover[first:], sizes[first:]):
-        if size < max(sizes) - 0.5:
+    parts = [cover[first].text]
+    for ln, size in zip(cover[first + 1:], sizes[first + 1:]):
+        if size < max(sizes) - 0.5 or " ".join(parts + [ln.text]) not in footer_text:
             break
         parts.append(ln.text)
     return " ".join(parts)
@@ -651,31 +687,33 @@ def _piece_line(text: str) -> bool:
     return bool(PIECE_RE.match(text)) and not SUBCUT_START_RE.match(text)
 
 
-def _ends(ln: Line) -> bool:
-    """Nothing on the next line continues this one."""
+def _runs_on(prev: Line, ln: Line, cutting: bool) -> bool:
+    """Whether ln continues prev. Only a step or a subcut runs on, and only until it ends
+    (".", ":", "!", "?" or a "Fig. N" citation) or ln starts a step, subheading, subcut,
+    fabric heading, count or citation of its own; in Cutting, a strip cut starts one too. A
+    line broken between "Fig." and its number always runs on."""
+    if not (STEP_RE.match(prev.text) or SUBCUT_START_RE.match(prev.text)):
+        return False
+    if re.search(r"\bFig\.$", prev.text):
+        return True
+    if re.search(r"[.:!?]$|\bFig\. \d+$", prev.text):
+        return False
     text = ln.text
-    return bool(re.search(r"[.:!?]$|\bFig\. \d+$", text) or _heading(text)
-                or UNIT_HEAD_RE.match(text) or BLOCK_HEAD_RE.match(text)
-                or (FABRIC_HEAD_RE.match(text) and ln.swatch is not None) or _piece_line(text))
-
-
-def _starts(ln: Line) -> bool:
-    """This line opens a step, subheading, cut, count or figure citation of its own."""
-    text = ln.text
-    return bool(STEP_RE.match(text) or _heading(text) or UNIT_HEAD_RE.match(text)
+    return not (STEP_RE.match(text) or _heading(text) or UNIT_HEAD_RE.match(text)
                 or BLOCK_HEAD_RE.match(text) or SUBCUT_START_RE.match(text)
-                or (FABRIC_HEAD_RE.match(text) and ln.swatch is not None) or strip_cut(text)
+                or (FABRIC_HEAD_RE.match(text) and ln.swatch is not None)
+                or (cutting and strip_cut(text))
                 or re.match(r"Make \d+\b|Trim(?: each unit)? to \d|Fig\. \d", text))
 
 
-def logical(lines: list) -> list:
-    """Physical lines joined into the lines a reader sees. A wrapped line runs on until the
-    next one starts something of its own, so a continuation that begins "(4) B4 squares"
-    stays step text and a subcut that wraps before "squares" still reads as one subcut. A
-    piece list line is then only a line that starts after a finished one."""
+def logical(lines: list, cutting: bool = False) -> list:
+    """Physical lines joined into the lines a reader sees: a step or subcut that wraps runs
+    on into the next line (_runs_on), so a continuation that begins "(4) B4 squares" stays
+    step text and a subcut that wraps before "squares" still reads as one subcut. Any other
+    line stands alone, so a caption cannot swallow the piece list below it."""
     out = []
     for ln in lines:
-        if out and not _ends(out[-1]) and not _starts(ln):
+        if out and _runs_on(out[-1], ln, cutting):
             prev = out[-1]
             raw = f"{prev.raw} {ln.raw}"
             out[-1] = Line(prev.page, prev.y, prev.runs + ln.runs, raw, normalize(raw),
@@ -685,14 +723,14 @@ def logical(lines: list) -> list:
     return out
 
 
-def steps(lines: list) -> list:
+def steps(lines: list, cutting: bool = False) -> list:
     """Numbered steps as (number, text), each running on until a structural line."""
     out = []
-    for ln in logical(lines):
+    for ln in logical(lines, cutting):
         m = STEP_RE.match(ln.text)
         if m:
             out.append([int(m.group(1)), m.group(2)])
-        elif _structural(ln.text):
+        elif _structural(ln.text, cutting):
             if out and out[-1] is not None:
                 out.append(None)
         elif out and out[-1] is not None:
@@ -700,11 +738,11 @@ def steps(lines: list) -> list:
     return [tuple(s) for s in out if s]
 
 
-def _structural(text: str) -> bool:
+def _structural(text: str, cutting: bool = False) -> bool:
     return bool(_heading(text) or UNIT_HEAD_RE.match(text) or BLOCK_HEAD_RE.match(text)
                 or SUBCUT_RE.match(text) or PIECE_RE.match(text) or FIG_RE.match(text)
                 or text.startswith("Make ") or CHECKPOINT_RE.search(text)
-                or FABRIC_HEAD_RE.match(text) or strip_cut(text))
+                or FABRIC_HEAD_RE.match(text) or (cutting and strip_cut(text)))
 
 
 def subsections(lines: list, head_re) -> list:
@@ -725,7 +763,7 @@ def cutting_blocks(doc: Doc) -> dict:
     line, such as a binding cut written without a step number."""
     blocks = {}
     current = None
-    for ln in logical(doc.body("Cutting")):
+    for ln in logical(doc.body("Cutting"), cutting=True):
         m = FABRIC_HEAD_RE.match(ln.text)
         if m and ln.swatch is not None:
             current = blocks.setdefault(m.group(1), {"name": m.group(2), "lines": []})
@@ -733,7 +771,7 @@ def cutting_blocks(doc: Doc) -> dict:
         if current is not None:
             current["lines"].append(ln)
     for block in blocks.values():
-        block["steps"] = steps(block["lines"])
+        block["steps"] = steps(block["lines"], cutting=True)
         block["cuts"] = list(block["steps"]) + [
             (None, ln.text) for ln in block["lines"]
             if not STEP_RE.match(ln.text) and strip_cut(ln.text)]
@@ -752,7 +790,7 @@ def cutting_blocks(doc: Doc) -> dict:
                         "eighths": a is not None and (b is not None or not m.group(5)),
                         "shape": m.group(6), "rest": m.group(7), "step": step_no}
                 block["subcuts"].append(last)
-            elif last is not None and not _structural(ln.text):
+            elif last is not None and not _structural(ln.text, cutting=True):
                 # A subcut that wraps keeps its tail: the unit it feeds, the last strip.
                 last["rest"] += " " + ln.text
             else:
@@ -1686,8 +1724,9 @@ def ps28(doc: Doc, opts):
     border_steps = [t for b in cutting_blocks(doc).values() for _, t in b["steps"]
                     if "border" in t]
     problems = []
-    # A piece that fits one strip needs no join (V-BORD-04): "cut (2) pieces L long".
-    length_at = rf"(?:trim(?: each)? to|cut(?: \(\d+\))?(?: pieces?)?) ({NUM})"
+    # A piece that fits one strip needs no join (V-BORD-04): "cut (2) pieces L long", or the
+    # S4 rectangle form "cut (2) W x L rectangles", whose second number is the length.
+    length_at = rf"(?:trim(?: each)? to|cut(?: \(\d+\))?(?: pieces?)?(?: {NUM} x)?) ({NUM})"
     for i, band in enumerate(bands, start=1):
         match = None
         for text in border_steps:

@@ -138,7 +138,7 @@ def _draw_render(c, item, y, label_w='60"', label_h='72"'):
             _fill(c, block_letter(r, k))
             c.rect(x0 + 15 + k * 10, top - 15 - (r + 1) * 10, 10, 10, fill=1, stroke=0)
     c.setFillColorRGB(0, 0, 0)
-    c.setFont("Helvetica", 7)
+    c.setFont("Helvetica", item[3] if len(item) > 3 else 7)
     c.drawCentredString(x0 + 75, top - 192, item[1] if len(item) > 1 else label_w)
     c.drawString(x0 + 156, top - 90, item[2] if len(item) > 2 else label_h)
     return top - 220
@@ -215,7 +215,7 @@ DRAW = {"p": _draw_p, "row": _draw_row, "fabric": _draw_fabric, "fig": _draw_fig
         "at": _draw_at}
 
 
-def render(pages, path, *, name=NAME, footer_size=10, odd_page=None):
+def render(pages, path, *, name=NAME, footer_size=10, odd_page=None, footer_layout="one line"):
     c = canvas.Canvas(str(path), pagesize=(612, 792), invariant=1)
     for n, items in enumerate(pages, start=1):
         c.setPageSize((612, 790) if n == odd_page else (612, 792))
@@ -224,7 +224,15 @@ def render(pages, path, *, name=NAME, footer_size=10, odd_page=None):
             y = DRAW[item[0]](c, item, y)
         c.setFillColorRGB(0, 0, 0)
         c.setFont("Helvetica", footer_size)
-        c.drawString(54, 30, f"{name}  |  page {n} of {len(pages)}  |  QREP 0.4.0")
+        mark = f"page {n} of {len(pages)}"
+        if footer_layout == "name above":
+            c.drawString(54, 42, name)
+            c.drawString(54, 30, f"{mark}  |  QREP 0.4.0")
+        elif footer_layout == "version above":
+            c.drawString(54, 42, "QREP 0.4.0")
+            c.drawString(54, 30, f"{name}  |  {mark}")
+        else:
+            c.drawString(54, 30, f"{name}  |  {mark}  |  QREP 0.4.0")
         c.showPage()
     c.save()
 
@@ -1035,9 +1043,10 @@ def test_alternate_rows_is_not_an_alternative_method(tmp_path):
                  "pressing the seams of alternate rows in opposite directions")
     got = results(tmp_path, pages)["PS-33"]
     assert got.status == "pass", got.evidence
-    pages = edit(throw_pages(), "Sew the blocks in each row together,",
-                 "Alternatively, sew the blocks in each row together,")
-    assert results(tmp_path, pages)["PS-33"].status == "fail"
+    for offer in ("Alternatively, sew", "For an alternate approach, sew"):
+        pages = edit(throw_pages(), "Sew the blocks in each row together,",
+                     f"{offer} the blocks in each row together,")
+        assert results(tmp_path, pages)["PS-33"].status == "fail", offer
 
 
 def test_ps28_border_pieces_that_fit_one_strip_need_no_join(tmp_path):
@@ -1048,20 +1057,24 @@ def test_ps28_border_pieces_that_fit_one_strip_need_no_join(tmp_path):
     model = sized_model(32, 32)
     model["borders"] = [{"fabric_id": "c", "width": 8}]
 
-    def pages(top):
+    def pages(side, top):
         return [[P("Tiny Border", size=24)],
                 [P("Cutting", size=14), ("fabric", "A", "Background"),
-                 P(f'1. Cut (2) 1 1/2" x WOF strips. For the side borders, cut (2) pieces 4 1/2" '
-                   f'long from one strip. For the top and bottom borders, cut (2) pieces {top} '
-                   f'long from the other strip.')],
+                 P(f'1. Cut (2) 1 1/2" x WOF strips. For the side borders, cut (2) {side} from '
+                   f'one strip. For the top and bottom borders, cut (2) {top} from the other '
+                   f'strip.')],
                 [P("Borders", size=14),
                  P("1. Measure the quilt through its center and trim the borders to match if "
                    "needed. Sew the side borders first, then the top and bottom borders. Press "
                    "toward the border.")]]
 
-    got = results(tmp_path, pages('6 1/2"'), model, only=("PS-28",))["PS-28"]
-    assert got.status == "pass", got.evidence
-    got = results(tmp_path, pages('6"'), model, only=("PS-28",))["PS-28"]
+    # Both the "pieces L long" and the S4 "W x L rectangles" wordings name the length.
+    for side, top in (('pieces 4 1/2" long', 'pieces 6 1/2" long'),
+                      ('1 1/2" x 4 1/2" rectangles', '1 1/2" x 6 1/2" rectangles')):
+        got = results(tmp_path, pages(side, top), model, only=("PS-28",))["PS-28"]
+        assert got.status == "pass", (side, got.evidence)
+    got = results(tmp_path, pages('pieces 4 1/2" long', 'pieces 6" long'), model,
+                  only=("PS-28",))["PS-28"]
     assert got.status == "fail", got.evidence
 
 
@@ -1074,3 +1087,64 @@ def test_a_long_name_that_wraps_on_the_cover_passes(tmp_path):
     pages = _replace_item(throw_pages(), 0, 0, P(name, size=24))
     got = results(tmp_path, pages, model, render_kw={"name": name})
     assert {k: r.evidence for k, r in got.items() if r.status == "fail"} == {}
+
+
+def test_a_same_size_line_under_the_name_is_not_part_of_it(tmp_path):
+    # The finished size set at the name's 24 pt: the footer never prints it after the name.
+    pages = _replace_item(throw_pages(), 0, 1, P('Finished size 60" x 72"', size=24))
+    got = results(tmp_path, pages)
+    assert {k: r.evidence for k, r in got.items() if r.status == "fail"} == {}
+
+
+def test_a_caption_line_before_a_piece_list_keeps_the_list(tmp_path):
+    # Only a step or a subcut runs on into the next line, so an unpunctuated caption above
+    # Block 2's piece list leaves "A3 (1)" a piece line.
+    pages = copy.deepcopy(throw_pages())
+    assert pages[5][8] == P("A3 (1)")
+    pages[5].insert(8, P("Pieces for one block"))
+    got = results(tmp_path, pages)
+    assert {k: r.evidence for k, r in got.items() if r.status == "fail"} == {}
+
+
+@pytest.mark.parametrize("layout", ["name above", "version above"])
+def test_a_footer_on_two_lines_passes(tmp_path, layout):
+    # G-02 asks for the name, "page N of M" and a version line; one sits 12 pt above.
+    got = results(tmp_path, throw_pages(), render_kw={"footer_layout": layout})
+    assert {k: r.evidence for k, r in got.items() if r.status == "fail"} == {}
+
+
+def test_render_labels_at_body_size_are_still_figure_labels(tmp_path):
+    # 12 pt dimension labels just outside the render: 60 in matches the text, 62 in does not.
+    pages = _replace_item(throw_pages(), 0, 6, ("render", '60"', '72"', 12))
+    got = results(tmp_path, pages)
+    assert {k: r.evidence for k, r in got.items() if r.status == "fail"} == {}
+    pages = _replace_item(throw_pages(), 0, 6, ("render", '62"', '72"', 12))
+    assert results(tmp_path, pages)["PS-43"].status == "fail"
+
+
+def test_a_binding_step_that_wraps_before_its_strip_count_stays_one_step(tmp_path):
+    # Outside Cutting, "(8) 2 1/2 x WOF strips for binding" starts no cut of its own.
+    pages = _split_item(throw_pages(), 8,
+                        "4. Join the (8) binding strips with diagonal seams and press them open. "
+                        'Press the long strip in half lengthwise. Sew it to the front, stop 1/4" '
+                        "from each corner and fold to miter. Join the two ends, turn the binding "
+                        "to the back and stitch it by hand. Fig. 8",
+                        "4. Join the",
+                        '(8) 2 1/2" x WOF strips for binding with diagonal seams and press them '
+                        'open. Press the long strip in half lengthwise. Sew it to the front, stop '
+                        '1/4" from each corner and fold to miter. Join the two ends, turn the '
+                        "binding to the back and stitch it by hand. Fig. 8")
+    got = results(tmp_path, pages)
+    assert {k: r.evidence for k, r in got.items() if r.status == "fail"} == {}
+
+
+def test_a_step_that_wraps_after_fig_keeps_its_citation(tmp_path):
+    # The line breaks between "Fig." and its number, so the next line opens "1. Draw".
+    pages = _split_item(units_pages(), 3,
+                        "1. Pair an A1 and a B1 square RST and draw a diagonal line on the back "
+                        "of A1. Fig. 1",
+                        "1. Pair an A1 and a B1 square RST as shown in Fig.",
+                        "1. Draw a diagonal line on the back of A1.")
+    got = results(tmp_path, pages, only=UNIT_CHECKS)
+    assert {k: r.status for k, r in got.items()} == {k: "pass" for k in UNIT_CHECKS}, \
+        {k: r.evidence for k, r in got.items()}
