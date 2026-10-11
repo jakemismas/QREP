@@ -304,3 +304,31 @@ def test_to_lab_follows_the_formulas():
         lab[0], [gray(0), gray(32), gray(128), gray(255), RED, GREEN, BLUE], strict=True
     ):
         assert_lab(got, want, tol=0.001)
+
+
+def test_each_square_of_a_perspective_grid_samples_its_own_fill():
+    # The 4 x 3 fills drawn through the hand-built homography of
+    # test_read_geometry.py: x = 8 + 240u / (4 + u), y = 8 + 160v / (4 + u)
+    # for u in 0..4, v in 0..3, corners (8, 8), (128, 8), (128, 68), (8, 128).
+    # The smallest squares, in the right column, run x 8 + 720/7 = 110.86 to
+    # 128 (17.14 px) and are 160/8 = 20 to 160/7 = 22.86 px tall, so the 0.2
+    # inset keeps each sample at least 3.4 px inside the drawn edges, which
+    # fillConvexPoly places within 1 px: every square reads its own fill.
+    import cv2
+
+    def point(u, v):
+        return (8 + 240 * u / (4 + u), 8 + 160 * v / (4 + u))
+
+    image = np.full((140, 140, 3), (40, 200, 120), dtype=np.uint8)
+    for r, row in enumerate(FILLS):
+        for c, fill in enumerate(row):
+            quad = [point(c, r), point(c + 1, r), point(c + 1, r + 1), point(c, r + 1)]
+            # 4 fractional bits keep the drawn corners within 1/16 px.
+            cv2.fillConvexPoly(
+                image, np.round(np.array(quad) * 16).astype(np.int32), bgr(fill), shift=4
+            )
+    frame = FieldFrame(kind="field", corners=corners((8, 8), (128, 8), (128, 68), (8, 128)))
+    result = sample(image, frame, counts(4, 3))
+    for r, row in enumerate(FILLS):
+        for c, fill in enumerate(row):
+            assert_lab(result.lab[r, c], lab_of(fill))
