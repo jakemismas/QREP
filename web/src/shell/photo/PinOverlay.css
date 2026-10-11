@@ -1,0 +1,10 @@
+/* Pin and quad overlay. The 720 px rule sits before the base rule, so the
+   base max-height wins at every width; the order is kept as found (#223). */
+@media (max-width: 720px) { .pf-corner-img { max-height: 48vh; } }
+.pf-corner-stage { display: flex; justify-content: center; }
+.pf-corner-box { position: relative; display: inline-block; background: var(--stage); padding: 14px; border-radius: 8px; touch-action: none; max-width: 100%; }
+.pf-corner-img { display: block; max-width: min(560px, 78vw); max-height: 60vh; width: auto; height: auto; border-radius: 3px; }
+.pf-corner-quad { position: absolute; inset: 14px; width: calc(100% - 28px); height: calc(100% - 28px); pointer-events: none; }
+.pf-corner-quad path { fill: rgba(165,80,47,0.07); stroke: var(--accent); stroke-width: 2; stroke-dasharray: 7 5; vector-effect: non-scaling-stroke; }
+.pf-pin { position: absolute; width: 30px; height: 30px; margin: -15px 0 0 -15px; border-radius: 50%; background: var(--accent); border: 3px solid var(--toggle-knob); box-shadow: 0 3px 8px rgba(0,0,0,0.35); cursor: grab; padding: 0; touch-action: none; }
+.pf-pin:active { cursor: grabbing; }
