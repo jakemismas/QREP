@@ -6,7 +6,9 @@ Usage:
 
 It prints one line per check, "<id> <pass|fail|not run>: <evidence>", then the count of
 figure placeholder frames, and exits 1 when any check fails. run_checks() returns the same
-results to a test.
+results to a test. A names file (--denylist, --reference-names) holds one name per line and
+may start with a UTF-8 byte order mark; one that cannot be read fails PS-08 or PS-39, and an
+empty --references counts as a missing folder.
 
 The checker never imports qrep, so a bug shared with qrep.construct or qrep.export cannot
 pass both. From the model JSON alone it recomputes, in integer eighths, MATH.md F4 (border
@@ -1066,6 +1068,8 @@ def ps07(doc: Doc, opts):
 
 @check("PS-08")
 def ps08(doc: Doc, opts):
+    if opts.get("denylist", ()) is None:
+        return False, "the denylist file could not be read"
     deny = [d.strip() for d in opts.get("denylist") or () if d.strip()]
     problems = []
     for entry in deny:
@@ -2111,11 +2115,14 @@ def ps39(doc: Doc, opts):
     # Counts only: the folder path, the file names and extensions and the matched words are
     # private and stay off every report.
     folder = opts.get("references")
-    if not folder:
+    if folder is None:
         return None, "no local reference directory given (never run in CI)"
-    folder = Path(folder)
-    if not folder.is_dir():
+    # An empty path would resolve to the working folder, so it counts as a missing folder.
+    if not str(folder).strip() or not Path(folder).is_dir():
         return False, "the reference directory does not exist or is not a folder"
+    if opts.get("reference_names", ()) is None:
+        return False, "the reference names file could not be read"
+    folder = Path(folder)
     mine = _words(doc.all_text())
     runs, read, unread, skipped = _reference_folder(folder)
     hits = sum(1 for i in range(len(mine) - 9) if tuple(mine[i:i + 10]) in runs)
@@ -2201,8 +2208,10 @@ def run_checks(pdf_path, model, *, references=None, denylist=(), reference_names
     if not isinstance(model, dict):
         model = json.loads(Path(model).read_text(encoding="utf-8"))
     doc = build_doc(read_pdf(pdf_path), model)
-    opts = {"references": references, "denylist": list(denylist),
-            "reference_names": list(reference_names)}
+    # None stands for a names file that could not be read; PS-08 and PS-39 then fail.
+    opts = {"references": references,
+            "denylist": None if denylist is None else list(denylist),
+            "reference_names": None if reference_names is None else list(reference_names)}
     results = []
     for check_id, fn in CHECKS.items():
         if only and check_id not in only:
@@ -2224,8 +2233,15 @@ def placeholder_frames(pdf_path, model) -> list:
     return [ln.page for ln in doc.lines if re.search(r"\bplaceholder\b", ln.text, re.I)]
 
 
-def _lines_of(path) -> list:
-    return Path(path).read_text(encoding="utf-8").splitlines() if path else []
+def _lines_of(path):
+    """A names file's lines, without the UTF-8 byte order mark PowerShell 5.1 writes, which
+    would hide the first name; None when the file cannot be read, so its check fails closed."""
+    if path is None:
+        return []
+    try:
+        return Path(path).read_text(encoding="utf-8-sig").splitlines()
+    except (OSError, UnicodeDecodeError):
+        return None
 
 
 def main(argv=None) -> int:

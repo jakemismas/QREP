@@ -1794,3 +1794,46 @@ def test_a_body_size_subheading_beside_a_figure_stays_a_subheading(tmp_path):
     got = results(tmp_path, pages, only=checks)
     assert {k: r.status for k, r in got.items()} == {k: "pass" for k in checks}, \
         {k: r.evidence for k, r in got.items()}
+
+
+# ---------------------------------------------------------------- CLI input files
+
+
+def _cli(tmp_path, capsys, *extra):
+    pdf, model = tmp_path / "pattern.pdf", tmp_path / "model.json"
+    render(throw_pages(), pdf)
+    model.write_text(json.dumps(throw_model()), encoding="utf-8")
+    code = pc.main([str(pdf), str(model), *(str(x) for x in extra)])
+    out = capsys.readouterr().out
+    # Every line but the last (the placeholder count) is "<id> <status>: <evidence>".
+    return code, {line.split()[0]: line for line in out.splitlines()[:-1]}, out
+
+
+def test_cli_reads_names_files_saved_with_a_byte_order_mark(tmp_path, capsys):
+    # PowerShell 5.1's "Out-File -Encoding utf8" writes EF BB BF before the first name. The
+    # throw is named Lantern Grid, so that first name must fail PS-39 and PS-08; OTHER shares
+    # no run of 10 words with the pattern, so the name is PS-39's only problem.
+    refs = _refs(tmp_path, {"other.txt": OTHER})
+    names = tmp_path / "names.txt"
+    names.write_bytes(codecs.BOM_UTF8 + b"Lantern Grid\r\nHarbor Lights\r\n")
+    code, lines, _ = _cli(tmp_path, capsys, "--references", refs, "--reference-names", names,
+                          "--denylist", names)
+    assert code == 1
+    assert lines["PS-39"].startswith("PS-39 fail:") and "1 reference names appear" in \
+        lines["PS-39"], lines["PS-39"]
+    assert lines["PS-08"].startswith("PS-08 fail:"), lines["PS-08"]
+
+
+@pytest.mark.parametrize("flag,check", [("--reference-names", "PS-39"), ("--denylist", "PS-08")])
+def test_cli_fails_closed_on_a_missing_names_file(tmp_path, capsys, flag, check):
+    refs = _refs(tmp_path, {"other.txt": OTHER})
+    missing = tmp_path / "private-titles.txt"
+    code, lines, out = _cli(tmp_path, capsys, "--references", refs, flag, missing)
+    assert code == 1 and lines[check].startswith(f"{check} fail:"), lines[check]
+    # Counts only: the file's name and folder stay off the report.
+    assert "private-titles" not in out and str(tmp_path) not in out
+
+
+def test_cli_an_empty_reference_folder_argument_is_a_missing_folder(tmp_path, capsys):
+    code, lines, _ = _cli(tmp_path, capsys, "--references", "")
+    assert code == 1 and lines["PS-39"].startswith("PS-39 fail:"), lines["PS-39"]
