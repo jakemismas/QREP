@@ -11,7 +11,7 @@
  */
 import { useState } from "react";
 import { useProject } from "../state/project";
-import type { ExportKind } from "../state/project";
+import type { ExportKind } from "../state/pattern";
 import type { SeamStrategy } from "../model/seams";
 import { formatEighths } from "../model/units";
 import { useToast } from "../ui";

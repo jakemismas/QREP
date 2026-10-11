@@ -1,0 +1,295 @@
+/*
+ * Pattern state (C1a, issue #146): the seam strategy, the three strategy
+ * plans, the engine exports, copy-my-settings and the round-trip demo. Every
+ * one of them reads the model from model.tsx's plain state.
+ */
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useEngine } from "../engine/useEngine";
+import type { Engine } from "../engine/useEngine";
+import { EngineError } from "../engine/rpc";
+import type { QuiltModel } from "../model/types";
+import type { SeamStrategy } from "../model/seams";
+import { useToast } from "../ui";
+import type { ModelApi } from "./model";
+import { buildSettingsSummary } from "./patternText";
+import type { StrategyPlan } from "./patternText";
+
+/** The three seam/plan strategies, in card order. */
+const STRATEGIES: SeamStrategy[] = ["historical", "strip", "modern"];
+export const DEFAULT_STRATEGY: SeamStrategy = "strip";
+const NO_PLANS: Record<SeamStrategy, StrategyPlan | null> = {
+  historical: null,
+  strip: null,
+  modern: null,
+};
+
+/** A user-initiated engine export (PARITY item 11). */
+export type ExportKind = "cutlist-csv" | "cutlist-md" | "yardage" | "svg" | "pdf";
+
+export interface RoundTripReport {
+  dimsMatch: boolean;
+  cellAccuracy: number;
+}
+
+/** Round-trip demo panel (render -> reverse -> compare) shown in the Pattern tab. */
+export interface RoundTripApi {
+  run: (level: 0 | 2) => Promise<void>;
+  report: RoundTripReport | null;
+}
+
+export interface PatternApi {
+  seamStrategy: SeamStrategy;
+  plans: Record<SeamStrategy, StrategyPlan | null>;
+  setPatternActive: (active: boolean) => void;
+  exportDownload: (kind: ExportKind) => Promise<void>;
+  copySettings: () => Promise<boolean>;
+  roundtrip: RoundTripApi;
+}
+
+/** What the provider that composes this module needs beyond the context value. */
+export interface PatternState {
+  api: PatternApi;
+  setSeamStrategy: (strategy: SeamStrategy) => void;
+  /** A new quilt opened: restore its strategy and drop the old quilt's plans. */
+  resetPlans: (strategy: SeamStrategy) => void;
+  /** Home: the default strategy, no plans, the Pattern tab closed, no round trip. */
+  closePattern: () => void;
+}
+
+export function slugify(name: string): string {
+  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return slug || "quilt";
+}
+
+export function base64ToArrayBuffer(b64: string): ArrayBuffer {
+  const binary = atob(b64);
+  const buffer = new ArrayBuffer(binary.length);
+  const bytes = new Uint8Array(buffer);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return buffer;
+}
+
+/** Save a blob under `filename` via a temporary anchor (same trick as saveToFile). */
+function triggerBlob(data: BlobPart, filename: string, mime: string): void {
+  const blob = new Blob([data], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
+function execCommandCopy(text: string): boolean {
+  try {
+    const area = document.createElement("textarea");
+    area.value = text;
+    area.style.position = "fixed";
+    area.style.opacity = "0";
+    document.body.appendChild(area);
+    area.focus();
+    area.select();
+    const ok = document.execCommand("copy");
+    area.remove();
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
+export const PatternContext = createContext<PatternApi | null>(null);
+
+export function usePatternState({ model, name, summary }: ModelApi): PatternState {
+  const engine = useEngine();
+  // ToastProvider rebuilds its value on every toast; keyed on that object,
+  // the plans effect below would re-run after each toast.
+  const { push } = useToast();
+  const toast = useMemo(() => ({ push }), [push]);
+
+  const engineRef = useRef<Engine>(engine);
+  engineRef.current = engine;
+
+  const [seamStrategy, setSeamStrategy] = useState<SeamStrategy>(DEFAULT_STRATEGY);
+  const [plans, setPlans] = useState<Record<SeamStrategy, StrategyPlan | null>>(NO_PLANS);
+  const [patternActive, setPatternActive] = useState(false);
+  const [roundtripReport, setRoundtripReport] = useState<RoundTripReport | null>(null);
+
+  // ---- plans (explicit, per model revision) ------------------------------
+  //
+  // PARITY item 1: card metrics and yardage are engine-authoritative. When the
+  // Pattern tab is open the three strategies are planned once per model
+  // revision; a plan whose model was superseded by a later edit is dropped.
+  // Every edit produces a new model object, so the object is the revision.
+
+  const plannedRef = useRef<QuiltModel | null>(null);
+
+  useEffect(() => {
+    if (!patternActive || !model) return;
+    if (plannedRef.current === model) return; // already requested for this revision
+    plannedRef.current = model;
+    const json = JSON.stringify(model);
+    for (const strategy of STRATEGIES) {
+      engineRef.current.call<StrategyPlan>("plan", json, strategy).then(
+        (result) => {
+          if (plannedRef.current === model) {
+            setPlans((prev) => ({ ...prev, [strategy]: result }));
+          }
+        },
+        (err: unknown) => {
+          if (plannedRef.current !== model) return;
+          const message =
+            err instanceof EngineError ? err.message : "Couldn’t work out the plan, try again?";
+          toast.push(message, "error");
+        },
+      );
+    }
+  }, [model, patternActive, toast]);
+
+  const resetPlans = useCallback((strategy: SeamStrategy) => {
+    setSeamStrategy(strategy);
+    setPlans(NO_PLANS);
+    plannedRef.current = null;
+  }, []);
+
+  const closePattern = useCallback(() => {
+    resetPlans(DEFAULT_STRATEGY);
+    setPatternActive(false);
+    setRoundtripReport(null);
+  }, [resetPlans]);
+
+  // ---- round-trip demo panel (render -> reverse -> compare) ----------------
+
+  const runRoundtrip = useCallback(
+    async (level: 0 | 2): Promise<void> => {
+      if (!model) return;
+      const json = JSON.stringify(model);
+      try {
+        const rendered = await engineRef.current.call<{ png_b64: string }>(
+          "render",
+          json,
+          level,
+          42,
+          10,
+        );
+        const bytes = new Uint8Array(base64ToArrayBuffer(rendered.png_b64));
+        const recovered = await engineRef.current.call<{ model: QuiltModel }>(
+          "reverse_photo",
+          bytes,
+          "{}",
+        );
+        const report = await engineRef.current.call<{ dims_match: boolean; cell_accuracy: number }>(
+          "compare",
+          json,
+          JSON.stringify(recovered.model),
+        );
+        setRoundtripReport({ dimsMatch: report.dims_match, cellAccuracy: report.cell_accuracy });
+      } catch (err) {
+        const message =
+          err instanceof EngineError ? err.message : "The round trip didn’t finish, try again?";
+        toast.push(message, "error");
+      }
+    },
+    [model, toast],
+  );
+
+  // ---- exports + copy (PARITY items 11/12) --------------------------------
+
+  const exportDownload = useCallback(
+    async (kind: ExportKind): Promise<void> => {
+      if (!model) return;
+      const json = JSON.stringify(model);
+      const strategy = seamStrategy;
+      const slug = slugify(name);
+      try {
+        let data: BlobPart;
+        let filename: string;
+        let mime: string;
+        if (kind === "svg") {
+          const r = await engineRef.current.call<{ text: string }>("export_svg", json);
+          data = r.text;
+          filename = `${slug}-diagram.svg`;
+          mime = "image/svg+xml";
+        } else if (kind === "cutlist-csv") {
+          const r = await engineRef.current.call<{ text: string }>(
+            "export_cutlist_csv",
+            json,
+            strategy,
+          );
+          data = r.text;
+          filename = `${slug}-cut-list.csv`;
+          mime = "text/csv";
+        } else if (kind === "cutlist-md") {
+          const r = await engineRef.current.call<{ text: string }>(
+            "export_cutlist_md",
+            json,
+            strategy,
+          );
+          data = r.text;
+          filename = `${slug}-cut-list.md`;
+          mime = "text/markdown";
+        } else if (kind === "yardage") {
+          const r = await engineRef.current.call<{ text: string }>("export_yardage", json, strategy);
+          data = r.text;
+          filename = `${slug}-yardage.txt`;
+          mime = "text/plain";
+        } else {
+          const r = await engineRef.current.call<{ pdf_b64: string }>("export_pdf", json, strategy);
+          data = base64ToArrayBuffer(r.pdf_b64);
+          filename = `${slug}-booklet.pdf`;
+          mime = "application/pdf";
+        }
+        triggerBlob(data, filename, mime);
+        toast.push("Saved: your pattern file is ready.", "success");
+      } catch (err) {
+        const message =
+          err instanceof EngineError ? err.message : "That export didn’t work, try again?";
+        toast.push(message, "error");
+      }
+    },
+    [model, name, seamStrategy, toast],
+  );
+
+  const copySettings = useCallback(async (): Promise<boolean> => {
+    if (!model) return false;
+    const text = buildSettingsSummary(model, name, summary, plans[seamStrategy]);
+    let ok = false;
+    try {
+      await navigator.clipboard.writeText(text);
+      ok = true;
+    } catch {
+      ok = execCommandCopy(text);
+    }
+    toast.push(
+      ok ? "Copied! Paste it into notes, email, anywhere." : "Could not copy, sorry!",
+      ok ? "success" : "error",
+    );
+    return ok;
+  }, [model, name, summary, plans, seamStrategy, toast]);
+
+  const roundtrip = useMemo<RoundTripApi>(
+    () => ({ run: runRoundtrip, report: roundtripReport }),
+    [runRoundtrip, roundtripReport],
+  );
+
+  const api = useMemo<PatternApi>(
+    () => ({ seamStrategy, plans, setPatternActive, exportDownload, copySettings, roundtrip }),
+    [seamStrategy, plans, exportDownload, copySettings, roundtrip],
+  );
+
+  return useMemo(
+    () => ({ api, setSeamStrategy, resetPlans, closePattern }),
+    [api, resetPlans, closePattern],
+  );
+}
+
+export function usePattern(): PatternApi {
+  const value = useContext(PatternContext);
+  if (value === null) throw new Error("usePattern requires ProjectProvider");
+  return value;
+}
+
+export function useRoundTrip(): RoundTripApi {
+  return usePattern().roundtrip;
+}

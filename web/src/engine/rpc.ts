@@ -85,10 +85,6 @@ export class EngineClient {
     return () => this.visionListeners.delete(listener);
   }
 
-  getVision(): VisionState {
-    return this.vision;
-  }
-
   /** Ask the worker to load the vision wheel now (idle prefetch / retry). */
   prefetchVision(): void {
     this.worker?.postMessage({ type: "load-vision" });
