@@ -1,29 +1,27 @@
 /*
- * Project state (S2 + S3, issues #42 / #43). Wraps an EditorStore for the open
- * model and drives the three commit-time side effects the editing slice needs:
- *   (a) a React snapshot of the mutable model so the canvas and panels redraw,
- *   (b) a debounced autosave of the wrapper doc to localStorage, and
- *   (c) a coalesced bridge re-validation whose summary is the fabric census.
- * Rendering still reads `model` synchronously and never waits on the engine;
- * `summary` fills in once validation lands.
+ * Project state (S2 + S3, issues #42 / #43; split in C1a, issue #146).
+ * ProjectProvider composes three state modules and the editing actions:
+ *   model.tsx   the open model as plain state, its name, the fabric census;
+ *   photo.tsx   the photo flow (staging, analysis, vision, size entry);
+ *   pattern.tsx the seam strategy, plans, exports and the round trip.
+ * This file keeps only the editing actions, which wrap an EditorStore (paint,
+ * fabrics, sizing, undo, the seams tool, open, save, autosave, openInEditor).
+ * After every commit it hands a snapshot of the store's model to model.tsx;
+ * the census and the plans follow from that state, never from the store.
+ * Every context value is memoized, and useProject() keeps the surface the
+ * shell and the editor read.
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useEngine } from "../engine/useEngine";
 import type { Engine } from "../engine/useEngine";
 import { EngineError } from "../engine/rpc";
-import type { VisionState } from "../engine/rpc";
 import { parseProjectFile } from "../model/types";
-import type { QuiltModel, ModelSummary } from "../model/types";
-import { classifyDevice, targetSize } from "../model/downscale";
+import type { QuiltModel } from "../model/types";
 import { effectiveMerges, pieceEstimate } from "../model/seams";
 import type { SeamFix, SeamStrategy } from "../model/seams";
 import { useToast } from "../ui";
-import { SizeEntryState } from "../model/sizeEntry";
 import { paletteGate } from "../model/verdictStory";
-import type { SizeSource, SizeUnit } from "../model/sizeEntry";
-import { PhotoFlowMachine } from "./photoFlow";
-import type { PhotoScreen, QuadSource } from "./photoFlow";
 import {
   COALESCE_WINDOW_MS,
   EditorStore,
@@ -33,156 +31,17 @@ import {
   parseAutosaveDoc,
 } from "./editor";
 import type { CellRef, ProjectUi } from "./editor";
-import { buildSettingsSummary } from "./patternText";
-import type { StrategyPlan } from "./patternText";
+import { DEFAULT_NAME, DEMO_URL, ModelContext, useModelState } from "./model";
+import type { ModelApi } from "./model";
+import { PatternContext, DEFAULT_STRATEGY, slugify, usePatternState } from "./pattern";
+import type { PatternApi, PatternState } from "./pattern";
+import { PhotoContext, usePhotoState } from "./photo";
+import type { PhotoApi, PhotoFlowState, PhotoSurface } from "./photo";
 
-const DEFAULT_NAME = "My quilt project";
-const DEMO_URL = "fixtures/double_irish_chain.json";
 const AUTOSAVE_KEY = "qrep-autosave";
 const AUTOSAVE_DEBOUNCE_MS = 800;
 
 export type EditorMode = "move" | "paint" | "seams";
-
-/** The three seam/plan strategies, in card order. */
-const STRATEGIES: SeamStrategy[] = ["historical", "strip", "modern"];
-const DEFAULT_STRATEGY: SeamStrategy = "strip";
-
-// ---- S6 photo reverse (issue #46) --------------------------------------
-
-/** Engine provenance stage keys -> UI stage keys (PARITY vocabulary). */
-const STAGE_NAME_MAP: Record<string, string> = {
-  rectify: "straighten",
-  palette: "colors",
-  grid: "grid",
-  cells: "squares",
-  repeat: "repeats",
-  border: "borders",
-};
-
-/** PARITY item 6: a square is uncertain below this per-cell confidence. */
-const UNCERTAIN_THRESHOLD = 0.9;
-
-/** detect_quad's bridge result (S2, issue #68). */
-interface DetectQuadResult {
-  quad: [number, number][];
-  tier: number | null;
-  confidence: number;
-  predicted_size: {
-    width_px: number;
-    height_px: number;
-    aspect: number | null;
-    preset: string | null;
-  };
-}
-
-function mapStageConfidence(raw: Record<string, number> | undefined): Record<string, number> {
-  const out: Record<string, number> = {};
-  if (!raw) return out;
-  for (const [key, value] of Object.entries(raw)) out[STAGE_NAME_MAP[key] ?? key] = value;
-  return out;
-}
-
-function countUncertain(confidence: number[][] | null | undefined): number {
-  if (!confidence) return 0;
-  let count = 0;
-  for (const row of confidence) {
-    for (const value of row) if (value < UNCERTAIN_THRESHOLD) count += 1;
-  }
-  return count;
-}
-
-/** Encode a canvas to PNG bytes (worker stages these into MEMFS). */
-function canvasToPngBytes(canvas: HTMLCanvasElement): Promise<Uint8Array> {
-  return new Promise((resolve, reject) => {
-    canvas.toBlob((blob) => {
-      if (!blob) {
-        reject(new Error("could not encode the photo"));
-        return;
-      }
-      blob.arrayBuffer().then((buffer) => resolve(new Uint8Array(buffer)), reject);
-    }, "image/png");
-  });
-}
-
-/** The recovered analysis surfaced to the results screen. */
-export interface PhotoResult {
-  modelJson: string;
-  stageConfidence: Record<string, number>;
-  uncertainCount: number;
-  reverseMs: number;
-  /** S4 (issue #70), additive: the verdict contract. S8 renders these. */
-  verdict?: string;
-  diagnostics?: Record<string, unknown>;
-  /** S6/S7 (issues #72/#73), additive: the size story. */
-  sizeRequested?: { width: number | null; height: number | null } | null;
-  sizeAchieved?: { width: number; height: number } | null;
-}
-
-/** The photo-reverse flow API (owned by the state layer; PhotoFlow consumes it).
- *
- * S2 (issue #68): the flow is idle -> crop -> progress -> results. start()
- * split into stage() (file in, photo shown immediately, detect_quad kicked
- * off) and analyze() (reverse with the user's pins when they moved one).
- * The post-results corners screen is retired; toCrop() re-enters the crop
- * screen seeded with the confirmed quad. */
-export interface PhotoApi {
-  /** True from the dropzone entry until the recovered model opens in the editor. */
-  active: boolean;
-  state: "idle" | "crop" | "progress" | "results";
-  photoUrl: string | null;
-  result: PhotoResult | null;
-  visionState: VisionState;
-  visionBytes: number | null;
-  corners: [number, number][];
-  detectedQuad: [number, number][] | null;
-  detectPending: boolean;
-  quadSource: "default" | "detected" | "user" | "seeded";
-  stage: (file: File) => Promise<void>;
-  analyze: () => Promise<void>;
-  /** S7 (issue #73): the size block state + gestures (UI-SPEC section 2). */
-  size: {
-    widthEighths: number | null;
-    heightEighths: number | null;
-    source: SizeSource;
-    unit: SizeUnit;
-    enteredInCm: boolean;
-    suggestedPreset: string | null;
-    editInput: (which: "width" | "height", text: string) => boolean;
-    tapChip: (name: string) => void;
-    toggleUnit: () => void;
-    seedForEdit: (width: number, height: number) => void;
-    canApply: boolean;
-  };
-  applySizeFromResults: () => Promise<void>;
-  startSample: () => Promise<void>;
-  cancel: () => void;
-  toCrop: () => void;
-  setCorner: (index: number, xy: [number, number]) => void;
-  resetToAuto: () => void;
-  backFromCrop: () => void;
-  openInEditor: () => void;
-  /** S8 (issue #74): blank-grid escape from a failure verdict. */
-  startInEditorFromFailure: () => void;
-  backToDropzone: () => void;
-  /** Retry a stalled vision load (vision-retry affordance on the progress screen). */
-  retryVision: () => void;
-}
-
-/** Round-trip demo panel (render -> reverse -> compare) shown in the Pattern tab. */
-export interface RoundTripApi {
-  run: (level: 0 | 2) => Promise<void>;
-  report: { dimsMatch: boolean; cellAccuracy: number } | null;
-}
-
-/** Derived uncertainty state for the open (photo-sourced) model. */
-export interface UncertaintyApi {
-  count: number;
-  showUncertain: boolean;
-  toggle: () => void;
-}
-
-/** A user-initiated engine export (PARITY item 11). */
-export type ExportKind = "cutlist-csv" | "cutlist-md" | "yardage" | "svg" | "pdf";
 
 function readStrategy(ui: ProjectUi | undefined): SeamStrategy {
   const value = ui?.seamStrategy;
@@ -199,44 +58,6 @@ function readSeamFix(ui: ProjectUi | undefined): SeamFix {
     if (action === "merge" || action === "split") fix[edge] = action;
   }
   return fix;
-}
-
-function base64ToArrayBuffer(b64: string): ArrayBuffer {
-  const binary = atob(b64);
-  const buffer = new ArrayBuffer(binary.length);
-  const bytes = new Uint8Array(buffer);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return buffer;
-}
-
-/** Save a blob under `filename` via a temporary anchor (same trick as saveToFile). */
-function triggerBlob(data: BlobPart, filename: string, mime: string): void {
-  const blob = new Blob([data], { type: mime });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = filename;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 10_000);
-}
-
-function execCommandCopy(text: string): boolean {
-  try {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.appendChild(area);
-    area.focus();
-    area.select();
-    const ok = document.execCommand("copy");
-    area.remove();
-    return ok;
-  } catch {
-    return false;
-  }
 }
 
 interface ResumeInfo {
@@ -269,10 +90,8 @@ export interface ResizeInfo {
   };
 }
 
-interface ProjectApi {
-  model: QuiltModel | null;
-  name: string;
-  summary: ModelSummary | null;
+/** The editing actions: everything C6a removes with the editor. */
+interface EditingApi {
   mode: EditorMode;
   selectedFabricId: string | null;
   canUndo: boolean;
@@ -303,33 +122,25 @@ interface ProjectApi {
   openFromText: (text: string, fallbackName: string) => boolean;
   rename: (name: string) => void;
   goHome: () => void;
-  // --- S5 pattern + seams ---
-  seamStrategy: SeamStrategy;
+  // --- S5 seams tool ---
   selectStrategy: (strategy: SeamStrategy) => void;
   seamMerges: string[];
   seamDrag: (edges: string[]) => void;
   seamTap: (cell: { row: number; col: number }) => void;
   handTweaked: boolean;
   estimates: { pieces: number; seams: number };
-  plans: Record<SeamStrategy, StrategyPlan | null>;
-  setPatternActive: (active: boolean) => void;
-  exportDownload: (kind: ExportKind) => Promise<void>;
-  copySettings: () => Promise<boolean>;
-  // --- S6 photo reverse + round trip + uncertainty ---
-  photo: PhotoApi;
-  roundtrip: RoundTripApi;
-  uncertainty: UncertaintyApi;
 }
+
+/** useProject()'s surface: the model, the pattern, the photo flow and the editing actions. */
+type ProjectApi = Pick<ModelApi, "model" | "name" | "summary"> &
+  PatternApi &
+  PhotoSurface &
+  EditingApi;
 
 const ProjectContext = createContext<ProjectApi | null>(null);
 
 function looksLikeModel(model: QuiltModel | undefined | null): boolean {
   return Boolean(model && model.center && model.center.cells && model.palette && model.palette.fabrics);
-}
-
-function slugify(name: string): string {
-  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-  return slug || "quilt";
 }
 
 /** Read the autosave slot once at startup: a resumable doc, a loud error, or nothing. */
@@ -350,9 +161,19 @@ function readAutosave(): RestoreState {
   }
 }
 
-export function ProjectProvider({ children }: { children: ReactNode }) {
+/** The editing actions on the EditorStore. They read and write the other
+ * modules only through the APIs passed in. */
+function useEditing(
+  { model, name, replaceModel, setName }: ModelApi,
+  { flow, exitToEditor, reset: resetPhoto }: PhotoFlowState,
+  { api: { seamStrategy }, setSeamStrategy, resetPlans, closePattern }: PatternState,
+) {
   const engine = useEngine();
-  const toast = useToast();
+  // ToastProvider rebuilds its value on every toast; pin the stable push so a
+  // toast does not rebuild every editing action.
+  const { push } = useToast();
+  const toast = useMemo(() => ({ push }), [push]);
+  const photoResult = flow.result;
 
   // `engine.validate` delegates to a stable client, but keep the latest ref so
   // scheduled validations never fire through a stale closure.
@@ -372,9 +193,6 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     clockRef.current += COALESCE_WINDOW_MS + 1;
   }, []);
 
-  const [model, setModel] = useState<QuiltModel | null>(null);
-  const [name, setName] = useState<string>(DEFAULT_NAME);
-  const [summary, setSummary] = useState<ModelSummary | null>(null);
   const [mode, setMode] = useState<EditorMode>("move");
   const [selectedFabricId, setSelectedFabricId] = useState<string | null>(null);
   const [canUndo, setCanUndo] = useState(false);
@@ -383,55 +201,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const [lastResize, setLastResize] = useState<ResizeInfo | null>(null);
   const [restore, setRestore] = useState<RestoreState>(readAutosave);
 
-  // ---- S6/S2 photo reverse state ------------------------------------------
-  const machineRef = useRef<PhotoFlowMachine>(new PhotoFlowMachine());
-  const sizeRef = useRef<SizeEntryState>(new SizeEntryState());
-  const [photoActive, setPhotoActive] = useState(false);
-  const [photoState, setPhotoState] = useState<PhotoScreen>("idle");
-  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
-  const [photoResult, setPhotoResult] = useState<PhotoResult | null>(null);
-  const [visionState, setVisionState] = useState<VisionState>("cold");
-  const [visionBytes, setVisionBytes] = useState<number | null>(null);
-  const [corners, setCorners] = useState<[number, number][]>(machineRef.current.corners);
-  const [detectedQuad, setDetectedQuad] = useState<[number, number][] | null>(null);
-  const [detectPending, setDetectPending] = useState(false);
-  const [quadSource, setQuadSource] = useState<QuadSource>("default");
-  const [roundtripReport, setRoundtripReport] = useState<
-    { dimsMatch: boolean; cellAccuracy: number } | null
-  >(null);
-  const [showUncertain, setShowUncertain] = useState(false);
-
-  const [, setSizeMirror] = useState(0);
-
-  // mirror the pure machines into React state after every transition
-  const syncPhoto = useCallback(() => {
-    const m = machineRef.current;
-    setPhotoState(m.state);
-    setCorners(m.corners);
-    setDetectedQuad(m.detectedQuad);
-    setDetectPending(m.detectPending);
-    setQuadSource(m.quadSource);
-    setSizeMirror((v) => v + 1);
-  }, []);
-
-  const photoUrlRef = useRef<string | null>(null);
-  photoUrlRef.current = photoUrl;
-  const photoResultRef = useRef<PhotoResult | null>(null);
-  photoResultRef.current = photoResult;
-  const stagedBytesRef = useRef<Uint8Array | null>(null);
-  const stagedDimsRef = useRef<{ width: number; height: number } | null>(null);
-  const stagedTokenRef = useRef<string | null>(null);
-  const reverseTokenRef = useRef<{ cancelled: boolean }>({ cancelled: false });
-  const retryGateRef = useRef<(() => void) | null>(null);
-  const prefetchedRef = useRef(false);
-
-  const [seamStrategy, setSeamStrategy] = useState<SeamStrategy>(DEFAULT_STRATEGY);
   const [seamFix, setSeamFix] = useState<SeamFix>({});
-  const [plans, setPlans] = useState<Record<SeamStrategy, StrategyPlan | null>>({
-    historical: null,
-    strip: null,
-    modern: null,
-  });
 
   const nameRef = useRef(name);
   nameRef.current = name;
@@ -441,68 +211,23 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   seamStrategyRef.current = seamStrategy;
   const seamFixRef = useRef(seamFix);
   seamFixRef.current = seamFix;
-  const summaryRef = useRef(summary);
-  summaryRef.current = summary;
-  const plansRef = useRef(plans);
-  plansRef.current = plans;
-  // Pattern tab drives explicit plan requests; edits bump the model revision so
-  // a stale in-flight plan can be discarded and the three strategies recomputed.
-  const patternActiveRef = useRef(false);
-  const editRevRef = useRef(0);
-  const plansRevRef = useRef(-1);
 
   // ---- React snapshot of the mutable store -------------------------------
-
-  const refresh = useCallback(() => {
-    const s = storeRef.current;
-    if (!s) return;
-    setModel(structuredClone(s.model));
-    setCanUndo(s.canUndo());
-    setCanRedo(s.canRedo());
-    setDirty(s.hasUnsavedChanges());
-  }, []);
-
-  // ---- coalesced commit-time validation (the fabric census) --------------
   //
-  // Only one validate is in flight at a time; newer commits overwrite the
-  // pending request, and a result applies only if it is still the newest
-  // (version === latest), so a late resolve for a replaced model cannot
-  // clobber the census.
+  // The snapshot becomes model.tsx's plain state, which the census, the plans,
+  // the exports and the round trip read. `fresh` marks a newly opened quilt.
 
-  const versionRef = useRef(0);
-  const pendingRef = useRef<{ json: string; version: number } | null>(null);
-  const validatingRef = useRef(false);
-
-  const drainValidation = useCallback(() => {
-    if (validatingRef.current) return;
-    const want = pendingRef.current;
-    if (!want) return;
-    pendingRef.current = null;
-    validatingRef.current = true;
-    engineRef.current
-      .validate(want.json)
-      .then(
-        (result) => {
-          if (want.version === versionRef.current) setSummary(result);
-        },
-        (err: unknown) => {
-          if (want.version !== versionRef.current) return;
-          const message = err instanceof EngineError ? err.message : "validation failed";
-          toast.push(message, "error");
-        },
-      )
-      .finally(() => {
-        validatingRef.current = false;
-        drainValidation();
-      });
-  }, [toast]);
-
-  const requestValidation = useCallback(() => {
-    const s = storeRef.current;
-    if (!s) return;
-    pendingRef.current = { json: JSON.stringify(s.model), version: ++versionRef.current };
-    drainValidation();
-  }, [drainValidation]);
+  const refresh = useCallback(
+    (fresh: boolean) => {
+      const s = storeRef.current;
+      if (!s) return;
+      replaceModel(structuredClone(s.model), fresh);
+      setCanUndo(s.canUndo());
+      setCanRedo(s.canRedo());
+      setDirty(s.hasUnsavedChanges());
+    },
+    [replaceModel],
+  );
 
   // ---- debounced autosave ------------------------------------------------
 
@@ -532,51 +257,10 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     }, AUTOSAVE_DEBOUNCE_MS);
   }, [writeAutosave]);
 
-  // ---- plans (explicit, per model revision) ------------------------------
-  //
-  // PARITY item 1: card metrics and yardage are engine-authoritative. When the
-  // Pattern tab is open the three strategies are planned once per model
-  // revision; a plan whose revision was superseded by a later edit is dropped.
-
-  const requestPlans = useCallback(() => {
-    const s = storeRef.current;
-    if (!s) return;
-    const rev = editRevRef.current;
-    if (plansRevRef.current === rev) return; // already requested for this revision
-    plansRevRef.current = rev;
-    const json = JSON.stringify(s.model);
-    for (const strategy of STRATEGIES) {
-      engineRef.current.call<StrategyPlan>("plan", json, strategy).then(
-        (result) => {
-          if (plansRevRef.current === rev) {
-            setPlans((prev) => ({ ...prev, [strategy]: result }));
-          }
-        },
-        (err: unknown) => {
-          if (plansRevRef.current !== rev) return;
-          const message =
-            err instanceof EngineError ? err.message : "Couldn’t work out the plan — try again?";
-          toast.push(message, "error");
-        },
-      );
-    }
-  }, [toast]);
-
-  const setPatternActive = useCallback(
-    (active: boolean) => {
-      patternActiveRef.current = active;
-      if (active) requestPlans();
-    },
-    [requestPlans],
-  );
-
   const afterMutation = useCallback(() => {
-    editRevRef.current += 1;
-    refresh();
-    requestValidation();
+    refresh(false);
     scheduleAutosave();
-    if (patternActiveRef.current) requestPlans();
-  }, [refresh, requestValidation, scheduleAutosave, requestPlans]);
+  }, [refresh, scheduleAutosave]);
 
   // ---- open / restore ----------------------------------------------------
 
@@ -588,23 +272,17 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       setName(displayName || DEFAULT_NAME);
       setMode("move");
       setSelectedFabricId(next.palette.fabrics[0]?.id ?? null);
-      setSummary(null);
       setLastResize(null);
       // Restore persisted seam UI (PARITY item 2/5); default strip, no fixes.
       const restoredStrategy = readStrategy(ui);
       const restoredFix = readSeamFix(ui);
-      setSeamStrategy(restoredStrategy);
+      resetPlans(restoredStrategy);
       seamStrategyRef.current = restoredStrategy;
       setSeamFix(restoredFix);
       seamFixRef.current = restoredFix;
-      setPlans({ historical: null, strip: null, modern: null });
-      plansRevRef.current = -1;
-      editRevRef.current += 1;
-      refresh();
-      requestValidation();
-      if (patternActiveRef.current) requestPlans();
+      refresh(true);
     },
-    [refresh, requestValidation, requestPlans],
+    [setName, resetPlans, refresh],
   );
 
   const openFromText = useCallback(
@@ -681,377 +359,8 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     installModel(doc.model, doc.name, doc.ui);
   }, [installModel]);
 
-  // ---- S6 photo reverse flow (issue #46) ---------------------------------
-  //
-  // The state machine is idle(dropzone) -> progress -> results -> corners.
-  // `active` is the app-level "in the photo flow" bit: idle doubles as the
-  // dropzone, so App routes to PhotoFlow on `active`, not on state alone.
-  // The session bitmap (photoUrl) is never persisted (PARITY item 7).
-
-  const setSessionPhoto = useCallback((url: string | null) => {
-    const previous = photoUrlRef.current;
-    if (previous && previous !== url) {
-      try {
-        URL.revokeObjectURL(previous);
-      } catch {
-        /* revoke is best-effort */
-      }
-    }
-    photoUrlRef.current = url;
-    setPhotoUrl(url);
-  }, []);
-
-  // Mirror the RPC vision state onto <body> for the e2e and the loading bar,
-  // and fetch the manifest once for the measured payload size.
-  useEffect(() => {
-    const unsubscribe = engineRef.current.onVision((state) => {
-      try {
-        document.body.dataset.visionState = state;
-      } catch {
-        /* SSR guard; never reached in the browser */
-      }
-      setVisionState(state);
-    });
-    return unsubscribe;
-  }, []);
-
-  useEffect(() => {
-    let alive = true;
-    fetch(new URL("wheels/manifest.json", document.baseURI))
-      .then((response) => response.json())
-      .then((manifest: { visionBytes?: number }) => {
-        if (alive && typeof manifest.visionBytes === "number") setVisionBytes(manifest.visionBytes);
-      })
-      .catch(() => {
-        /* the loading bar shows a placeholder size if the manifest is missing */
-      });
-    return () => {
-      alive = false;
-    };
-  }, []);
-
-  // PARITY item 17: after the engine is ready and the page is idle, quietly
-  // prefetch the vision stack (skipped when the browser signals Save-Data).
-  const enginePhase = engine.status.phase;
-  useEffect(() => {
-    if (enginePhase !== "ready" || prefetchedRef.current) return;
-    const connection = (navigator as { connection?: { saveData?: boolean } }).connection;
-    if (connection?.saveData) return;
-    prefetchedRef.current = true;
-    const run = () => engineRef.current.prefetchVision();
-    const idle = (window as typeof window & { requestIdleCallback?: (cb: () => void) => number })
-      .requestIdleCallback;
-    if (typeof idle === "function") idle(run);
-    else window.setTimeout(run, 1500);
-  }, [enginePhase]);
-
-  const isVisionError = (error: unknown): boolean =>
-    error instanceof EngineError && /vision/i.test(error.message);
-
-  // One reverse attempt with a vision-retry loop: a blocked vision wheel
-  // rejects the call, so we wait for a retry ping (manual or a safety-net
-  // timeout) and re-issue, which re-triggers the worker's lazy vision load.
-  const runReverse = useCallback(
-    async (
-      payload: Uint8Array | string,
-      optionsJson: string,
-      token: { cancelled: boolean },
-    ): Promise<{
-      model: QuiltModel;
-      verdict?: string;
-      diagnostics?: Record<string, unknown>;
-      requested?: { width: number | null; height: number | null } | null;
-      achieved?: { width: number; height: number } | null;
-      ms: number;
-    }> => {
-      for (;;) {
-        if (token.cancelled) throw new EngineError("worker", "cancelled");
-        try {
-          const started = performance.now();
-          const result = await engineRef.current.call<{
-            model: QuiltModel;
-            verdict?: string;
-            diagnostics?: Record<string, unknown>;
-            requested?: { width: number | null; height: number | null };
-            achieved?: { width: number; height: number };
-          }>("reverse_photo", payload, optionsJson);
-          return {
-            model: result.model,
-            verdict: result.verdict,
-            diagnostics: result.diagnostics,
-            requested: result.requested ?? null,
-            achieved: result.achieved ?? null,
-            ms: performance.now() - started,
-          };
-        } catch (error) {
-          if (token.cancelled || !isVisionError(error)) throw error;
-          await new Promise<void>((resolve) => {
-            let done = false;
-            const finish = () => {
-              if (done) return;
-              done = true;
-              retryGateRef.current = null;
-              clearTimeout(timer);
-              resolve();
-            };
-            const timer = setTimeout(finish, 2000);
-            retryGateRef.current = finish;
-          });
-        }
-      }
-    },
-    [],
-  );
-
-  const applyReverse = useCallback(
-    (
-      model: QuiltModel,
-      ms: number,
-      verdict?: string,
-      diagnostics?: Record<string, unknown>,
-      requested?: { width: number | null; height: number | null } | null,
-      achieved?: { width: number; height: number } | null,
-    ) => {
-      setPhotoResult({
-        modelJson: JSON.stringify(model),
-        stageConfidence: mapStageConfidence(model.provenance?.stage_confidence),
-        uncertainCount: countUncertain(model.center.cell_confidence),
-        reverseMs: ms,
-        verdict,
-        diagnostics,
-        sizeRequested: requested ?? null,
-        sizeAchieved: achieved ?? null,
-      });
-    },
-    [],
-  );
-
-  /** Stage the photo's bytes into the worker once; the token is reused by
-   * detect_quad and analyze, and re-staged if a worker restart wiped it. */
-  const ensureStagedToken = useCallback(async (): Promise<string | null> => {
-    if (stagedTokenRef.current) return stagedTokenRef.current;
-    const bytes = stagedBytesRef.current;
-    if (!bytes) return null;
-    const staged = await engineRef.current.call<{ token: string }>("stage_photo", bytes);
-    stagedTokenRef.current = staged.token;
-    return staged.token;
-  }, []);
-
-  // S2 stage(): the photo and default pins render IMMEDIATELY (no engine on
-  // the critical path); detection resolves in the background and snaps in
-  // unless the user already moved a pin (the machine owns that race).
-  const stage = useCallback(
-    async (file: File): Promise<void> => {
-      setPhotoActive(true);
-      setPhotoResult(null);
-      stagedTokenRef.current = null;
-      sizeRef.current.reset();
-      const seq = machineRef.current.enterCrop();
-      syncPhoto();
-      setSessionPhoto(URL.createObjectURL(file));
-      try {
-        const bitmap = await createImageBitmap(file);
-        const size = targetSize(bitmap.width, bitmap.height, classifyDevice(window.innerWidth));
-        const canvas = document.createElement("canvas");
-        canvas.width = size.width;
-        canvas.height = size.height;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) throw new Error("no 2d canvas context");
-        ctx.drawImage(bitmap, 0, 0, size.width, size.height);
-        if (typeof bitmap.close === "function") bitmap.close();
-        const bytes = await canvasToPngBytes(canvas);
-        stagedBytesRef.current = bytes;
-        stagedDimsRef.current = { width: size.width, height: size.height };
-        const token = await ensureStagedToken();
-        if (!token) throw new Error("no staged photo");
-        const detected = await engineRef.current.call<DetectQuadResult>("detect_quad", token);
-        machineRef.current.detectionResolved(seq, {
-          quad: detected.quad,
-          tier: detected.tier,
-          confidence: detected.confidence,
-        });
-        sizeRef.current.suggest(detected.predicted_size?.preset ?? null);
-        syncPhoto();
-      } catch {
-        // the crop screen stays fully usable on default pins; the finding-
-        // your-quilt affordance simply disappears (cold-start contract)
-        machineRef.current.detectionFailed(seq);
-        syncPhoto();
-      }
-    },
-    [ensureStagedToken, setSessionPhoto, syncPhoto],
-  );
-
-  // S2 analyze(): reverse via the staged token; corners ride along ONLY when
-  // the user moved a pin (see photoFlow.ts for the honesty rationale).
-  const analyze = useCallback(async (): Promise<void> => {
-    const passed = machineRef.current.analyze();
-    syncPhoto();
-    setPhotoResult(null);
-    const token = { cancelled: false };
-    reverseTokenRef.current = token;
-    try {
-      const dims = stagedDimsRef.current ?? { width: 1, height: 1 };
-      const options: Record<string, unknown> = {};
-      if (passed) {
-        options.corners = passed.map(([x, y]) => [x * dims.width, y * dims.height]);
-      }
-      const sized = sizeRef.current.sizeOptions();
-      if (sized) {
-        options.finished_width = sized.finished_width;
-        options.finished_height = sized.finished_height;
-      }
-      const optionsJson = Object.keys(options).length ? JSON.stringify(options) : "{}";
-      let staged = await ensureStagedToken();
-      if (!staged) throw new Error("no staged photo");
-      let outcome: {
-        model: QuiltModel;
-        verdict?: string;
-        diagnostics?: Record<string, unknown>;
-        requested?: { width: number | null; height: number | null } | null;
-        achieved?: { width: number; height: number } | null;
-        ms: number;
-      };
-      try {
-        outcome = await runReverse(staged, optionsJson, token);
-      } catch (error) {
-        // a worker restart wiped MEMFS: the token is stale; re-stage once
-        const stale =
-          error instanceof EngineError &&
-          error.kind === "value" &&
-          /not found/i.test(error.message);
-        if (!stale) throw error;
-        stagedTokenRef.current = null;
-        staged = await ensureStagedToken();
-        if (!staged) throw error;
-        outcome = await runReverse(staged, optionsJson, token);
-      }
-      if (token.cancelled) return;
-      applyReverse(outcome.model, outcome.ms, outcome.verdict, outcome.diagnostics, outcome.requested, outcome.achieved);
-      machineRef.current.results();
-      syncPhoto();
-    } catch {
-      if (token.cancelled) return;
-      toast.push("That photo didn’t come through — try another?", "error");
-      machineRef.current.seedFromConfirmed();
-      syncPhoto();
-    }
-  }, [ensureStagedToken, runReverse, applyReverse, syncPhoto, toast]);
-
-  const startSample = useCallback(async (): Promise<void> => {
-    // sample bypass (S2 contract): auto-confirmed full-frame render, no crop
-    setPhotoActive(true);
-    setPhotoResult(null);
-    machineRef.current.bypassToProgress();
-    syncPhoto();
-    const token = { cancelled: false };
-    reverseTokenRef.current = token;
-    try {
-      const demoText = await (await fetch(new URL(DEMO_URL, document.baseURI))).text();
-      const rendered = await engineRef.current.call<{ png_b64: string }>(
-        "render",
-        demoText,
-        0,
-        42,
-        10,
-      );
-      if (token.cancelled) return;
-      const bytes = new Uint8Array(base64ToArrayBuffer(rendered.png_b64));
-      stagedBytesRef.current = bytes;
-      stagedTokenRef.current = null;
-      try {
-        const bitmap = await createImageBitmap(new Blob([bytes], { type: "image/png" }));
-        stagedDimsRef.current = { width: bitmap.width, height: bitmap.height };
-        if (typeof bitmap.close === "function") bitmap.close();
-      } catch {
-        stagedDimsRef.current = null;
-      }
-      setSessionPhoto(URL.createObjectURL(new Blob([bytes], { type: "image/png" })));
-      const outcome = await runReverse(bytes, "{}", token);
-      if (token.cancelled) return;
-      applyReverse(outcome.model, outcome.ms, outcome.verdict, outcome.diagnostics, outcome.requested, outcome.achieved);
-      machineRef.current.results();
-      syncPhoto();
-    } catch {
-      if (token.cancelled) return;
-      toast.push("The sample didn’t load — try again?", "error");
-      machineRef.current.reset();
-      syncPhoto();
-    }
-  }, [runReverse, applyReverse, setSessionPhoto, syncPhoto, toast]);
-
-  const cancel = useCallback(() => {
-    // PARITY item 14 (sprint 2, frozen): cancel returns to the dropzone;
-    // the worker restart also invalidates the staged token by design
-    reverseTokenRef.current.cancelled = true;
-    retryGateRef.current?.();
-    engineRef.current.restart();
-    stagedTokenRef.current = null;
-    machineRef.current.cancel();
-    syncPhoto();
-    setPhotoResult(null);
-  }, [syncPhoto]);
-
-  const retryVision = useCallback(() => {
-    engineRef.current.prefetchVision();
-    retryGateRef.current?.();
-  }, []);
-
-  // S7: inline size edit from results via apply_finished_size (no re-run)
-  const applySizeFromResults = useCallback(async (): Promise<void> => {
-    const current = photoResultRef.current;
-    const sized = sizeRef.current.sizeOptions();
-    if (!current || !sized) return;
-    try {
-      const applied = await engineRef.current.call<{
-        model: QuiltModel;
-        requested: { width: number | null; height: number | null };
-        achieved: { width: number; height: number };
-      }>("apply_finished_size", current.modelJson, sized.finished_width, sized.finished_height);
-      setPhotoResult({
-        ...current,
-        modelJson: JSON.stringify(applied.model),
-        sizeRequested: applied.requested,
-        sizeAchieved: applied.achieved,
-        diagnostics: { ...(current.diagnostics ?? {}), size_source: "user", size_is_guess: false },
-      });
-    } catch (err) {
-      const message = err instanceof EngineError ? err.message : "That size did not apply. Try again?";
-      toast.push(message, "error");
-    }
-  }, [toast]);
-
-  // "Adjust the crop" from results: one pin surface, reachable from both ends
-  const toCrop = useCallback(() => {
-    machineRef.current.seedFromConfirmed();
-    syncPhoto();
-  }, [syncPhoto]);
-
-  const setCorner = useCallback(
-    (index: number, xy: [number, number]) => {
-      machineRef.current.movePin(index, xy);
-      syncPhoto();
-    },
-    [syncPhoto],
-  );
-
-  const resetToAuto = useCallback(() => {
-    machineRef.current.resetToAuto();
-    syncPhoto();
-  }, [syncPhoto]);
-
-  const backFromCrop = useCallback(() => {
-    // Back discards the staged photo (UI-SPEC section 1 flow rules)
-    machineRef.current.backFromCrop();
-    syncPhoto();
-    stagedBytesRef.current = null;
-    stagedDimsRef.current = null;
-    stagedTokenRef.current = null;
-    setSessionPhoto(null);
-  }, [setSessionPhoto, syncPhoto]);
-
   const openInEditor = useCallback(() => {
-    const result = photoResultRef.current;
+    const result = photoResult;
     if (!result) return;
     let model: QuiltModel;
     try {
@@ -1064,10 +373,8 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     // Persist immediately so a reload can resume (the bitmap stays session-only).
     nameRef.current = displayName;
     writeAutosave();
-    setPhotoActive(false);
-    setPhotoState("idle");
-    // photoUrl stays: the editor compare affordance reads it until reload.
-  }, [installModel, writeAutosave]);
+    exitToEditor();
+  }, [photoResult, installModel, writeAutosave, exitToEditor]);
 
   const startInEditorFromFailure = useCallback(() => {
     // S8 (issue #74): the recovered LAYOUT is wrong by definition on a
@@ -1075,7 +382,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     // Gate on the frozen trust bounds (paletteGate); below them a plain
     // blank grid - prefilled junk fabrics would undermine the honesty theme.
     const blank = makeBlankModel();
-    const result = photoResultRef.current;
+    const result = photoResult;
     if (result) {
       try {
         const recovered = JSON.parse(result.modelJson) as QuiltModel;
@@ -1096,63 +403,8 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     installModel(blank, displayName);
     nameRef.current = displayName;
     writeAutosave();
-    setPhotoActive(false);
-    setPhotoState("idle");
-  }, [installModel, writeAutosave]);
-
-  const backToDropzone = useCallback(() => {
-    setPhotoActive(true);
-    machineRef.current.reset();
-    syncPhoto();
-    setPhotoResult(null);
-    stagedBytesRef.current = null;
-    stagedTokenRef.current = null;
-    setSessionPhoto(null);
-    // vision prefetch fires on photo-flow ENTRY, not on drop (S2 contract);
-    // this is also the entry path from the start screen
-    engineRef.current.prefetchVision();
-  }, [setSessionPhoto, syncPhoto]);
-
-  // ---- round-trip demo panel (render -> reverse -> compare) ----------------
-
-  const runRoundtrip = useCallback(
-    async (level: 0 | 2): Promise<void> => {
-      const s = storeRef.current;
-      if (!s) return;
-      const json = JSON.stringify(s.model);
-      try {
-        const rendered = await engineRef.current.call<{ png_b64: string }>(
-          "render",
-          json,
-          level,
-          42,
-          10,
-        );
-        const bytes = new Uint8Array(base64ToArrayBuffer(rendered.png_b64));
-        const recovered = await engineRef.current.call<{ model: QuiltModel }>(
-          "reverse_photo",
-          bytes,
-          "{}",
-        );
-        const report = await engineRef.current.call<{ dims_match: boolean; cell_accuracy: number }>(
-          "compare",
-          json,
-          JSON.stringify(recovered.model),
-        );
-        setRoundtripReport({ dimsMatch: report.dims_match, cellAccuracy: report.cell_accuracy });
-      } catch (err) {
-        const message =
-          err instanceof EngineError ? err.message : "The round trip didn’t finish — try again?";
-        toast.push(message, "error");
-      }
-    },
-    [toast],
-  );
-
-  // ---- derived uncertainty for the open (photo-sourced) model --------------
-
-  const uncertainCount = useMemo(() => countUncertain(model?.center.cell_confidence), [model]);
-  const toggleUncertain = useCallback(() => setShowUncertain((value) => !value), []);
+    exitToEditor();
+  }, [photoResult, installModel, writeAutosave, exitToEditor]);
 
   // ---- editing actions ---------------------------------------------------
 
@@ -1398,17 +650,13 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       setName(next.trim() || DEFAULT_NAME);
       scheduleAutosave();
     },
-    [scheduleAutosave],
+    [setName, scheduleAutosave],
   );
 
   const goHome = useCallback(() => {
     storeRef.current = null;
-    pendingRef.current = null;
-    versionRef.current++;
-    patternActiveRef.current = false;
-    plansRevRef.current = -1;
-    setModel(null);
-    setSummary(null);
+    // A fresh null model drops the census and any validation still in flight.
+    replaceModel(null, true);
     setName(DEFAULT_NAME);
     setMode("move");
     setSelectedFabricId(null);
@@ -1416,22 +664,13 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     setCanRedo(false);
     setDirty(false);
     setLastResize(null);
-    setSeamStrategy(DEFAULT_STRATEGY);
+    closePattern();
     seamStrategyRef.current = DEFAULT_STRATEGY;
     setSeamFix({});
     seamFixRef.current = {};
-    setPlans({ historical: null, strip: null, modern: null });
     // Leaving for home also exits any photo flow and drops the session bitmap.
-    setPhotoActive(false);
-    machineRef.current.reset();
-    syncPhoto();
-    setPhotoResult(null);
-    stagedBytesRef.current = null;
-    stagedTokenRef.current = null;
-    setShowUncertain(false);
-    setRoundtripReport(null);
-    setSessionPhoto(null);
-  }, [setSessionPhoto, syncPhoto]);
+    resetPhoto();
+  }, [replaceModel, setName, closePattern, resetPhoto]);
 
   // ---- seams tool (PARITY item 2; preview layer over ui.seamFix) ----------
 
@@ -1457,7 +696,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       }
       scheduleAutosave();
     },
-    [toast, scheduleAutosave],
+    [toast, scheduleAutosave, setSeamStrategy],
   );
 
   const seamDrag = useCallback(
@@ -1539,87 +778,6 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
 
   const handTweaked = Object.keys(seamFix).length > 0;
 
-  // ---- exports + copy (PARITY items 11/12) --------------------------------
-
-  const exportDownload = useCallback(
-    async (kind: ExportKind): Promise<void> => {
-      const s = storeRef.current;
-      if (!s) return;
-      const json = JSON.stringify(s.model);
-      const strategy = seamStrategyRef.current;
-      const slug = slugify(nameRef.current);
-      try {
-        let data: BlobPart;
-        let filename: string;
-        let mime: string;
-        if (kind === "svg") {
-          const r = await engineRef.current.call<{ text: string }>("export_svg", json);
-          data = r.text;
-          filename = `${slug}-diagram.svg`;
-          mime = "image/svg+xml";
-        } else if (kind === "cutlist-csv") {
-          const r = await engineRef.current.call<{ text: string }>(
-            "export_cutlist_csv",
-            json,
-            strategy,
-          );
-          data = r.text;
-          filename = `${slug}-cut-list.csv`;
-          mime = "text/csv";
-        } else if (kind === "cutlist-md") {
-          const r = await engineRef.current.call<{ text: string }>(
-            "export_cutlist_md",
-            json,
-            strategy,
-          );
-          data = r.text;
-          filename = `${slug}-cut-list.md`;
-          mime = "text/markdown";
-        } else if (kind === "yardage") {
-          const r = await engineRef.current.call<{ text: string }>("export_yardage", json, strategy);
-          data = r.text;
-          filename = `${slug}-yardage.txt`;
-          mime = "text/plain";
-        } else {
-          const r = await engineRef.current.call<{ pdf_b64: string }>("export_pdf", json, strategy);
-          data = base64ToArrayBuffer(r.pdf_b64);
-          filename = `${slug}-booklet.pdf`;
-          mime = "application/pdf";
-        }
-        triggerBlob(data, filename, mime);
-        toast.push("Saved — your pattern file is ready.", "success");
-      } catch (err) {
-        const message =
-          err instanceof EngineError ? err.message : "That export didn’t work — try again?";
-        toast.push(message, "error");
-      }
-    },
-    [toast],
-  );
-
-  const copySettings = useCallback(async (): Promise<boolean> => {
-    const s = storeRef.current;
-    if (!s) return false;
-    const text = buildSettingsSummary(
-      s.model,
-      nameRef.current,
-      summaryRef.current,
-      plansRef.current[seamStrategyRef.current],
-    );
-    let ok = false;
-    try {
-      await navigator.clipboard.writeText(text);
-      ok = true;
-    } catch {
-      ok = execCommandCopy(text);
-    }
-    toast.push(
-      ok ? "Copied! Paste it into notes, email, anywhere." : "Could not copy — sorry!",
-      ok ? "success" : "error",
-    );
-    return ok;
-  }, [toast]);
-
   // ---- beforeunload guard (registered only while file-dirty) -------------
 
   useEffect(() => {
@@ -1636,110 +794,120 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("beforeunload", handler);
   }, [dirty, writeAutosave]);
 
-  const api: ProjectApi = {
-    model,
-    name,
-    summary,
-    mode,
-    selectedFabricId,
-    canUndo,
-    canRedo,
-    resume: restore.resume,
-    autosaveError: restore.autosaveError,
-    setMode: handleSetMode,
-    selectFabric,
-    paintStroke,
-    recolorFabric,
-    renameFabric,
-    addFabric,
-    deleteFabric,
-    lastResize,
-    resizeLocked,
-    resizeUnlocked,
-    setBorderWidth,
-    setBorderFabric,
-    addBorder,
-    removeBorder,
-    clearResizeHint,
-    undo,
-    redo,
-    saveToFile,
-    startBlank,
-    resumeAutosave,
-    openDemo,
-    openFromText,
-    rename,
-    goHome,
-    seamStrategy,
-    selectStrategy,
-    seamMerges,
-    seamDrag,
-    seamTap,
-    handTweaked,
-    estimates,
-    plans,
-    setPatternActive,
-    exportDownload,
-    copySettings,
-    photo: {
-      active: photoActive,
-      state: photoState,
-      photoUrl,
-      result: photoResult,
-      visionState,
-      visionBytes,
-      corners,
-      detectedQuad,
-      detectPending,
-      quadSource,
-      stage,
-      analyze,
-      size: {
-        widthEighths: sizeRef.current.widthEighths,
-        heightEighths: sizeRef.current.heightEighths,
-        source: sizeRef.current.source,
-        unit: sizeRef.current.unit,
-        enteredInCm: sizeRef.current.enteredInCm,
-        suggestedPreset: sizeRef.current.suggestedPreset,
-        editInput: (which: "width" | "height", text: string) => {
-          const ok = sizeRef.current.editInput(which, text);
-          syncPhoto();
-          return ok;
-        },
-        tapChip: (name: string) => {
-          sizeRef.current.tapChip(name);
-          syncPhoto();
-        },
-        toggleUnit: () => {
-          sizeRef.current.toggleUnit();
-          syncPhoto();
-        },
-        seedForEdit: (width: number, height: number) => {
-          if (sizeRef.current.source === "none") {
-            sizeRef.current.widthEighths = width;
-            sizeRef.current.heightEighths = height;
-          }
-          syncPhoto();
-        },
-        canApply: sizeRef.current.sizeOptions() !== null,
-      },
-      applySizeFromResults,
-      startSample,
-      cancel,
-      toCrop,
-      setCorner,
-      resetToAuto,
-      backFromCrop,
-      openInEditor,
-      startInEditorFromFailure,
-      backToDropzone,
-      retryVision,
-    },
-    roundtrip: { run: runRoundtrip, report: roundtripReport },
-    uncertainty: { count: uncertainCount, showUncertain, toggle: toggleUncertain },
-  };
+  const api = useMemo<EditingApi>(
+    () => ({
+      mode,
+      selectedFabricId,
+      canUndo,
+      canRedo,
+      resume: restore.resume,
+      autosaveError: restore.autosaveError,
+      setMode: handleSetMode,
+      selectFabric,
+      paintStroke,
+      recolorFabric,
+      renameFabric,
+      addFabric,
+      deleteFabric,
+      lastResize,
+      resizeLocked,
+      resizeUnlocked,
+      setBorderWidth,
+      setBorderFabric,
+      addBorder,
+      removeBorder,
+      clearResizeHint,
+      undo,
+      redo,
+      saveToFile,
+      startBlank,
+      resumeAutosave,
+      openDemo,
+      openFromText,
+      rename,
+      goHome,
+      selectStrategy,
+      seamMerges,
+      seamDrag,
+      seamTap,
+      handTweaked,
+      estimates,
+    }),
+    [
+      mode,
+      selectedFabricId,
+      canUndo,
+      canRedo,
+      restore,
+      handleSetMode,
+      selectFabric,
+      paintStroke,
+      recolorFabric,
+      renameFabric,
+      addFabric,
+      deleteFabric,
+      lastResize,
+      resizeLocked,
+      resizeUnlocked,
+      setBorderWidth,
+      setBorderFabric,
+      addBorder,
+      removeBorder,
+      clearResizeHint,
+      undo,
+      redo,
+      saveToFile,
+      startBlank,
+      resumeAutosave,
+      openDemo,
+      openFromText,
+      rename,
+      goHome,
+      selectStrategy,
+      seamMerges,
+      seamDrag,
+      seamTap,
+      handTweaked,
+      estimates,
+    ],
+  );
 
-  return <ProjectContext.Provider value={api}>{children}</ProjectContext.Provider>;
+  return { api, openInEditor, startInEditorFromFailure };
+}
+
+export function ProjectProvider({ children }: { children: ReactNode }) {
+  // Hook order is effect order: the census validation (model) is queued on the
+  // worker before the plans (pattern), as it was before the split.
+  const modelState = useModelState();
+  const photoState = usePhotoState(modelState.model);
+  const patternState = usePatternState(modelState);
+  const editing = useEditing(modelState, photoState, patternState);
+
+  const { flow, uncertainty } = photoState;
+  const { openInEditor, startInEditorFromFailure } = editing;
+  const photo = useMemo<PhotoApi>(
+    () => ({ ...flow, openInEditor, startInEditorFromFailure }),
+    [flow, openInEditor, startInEditorFromFailure],
+  );
+  const photoSurface = useMemo<PhotoSurface>(() => ({ photo, uncertainty }), [photo, uncertainty]);
+
+  const { model, name, summary } = modelState;
+  const patternApi = patternState.api;
+  const editingApi = editing.api;
+  const project = useMemo<ProjectApi>(
+    () => ({ model, name, summary, ...patternApi, ...photoSurface, ...editingApi }),
+    [model, name, summary, patternApi, photoSurface, editingApi],
+  );
+
+  return (
+    <ModelContext.Provider value={modelState}>
+      <PhotoContext.Provider value={photoSurface}>
+        <PatternContext.Provider value={patternApi}>
+          <ProjectContext.Provider value={project}>{children}</ProjectContext.Provider>
+        </PatternContext.Provider>
+      </PhotoContext.Provider>
+    </ModelContext.Provider>
+  );
 }
 
 export function useProject(): ProjectApi {

@@ -1,24 +1,27 @@
 /**
  * React seam over EngineClient (S2). One client per app; status streamed
  * into React state; retry re-boots the disposable worker.
+ *
+ * The status rides its own context (engineStatus.ts; C1a, issue #146): every
+ * bridge call flips it to busy and back, so the engine value holds the calls
+ * alone, is memoized on the client, and never changes.
  */
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { EngineClient, type EngineStatus, type VisionState, type WorkerLike } from "./rpc";
+import { EngineStatusContext } from "./engineStatus";
 import type { ModelSummary } from "../model/types";
 
 export interface Engine {
-  status: EngineStatus;
   retry: () => void;
   /** Terminate and re-boot the disposable worker (cancel / recover). */
   restart: () => void;
   /** bridge.validate: model JSON -> summary (rejects with EngineError). */
   validate: (modelJson: string) => Promise<ModelSummary>;
   call: <T>(method: string, ...args: unknown[]) => Promise<T>;
-  /** Vision wheel lifecycle (S6): subscribe, prefetch, read. */
+  /** Vision wheel lifecycle (S6): subscribe and prefetch. */
   onVision: (listener: (state: VisionState) => void) => () => void;
   prefetchVision: () => void;
-  getVision: () => VisionState;
 }
 
 function makeWorker(): WorkerLike {
@@ -41,19 +44,21 @@ export function EngineProvider({ children }: { children: ReactNode }) {
 
   const engine = useMemo<Engine>(
     () => ({
-      status,
       retry: () => client.restart(),
       restart: () => client.restart(),
       validate: (modelJson: string) => client.call<ModelSummary>("validate", modelJson),
       call: (method, ...args) => client.call(method, ...args),
       onVision: (listener) => client.onVision(listener),
       prefetchVision: () => client.prefetchVision(),
-      getVision: () => client.getVision(),
     }),
-    [client, status],
+    [client],
   );
 
-  return <EngineContext.Provider value={engine}>{children}</EngineContext.Provider>;
+  return (
+    <EngineContext.Provider value={engine}>
+      <EngineStatusContext.Provider value={status}>{children}</EngineStatusContext.Provider>
+    </EngineContext.Provider>
+  );
 }
 
 export function useEngine(): Engine {
