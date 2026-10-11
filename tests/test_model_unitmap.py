@@ -300,10 +300,15 @@ def test_a_model_without_a_unit_map_keeps_its_bytes():
     assert "unit_map" not in data["center"]
 
 
-@pytest.mark.parametrize(("declared", "written"), [("1", "1.1"), ("1.0", "1.1"), ("1.5", "1.5")])
+@pytest.mark.parametrize(
+    ("declared", "written"),
+    [("1", "1.1"), ("1.0", "1.1"), ("1.00", "1.1"), ("1.0.0", "1.1"), ("1.", "1.1"),
+     ("1.5", "1.5"), ("1.10", "1.10")],
+)
 def test_a_unit_map_is_written_at_minor_one_or_later(declared, written):
-    # "1" and "1.0" predate the map, so a map moves them to 1.1; a later
-    # minor already has it and stays as written.
+    # Minor 0, however it is written, predates the map, so a map moves it to
+    # 1.1; a later minor (5, or 10, which a string compare would misorder)
+    # already has it and stays as written.
     data = json.loads(dumps(pinwheel()))
     data["schema_version"] = declared
     quilt = loads(json.dumps(data))
@@ -311,11 +316,12 @@ def test_a_unit_map_is_written_at_minor_one_or_later(declared, written):
     assert json.loads(dumps(quilt))["schema_version"] == written
 
 
-def test_a_map_added_without_validation_is_still_written_as_one_point_one():
+@pytest.mark.parametrize("declared", ["1", "1.0"])
+def test_a_map_added_without_validation_is_still_written_as_one_point_one(declared):
     # model_copy skips the validator, so the writer applies the same rule.
     plain = two_fabric_quilt(GridRegion(rows=2, cols=2, cell_size=16, cells=[["r"] * 2] * 2), "r", "w")
-    copied = plain.model_copy(update={"center": pinwheel().center})
-    assert copied.schema_version == "1"
+    copied = plain.model_copy(update={"center": pinwheel().center, "schema_version": declared})
+    assert copied.schema_version == declared
     assert json.loads(dumps(copied))["schema_version"] == "1.1"
 
 
@@ -360,11 +366,16 @@ def region(units: list, rows: int = 2, cols: int = 2, cell_size: int = 8) -> Gri
     )
 
 
-ALL_A = {
-    "hst": {"diagonal": "tl_br", "upper": "a", "lower": "a"},
-    "qst": {"top": "a", "right": "a", "bottom": "a", "left": "a"},
-    "corner": {"corners": {corner: "a" for corner in ("top_left", "top_right", "bottom_right", "bottom_left")}, "leg": "1/2"},
-    "goose": {"points": "up", "body": "a", "sky": "a"},
+# A valid unit of each kind in the palette fabrics a and b; the corners are b
+# on a base cell of a.
+VALID_PARTS = {
+    "hst": {"diagonal": "tl_br", "upper": "a", "lower": "b"},
+    "qst": {"top": "a", "right": "b", "bottom": "a", "left": "b"},
+    "corner": {
+        "corners": {c: "b" for c in ("top_left", "top_right", "bottom_right", "bottom_left")},
+        "leg": "1/2",
+    },
+    "goose": {"points": "up", "body": "a", "sky": "b"},
 }
 UNIT_CLASSES = {"hst": HstUnit, "qst": QstUnit, "corner": CornerUnit, "goose": GooseUnit}
 PARTS = [
@@ -385,10 +396,10 @@ PARTS = [
 
 @pytest.mark.parametrize(("kind", "part"), PARTS, ids=lambda v: v)
 def test_every_part_fabric_must_be_in_the_palette(kind, part):
-    # One part at a time names "ghost"; every other part, and every cell, is
-    # "a", which the palette holds. A goose up at (0, 0) covers (0, 0) and
+    # One part at a time names "ghost"; every other part is a or b and every
+    # cell a, which the palette holds. A goose up at (0, 0) covers (0, 0) and
     # (0, 1); plain squares fill the rest of the 2 x 2 grid.
-    fields = json.loads(json.dumps(ALL_A[kind]))
+    fields = json.loads(json.dumps(VALID_PARTS[kind]))
     if kind == "corner":
         fields["corners"][part] = "ghost"
     else:
@@ -398,7 +409,7 @@ def test_every_part_fabric_must_be_in_the_palette(kind, part):
     with pytest.raises(ValidationError, match=r"\['ghost'\] referenced but not in palette"):
         two_fabric_quilt(region(units), "a", "b")
     # The same unit with "ghost" back to "a" is accepted.
-    accepted = UNIT_CLASSES[kind](row=0, col=0, confidence=HAND, **ALL_A[kind])
+    accepted = UNIT_CLASSES[kind](row=0, col=0, confidence=HAND, **VALID_PARTS[kind])
     two_fabric_quilt(region([accepted] + plain_map(2, 2, skip=set(unit.squares()))), "a", "b")
 
 
@@ -422,7 +433,7 @@ def test_a_unit_outside_the_grid_is_refused():
     ],
 )
 def test_a_goose_must_cover_two_squares_of_the_grid(points, row, col, rows, cols):
-    goose = GooseUnit(row=row, col=col, points=points, body="a", sky="a", confidence=HAND)
+    goose = GooseUnit(row=row, col=col, points=points, body="a", sky="b", confidence=HAND)
     others = plain_map(rows, cols, skip={(row, col)})
     with pytest.raises(ValidationError, match=f"outside the {rows} x {cols} grid"):
         region(others + [goose], rows=rows, cols=cols)
@@ -441,7 +452,7 @@ def test_a_goose_covers_its_square_and_the_next():
 
 def test_a_square_covered_twice_is_refused():
     # The goose at (0, 0) pointing up also covers (0, 1), which a plain unit holds.
-    goose = GooseUnit(row=0, col=0, points="up", body="a", sky="a", confidence=HAND)
+    goose = GooseUnit(row=0, col=0, points="up", body="a", sky="b", confidence=HAND)
     with pytest.raises(ValidationError, match=r"row 0, col 1 is covered by 2 units"):
         region(plain_map(2, 2, skip={(0, 0)}) + [goose])
 
@@ -455,7 +466,7 @@ def test_a_corner_leg_must_land_on_a_whole_eighth():
     # 1/3 of an 8-eighth square is 8/3 eighths, which no rotary cut can make
     # (MATH.md F14 cuts the corner square at leg + 1/2 in). On a 12-eighth
     # square the same leg is 4 eighths and is accepted.
-    unit = CornerUnit(row=0, col=0, corners={"top_left": "a"}, leg="1/3", confidence=HAND)
+    unit = CornerUnit(row=0, col=0, corners={"top_left": "b"}, leg="1/3", confidence=HAND)
     with pytest.raises(ValidationError, match="is 8/3 eighths, not a whole number of eighths"):
         region([unit], rows=1, cols=1, cell_size=8)
     assert region([unit], rows=1, cols=1, cell_size=12).unit_map == [unit]
@@ -499,8 +510,11 @@ def test_opposite_corners_share_no_side(ends):
         (1, 'such as "1/3"'),
         (True, 'such as "1/3"'),
         ("2/6", "lowest terms"),
-        ("4/3", "at most the whole side"),
-        (Fraction(4, 3), "at most the whole side"),
+        # A whole-side leg is half the square, which the hst kind writes.
+        ("1/1", "less than the whole side"),
+        (Fraction(1), "less than the whole side"),
+        ("4/3", "less than the whole side"),
+        (Fraction(4, 3), "less than the whole side"),
         (Fraction(0), "more than 0"),
         (Fraction(-1, 3), "more than 0"),
     ],
@@ -548,3 +562,86 @@ def test_a_square_index_is_a_whole_number_not_a_bool(row, col):
     # JSON true would otherwise load as square 1 and be written back as 1.
     with pytest.raises(ValidationError, match="Input should be a valid integer"):
         PlainUnit(row=row, col=col, confidence=HAND)
+
+
+def _snowball_with(**update) -> GridRegion:
+    # The snowball region with its one unit changed by model_copy, which skips
+    # validation, the way a resize or an edit in code would.
+    region = snowball().center
+    return region.model_copy(update={"unit_map": [region.unit_map[0].model_copy(update=update)]})
+
+
+@pytest.mark.parametrize(
+    ("update", "message"),
+    [
+        # Negative indexes would wrap to the last row or column.
+        ({"row": -1}, r"row: Input should be greater than or equal to 0"),
+        ({"col": -1}, r"col: Input should be greater than or equal to 0"),
+        ({"row": True}, r"row: Input should be a valid integer"),
+        ({"leg": Fraction(3, 2)}, "less than the whole side"),
+        # Four corners at 2/3 total 4/3 on every side; 48 x 2/3 = 32 eighths,
+        # a whole number, so only the side rule refuses it.
+        ({"leg": Fraction(2, 3)}, "total more than the side"),
+        ({"confidence": 1.5}, r"confidence: Input should be less than or equal to 1"),
+    ],
+    ids=["row", "col", "bool-row", "leg-range", "side-rule", "confidence"],
+)
+def test_the_area_count_rechecks_every_unit_rule(update, message):
+    with pytest.raises(ValueError, match=message):
+        quadrupled_area_by_fabric(_snowball_with(**update))
+
+
+@pytest.mark.parametrize(
+    ("build", "message"),
+    [
+        (lambda: HstUnit(row=0, col=0, diagonal="tl_br", upper="a", lower="a", confidence=HAND),
+         "is a plain square"),
+        (lambda: QstUnit(row=0, col=0, top="a", right="a", bottom="a", left="a", confidence=HAND),
+         "is a plain square"),
+        (lambda: QstUnit(row=0, col=0, top="a", right="a", bottom="b", left="b", confidence=HAND),
+         "is a tl_br hst"),
+        (lambda: QstUnit(row=0, col=0, top="a", right="b", bottom="b", left="a", confidence=HAND),
+         "is a tr_bl hst"),
+        (lambda: GooseUnit(row=0, col=0, points="up", body="a", sky="a", confidence=HAND),
+         "is two plain squares"),
+    ],
+    ids=["hst", "qst-plain", "qst-tl_br", "qst-tr_bl", "goose"],
+)
+def test_a_unit_that_a_simpler_kind_writes_is_refused(build, message):
+    # One spelling per square: these are plain squares or an hst.
+    with pytest.raises(ValidationError, match=message):
+        build()
+
+
+def test_a_three_fabric_qst_is_a_qst():
+    # Star points: one fabric on two opposite quarters, two others on the
+    # rest, so no simpler kind writes it.
+    unit = QstUnit(row=0, col=0, top="a", right="b", bottom="a", left="c", confidence=HAND)
+    assert unit.fabric_ids() == {"a", "b", "c"}
+
+
+def test_a_corner_in_its_base_fabric_is_refused():
+    # The cell is a, so a corner of a is no triangle at all; leave it out.
+    unit = CornerUnit(row=0, col=0, corners={"top_left": "a", "top_right": "b"}, leg="1/2",
+                      confidence=HAND)
+    with pytest.raises(ValidationError, match="has a corner in its base fabric a"):
+        region([unit], rows=1, cols=1)
+
+
+def test_the_map_is_kept_in_row_major_order():
+    # The same units in reverse are the same model and write the same bytes.
+    forward = pinwheel()
+    units = list(reversed(forward.center.unit_map))
+    region = GridRegion.model_validate(
+        {**forward.center.model_dump(), "unit_map": [u.model_dump() for u in units]}
+    )
+    backward = two_fabric_quilt(region, "r", "w")
+    assert [(u.row, u.col) for u in backward.center.unit_map] == [(0, 0), (0, 1), (1, 0), (1, 1)]
+    assert backward == forward
+    assert dumps(backward) == dumps(forward)
+
+
+@pytest.mark.parametrize("confidence", [True, "0.5"], ids=["bool", "string"])
+def test_a_unit_confidence_is_a_number_not_a_bool_or_string(confidence):
+    with pytest.raises(ValidationError, match="Input should be a valid number"):
+        PlainUnit(row=0, col=0, confidence=confidence)

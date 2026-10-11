@@ -4,8 +4,8 @@ All lengths are integer eighths of an inch (see qrep.model.units). CV
 confidence lives in four places: provenance.stage_confidence (per CV stage),
 GridRegion.cell_confidence (per cell), each unit of GridRegion.unit_map (per
 unit, qrep.model.unitmap) and FinishedSizeBasis.confidence (a size estimated
-from the photo). Hand-authored models omit the first two and leave unit
-confidence at 1.0; the effective_* helpers fill in the 1.0 defaults. User facts (the confirmed block
+from the photo). Hand-authored models omit the first two and state 1.0 on
+every unit; the effective_* helpers fill in the 1.0 defaults. User facts (the confirmed block
 structure, a typed or preset size) record confidence 1.0 (docs/SPEC.md
 section 8).
 """
@@ -26,6 +26,13 @@ _HEX_RE = re.compile(r"^#[0-9a-f]{6}$")
 # A unit map is new in schema 1.1. A model without one keeps the version it
 # was written with, so its saved bytes do not change.
 UNIT_MAP_SCHEMA_VERSION = "1.1"
+
+
+def _minor(version: str) -> int:
+    """The minor number of a major-1 version: "1", "1.", "1.00" and "1.0.0"
+    are 0, "1.10" is 10; an unreadable minor counts as 0."""
+    parts = str(version).split(".")
+    return int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 0
 
 
 class QrepSchemaError(ValueError):
@@ -99,10 +106,16 @@ class GridRegion(BaseModel):
                         raise ValueError(f"cell confidence {v} outside [0, 1]")
         return self
 
+    @field_validator("unit_map")
+    @classmethod
+    def _row_major(cls, v: list | None) -> list | None:
+        # One order, so the same map is the same model and the same bytes.
+        return None if v is None else sorted(v, key=lambda unit: (unit.row, unit.col))
+
     @model_validator(mode="after")
     def _units_tile_the_grid(self) -> "GridRegion":
         if self.unit_map is not None:
-            check_unit_map(self.unit_map, self.rows, self.cols, self.cell_size)
+            check_unit_map(self.unit_map, self.rows, self.cols, self.cell_size, self.cells)
         return self
 
     @model_serializer(mode="wrap")
@@ -329,7 +342,7 @@ class Quilt(BaseModel):
 
     @model_validator(mode="after")
     def _unit_map_is_version_one_one(self) -> "Quilt":
-        if self.center.unit_map is not None and self.schema_version in ("1", "1.0"):
+        if self.center.unit_map is not None and _minor(self.schema_version) < 1:
             self.schema_version = UNIT_MAP_SCHEMA_VERSION
         return self
 
@@ -338,7 +351,8 @@ class Quilt(BaseModel):
         # model_copy and assignment skip the validator above, so the writer
         # applies the same rule and a file with a map never says "1".
         data = handler(self)
-        if self.center.unit_map is not None and data.get("schema_version") in ("1", "1.0"):
+        version = data.get("schema_version")
+        if self.center.unit_map is not None and version is not None and _minor(version) < 1:
             data["schema_version"] = UNIT_MAP_SCHEMA_VERSION
         return data
 

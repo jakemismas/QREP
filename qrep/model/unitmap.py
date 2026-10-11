@@ -8,6 +8,11 @@ parts, or 1.0 for a hand-authored map. It has no default, so a read cannot
 store a guess as certain by leaving it out. The cells keep one fabric per
 square for code that reads only the cells.
 
+Each square has one spelling: the region keeps its map in row-major order,
+corners keep one order, and a unit that a simpler kind writes is refused (an
+hst or goose in one fabric, a qst that is an hst or plain, a corner in its base
+fabric, a corner leg of the whole side).
+
 - plain: one fabric, the square's cell.
 - hst: two halves split by a diagonal, tl_br (top-left to bottom-right) or
   tr_bl; upper is the half that holds the top edge, lower the other.
@@ -35,6 +40,7 @@ from pydantic import (
     Field,
     PlainSerializer,
     PlainValidator,
+    ValidationError,
     field_validator,
     model_validator,
 )
@@ -72,8 +78,9 @@ def _leg(value: object) -> Fraction:
         raise ValueError(f'corner leg must be a fraction of the side such as "1/3", got {value!r}')
     if leg <= 0:
         raise ValueError(f"corner leg {leg} must be more than 0")
-    if leg > 1:
-        raise ValueError(f"corner leg {leg} must be at most the whole side")
+    if leg >= 1:
+        # A whole-side corner is half the square, which the hst kind writes.
+        raise ValueError(f"corner leg {leg} must be less than the whole side")
     return leg
 
 
@@ -83,7 +90,8 @@ Leg = Annotated[
     PlainSerializer(lambda leg: f"{leg.numerator}/{leg.denominator}", return_type=str),
 ]
 
-Confidence = Annotated[float, Field(ge=0.0, le=1.0)]
+# Strict, so JSON true or "0.5" is refused instead of read as a number.
+Confidence = Annotated[float, Field(ge=0.0, le=1.0, strict=True)]
 # Strict, so JSON true is not read as square 1 and rewritten as 1.
 Index = Annotated[int, Field(ge=0, strict=True)]
 
@@ -110,6 +118,12 @@ class HstUnit(BaseModel):
     lower: str = Field(description="fabric of the half that holds the bottom edge")
     confidence: Confidence
 
+    @model_validator(mode="after")
+    def _two_fabrics(self) -> "HstUnit":
+        if self.upper == self.lower:
+            raise ValueError(f"an hst in one fabric ({self.upper}) is a plain square")
+        return self
+
     def squares(self) -> list[tuple[int, int]]:
         return [(self.row, self.col)]
 
@@ -126,6 +140,18 @@ class QstUnit(BaseModel):
     bottom: str
     left: str
     confidence: Confidence
+
+    @model_validator(mode="after")
+    def _not_a_simpler_kind(self) -> "QstUnit":
+        # Top and right together are the upper half of a tl_br diagonal, top
+        # and left the upper half of a tr_bl one.
+        if len({self.top, self.right, self.bottom, self.left}) == 1:
+            raise ValueError(f"a qst in one fabric ({self.top}) is a plain square")
+        if self.top == self.right and self.bottom == self.left:
+            raise ValueError("a qst whose top matches its right and bottom its left is a tl_br hst")
+        if self.top == self.left and self.bottom == self.right:
+            raise ValueError("a qst whose top matches its left and bottom its right is a tr_bl hst")
+        return self
 
     def squares(self) -> list[tuple[int, int]]:
         return [(self.row, self.col)]
@@ -176,6 +202,12 @@ class GooseUnit(BaseModel):
     sky: str
     confidence: Confidence
 
+    @model_validator(mode="after")
+    def _two_fabrics(self) -> "GooseUnit":
+        if self.body == self.sky:
+            raise ValueError(f"a goose in one fabric ({self.body}) is two plain squares")
+        return self
+
     @property
     def horizontal(self) -> bool:
         return self.points in ("up", "down")
@@ -194,14 +226,27 @@ Unit = Annotated[
 ]
 
 
-def check_unit_map(units: list[Unit], rows: int, cols: int, cell_size: int) -> None:
-    """Raise ValueError unless the units tile the grid: each inside it, each
-    square covered exactly once, and each corner leg a whole number of
-    eighths."""
+def check_unit_map(
+    units: list[Unit], rows: int, cols: int, cell_size: int, cells: list[list[str]]
+) -> None:
+    """Raise ValueError unless every unit keeps its own rules and the units
+    tile the grid: each inside it, each square covered exactly once, each
+    corner leg a whole number of eighths and each corner off its base fabric.
+    """
     counts = [[0] * cols for _ in range(rows)]
     for unit in units:
+        # model_copy and assignment skip a unit's own validation, so a unit
+        # rebuilt from its fields proves its bounds, leg and side rules again.
+        try:
+            type(unit).model_validate(unit.model_dump())
+        except ValidationError as error:
+            first = error.errors()[0]
+            where = ".".join(str(part) for part in first["loc"]) or "unit"
+            raise ValueError(
+                f"{unit.kind} unit at row {unit.row}, col {unit.col}: {where}: {first['msg']}"
+            ) from None
         for r, c in unit.squares():
-            if not (r < rows and c < cols):
+            if not (0 <= r < rows and 0 <= c < cols):
                 raise ValueError(
                     f"{unit.kind} unit at row {unit.row}, col {unit.col} covers a square "
                     f"outside the {rows} x {cols} grid"
@@ -213,6 +258,11 @@ def check_unit_map(units: list[Unit], rows: int, cols: int, cell_size: int) -> N
             raise ValueError(
                 f"corner leg {unit.leg} of a {cell_size}-eighth square is "
                 f"{unit.leg * cell_size} eighths, not a whole number of eighths"
+            )
+        if isinstance(unit, CornerUnit) and cells[unit.row][unit.col] in unit.corners.values():
+            raise ValueError(
+                f"corner unit at row {unit.row}, col {unit.col} has a corner in its base "
+                f"fabric {cells[unit.row][unit.col]}; leave that corner out"
             )
     for r in range(rows):
         for c in range(cols):
@@ -230,7 +280,7 @@ def quadrupled_area_by_fabric(region: "GridRegion") -> dict[str, int]:
     that left a leg off the eighths must raise here instead of rounding.
     """
     if region.unit_map is not None:
-        check_unit_map(region.unit_map, region.rows, region.cols, region.cell_size)
+        check_unit_map(region.unit_map, region.rows, region.cols, region.cell_size, region.cells)
     s = region.cell_size
     whole = AREA_SCALE * s * s
     area: dict[str, int] = {}

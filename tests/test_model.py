@@ -420,7 +420,8 @@ def one_unit_of_each_kind(confidence: float = 1.0) -> list:
         PlainUnit(row=0, col=0, **c),
         HstUnit(row=0, col=1, diagonal="tl_br", upper="f0", lower="f1", **c),
         QstUnit(row=0, col=2, top="f0", right="f1", bottom="f0", left="f1", **c),
-        CornerUnit(row=0, col=3, corners={"top_left": "f1"}, leg="1/3", **c),
+        # The base cell at (0, 3) is f1, so the corner is f0.
+        CornerUnit(row=0, col=3, corners={"top_left": "f0"}, leg="1/3", **c),
         GooseUnit(row=1, col=0, points="up", body="f0", sky="f1", **c),
         GooseUnit(row=1, col=2, points="down", body="f1", sky="f0", **c),
     ]
@@ -474,8 +475,8 @@ UNRECORDED_CONFIDENCE = {"GridRegion.cell_size", "BorderBand.width"}
 # basis, which no read fills yet (#207). Every other CV value must be stored by
 # read_shaped_quilt and so meet the presence check; a new optional CV field
 # fails until it is stored there or named here. No read writes a unit map until
-# B4a, so the unit values are named too; unit_shaped_quilt checks their
-# confidences instead.
+# B4a (#139), so the unit values are named too, and #139's criterion removes
+# them; unit_shaped_quilt checks their confidences instead.
 UNIT_VALUES = {path for path, source in FIELD_SOURCES.items() if source.startswith("cv:unit:")}
 NOT_STORED_ON_A_READ = {
     "FinishedSizeBasis.achieved_width",
@@ -557,6 +558,17 @@ def _instances(value) -> list[BaseModel]:
     if isinstance(value, (list, tuple)):
         return [model for item in value for model in _instances(item)]
     return []
+
+
+def test_each_unit_class_names_its_own_kind_carrier():
+    # A unit field labeled with another kind's carrier would point the
+    # presence check at the wrong confidences.
+    classes = {cls.__name__: cls for cls in (PlainUnit, HstUnit, QstUnit, CornerUnit, GooseUnit)}
+    labeled = {p: s for p, s in FIELD_SOURCES.items() if s.startswith("cv:unit:")}
+    assert {p.split(".")[0] for p in labeled} == set(classes)
+    for path, source in labeled.items():
+        kind = classes[path.split(".")[0]].model_fields["kind"].default
+        assert source == f"cv:unit:{kind}", path
 
 
 def test_instances_descends_into_every_container():
