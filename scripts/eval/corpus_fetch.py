@@ -53,16 +53,42 @@ def default_cache() -> Path:
     return Path(common).parent / "corpus" / "private" / "cache"
 
 
+class NotPrivate(ValueError):
+    """A write target outside the main checkout's ignored corpus/private/."""
+
+
+def require_private(path: Path) -> Path:
+    """path, when it lies inside the main checkout's corpus/private/ and git ignores it.
+
+    Fetched images and every view of them are written only there, because corpus-guard never
+    sees a file outside corpus/, and a file git does not ignore can be staged by accident."""
+    private = default_cache().parent.resolve()
+    target = path.resolve()
+    if not target.is_relative_to(private):
+        raise NotPrivate(f"refusing {path}: write only inside {private}")
+    ignored = subprocess.run(
+        ["git", "-C", str(private.parents[1]), "check-ignore", "-q", "--no-index", str(target)],
+        capture_output=True,
+    )
+    if ignored.returncode != 0:
+        raise NotPrivate(f"refusing {path}: git does not ignore it")
+    return path
+
+
 COLUMNS = (
     "file", "license", "source", "object_id", "title", "landing_url", "image_url",
     "rights_flag", "policy_url", "credit", "dimensions_text", "finished_in", "sha256",
     "file_sha256", "px_w", "px_h", "tier", "class", "capture", "commit_ok", "date_end",
+    "eval_set",
 )
 TIERS = ("A", "B", "R", "X")
 IN_SCOPE = ("squares", "hst", "qst", "snowball", "flying_geese")
-REFUSALS = ("on_point", "curve", "applique", "medallion", "hexagon", "diamond_star", "other")
-# Why a tier X photo is excluded from every eval set.
-EXCLUSIONS = ("partial_view", "duplicate", "not_a_quilt", "unreadable")
+REFUSALS = ("on_point", "curve", "applique", "medallion", "hexagon", "diamond_star")
+# Why a tier X photo is excluded from every eval set. whole_cloth has no piecing to read;
+# outside_classes is an out-of-scope photo that none of plan D3a's six refusal classes names, so
+# it cannot be a tier R row as the plan defines R.
+EXCLUSIONS = ("partial_view", "duplicate", "not_a_quilt", "unreadable", "whole_cloth",
+              "outside_classes")
 CLASSES_BY_TIER = {"A": IN_SCOPE, "B": IN_SCOPE, "R": REFUSALS, "X": EXCLUSIONS}
 
 # A plain User-Agent with no personal contact details (plan D3a, criterion 1).
@@ -75,6 +101,10 @@ MIN_INTERVAL_S = 1.0
 ALLOWED_HOSTS = frozenset({
     "collectionapi.metmuseum.org", "images.metmuseum.org", "www.metmuseum.org",
     "api.si.edu", "ids.si.edu", "collections.si.edu", "www.si.edu",
+    # Smithsonian Open Access's own media bucket (registry.opendata.aws/smithsonian-open-access);
+    # ids.si.edu/ids/download redirects most image requests there. This bucket only: every
+    # other amazonaws.com host stays refused.
+    "smithsonian-open-access.s3-us-west-2.amazonaws.com",
     "api.artic.edu", "www.artic.edu",
     "collections.lacma.org", "collections-images.lacma.org", "www.lacma.org",
     # Cooper Hewitt is a Smithsonian museum whose record pages live on its own domain.
@@ -156,8 +186,12 @@ class Candidate:
 def _years(text: str) -> list[int]:
     # Digit guards rather than word boundaries, so a decade such as 1850s still reads 1850.
     years = [int(y) for y in re.findall(r"(?<!\d)(1[5-9]\d\d|20\d\d)(?!\d)", text)]
-    # A range written 1925-35 ends in 1935.
-    for start, end in re.findall(r"(?<!\d)(1[5-9]\d\d|20\d\d)\s*-\s*(\d\d)(?!\d)", text):
+    # A decade ends with its last year: the 1850s with 1859, because date_end is the last year
+    # the record's date gives (corpus/README.md).
+    for decade in re.findall(r"(?<!\d)(1[5-9]\d0|20\d0)'?s\b", text):
+        years.append(int(decade) + 9)
+    # A range written 1925-35 ends in 1935; museum records write the dash as a hyphen or an en dash.
+    for start, end in re.findall(r"(?<!\d)(1[5-9]\d\d|20\d\d)\s*[-\u2013]\s*(\d\d)(?!\d)", text):
         years.append(int(start[:2] + end))
     # A century ends with its last year: the 19th century with 1900.
     for number in re.findall(r"(?<!\d)(1[5-9]|20)(?:st|nd|rd|th)\s+century", text, re.IGNORECASE):
@@ -241,12 +275,22 @@ def _texts(entries) -> list[str]:
     return [e.get("content", "") for e in entries or [] if isinstance(e, dict)]
 
 
+def _si_record_id(row: dict) -> str:
+    nonrep = (row.get("content") or {}).get("descriptiveNonRepeating") or {}
+    return nonrep.get("record_ID") or row.get("id") or ""
+
+
+def _si_media(row: dict) -> list[dict]:
+    nonrep = (row.get("content") or {}).get("descriptiveNonRepeating") or {}
+    return (nonrep.get("online_media") or {}).get("media") or []
+
+
 def si_candidate(row: dict) -> Candidate:
     """A Smithsonian Open Access search row; one image medium must be usage CC0."""
     content = row.get("content") or {}
     nonrep = content.get("descriptiveNonRepeating") or {}
-    record_id = nonrep.get("record_ID") or row.get("id") or ""
-    media = (nonrep.get("online_media") or {}).get("media") or []
+    record_id = _si_record_id(row)
+    media = _si_media(row)
     cleared = [
         m for m in media
         if (m.get("usage") or {}).get("access") == "CC0" and m.get("type") == "Images"
@@ -307,8 +351,8 @@ class RateLimiter:
 _NUM = r"\d+(?:\.\d+)?(?:\s+\d+/\d+)?|\d+/\d+"
 # A pair, or a triple whose third number (the depth) is dropped, then its unit.
 _PAIR = re.compile(
-    rf"(?:\b(?P<l1>[HW])(?:\.|eight|idth)?\s*)?(?P<a>{_NUM})\s*(?:in\.?|inches|cm)?\s*x\s*"
-    rf"(?:\b(?P<l2>[HW])(?:\.|eight|idth)?\s*)?(?P<b>{_NUM})\s*(?:in\.?|inches|cm)?"
+    rf"(?:\b(?P<l1>[HWL])(?:\.|eight|idth|ength)?\s*)?(?P<a>{_NUM})\s*(?:in\.?|inches|cm)?\s*x\s*"
+    rf"(?:\b(?P<l2>[HWL])(?:\.|eight|idth|ength)?\s*)?(?P<b>{_NUM})\s*(?:in\.?|inches|cm)?"
     rf"(?:\s*x\s*(?:\bD\.?\s*)?(?:{_NUM}))?\s*(?P<unit>in\b\.?|inches|cm\b)",
     re.IGNORECASE,
 )
@@ -346,8 +390,10 @@ def parse_finished_size(text: str) -> tuple[float, float] | None:
     """(width, height) in inches from a museum dimensions text, or None.
 
     Inches win over centimetres. An unlabeled pair reads height x width, the
-    museum convention for flat textiles; H. and W. labels win over order. The
-    result is approximate: a museum measures the object, not the pattern."""
+    museum convention for flat textiles; H., W. and L. labels win over order,
+    and L. (length) reads as the height, because a museum that gives L x W for
+    a flat textile measures its long side down. The result is approximate: a
+    museum measures the object, not the pattern."""
     normalized = _FEET.sub(_feet_to_inches, text.replace("\u00d7", "x").replace("\u00a0", " "))
     pairs = list(_PAIR.finditer(normalized))
     chosen = next((m for m in pairs if not m["unit"].lower().startswith("cm")), None)
@@ -356,7 +402,7 @@ def parse_finished_size(text: str) -> tuple[float, float] | None:
         return None
     scale = 1 / 2.54 if chosen["unit"].lower().startswith("cm") else 1.0
     a, b = (round(_number(chosen[k]) * scale, 2) for k in ("a", "b"))
-    labels = ((chosen["l1"] or "").upper(), (chosen["l2"] or "").upper())
+    labels = tuple((chosen[k] or "").upper().replace("L", "H") for k in ("l1", "l2"))
     if labels == ("W", "H"):
         return (a, b)
     return (b, a)
@@ -454,14 +500,20 @@ class Client:
         self.opener = urllib.request.build_opener(_AllowlistRedirects)
         self.requests: dict[str, int] = {}
 
-    def get(self, url: str, headers: dict[str, str] | None = None) -> bytes:
+    def get_final(
+        self, url: str, headers: dict[str, str] | None = None
+    ) -> tuple[bytes, str, int]:
+        """The body, the URL that answered after any redirects, and its HTTP status."""
         check_host(url)
         self.limiter.wait()
         host = urllib.parse.urlsplit(url).hostname or ""
         self.requests[host] = self.requests.get(host, 0) + 1
         request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, **(headers or {})})
         with self.opener.open(request, timeout=180) as response:
-            return response.read()
+            return response.read(), response.geturl(), response.status
+
+    def get(self, url: str, headers: dict[str, str] | None = None) -> bytes:
+        return self.get_final(url, headers)[0]
 
     def json(self, url: str, headers: dict[str, str] | None = None) -> dict:
         return json.loads(self.get(url, headers))
@@ -613,15 +665,19 @@ def search(client: Client, cache: Path, sources: list[str], refresh: bool) -> di
     return report
 
 
-def _image_facts(path: Path) -> tuple[str, int, int]:
+def _image_facts(data: bytes) -> tuple[str, int, int]:
     from PIL import Image
 
-    data = path.read_bytes()
     with Image.open(io.BytesIO(data)) as image:
         image.verify()
     with Image.open(io.BytesIO(data)) as image:
         width, height = image.size
     return hashlib.sha256(data).hexdigest(), width, height
+
+
+def _image_headers(source: str) -> dict[str, str]:
+    # AIC asks every client, image requests included, to identify itself in AIC-User-Agent.
+    return {"AIC-User-Agent": USER_AGENT} if source == "aic" else {}
 
 
 def download(client: Client, cache: Path, sources: list[str]) -> dict:
@@ -633,10 +689,13 @@ def download(client: Client, cache: Path, sources: list[str]) -> dict:
             continue
         path = cache / c.cache_file
         try:
+            # Validate before caching: a challenge page or an error body answered with 200 must
+            # not sit in the cache, where it would block every later fetch of that image.
+            data = path.read_bytes() if path.exists() else client.get(
+                c.image_url, _image_headers(c.source))
+            sha, width, height = _image_facts(data)
             if not path.exists():
-                data = client.get(c.image_url)
                 path.write_bytes(data)
-            sha, width, height = _image_facts(path)
         except Exception as err:  # noqa: BLE001 - one bad image must not stop the run
             failed[c.cache_file] = f"{type(err).__name__}: {err}"
             continue
@@ -660,11 +719,14 @@ def build_rows(cache: Path, screen_csv: Path, committed: dict[str, tuple[str, st
     by_stem = {Path(c.cache_file).stem: c for c in load_candidates(cache) if c.sha256}
     with screen_csv.open(encoding="utf-8", newline="") as handle:
         decisions = list(csv.DictReader(handle))
+    missing = [d["stem"] for d in decisions if d["stem"] not in by_stem]
+    if missing:
+        # A decision for a photo that is not fetched (or no longer clears) is a screening error,
+        # not a row to drop quietly.
+        raise ValueError(f"screen decisions with no fetched candidate: {missing}")
     out = []
     for d in decisions:
-        c = by_stem.get(d["stem"])
-        if c is None:
-            continue
+        c = by_stem[d["stem"]]
         source = SOURCES[c.source]
         parsed = parse_finished_size(c.dimensions_text) if c.dimensions_text else None
         file, file_sha = committed.get(c.cache_file, ("private/cache/" + c.cache_file, ""))
@@ -678,8 +740,22 @@ def build_rows(cache: Path, screen_csv: Path, committed: dict[str, tuple[str, st
             "sha256": c.sha256, "file_sha256": file_sha, "px_w": str(c.px_w),
             "px_h": str(c.px_h), "tier": d["tier"], "class": d["class"],
             "capture": "museum_scan", "commit_ok": d["commit_ok"], "date_end": str(c.date_end),
+            "eval_set": d.get("eval_set", ""),
         })
     return out
+
+
+def committed_copies(rows: Iterable[dict[str, str]]) -> dict[str, tuple[str, str]]:
+    """The committed copies the manifest already binds, keyed by cache file."""
+    return {cache_name(r["source"], r["object_id"]): (r["file"], r["file_sha256"])
+            for r in rows if r["file"].startswith("images/")}
+
+
+def merge_rows(old: Iterable[dict[str, str]], new: Iterable[dict[str, str]]) -> list[dict]:
+    """old with each photo that new screens replaced by its new row, and new photos added."""
+    merged = {(r["source"], r["object_id"]): r for r in old}
+    merged.update({(r["source"], r["object_id"]): r for r in new})
+    return list(merged.values())
 
 
 def verify(cache: Path, rows: list[dict[str, str]]) -> list[str]:
@@ -694,65 +770,125 @@ def verify(cache: Path, rows: list[dict[str, str]]) -> list[str]:
     return problems
 
 
-def recheck(client: Client, rows: list[dict[str, str]], cache: Path) -> list[str]:
-    """Re-read each row's rights flag from its live record; any change is a problem.
+def live_flag(source: str, record: dict) -> str:
+    """The record's own rights value, written as a manifest rights_flag, whether or not it clears.
 
-    The policy pages answer scripted reads with 403 or 429 (2026-10-10), so the
-    recheck fails on a policy page that is gone (404 or 410) and leaves a blocked
-    one to the release's human check (E4)."""
-    problems = []
-    live: dict[tuple[str, str], Candidate | str] = {}
-    sources = sorted({row["source"] for row in rows})
-    with_rows = {s: [r for r in rows if r["source"] == s] for s in sources}
-    if "met" in sources:
-        for row in with_rows["met"]:
-            record = client.json(f"{MET}/v1/objects/{row['object_id']}")
-            live[("met", row["object_id"])] = _parse_or_reason("met", record)
-    if "aic" in sources:
-        ids = [row["object_id"] for row in with_rows["aic"]]
-        for start in range(0, len(ids), 100):
-            url = f"{AIC_API}/artworks?" + _query(
-                {"ids": ",".join(ids[start:start + 100]), "fields": AIC_FIELDS, "limit": "100"})
-            for record in client.json(url, {"AIC-User-Agent": USER_AGENT}).get("data") or []:
-                live[("aic", str(record.get("id")))] = _parse_or_reason("aic", record)
-    if "smithsonian" in sources:
-        for record in si_rows(client, cache, refresh=True):
-            parsed = _parse_or_reason("smithsonian", record)
-            key = parsed.object_id if isinstance(parsed, Candidate) else record.get("id", "")
-            live[("smithsonian", key)] = parsed
-    if "lacma" in sources:
-        for row in with_rows["lacma"]:
-            page = client.get(f"https://collections.lacma.org/object/{row['object_id']}")
-            record = {"object_id": row["object_id"], "html": page.decode("utf-8")}
-            live[("lacma", row["object_id"])] = _parse_or_reason("lacma", record)
-    for row in rows:
-        found = live.get((row["source"], row["object_id"]))
-        source = SOURCES[row["source"]]
-        if found is None:
-            problems.append(f"{row['file']}: no live record (withdrawn, or no longer flagged)")
-        elif isinstance(found, str):
-            problems.append(f"{row['file']}: {found}")
-        elif (row["license"], row["rights_flag"], row["policy_url"]) != (
-            source.license, source.rights_flag, source.policy_url
-        ):
-            problems.append(f"{row['file']}: license, flag or policy URL differs from the source's")
-    for source in sources:
-        url = SOURCES[source].policy_url
+    A flag that clears renders exactly as SOURCES gives it, so a row whose flag still holds
+    compares equal; anything else renders what the record says, so a change names itself."""
+    if source in ("met", "aic"):
+        key = "isPublicDomain" if source == "met" else "is_public_domain"
+        return f"{key}={json.dumps(record[key]) if key in record else 'missing'}"
+    if source == "smithsonian":
+        # As si_candidate clears a record on any CC0 image medium, any CC0 medium reads CC0;
+        # otherwise the first medium's value shows what the record says now.
+        accesses = [(m.get("usage") or {}).get("access") for m in _si_media(record)
+                    if m.get("type") == "Images"]
+        access = "CC0" if "CC0" in accesses else (accesses[0] if accesses else None)
+        return f"media.usage.access={access if access is not None else 'missing'}"
+    if source == "lacma":
+        flags = _PUBLIC_DOMAIN.findall(record["html"])
+        if not flags:
+            return "publicDomain=missing"
+        return "publicDomain=" + ("1" if all(f == "1" for f in flags) else ",".join(flags))
+    raise ValueError(f"unknown source {source!r}")
+
+
+def _record_id(source: str, record: dict) -> str:
+    if source == "met":
+        return str(record.get("objectID"))
+    if source == "aic":
+        return str(record.get("id"))
+    if source == "smithsonian":
+        return _si_record_id(record)
+    return record["object_id"]
+
+
+def _live_flags(
+    client: Client, rows: list[dict[str, str]], cache: Path
+) -> tuple[dict[tuple[str, str], str], dict[tuple[str, str], str]]:
+    """Each row's live_flag by (source, object_id), and why any row's record could not be read.
+    A row in neither map has no live record."""
+    flags: dict[tuple[str, str], str] = {}
+    errors: dict[tuple[str, str], str] = {}
+
+    def read(source: str, wanted: list[str], fetch: Callable[[], list[dict]]) -> None:
+        # The flag is rendered inside the guard too, so a record of an unexpected shape is that
+        # row's problem rather than a traceback that hides every other row's result.
         try:
-            client.get(url)
-        except urllib.error.HTTPError as err:
-            if err.code in (404, 410):
-                problems.append(f"{source}: policy page {url} answers {err.code}")
-        except urllib.error.URLError as err:
-            problems.append(f"{source}: policy page {url} unreachable ({err.reason})")
-    return problems
+            by_id = {_record_id(source, record): record for record in fetch()}
+            found = {oid: live_flag(source, by_id[oid]) for oid in wanted if oid in by_id}
+        except Exception as err:  # noqa: BLE001 - one unreadable record must not hide the rest
+            reason = f"{type(err).__name__}: {err}"
+            errors.update({(source, object_id): reason for object_id in wanted})
+            return
+        flags.update({(source, oid): flag for oid, flag in found.items()})
+
+    ids = {name: [r["object_id"] for r in rows if r["source"] == name] for name in SOURCES}
+    for oid in ids["met"]:
+        read("met", [oid], lambda oid=oid: [client.json(f"{MET}/v1/objects/{oid}")])
+    for start in range(0, len(ids["aic"]), 100):
+        batch = ids["aic"][start:start + 100]
+        url = f"{AIC_API}/artworks?" + _query(
+            {"ids": ",".join(batch), "fields": AIC_FIELDS, "limit": "100"})
+        read("aic", batch,
+             lambda url=url: client.json(url, {"AIC-User-Agent": USER_AGENT}).get("data") or [])
+    if ids["smithsonian"]:
+        read("smithsonian", ids["smithsonian"], lambda: si_rows(client, cache, refresh=True))
+    for oid in ids["lacma"]:
+        read("lacma", [oid], lambda oid=oid: [{"object_id": oid, "html": client.get(
+            f"https://collections.lacma.org/object/{oid}").decode("utf-8")}])
+    return flags, errors
 
 
-def _parse_or_reason(source: str, record: dict) -> Candidate | str:
+def _policy_problem(client: Client, url: str) -> str | None:
     try:
-        return PARSERS[source](record)
-    except NotCleared as err:
-        return str(err)
+        _, final, status = client.get_final(url)
+    except urllib.error.HTTPError as err:
+        return f"policy page {url} answers HTTP {err.code}"
+    except urllib.error.URLError as err:
+        return f"policy page {url} unreachable ({err.reason})"
+    except Exception as err:  # noqa: BLE001 - a redirect off the allowlist raises HostRefused
+        return f"policy page {url} unreadable ({type(err).__name__}: {err})"
+    if final != url:
+        return f"policy page {url} redirects to {final}"
+    if status != 200:
+        return f"policy page {url} answers HTTP {status}"
+    return None
+
+
+def recheck(client: Client, rows: list[dict[str, str]], cache: Path) -> list[str]:
+    """Re-read each row's rights value from its live record and every policy page the rows
+    cite; any change is a problem.
+
+    A row passes when its live record renders, through live_flag, to the row's own rights_flag
+    and its license is the one its source sets. A record that cannot be fetched, or is missing,
+    is a problem. A policy page passes only on HTTP 200 at the URL the row cites: any error
+    status (403 and 429 included), any redirect and any unreachable page is a problem. The
+    recheck fails closed, with nothing left to a human check, because a policy page that blocks
+    scripted reads is one whose terms the recheck cannot confirm."""
+    flags, errors = _live_flags(client, rows, cache)
+    problems = []
+    for row in rows:
+        file, key = row["file"], (row["source"], row["object_id"])
+        source = SOURCES.get(row["source"])
+        if source is None:
+            problems.append(f"{file}: unknown source {row['source']!r}")
+            continue
+        if row["license"] != source.license:
+            problems.append(f"{file}: license {row['license']} is not {source.license}, "
+                            f"the license {source.name} sets")
+        if key in errors:
+            problems.append(f"{file}: live record unreadable ({errors[key]})")
+        elif key not in flags:
+            problems.append(f"{file}: no live record (withdrawn, or no longer flagged)")
+        elif flags[key] != row["rights_flag"]:
+            problems.append(
+                f"{file}: rights flag changed from {row['rights_flag']} to {flags[key]}")
+    for url in sorted({row["policy_url"] for row in rows}):
+        problem = _policy_problem(client, url)
+        if problem is not None:
+            problems.append(problem)
+    return problems
 
 
 def main(argv: list[str]) -> int:
@@ -769,16 +905,21 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--refresh", action="store_true", help="re-request cached API answers")
     args = parser.parse_args(argv)
     sources = args.source or sorted(FETCHERS)
-    args.cache = args.cache or default_cache()
+    args.cache = require_private(args.cache or default_cache())
     client = Client()
     if args.command in {"search", "download"}:
         args.cache.mkdir(parents=True, exist_ok=True)
         report = (search(client, args.cache, sources, args.refresh) if args.command == "search"
                   else download(client, args.cache, sources))
         print(json.dumps({"report": report, "requests": client.requests}, indent=1))
-        return 0
+        return 1 if report.get("failed") else 0
     if args.command == "rows":
-        raise SystemExit("rows is driven by the screening step; see corpus/README.md")
+        if args.screen_csv is None:
+            parser.error("rows needs SCREEN_CSV")
+        write_manifest(merge_rows(read_manifest(), build_rows(
+            args.cache, args.screen_csv, committed_copies(read_manifest()))))
+        print(MANIFEST)
+        return 0
     if args.command == "attribution":
         ATTRIBUTION.write_text(attribution_markdown(read_manifest()), encoding="utf-8",
                                newline="\n")

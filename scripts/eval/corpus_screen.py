@@ -3,8 +3,9 @@
 Screening reads sheets of fetched photos at a size where the piecing shows; proposers read a
 ruler view whose grid labels are source-image pixels, plus zooms of any region, so a corner
 read off a view is already in the annotation's coordinates. Nothing here runs QREP: a proposal
-must never be seeded from QREP output (plan section 8.2). Views are written beside the cache,
-inside the main checkout's ignored corpus/private/, and never into a worktree.
+must never be seeded from QREP output (plan section 8.2). Views are written only inside the main
+checkout's ignored corpus/private/, and every view command refuses any other output path; the
+one exception is downsize, whose copy goes to corpus/images/ to be committed.
 
 Usage:
     python scripts/eval/corpus_screen.py sheets OUT_DIR IMAGE...
@@ -22,6 +23,8 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
+from corpus_fetch import REPO, require_private
+
 # Museum scans run to several thousand pixels; a 700 px tile still shows a 15 x 15 field's
 # squares at about 40 px each, enough to tell squares from triangles.
 SHEET_TILE = 700
@@ -32,6 +35,7 @@ ZOOM_SIDE = 900
 CORNER_FRACTION = 0.2
 # Plan D3a, criterion 10: committed copies are at most 800 px on the long side.
 COMMIT_SIDE = 800
+IMAGES = REPO / "corpus" / "images"
 JPEG_QUALITY = 90
 LABEL = (255, 0, 160)
 
@@ -173,6 +177,11 @@ def main(argv: list[str]) -> int:
     p.add_argument("image", type=Path)
     p.add_argument("out", type=Path)
     args = parser.parse_args(argv)
+    if args.command == "downsize":
+        if args.out.resolve().parent != IMAGES.resolve():
+            raise SystemExit(f"refusing {args.out}: committed copies go only in {IMAGES}")
+    else:
+        require_private(args.out_dir if args.command in {"sheets", "corners"} else args.out)
     if args.command == "sheets":
         for out in sheets(args.images, args.out_dir):
             print(out)

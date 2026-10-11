@@ -7,14 +7,18 @@ shapes are qrep/contract.py's own models, imported rather than redefined, so the
 UI, the eval and the corpus share one shape (plan section 5.E, E1b).
 
 Coordinates are pixels of the source image as fetched (canvas = its width and
-height), so an annotation maps to a read request with a zero crop offset; a
-consumer that reads a downsized or decoded copy scales by its own factors.
+height), whichever file photo names: a committed copy under corpus/images/ is
+downsized, so to_read_request scales the corners to the size of the image the
+request stages.
 
 Every annotated field is a list of claims, each a value with a provenance code,
 so a later verification sits beside the proposals instead of overwriting them,
 and the eval can count only gate truth (plan section 8.2). Annotation values
 are judgments by people or agents, never engine output, so they carry
 provenance rather than a CV confidence; agent proposals never count as truth.
+The identity fields (schema_version, photo, sha256, canvas) are not claims:
+they are the key that binds the file to its manifest row, and
+licensed_photo_problems checks each of them against that row.
 """
 
 import json
@@ -27,6 +31,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from qrep.contract import (
     FABRICS_MAX,
     FABRICS_MIN,
+    Corners,
     Counts,
     FieldFrame,
     OuterEdgeFrame,
@@ -56,11 +61,11 @@ FRAME_TRUTH: tuple[str, ...] = ("verified-jake",)
 # The dev annotate page's classes (plan C3a), so its JSON validates here.
 ConstructionClass = Literal["squares", "hst", "qst", "snowball", "flying_geese", "out_of_scope"]
 CONSTRUCTION_CLASSES: tuple[str, ...] = get_args(ConstructionClass)
-# Refusal classes from plan D3a; other covers what none of them names.
-RefusalClass = Literal[
-    "on_point", "curve", "applique", "medallion", "hexagon", "diamond_star", "other"
-]
+# The refusal classes plan D3a lists, and only those.
+RefusalClass = Literal["on_point", "curve", "applique", "medallion", "hexagon", "diamond_star"]
 REFUSAL_CLASSES: tuple[str, ...] = get_args(RefusalClass)
+# The photoreal sidecar's character vocabulary (tests/fixtures/photoreal/generator.py).
+Character = Literal["squares", "non_square", "no_pattern", "garbage"]
 # A nested screenshot is a screenshot of a screen showing a photo; it never
 # counts as a phone capture (approaches-25).
 Capture = Literal["museum_scan", "direct_screenshot", "nested_screenshot", "camera"]
@@ -139,6 +144,15 @@ class Mask(_Strict):
     reason: MaskReason
 
 
+class Grid(_Strict):
+    """The photoreal sidecar's grid: squares down and across the field, and the border's
+    total width in squares (None when the bands are not known)."""
+
+    rows: int = Field(ge=1)
+    cols: int = Field(ge=1)
+    border_pitches: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+
+
 class _Claim(_Strict):
     provenance: Provenance
 
@@ -179,6 +193,26 @@ class MasksClaim(_Claim):
     value: list[Mask]
 
 
+class QuadClaim(_Claim):
+    """The sidecar's quad: the outer edge as [x, y] pairs, top left first, clockwise."""
+
+    value: list[tuple[float, float]] = Field(min_length=4, max_length=4)
+
+
+class GridClaim(_Claim):
+    value: Grid
+
+
+class RepeatCellsClaim(_Claim):
+    """The sidecar's repeat_cells: [down, across] squares per block, or None for one block."""
+
+    value: tuple[int, int] | None
+
+
+class CharacterClaim(_Claim):
+    value: Character
+
+
 class GoldLayoutClaim(_Claim):
     """A path under corpus/gold/ (D3b)."""
 
@@ -206,6 +240,12 @@ class Annotation(_Strict):
     device_class: list[DeviceClassClaim] = Field(default_factory=list)
     masks: list[MasksClaim] = Field(default_factory=list)
     gold_layout: list[GoldLayoutClaim] = Field(default_factory=list)
+    # The photoreal sidecar fields this format extends; sidecar_view derives any that a
+    # provenance leaves out from its frame, counts and class.
+    quad: list[QuadClaim] = Field(default_factory=list)
+    grid: list[GridClaim] = Field(default_factory=list)
+    repeat_cells: list[RepeatCellsClaim] = Field(default_factory=list)
+    character: list[CharacterClaim] = Field(default_factory=list)
 
     @field_validator("canvas")
     @classmethod
@@ -225,15 +265,41 @@ class Annotation(_Strict):
     @model_validator(mode="after")
     def _points_on_canvas(self):
         width, height = self.canvas
+
+        def on_canvas(x: float, y: float, what: str) -> None:
+            if not (0 <= x <= width and 0 <= y <= height):
+                raise ValueError(f"{what} ({x}, {y}) lies off the {width} x {height} canvas")
+
         for claim in self.frame:
             frames = [claim.value.outer_edge] + ([claim.value.field] if claim.value.field else [])
             for frame in frames:
                 for corner in _corner_points(frame):
-                    if not (0 <= corner.x <= width and 0 <= corner.y <= height):
+                    on_canvas(corner.x, corner.y, f"{claim.provenance} corner")
+        for claim in self.masks:
+            for mask in claim.value:
+                for point in mask.polygon:
+                    on_canvas(point.x, point.y, f"{claim.provenance} mask point")
+        for claim in self.quad:
+            for x, y in claim.value:
+                on_canvas(x, y, f"{claim.provenance} quad point")
+        return self
+
+    @model_validator(mode="after")
+    def _quads_in_order(self):
+        for claim in self.frame:
+            edge = _corner_points(claim.value.outer_edge)
+            _check_quad(edge, f"{claim.provenance} outer edge")
+            if claim.value.field is not None:
+                field = _corner_points(claim.value.field)
+                _check_quad(field, f"{claim.provenance} field")
+                # The field lies inside the outer edge (on it when there is no border).
+                for corner in field:
+                    if any(_cross(a, b, corner) < 0 for a, b in _edges(edge)):
                         raise ValueError(
-                            f"{claim.provenance} corner ({corner.x}, {corner.y}) lies off the "
-                            f"{width} x {height} canvas"
-                        )
+                            f"{claim.provenance} field corner ({corner.x}, {corner.y}) lies "
+                            "outside the outer edge")
+        for claim in self.quad:
+            _check_quad([Point(x=x, y=y) for x, y in claim.value], f"{claim.provenance} quad")
         return self
 
 
@@ -247,6 +313,25 @@ CLAIM_FIELDS: tuple[str, ...] = tuple(
 def _corner_points(frame: OuterEdgeFrame | FieldFrame) -> list[Point]:
     c = frame.corners
     return [c.top_left, c.top_right, c.bottom_right, c.bottom_left]
+
+
+def _cross(a: Point, b: Point, c: Point) -> float:
+    # z of (b - a) x (c - a); with y pointing down, positive means c turns clockwise from a-b.
+    return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)
+
+
+def _edges(quad: list[Point]) -> list[tuple[Point, Point]]:
+    return [(quad[i], quad[(i + 1) % 4]) for i in range(4)]
+
+
+def _check_quad(quad: list[Point], what: str) -> None:
+    """Corners top left, top right, bottom right, bottom left: a convex quad traced clockwise
+    on screen, each corner on its own side, so a swapped, crossed or flat quad fails."""
+    tl, tr, br, bl = quad
+    if not (tl.x < tr.x and bl.x < br.x and tl.y < bl.y and tr.y < br.y):
+        raise ValueError(f"{what} corners are out of order")
+    if any(_cross(quad[i], quad[(i + 1) % 4], quad[(i + 2) % 4]) <= 0 for i in range(4)):
+        raise ValueError(f"{what} is crossed, concave or flat")
 
 
 def schema() -> dict:
@@ -273,27 +358,35 @@ def in_holdout(sha256: str) -> bool:
 
 
 def licensed_photo_problems(
-    annotation: Annotation, stem: str, rows_by_file: dict[str, dict[str, str]]
+    doc: Annotation | dict, stem: str, rows_by_file: dict[str, dict[str, str]]
 ) -> list[str]:
-    """Why an annotation file may not be committed, or [] when it may.
+    """Why an annotation or gold file may not be committed, or [] when it may.
 
     The rule of issue #113: a committed annotation names a photo with a
     CC0-1.0 or PDM-1.0 manifest row that binds the same source image, under the
     photo's own stem, because a cell model of a private photo can reveal a
     modern design (plan section 8.2); such annotations stay in corpus/private/.
+    doc is an Annotation, or any parsed JSON document such as a D3b gold layout,
+    of which only the photo, sha256 and canvas keys are read.
     """
-    row = rows_by_file.get(annotation.photo)
+    if isinstance(doc, Annotation):
+        photo, sha256, canvas = doc.photo, doc.sha256, list(doc.canvas)
+    else:
+        photo, sha256, canvas = doc.get("photo"), doc.get("sha256"), doc.get("canvas")
+    row = rows_by_file.get(photo) if isinstance(photo, str) else None
     if row is None:
-        return [f"photo {annotation.photo!r} has no row in corpus/manifest.csv"]
+        return [f"photo {photo!r} has no row in corpus/manifest.csv"]
     problems = []
     if row.get("license") not in LICENSES:
-        problems.append(f"row {annotation.photo!r} is licensed {row.get('license')!r}")
-    if row.get("sha256") != annotation.sha256:
-        problems.append(f"row {annotation.photo!r} binds another source image")
-    if Path(annotation.photo).stem != stem:
+        problems.append(f"row {photo!r} is licensed {row.get('license')!r}")
+    if row.get("sha256") != sha256:
+        problems.append(f"row {photo!r} binds another source image")
+    if Path(photo).stem != stem:
         problems.append(f"file stem {stem!r} is not the photo's stem")
-    if (row.get("px_w"), row.get("px_h")) != tuple(str(n) for n in annotation.canvas):
-        problems.append(f"canvas {list(annotation.canvas)} is not the row's px_w and px_h")
+    if not isinstance(canvas, list) or [row.get("px_w"), row.get("px_h")] != [
+        str(n) for n in canvas
+    ]:
+        problems.append(f"canvas {canvas!r} is not the row's px_w and px_h")
     return problems
 
 
@@ -309,16 +402,20 @@ def pick(claims: list[C], prefer: tuple[str, ...] = TRUTH) -> C | None:
 def to_read_request(
     annotation: Annotation,
     token: str,
+    image_size: tuple[int, int],
     *,
     frame: Literal["outer_edge", "field"] = "outer_edge",
     prefer: tuple[str, ...] = FRAME_TRUTH,
 ) -> ReadRequest:
     """The read request a user who confirmed this annotation would send.
 
-    frame chooses what the user confirmed: the outer edge with its bands, or the
-    field corners. prefer orders the provenance codes to accept; the default
-    accepts gate truth only, so a proposal never stands in for truth unless the
-    caller asks for it.
+    token names the staged image and image_size is its (width, height) in
+    pixels: the canvas for the source image, or a committed copy's own size.
+    The corners are scaled from canvas pixels to the staged image's pixels,
+    because a request's corners index the image it stages. frame chooses what
+    the user confirmed: the outer edge with its bands, or the field corners.
+    prefer orders the provenance codes to accept; the default accepts gate
+    truth only, so a proposal never stands in for truth unless the caller asks.
     """
     framed, counted = pick(annotation.frame, prefer), pick(annotation.counts, prefer)
     if framed is None or counted is None:
@@ -332,9 +429,18 @@ def to_read_request(
     # to choose, as a user who skips the count would, instead of failing the request.
     if count is not None and not FABRICS_MIN <= count <= FABRICS_MAX:
         count = None
+    if min(image_size) < 1:
+        raise ValueError(f"image size {image_size} must be at least 1 pixel each way")
+    sx, sy = image_size[0] / annotation.canvas[0], image_size[1] / annotation.canvas[1]
+    c = chosen.corners
+    scaled = Corners(**{
+        name: Point(x=point.x * sx, y=point.y * sy)
+        for name, point in (("top_left", c.top_left), ("top_right", c.top_right),
+                            ("bottom_right", c.bottom_right), ("bottom_left", c.bottom_left))
+    })
     return ReadRequest(
         token=token,
-        frame=chosen,
+        frame=chosen.model_copy(update={"corners": scaled}),
         crop_offset=Point(x=0.0, y=0.0),
         counts=counted.value,
         fabric_count=count,
@@ -342,11 +448,14 @@ def to_read_request(
 
 
 def sidecar_view(annotation: Annotation, prefer: tuple[str, ...] = FRAME_TRUTH) -> dict:
-    """The photoreal sidecar fields this annotation extends, in the sidecar's
-    own shapes, so the eval can score both with one code path. quad is the outer
-    edge (the sidecar's quad spans its border); grid.border_pitches is the
-    bands' total width in squares; repeat_cells is [down, across] squares per
-    block, or None for one block per axis."""
+    """The photoreal sidecar fields, in the sidecar's own shapes, so the eval
+    can score both with one code path. A stored quad, grid, repeat_cells or
+    character claim wins; otherwise each is derived: quad is the outer edge
+    (the sidecar's quad spans its border); grid.border_pitches is the bands'
+    total width in squares, or None when no frame gives the bands;
+    repeat_cells is [down, across] squares per block, or None for one block per
+    axis; an in-scope class reads squares or non_square, and out_of_scope,
+    which the sidecar vocabulary has no word for, reads None."""
     framed, counted = pick(annotation.frame, prefer), pick(annotation.counts, prefer)
     built = pick(annotation.construction_class, prefer)
     fabrics = pick(annotation.fabrics, prefer)
@@ -363,16 +472,28 @@ def sidecar_view(annotation: Annotation, prefer: tuple[str, ...] = FRAME_TRUTH) 
         view["quad"] = [[p.x, p.y] for p in _corner_points(edge)]
     if counted is not None:
         n = counted.value
-        bands = framed.value.outer_edge.bands if framed is not None else []
+        bands = framed.value.outer_edge.bands if framed is not None else None
         view["grid"] = {
             "rows": n.blocks_down * n.squares_per_block_down,
             "cols": n.blocks_across * n.squares_per_block_across,
-            "border_pitches": sum(band.width_squares for band in bands),
+            "border_pitches": (
+                sum(band.width_squares for band in bands) if bands is not None else None),
         }
         if (n.blocks_across, n.blocks_down) != (1, 1):
             view["repeat_cells"] = [n.squares_per_block_down, n.squares_per_block_across]
-    if built is not None:
+    if built is not None and built.value != "out_of_scope":
         view["character"] = "squares" if built.value == "squares" else "non_square"
+    stored = {name: pick(getattr(annotation, name), prefer)
+              for name in ("quad", "grid", "repeat_cells", "character")}
+    if stored["quad"] is not None:
+        view["quad"] = [list(point) for point in stored["quad"].value]
+    if stored["grid"] is not None:
+        view["grid"] = stored["grid"].value.model_dump()
+    if stored["repeat_cells"] is not None:
+        cells = stored["repeat_cells"].value
+        view["repeat_cells"] = list(cells) if cells is not None else None
+    if stored["character"] is not None:
+        view["character"] = stored["character"].value
     return view
 
 
