@@ -1,0 +1,148 @@
+{
+  "schema_version": 1,
+  "photo": "private/cache/smithsonian-saam-2016-5-50.jpg",
+  "sha256": "1394ffd466f25cbda602320cf84e067a6869eeb54c5edcf0030babc2a911f0ac",
+  "canvas": [
+    2672,
+    3000
+  ],
+  "construction_class": [
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-b"
+    }
+  ],
+  "refusal_class": [
+    {
+      "value": "medallion",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "medallion",
+      "provenance": "proposed-b"
+    }
+  ],
+  "finished_size": [
+    {
+      "value": {
+        "width_in": 67.0,
+        "height_in": 82.0,
+        "approximate": true,
+        "source_text": "82 \u00d7 67 in. (208.3 \u00d7 170.2 cm)"
+      },
+      "provenance": "source-record"
+    }
+  ],
+  "capture": [
+    {
+      "value": "museum_scan",
+      "provenance": "screened"
+    }
+  ],
+  "device_class": [
+    {
+      "value": "museum",
+      "provenance": "screened"
+    }
+  ],
+  "masks": [
+    {
+      "value": [
+        {
+          "polygon": [
+            {
+              "x": 2500.0,
+              "y": 2850.0
+            },
+            {
+              "x": 2615.0,
+              "y": 2850.0
+            },
+            {
+              "x": 2615.0,
+              "y": 2990.0
+            },
+            {
+              "x": 2500.0,
+              "y": 2990.0
+            }
+          ],
+          "reason": "label"
+        },
+        {
+          "polygon": [
+            {
+              "x": 360.0,
+              "y": 232.0
+            },
+            {
+              "x": 485.0,
+              "y": 232.0
+            },
+            {
+              "x": 485.0,
+              "y": 292.0
+            },
+            {
+              "x": 360.0,
+              "y": 292.0
+            }
+          ],
+          "reason": "label"
+        }
+      ],
+      "provenance": "proposed-a"
+    },
+    {
+      "value": [
+        {
+          "polygon": [
+            {
+              "x": 2500.0,
+              "y": 2830.0
+            },
+            {
+              "x": 2615.0,
+              "y": 2830.0
+            },
+            {
+              "x": 2615.0,
+              "y": 2990.0
+            },
+            {
+              "x": 2500.0,
+              "y": 2990.0
+            }
+          ],
+          "reason": "label"
+        },
+        {
+          "polygon": [
+            {
+              "x": 360.0,
+              "y": 225.0
+            },
+            {
+              "x": 485.0,
+              "y": 225.0
+            },
+            {
+              "x": 485.0,
+              "y": 292.0
+            },
+            {
+              "x": 360.0,
+              "y": 292.0
+            }
+          ],
+          "reason": "label"
+        }
+      ],
+      "provenance": "proposed-b"
+    }
+  ]
+}

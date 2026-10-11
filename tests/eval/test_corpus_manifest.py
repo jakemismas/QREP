@@ -226,22 +226,45 @@ def test_eval_refusals_are_weighted_toward_on_point_look_alikes():
     assert max(counts, key=counts.get) == "on_point"
 
 
-def test_the_eval_set_column_follows_the_readme_rule_row_by_row():
-    # Source: corpus/README.md, the v0 eval set: every tier A photo, every tier R photo in
-    # on_point, curve, diamond_star or hexagon, and the first three tier R medallion stems and
-    # the first three tier R applique stems in sort order of the photo stem; every other row is
-    # empty. The rule is applied here from tier, class and stem alone, so a row marked by hand
-    # against it fails.
-    stems = {klass: sorted(Path(row["file"]).stem for row in rows()
-                           if row["tier"] == "R" and row["class"] == klass)
-             for klass in ("medallion", "applique")}
-    first_three = set(stems["medallion"][:3]) | set(stems["applique"][:3])
-    for row in rows():
-        chosen = (row["tier"] == "A"
-                  or (row["tier"] == "R"
-                      and row["class"] in {"on_point", "curve", "diamond_star", "hexagon"})
-                  or (row["tier"] == "R" and Path(row["file"]).stem in first_three))
-        assert row["eval_set"] == ("v0" if chosen else ""), row["file"]
+# The v0 eval set, pinned photo by photo when the rule corpus/README.md records chose it
+# (2026-10-11): every tier A photo, every tier R photo in on_point, curve, diamond_star or
+# hexagon, and the first three tier R medallion and applique stems in sort order. A rule re-applied
+# to a grown corpus would pick other photos, so membership is this list, and a later screen that
+# adds photos changes it only by an edit here.
+V0_EVAL_SET = frozenset({
+    "lacma-30012", "lacma-44818", "lacma-52521", "lacma-52522", "lacma-54813", "lacma-54852",
+    "lacma-54853", "lacma-54871", "lacma-54876", "lacma-54904", "lacma-56077", "lacma-58735",
+    "lacma-59557", "lacma-60126", "lacma-61642", "lacma-63229", "lacma-63267", "met-13596",
+    "met-13650", "met-13854", "met-13865", "met-13867", "met-13870", "met-13874", "met-13878",
+    "met-13880", "met-13882", "met-13884", "met-13889", "met-13897", "met-13902", "met-13904",
+    "met-13905", "met-13906", "met-13910", "met-13911", "met-13915", "met-16293", "met-16294",
+    "met-229936", "met-717637", "met-717944", "met-814560", "met-854567", "met-854570",
+    "smithsonian-chndm-1972-28-1", "smithsonian-chndm-1973-45-1", "smithsonian-chndm-1986-27-1",
+    "smithsonian-nmah-556181", "smithsonian-nmah-556281", "smithsonian-nmah-556282",
+    "smithsonian-nmah-556322", "smithsonian-nmah-556331", "smithsonian-saam-1987-80",
+    "smithsonian-saam-1998-149-11", "smithsonian-saam-1998-149-12",
+    "smithsonian-saam-1998-149-13", "smithsonian-saam-1998-149-14",
+    "smithsonian-saam-1998-149-15", "smithsonian-saam-1998-149-17",
+    "smithsonian-saam-1998-149-21", "smithsonian-saam-1998-149-23",
+    "smithsonian-saam-1998-149-25", "smithsonian-saam-1998-149-26",
+    "smithsonian-saam-1998-149-27", "smithsonian-saam-1998-149-31", "smithsonian-saam-1998-8-3",
+    "smithsonian-saam-2004-15-1", "smithsonian-saam-2004-15-2", "smithsonian-saam-2013-67-11",
+    "smithsonian-saam-2013-67-16", "smithsonian-saam-2013-67-17", "smithsonian-saam-2013-67-2",
+    "smithsonian-saam-2013-67-9", "smithsonian-saam-2016-57-2", "smithsonian-saam-2016-57-7",
+    "smithsonian-saam-2017-24-1", "smithsonian-saam-2017-24-10", "smithsonian-saam-2017-24-11",
+    "smithsonian-saam-2017-24-12", "smithsonian-saam-2017-24-13", "smithsonian-saam-2017-24-15",
+    "smithsonian-saam-2017-24-27", "smithsonian-saam-2017-24-29", "smithsonian-saam-2017-24-3",
+    "smithsonian-saam-2017-24-32", "smithsonian-saam-2017-24-34", "smithsonian-saam-2017-24-4",
+    "smithsonian-saam-2017-24-5", "smithsonian-saam-2017-24-7", "smithsonian-saam-2021-67-2",
+})
+
+
+def test_the_eval_set_column_is_the_pinned_v0_set():
+    # 13 tier A + 32 on_point + 15 curve + 15 diamond_star + 10 hexagon + 3 medallion + 3 applique
+    # = 91 photos, the README's count.
+    assert len(V0_EVAL_SET) == 13 + 32 + 15 + 15 + 10 + 3 + 3 == 91
+    marked = {Path(row["file"]).stem for row in rows() if row["eval_set"] == "v0"}
+    assert marked == V0_EVAL_SET
 
 
 def test_the_rows_criterion_5_names_carry_their_tiers():
