@@ -143,6 +143,32 @@ input {
   box-shadow: 0 2px 10px var(--shadow);
 }
 
+/* The engine chip is the one header item that gives way on a phone, so the
+   theme toggle stays on screen (ux-04). A boot label too long for the row
+   ("Loading the Python engine") ends in an ellipsis, since the next label
+   replaces it within seconds. A failure message wraps instead: it says what
+   to do next, and phones show no tooltip to read the rest in. */
+.qrep-header .qrep-engine,
+.qrep-header .q-chip {
+  min-width: 0;
+}
+
+.qrep-header .q-chip[data-engine-phase="booting"] .q-chip__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.qrep-header .q-chip--failed .q-chip__label {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* A wrapped message in a full pill turns it into a circle whose curve cuts
+   into the text. */
+.qrep-header .q-chip--failed {
+  border-radius: 14px;
+}
+
 .qrep-logo {
   display: inline-flex;
   align-items: center;
