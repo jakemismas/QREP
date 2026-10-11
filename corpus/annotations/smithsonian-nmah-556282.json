@@ -26,16 +26,27 @@
       "provenance": "proposed-b"
     }
   ],
+  "finished_size": [
+    {
+      "value": {
+        "width_in": 72.0,
+        "height_in": 71.0,
+        "approximate": true,
+        "source_text": "overall: 72 in x 71 in; 183 cm x 180 cm"
+      },
+      "provenance": "source-record"
+    }
+  ],
   "capture": [
     {
       "value": "museum_scan",
-      "provenance": "source-record"
+      "provenance": "screened"
     }
   ],
   "device_class": [
     {
       "value": "museum",
-      "provenance": "source-record"
+      "provenance": "screened"
     }
   ]
 }

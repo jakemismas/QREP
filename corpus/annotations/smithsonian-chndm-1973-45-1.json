@@ -188,13 +188,13 @@
   "capture": [
     {
       "value": "museum_scan",
-      "provenance": "source-record"
+      "provenance": "screened"
     }
   ],
   "device_class": [
     {
       "value": "museum",
-      "provenance": "source-record"
+      "provenance": "screened"
     }
   ]
 }

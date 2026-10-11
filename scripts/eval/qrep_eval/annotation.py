@@ -48,12 +48,14 @@ Provenance = Literal[
     "verified-jake",
     "hand-authored",
     "source-record",
+    "screened",
 ]
 PROVENANCES: tuple[str, ...] = get_args(Provenance)
 # Gate truth (plan section 5.D): verified-jake for corners, counts and bands,
 # hand-authored plus adjudicated for squares. source-record marks a value copied
-# from the institution's own record (its dimensions text); nobody judged it, so
-# it is never truth either.
+# from the institution's own record (its dimensions text), and screened a value
+# the screen sets from the photo's source (a museum photo's capture and device);
+# nobody judged either one photo by photo, so neither is ever truth.
 TRUTH: tuple[str, ...] = ("verified-jake", "adjudicated", "hand-authored")
 # Corners, bands and counts count as truth only when Jake verified them.
 FRAME_TRUTH: tuple[str, ...] = ("verified-jake",)
@@ -358,21 +360,24 @@ def in_holdout(sha256: str) -> bool:
 
 
 def licensed_photo_problems(
-    doc: Annotation | dict, stem: str, rows_by_file: dict[str, dict[str, str]]
+    doc: Annotation | dict, stem: str | None, rows_by_file: dict[str, dict[str, str]]
 ) -> list[str]:
     """Why an annotation or gold file may not be committed, or [] when it may.
 
     The rule of issue #113: a committed annotation names a photo with a
-    CC0-1.0 or PDM-1.0 manifest row that binds the same source image, under the
-    photo's own stem, because a cell model of a private photo can reveal a
-    modern design (plan section 8.2); such annotations stay in corpus/private/.
-    doc is an Annotation, or any parsed JSON document such as a D3b gold layout,
-    of which only the photo, sha256 and canvas keys are read.
+    CC0-1.0 or PDM-1.0 manifest row that binds the same source image, because a
+    cell model of a private photo can reveal a modern design (plan section 8.2);
+    such annotations stay in corpus/private/. doc is an Annotation, whose file
+    sits under its photo's stem (stem is its file name's stem), or any parsed
+    JSON document such as a D3b gold layout (stem None, so its file name is
+    D3b's to choose), of which only the photo and sha256 keys are read, and its
+    canvas when it names one.
     """
     if isinstance(doc, Annotation):
         photo, sha256, canvas = doc.photo, doc.sha256, list(doc.canvas)
     else:
         photo, sha256, canvas = doc.get("photo"), doc.get("sha256"), doc.get("canvas")
+    names_canvas = isinstance(doc, Annotation) or "canvas" in doc
     row = rows_by_file.get(photo) if isinstance(photo, str) else None
     if row is None:
         return [f"photo {photo!r} has no row in corpus/manifest.csv"]
@@ -381,11 +386,11 @@ def licensed_photo_problems(
         problems.append(f"row {photo!r} is licensed {row.get('license')!r}")
     if row.get("sha256") != sha256:
         problems.append(f"row {photo!r} binds another source image")
-    if Path(photo).stem != stem:
+    if stem is not None and Path(photo).stem != stem:
         problems.append(f"file stem {stem!r} is not the photo's stem")
-    if not isinstance(canvas, list) or [row.get("px_w"), row.get("px_h")] != [
-        str(n) for n in canvas
-    ]:
+    if names_canvas and (not isinstance(canvas, list) or [
+        row.get("px_w"), row.get("px_h")
+    ] != [str(n) for n in canvas]):
         problems.append(f"canvas {canvas!r} is not the row's px_w and px_h")
     return problems
 

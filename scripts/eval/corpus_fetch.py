@@ -304,6 +304,11 @@ def _si_media(row: dict) -> list[dict]:
     return (nonrep.get("online_media") or {}).get("media") or []
 
 
+# The physicalDescription labels that carry a size: NMAH records say "Measurements" and other
+# Smithsonian units "Dimensions"; "Physical Description" and "Medium" entries name materials.
+SI_SIZE_LABELS = ("Dimensions", "Measurements")
+
+
 def si_candidate(row: dict) -> Candidate:
     """A Smithsonian Open Access search row; one image medium must be usage CC0."""
     content = row.get("content") or {}
@@ -321,7 +326,7 @@ def si_candidate(row: dict) -> Candidate:
             if r.get("label") == "High-resolution JPEG" and r.get("url")]
     freetext = content.get("freetext") or {}
     dims = [e.get("content", "") for e in freetext.get("physicalDescription") or []
-            if e.get("label") == "Dimensions"]
+            if e.get("label") in SI_SIZE_LABELS]
     years = [y for text in _texts(freetext.get("date")) for y in _years(text)]
     link = nonrep.get("record_link") or ""
     if not link.startswith("https://"):
@@ -389,6 +394,9 @@ def _number(text: str) -> float:
     return value
 
 
+# The words that make a size the mount's or the frame's rather than the object's own.
+_MOUNT = re.compile(r"\b(?:mount(?:ed|s)?|frame[ds]?)\b", re.IGNORECASE)
+_UNMOUNTED = re.compile(r"\bwithout\s+(?:a\s+)?(?:mount|frame)\b", re.IGNORECASE)
 _FEET = re.compile(rf"(?P<ft>\d+)\s*ft\.?\s*(?:(?P<inch>{_NUM})\s*in\b\.?)?", re.IGNORECASE)
 
 
@@ -412,14 +420,27 @@ def parse_finished_size(text: str) -> tuple[float, float] | None:
     Inches win over centimetres. An unlabeled pair reads height x width, the
     museum convention for flat textiles; H., W. and L. labels win over order,
     one label alone included, and L. (length) reads as the height, because a
-    museum that gives L x W for a flat textile measures its long side down. The
+    museum that gives L x W for a flat textile measures its long side down. A
+    size the text gives with the object's mount or frame yields to the object's
+    own size (without mount, or the sight size) when the text gives both. The
     result is approximate: a museum measures the object, not the pattern."""
     normalized = _FEET.sub(_feet_to_inches, text.replace("\u00d7", "x").replace("\u00a0", " "))
     pairs = list(_PAIR.finditer(normalized))
-    chosen = next((m for m in pairs if not m["unit"].lower().startswith("cm")), None)
-    chosen = chosen or (pairs[0] if pairs else None)
-    if chosen is None:
+    if not pairs:
         return None
+    mounted, end = [], 0
+    for match in pairs:
+        before = normalized[end:match.start()]
+        if mounted and not before.strip(" ("):
+            # A pair in parentheses right after another restates it in the other unit.
+            mounted.append(mounted[-1])
+        else:
+            mounted.append(bool(_MOUNT.search(before)) and not _UNMOUNTED.search(before))
+        end = match.end()
+    # The object's own size before its mount's or frame's, inches before centimetres, and
+    # otherwise the order the text gives.
+    _, chosen = min(
+        ((mounted[i], m["unit"].lower().startswith("cm"), i), m) for i, m in enumerate(pairs))
     scale = 1 / 2.54 if chosen["unit"].lower().startswith("cm") else 1.0
     a, b = (round(_number(chosen[k]) * scale, 2) for k in ("a", "b"))
     labels = tuple((chosen[k] or "").upper().replace("L", "H") for k in ("l1", "l2"))

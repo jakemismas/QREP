@@ -5,7 +5,8 @@ ruler view whose grid labels are source-image pixels, plus zooms of any region, 
 read off a view is already in the annotation's coordinates. Nothing here runs QREP: a proposal
 must never be seeded from QREP output (plan section 8.2). Views are written only inside the main
 checkout's ignored corpus/private/, and every view command refuses any other output path; the
-one exception is downsize, whose copy goes to corpus/images/ to be committed.
+one exception is downsize, whose copy goes to corpus/images/ to be committed, and only from a
+source image that a CC0-1.0 or PDM-1.0 manifest row with commit_ok yes binds.
 
 Usage:
     python scripts/eval/corpus_screen.py sheets OUT_DIR IMAGE...
@@ -23,7 +24,8 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
-from corpus_fetch import REPO, require_private
+from corpus_fetch import REPO, read_manifest, require_private
+from qrep_eval.annotation import LICENSES
 
 # Museum scans run to several thousand pixels; a 700 px tile still shows a 15 x 15 field's
 # squares at about 40 px each, enough to tell squares from triangles.
@@ -148,10 +150,31 @@ def sheets(paths: list[Path], out_dir: Path) -> list[Path]:
     return written
 
 
+class NotCommittable(ValueError):
+    """A source image that no cleared, commit_ok manifest row binds."""
+
+
+def committable_row(path: Path, rows: list[dict[str, str]]) -> dict[str, str]:
+    """The manifest row that lets path's bytes become a committed copy: the row binding them by
+    sha256, licensed CC0-1.0 or PDM-1.0, with commit_ok yes. corpus-guard checks the copy only
+    after it is staged; this refuses a photo that may not be committed before it is written."""
+    sha = hashlib.sha256(path.read_bytes()).hexdigest()
+    row = next((r for r in rows if r["sha256"] == sha), None)
+    if row is None:
+        raise NotCommittable(f"{path}: no manifest row binds a source image with sha256 {sha}")
+    if row["license"] not in LICENSES or row["commit_ok"] != "yes":
+        raise NotCommittable(
+            f"{path}: its row is licensed {row['license']} with commit_ok {row['commit_ok']}")
+    return row
+
+
 def downsize(path: Path, out: Path, side: int = COMMIT_SIDE) -> tuple[str, int, int]:
     """A committed copy at most side px on the long side; returns its sha256 and size."""
     image = _open(path)
     copy = ImageOps.contain(image, (side, side), Image.LANCZOS)
+    # Pillow carries a source's JPEG comment into the copy, and a comment can hold an accession
+    # note, so the committed copy keeps no metadata at all.
+    copy.info.clear()
     out.parent.mkdir(parents=True, exist_ok=True)
     copy.save(out, "JPEG", quality=JPEG_QUALITY, optimize=True)
     return hashlib.sha256(out.read_bytes()).hexdigest(), copy.width, copy.height
@@ -178,6 +201,10 @@ def main(argv: list[str]) -> int:
     p.add_argument("out", type=Path)
     args = parser.parse_args(argv)
     if args.command == "downsize":
+        try:
+            committable_row(args.image, read_manifest())
+        except NotCommittable as err:
+            raise SystemExit(f"refusing {err}") from None
         if args.out.resolve().parent != IMAGES.resolve():
             raise SystemExit(f"refusing {args.out}: committed copies go only in {IMAGES}")
     else:

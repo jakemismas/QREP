@@ -21,6 +21,7 @@ from PIL import Image
 from pydantic import ValidationError
 
 import corpus_fetch as cf
+import corpus_screen as cs
 from qrep.contract import OuterEdgeFrame, ReadRequest
 from qrep_eval import annotation as an
 
@@ -777,29 +778,52 @@ def test_the_licensed_photo_rule_refuses_an_annotation_of_a_private_photo():
 
 
 def test_the_licensed_photo_rule_reads_a_gold_layout_by_its_identity_keys():
-    # A D3b gold layout is its own format; only photo, sha256 and canvas are read, so extra keys
-    # pass and a missing canvas is a problem.
+    # A D3b gold layout is its own format, named as D3b chooses: its photo and sha256 are read,
+    # and its canvas when it names one, so extra keys pass and its file name is never compared
+    # with the photo's stem (stem None).
     licensed = {"private/cache/met-1.jpg": {"license": "CC0-1.0", "sha256": SHA,
                                             "px_w": "1000", "px_h": "800"}}
     gold = {"photo": "private/cache/met-1.jpg", "sha256": SHA, "canvas": [1000, 800],
             "tiles": [{"row": 0, "col": 0, "fabric": 1}], "layout": {"rows": 30, "cols": 40}}
-    assert an.licensed_photo_problems(gold, "met-1", licensed) == []
+    assert an.licensed_photo_problems(gold, None, licensed) == []
     no_canvas = {k: v for k, v in gold.items() if k != "canvas"}
-    assert len(an.licensed_photo_problems(no_canvas, "met-1", licensed)) == 1
+    assert an.licensed_photo_problems(no_canvas, None, licensed) == []
+    # Each named key still binds: a canvas of 999 x 800 against the row's 1000 x 800, a missing
+    # or other sha256, and a photo with no row are one problem each.
+    for bad, word in ((gold | {"canvas": [999, 800]}, "canvas"),
+                      (no_canvas | {"sha256": "f" * 64}, "another source image"),
+                      ({k: v for k, v in no_canvas.items() if k != "sha256"}, "another source"),
+                      (no_canvas | {"photo": "local-photos/IMG_0001.png"}, "no row")):
+        problems = an.licensed_photo_problems(bad, None, licensed)
+        assert len(problems) == 1 and word in problems[0], problems
 
 
 def test_every_committed_annotation_names_a_licensed_photo():
     # The issue #113 rule, applied by this test until corpus-guard enforces it: every committed
     # annotation or gold JSON, in any subfolder, names a photo with a CC0-1.0 or PDM-1.0 row whose
-    # sha256 and canvas match, under the photo's own stem. Gold files are read as plain JSON,
-    # because D3b's gold layouts are not annotations.
+    # sha256 and canvas match; an annotation sits under the photo's own stem. Gold files are read
+    # as plain JSON under any name, because D3b's gold layouts are not annotations.
     by_file = {row["file"]: row for row in rows()}
     assert ANNOTATIONS
-    docs = [(path, an.load(path)) for path in ANNOTATIONS] + [
-        (path, json.loads(path.read_text(encoding="utf-8"))) for path in GOLD]
-    for path, doc in docs:
-        problems = an.licensed_photo_problems(doc, path.stem, by_file)
+    docs = [(path, an.load(path), path.stem) for path in ANNOTATIONS] + [
+        (path, json.loads(path.read_text(encoding="utf-8")), None) for path in GOLD]
+    for path, doc, stem in docs:
+        problems = an.licensed_photo_problems(doc, stem, by_file)
         assert problems == [], (path.name, problems)
+
+
+def test_capture_and_device_class_are_the_screens_calls():
+    # No museum record states how its photo was captured or on what device: the screen sets both
+    # from the source (a museum photo is a museum scan on a museum's equipment), so both carry
+    # the screen's code, and source-record marks only values copied from the record.
+    for path in ANNOTATIONS:
+        doc = an.load(path)
+        for name in ("capture", "device_class"):
+            assert {c.provenance for c in getattr(doc, name)} == {"screened"}, (path.name, name)
+        for name in an.CLAIM_FIELDS:
+            if name != "finished_size":
+                codes = {c.provenance for c in getattr(doc, name)}
+                assert "source-record" not in codes, (path.name, name)
 
 
 def test_annotation_finished_sizes_match_their_rows():
@@ -891,6 +915,20 @@ def test_the_fetch_refuses_any_host_off_the_allowlist(url):
         ("203.2 × 182.9 cm (80 × 72 in.)", (72.0, 80.0)),
         # Centimetres only: 254 / 2.54 = 100.0 in high, 203.2 / 2.54 = 80.0 in wide.
         ("254 x 203.2 cm", (80.0, 100.0)),
+        # A mounted object: the size without the mount wins over the mounted size that comes
+        # first. 45 in high; 36 5/8 = 36.625 in wide, an exact half at the third place, which
+        # rounds to the even digit: 36.62.
+        ("H x W x D (with mount): 48 1/2 × 39 1/2 × 1 1/2 in. (123.2 × 100.3 × "
+         "3.8 cm); H x W (without mount): 45 × 36 5/8 in. (114.3 × 93 cm)",
+         (36.62, 45.0)),
+        # A framed object, frame first: the sight size is the object's. 18 1/4 = 18.25 in high,
+        # 36 1/4 = 36.25 in wide.
+        ("Frame: 21 x 39 in.; sight: 18 1/4 x 36 1/4 in.", (36.25, 18.25)),
+        # The frame after the sight size, with no semicolon between them: still the sight size.
+        ("sight 18 1/4 x 36 1/4 in. (47.0 x 92.0 cm) irregular frame: 21 x 39 x 1 1/4 in. "
+         "(53.4 x 99.1 x 3.1 cm)", (36.25, 18.25)),
+        # Only a framed size: it is all the text gives, so it stands. 21 in high, 39 in wide.
+        ("framed: 21 x 39 in.", (39.0, 21.0)),
         ("Dimensions unavailable", None),
     ],
 )
@@ -1060,6 +1098,20 @@ def test_a_smithsonian_row_clears_on_a_cc0_image_medium():
     medium["usage"]["access"] = "Usage conditions apply"
     with pytest.raises(cf.NotCleared):
         cf.si_candidate(restricted)
+
+
+def test_a_smithsonian_row_reads_its_measurements_label():
+    # NMAH records label their size "Measurements" rather than "Dimensions", and list materials
+    # under "Physical Description", which is no size. By hand: the pair 84 in x 50 in carries no
+    # H or W label, so it reads height x width: 50 in wide, 84 in high.
+    row = json.loads(json.dumps(SI_ROW))
+    row["content"]["freetext"]["physicalDescription"] = [
+        {"label": "Physical Description", "content": "fabric, cotton (overall material)"},
+        {"label": "Measurements", "content": "overall: 84 in x 50 in; 213 cm x 126 cm"},
+    ]
+    c = cf.si_candidate(row)
+    assert c.dimensions_text == "overall: 84 in x 50 in; 213 cm x 126 cm"
+    assert cf.parse_finished_size(c.dimensions_text) == (50.0, 84.0)
 
 
 def test_screening_keeps_quilts_made_before_1930_with_cleared_flags():
@@ -1406,6 +1458,45 @@ def test_a_rescreen_without_an_eval_set_column_keeps_the_old_eval_set(tmp_path):
                     encoding="utf-8")
     (merged,) = cf.merge_rows(old, cf.build_rows(tmp_path, five, {}))
     assert merged["eval_set"] == ""
+
+
+def test_only_a_cleared_row_that_may_be_committed_licenses_a_copy(tmp_path):
+    # A committed copy needs a row for its source bytes, licensed CC0-1.0 or PDM-1.0, with
+    # commit_ok yes; each change below breaks one of the three.
+    src = tmp_path / "x.jpg"
+    Image.new("RGB", (1000, 500), "white").save(src)
+    row = {"sha256": sha256_file(src), "license": "CC0-1.0", "commit_ok": "yes"}
+    assert cs.committable_row(src, [row]) == row
+    assert cs.committable_row(src, [row | {"license": "PDM-1.0"}])["license"] == "PDM-1.0"
+    for change in ({"commit_ok": "no"}, {"license": "CC-BY-4.0"}, {"sha256": "0" * 64}):
+        with pytest.raises(cs.NotCommittable):
+            cs.committable_row(src, [row | change])
+
+
+def test_the_downsize_command_checks_its_input_before_it_writes(tmp_path, monkeypatch):
+    # The command's own call path: a source whose bytes match no manifest row is refused, and
+    # nothing reaches the images folder.
+    monkeypatch.setattr(cs, "IMAGES", tmp_path / "images")
+    src = tmp_path / "x.jpg"
+    Image.new("RGB", (1000, 500), "white").save(src)
+    out = tmp_path / "images" / "x.jpg"
+    with pytest.raises(SystemExit, match="no manifest row"):
+        cs.main(["downsize", str(src), str(out)])
+    assert not out.exists()
+
+
+def test_a_committed_copy_carries_no_jpeg_comment(tmp_path):
+    src = tmp_path / "x.jpg"
+    Image.new("RGB", (1000, 500), "white").save(src, comment=b"accession 1985.1")
+    with Image.open(src) as image:
+        assert image.info.get("comment") == b"accession 1985.1"
+    out = tmp_path / "y.jpg"
+    _, width, height = cs.downsize(src, out)
+    # By hand: 1000 x 500 fits 800 x 800 at a scale of 800 / 1000 = 0.8, so 800 x 400.
+    assert (width, height) == (800, 400)
+    with Image.open(out) as image:
+        assert "comment" not in image.info
+    assert b"accession" not in out.read_bytes()
 
 
 @needs_git

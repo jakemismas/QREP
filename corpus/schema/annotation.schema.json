@@ -51,7 +51,8 @@
             "adjudicated",
             "verified-jake",
             "hand-authored",
-            "source-record"
+            "source-record",
+            "screened"
           ],
           "title": "Provenance",
           "type": "string"
@@ -84,7 +85,8 @@
             "adjudicated",
             "verified-jake",
             "hand-authored",
-            "source-record"
+            "source-record",
+            "screened"
           ],
           "title": "Provenance",
           "type": "string"
@@ -117,7 +119,8 @@
             "adjudicated",
             "verified-jake",
             "hand-authored",
-            "source-record"
+            "source-record",
+            "screened"
           ],
           "title": "Provenance",
           "type": "string"
@@ -211,7 +214,8 @@
             "adjudicated",
             "verified-jake",
             "hand-authored",
-            "source-record"
+            "source-record",
+            "screened"
           ],
           "title": "Provenance",
           "type": "string"
@@ -237,7 +241,8 @@
             "adjudicated",
             "verified-jake",
             "hand-authored",
-            "source-record"
+            "source-record",
+            "screened"
           ],
           "title": "Provenance",
           "type": "string"
@@ -301,7 +306,8 @@
             "adjudicated",
             "verified-jake",
             "hand-authored",
-            "source-record"
+            "source-record",
+            "screened"
           ],
           "title": "Provenance",
           "type": "string"
@@ -380,7 +386,8 @@
             "adjudicated",
             "verified-jake",
             "hand-authored",
-            "source-record"
+            "source-record",
+            "screened"
           ],
           "title": "Provenance",
           "type": "string"
@@ -406,7 +413,8 @@
             "adjudicated",
             "verified-jake",
             "hand-authored",
-            "source-record"
+            "source-record",
+            "screened"
           ],
           "title": "Provenance",
           "type": "string"
@@ -433,7 +441,8 @@
             "adjudicated",
             "verified-jake",
             "hand-authored",
-            "source-record"
+            "source-record",
+            "screened"
           ],
           "title": "Provenance",
           "type": "string"
@@ -496,7 +505,8 @@
             "adjudicated",
             "verified-jake",
             "hand-authored",
-            "source-record"
+            "source-record",
+            "screened"
           ],
           "title": "Provenance",
           "type": "string"
@@ -551,7 +561,8 @@
             "adjudicated",
             "verified-jake",
             "hand-authored",
-            "source-record"
+            "source-record",
+            "screened"
           ],
           "title": "Provenance",
           "type": "string"
@@ -629,7 +640,8 @@
             "adjudicated",
             "verified-jake",
             "hand-authored",
-            "source-record"
+            "source-record",
+            "screened"
           ],
           "title": "Provenance",
           "type": "string"
@@ -671,7 +683,8 @@
             "adjudicated",
             "verified-jake",
             "hand-authored",
-            "source-record"
+            "source-record",
+            "screened"
           ],
           "title": "Provenance",
           "type": "string"
@@ -707,7 +720,8 @@
             "adjudicated",
             "verified-jake",
             "hand-authored",
-            "source-record"
+            "source-record",
+            "screened"
           ],
           "title": "Provenance",
           "type": "string"

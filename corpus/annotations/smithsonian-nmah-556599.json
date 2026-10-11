@@ -26,16 +26,27 @@
       "provenance": "proposed-b"
     }
   ],
+  "finished_size": [
+    {
+      "value": {
+        "width_in": 91.0,
+        "height_in": 93.0,
+        "approximate": true,
+        "source_text": "overall: 93 in x 91 in; 236 cm x 230 cm"
+      },
+      "provenance": "source-record"
+    }
+  ],
   "capture": [
     {
       "value": "museum_scan",
-      "provenance": "source-record"
+      "provenance": "screened"
     }
   ],
   "device_class": [
     {
       "value": "museum",
-      "provenance": "source-record"
+      "provenance": "screened"
     }
   ],
   "masks": [
