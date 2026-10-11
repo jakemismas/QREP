@@ -3,6 +3,7 @@
 from qrep.model.io import dumps, load, loads, save
 from qrep.model.schema import (
     STAGES,
+    UNIT_MAP_SCHEMA_VERSION,
     Binding,
     BorderBand,
     Fabric,
@@ -16,26 +17,45 @@ from qrep.model.schema import (
     QuiltMetadata,
     Settings,
 )
+from qrep.model.unitmap import (
+    AREA_SCALE,
+    CornerUnit,
+    GooseUnit,
+    HstUnit,
+    PlainUnit,
+    QstUnit,
+    Unit,
+    quadrupled_area_by_fabric,
+)
 from qrep.model.units import EIGHTHS_PER_INCH, format_inches
 
 __all__ = [
     "STAGES",
+    "AREA_SCALE",
     "EIGHTHS_PER_INCH",
+    "UNIT_MAP_SCHEMA_VERSION",
     "Binding",
     "BorderBand",
+    "CornerUnit",
     "Fabric",
+    "GooseUnit",
     "GridRegion",
+    "HstUnit",
     "Palette",
+    "PlainUnit",
     "Provenance",
     "QrepSchemaError",
+    "QstUnit",
     "Quilt",
     "QuiltingLayer",
     "QuiltingMotif",
     "QuiltMetadata",
     "Settings",
+    "Unit",
     "dumps",
     "format_inches",
     "load",
     "loads",
+    "quadrupled_area_by_fabric",
     "save",
 ]
