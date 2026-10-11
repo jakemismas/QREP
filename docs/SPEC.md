@@ -256,7 +256,7 @@ The quilt model records every value with its source:
 |---|---|---|
 | Corners or outer edge, border bands, counts, fabric count, typed or preset finished size | User | User fact, confidence 1.0 |
 | Count, corner and fabric-count suggestions; palette colors | CV | Confidence in [0, 1] |
-| Fabric per square, unit class, fabric per part | CV | Confidence in [0, 1] per square |
+| Fabric per square, unit class, fabric per part | CV | Confidence in [0, 1] per square (its fabric) and per unit (its class and parts) |
 | Grid fit, global and per region | CV | Confidence in [0, 1] |
 | Finished size estimated from the photo | CV guess | Low confidence; printed only as an estimate |
 | Hand-authored models and fixtures | Author | Confidence 1.0 |
@@ -273,6 +273,20 @@ unchanged:
   rounding applied, the step the finished square size snaps to; all in eighths. A typed or preset
   size records confidence 1.0; a default size must state the photo estimate's confidence (A10
   fills the basis for a size you set; #207 records the estimate on every read).
+
+The grid region's optional unit map says how each square is pieced (qrep/model/unitmap.py). Each
+unit is plain (the square's own fabric), a half-square triangle (its diagonal and a fabric per
+half), a quarter-square triangle (a fabric per quarter: top, right, bottom and left), a snowball
+corner unit (a fabric for each corner that has a triangle, one leg as a fraction of the side, and
+the square's own fabric as the base) or a flying goose over two adjacent squares (body and sky
+fabrics; pointing up or down it lies across two columns, left or right down two rows). The map
+covers every square exactly once and names only palette fabrics. A corner leg lands on a whole
+eighth at the square's size, and the legs along one side total at most the side. Each unit carries
+its own confidence: in [0, 1] from a read (B4a and B4b write the map), 1.0 when hand-authored. A
+model with a unit map is written as schema_version 1.1; a model without one keeps its version and
+its bytes, and a missing or unknown major version still raises. The finished-area check stays
+exact with triangles: it counts quadrupled square eighths, because a quarter of an odd square has
+a doubled area that is not whole.
 
 A test walks the schema and records where every stored field comes from. It asserts that every
 confidence stays in [0, 1] and that the user facts the model records today, the confirmed block
