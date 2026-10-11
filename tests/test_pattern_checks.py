@@ -467,7 +467,8 @@ FAILING = {
     # PS-19: 4 sets x 2 B1 strips = 8, but Cutting sets aside 6.
     "PS-19": lambda p: edit(p, "Make 3.", "Make 4."),
     # PS-20: MATH.md F5 gives fabric A 4 1/4 yd (hand computation above).
-    "PS-20": lambda p: edit(p, "4 1/4 yd", "4 yd"),
+    "PS-20": lambda p: _replace_item(p, 1, 1, ROW([(0, "A"), (20, "Background"), (230, "4 yd")],
+                                                  "A")),
     # PS-21: a fat quarter offer with no fat quarter diagram in Cutting.
     "PS-21": lambda p: edit(p, "1 1/4 yd", "1 1/4 yd or 2 fat quarters"),
     # PS-22: a strip set step cites no figure.
@@ -501,6 +502,38 @@ FAILING = {
 }
 
 
+# Defects the self-review found, one regression case each: (check, old text, new text).
+MORE_FAILING = [
+    # PS-05: a piece total in a sentence (GAP-04 prints one today).
+    ("PS-05", "3 fabrics, plus backing", "3 fabrics, plus backing. The top has 2479 pieces."),
+    # PS-05: a model fabric id on the wrapped second line of a step.
+    ("PS-05", "turn the binding to the back", "turn the r binding to the back"),
+    # PS-09: a typed size needs the sentence that echoes it; "Finished size" is not one.
+    ("PS-09", 'You asked for 60" x 72"; this pattern makes 60" x 72" with 4" finished squares.',
+     "Sizes are in inches."),
+    # PS-26: a segment of 3 strips of 4 in squares is 4 1/2 x (3 x 4 + 1/2) = 12 1/2 in long.
+    ("PS-26", '4 1/2" x 12 1/2"', '4 1/2" x 16 1/2"'),
+    # PS-26: a block of 3 x 3 squares of 4 in measures 12 1/2 in on both sides.
+    ("PS-26", 'Block 1 should measure 12 1/2" square.', 'Block 1 should measure 12 1/2" x 16 1/2".'),
+]
+
+
+@pytest.mark.parametrize("check_id,old,new", MORE_FAILING)
+def test_review_regressions_fail(tmp_path, check_id, old, new):
+    got = results(tmp_path, edit(throw_pages(), old, new))[check_id]
+    assert got.status == "fail", got.evidence
+
+
+def test_ps25_make_counts_follow_the_block_census(tmp_path):
+    # The model's 20 blocks are 10 nine-patch (Block 1, first in reading order) and 10 plain;
+    # 12 + 8 still sums to the build line's 20, so only the census catches it.
+    pages = _replace_item(throw_pages(), 5, 6, P("Make 12."))
+    pages[5][12] = P("Make 8.")
+    got = results(tmp_path, pages)["PS-25"]
+    assert got.status == "fail" and "reading order" in got.evidence, got.evidence
+    assert pc.block_census(throw_model()) == [10, 10]
+
+
 def _swap_rows(pages):
     pages = copy.deepcopy(pages)
     rows = pages[1]
@@ -525,7 +558,7 @@ def test_each_check_fails_on_its_broken_document(tmp_path, check_id):
 
 def test_ps08_denylisted_name_fails(tmp_path):
     pages = throw_pages()
-    assert results(tmp_path, pages, denylist=["Fable Grid"])["PS-08"].status == "pass"
+    assert results(tmp_path, pages, denylist=["Harbor Grid"])["PS-08"].status == "pass"
     got = results(tmp_path, pages, denylist=["lantern grid"])["PS-08"]
     assert got.status == "fail", got.evidence
 
@@ -590,8 +623,11 @@ def test_ps15_photo_read_needs_the_uncertain_count(tmp_path):
 #   Make 12, two per pair, so ceil(12 / 2) = 6 squares of each fabric. 4 in = 32 e:
 #   floor(320 / 32) = 10 per strip, 1 strip, the last strip gives 6.
 # - QST unit 1 and its mirror QST unit 2, F = 3 in: squares 3 + 1 1/2 = 4 1/2 in, trim to
-#   3 1/2 in (V-TRI-04). One pair makes one unit of each hand (PATTERN-SPEC Appendix A), so
-#   Make 4 of each takes 4 squares of each fabric. 36 e: floor(320 / 36) = 8 per strip.
+#   3 1/2 in (V-TRI-04). The document declares unit 2 the mirror of unit 1, so the checker
+#   counts one unit of each hand per pair, the Appendix A case of three-fabric star points (a
+#   two-fabric hourglass would come out symmetric, and this synthetic document does not model
+#   the third fabric). Make 4 of each takes 4 squares of each listed fabric; 36 e gives
+#   floor(320 / 36) = 8 per strip.
 # - Flying geese unit 1, 2 x 4 in: rectangle 2 1/2 x 4 1/2 in and two 2 1/2 in squares
 #   (V-TRI-05); Make 4 takes 4 rectangles and 8 squares. The rectangle's 2 1/2 in strip
 #   (20 e) wins over a 4 1/2 in strip (MATH.md F2: 1 x 20 e < 1 x 36 e), floor(320 / 36)
@@ -734,7 +770,8 @@ def test_ps39_runs_only_with_a_reference_folder(tmp_path):
                                                         "pressing toward Block 2, and join"}),
                                     encoding="utf-8")
     got = results(tmp_path, pages, references=refs)["PS-39"]
-    assert got.status == "fail" and "Sew" not in got.evidence
+    # Counts only: no matched word reaches the evidence (R9), in either case.
+    assert got.status == "fail" and "sew the blocks" not in got.evidence.lower()
 
 
 def test_ps39_reference_names_fail(tmp_path):

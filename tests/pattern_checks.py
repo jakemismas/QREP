@@ -8,11 +8,15 @@ It prints one line per check, "<id> <pass|fail|not run>: <evidence>", then the c
 figure placeholder frames, and exits 1 when any check fails. run_checks() returns the same
 results to a test.
 
-The checker never imports qrep. It recomputes the MATH.md formulas it needs (F2 to F5 for
-cut lines and purchase lines, F6 to F12 for binding, backing, wide back and batting, and the
-checkpoint sums) in integer eighths from the model JSON alone, so a bug shared with
-qrep.construct or qrep.export cannot pass both. pypdf is imported inside read_pdf, so the
-module also loads where pypdf is missing.
+The checker never imports qrep, so a bug shared with qrep.construct or qrep.export cannot
+pass both. From the model JSON alone it recomputes, in integer eighths, MATH.md F4 (border
+strips), F6 to F12 (binding, backing, wide back, batting), the block census (block types and
+make counts), the quilt-center and strip-set checkpoints, and the fabric area order. Applied
+to the printed cut lines and the model's settings, it recomputes F2 and F3 (yields, strip and
+set counts) and F5 (purchase lines). Which pieces a construction method needs is A3's
+decision and is not re-derived here: a short cut list that is consistent with itself and with
+its own make counts passes PS-19 and PS-20 as long as the block census holds. pypdf is
+imported inside read_pdf, so the module also loads where pypdf is missing.
 
 It implements every [S] check of section 6 except PS-04 (two generations; A4a, C2a and A6
 carry it) and PS-40 (the web screen; C2's end-to-end test carries it), plus the [M] parts
@@ -558,6 +562,27 @@ def border_plan(model: dict) -> list:
     return bands
 
 
+def block_census(model: dict) -> list | None:
+    """Block counts per type in order of first appearance, reading order (PATTERN-SPEC S6);
+    a turned block is the same type, a mirror image is not. None without confirmed blocks."""
+    cb = model.get("confirmed_blocks")
+    if not cb:
+        return None
+    cells = model["center"]["cells"]
+    sa, sd = cb["squares_across"], cb["squares_down"]
+    counts = {}
+    for br in range(cb["blocks_down"]):
+        for bc in range(cb["blocks_across"]):
+            block = tuple(tuple(cells[br * sd + r][bc * sa + c] for c in range(sa))
+                          for r in range(sd))
+            turns = [block, tuple(tuple(row[::-1]) for row in block[::-1])]
+            if sa == sd:
+                turns += [tuple(zip(*block[::-1])), tuple(zip(*block))[::-1]]
+            key = min(turns)
+            counts[key] = counts.get(key, 0) + 1
+    return list(counts.values())
+
+
 def fabric_areas(model: dict) -> dict:
     c = model["center"]
     cell = c["cell_size"]
@@ -775,7 +800,8 @@ def ps05(doc: Doc, opts):
                  "heuristic"):
         if re.search(rf"\b{word}\b", text, re.IGNORECASE):
             problems.append(f"banned word {word!r}")
-    if re.search(r"\b(?:total pieces|pieces total|piece total|piece count|pieces in all)\b",
+    if re.search(r"\b(?:total pieces|pieces total|piece total|piece count|pieces in all)\b|"
+                 r"\b(?:has|have|totals?|of) [\d,]+ pieces\b|\b[\d,]+ pieces (?:to cut|in all)\b",
                  text, re.IGNORECASE):
         problems.append("a piece total")
     for pattern, what in ((r"\bf\d+\b", "an internal fabric id"),
@@ -788,7 +814,7 @@ def ps05(doc: Doc, opts):
     m = re.search(r"\b\d+\.\d+\b", VERSION_RE.sub(" ", text))
     if m:
         problems.append(f"a decimal number {m.group(0)!r}")
-    step_text = " ".join(ln.text for ln in doc.lines if STEP_RE.match(ln.text))
+    step_text = " ".join(t for h in HEADINGS for _, t in steps(doc.body(h)))
     for fabric in doc.model["palette"]["fabrics"]:
         fid = fabric["id"]
         if fid.lower() in STOP_IDS or re.fullmatch(r"[A-Z]", fid):
@@ -868,14 +894,17 @@ def ps09(doc: Doc, opts):
     basis = doc.model.get("size_basis")
     if not basis:
         return True, "not applicable: the model records no size basis"
-    cover = " ".join(ln.text for ln in doc.lines if ln.page == 1 and ln.section == "cover")
     cell = doc.model["center"]["cell_size"]
     found = []
-    for sentence in sentences(cover):
+    # Cover lines carry no closing periods, so split each line on its own.
+    cover = [s for ln in doc.lines if ln.page == 1 and ln.section == "cover"
+             for s in sentences(ln.text)]
+    for sentence in cover:
         if basis["source"] == "default":
             if "estimated from the photo" in sentence and has_len(sentence, cell):
                 found.append(sentence)
-        elif has_pair(sentence, basis["achieved_width"], basis["achieved_height"]) and all(
+        elif re.search(r"\basked for\b|\brequested\b", sentence) and has_pair(
+                sentence, basis["achieved_width"], basis["achieved_height"]) and all(
                 has_len(sentence, basis[k]) for k in ("requested_width", "requested_height")
                 if basis.get(k)):
             found.append(sentence)
@@ -1467,6 +1496,9 @@ def ps25(doc: Doc, opts):
             problems.append(f"{head} has no 'Make N.'")
     if build and sum(makes) != build[0]:
         problems.append(f"make counts sum to {sum(makes)}, the build line says {build[0]} blocks")
+    census = block_census(doc.model)
+    if census is not None and makes != census:
+        problems.append(f"make counts {makes}, the model's blocks in reading order give {census}")
     return _fail_or_pass(problems, f"{len(blocks)} block types with figures, checkpoints and "
                                    f"make counts summing to {sum(makes)}")
 
@@ -1486,6 +1518,13 @@ def ps26(doc: Doc, opts):
             if side is None or side <= 4 or (side - 4) % cell:
                 problems.append(f"{u['head']}: checkpoint {fmt(side or 0)} is not whole "
                                 f"{fmt(cell)} squares plus 1/2")
+        order = re.search(rf"\border:? ((?:{LABEL}, )+{LABEL})", u["text"])
+        if u["kind"] == "Strip set" and order:
+            # A segment is one square wide and as long as its strips, each one square.
+            want = sorted((cell + 4, len(order.group(1).split(", ")) * cell + 4))
+            if sorted(cp[1:]) != want:
+                problems.append(f"{u['head']}: segment {fmt(cp[1])} x {fmt(cp[2])}, its strips "
+                                f"give {fmt(want[0])} x {fmt(want[1])}")
     build = _build_line(doc)
     confirmed = doc.model.get("confirmed_blocks")
     for head, m, lines in subsections(doc.body("Making the blocks"), BLOCK_HEAD_RE):
@@ -1493,12 +1532,14 @@ def ps26(doc: Doc, opts):
         if not cp:
             continue
         n += 1
-        side = eighths(cp.group(1))
-        want = confirmed["squares_across"] * cell + 4 if confirmed else \
-            (build[1] + 4 if build else None)
-        if side is None or (side - 4) % cell or (want is not None and side != want):
-            problems.append(f"{head}: checkpoint {cp.group(1)}, its squares plus 1/2 give "
-                            f"{fmt(want) if want else 'a multiple of the square'}")
+        sides = (eighths(cp.group(1)), eighths(cp.group(2)) if cp.group(2) else
+                 eighths(cp.group(1)))
+        want = (confirmed["squares_across"] * cell + 4, confirmed["squares_down"] * cell + 4) \
+            if confirmed else ((build[1] + 4,) * 2 if build else None)
+        if None in sides or any((s - 4) % cell for s in sides) or \
+                (want is not None and sides != want):
+            problems.append(f"{head}: checkpoint {cp.group(0)!r}, its squares plus 1/2 give "
+                            f"{' x '.join(fmt(w) for w in want) if want else 'whole squares'}")
     m = re.search(rf"quilt center should measure ({NUM}) x ({NUM})", doc.text("Quilt assembly"))
     if not m:
         problems.append("no quilt-center checkpoint")
