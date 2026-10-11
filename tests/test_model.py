@@ -10,11 +10,16 @@ from qrep.model import (
     STAGES,
     Binding,
     BorderBand,
+    CornerUnit,
     Fabric,
+    GooseUnit,
     GridRegion,
+    HstUnit,
     Palette,
+    PlainUnit,
     Provenance,
     QrepSchemaError,
+    QstUnit,
     Quilt,
     QuiltMetadata,
     dumps,
@@ -308,7 +313,7 @@ def test_misspelled_source_reports_only_the_source():
 # settings and authored values are set by hand, derived values follow
 # deterministically from the read or other fields, format values describe the
 # file, provenance values name where a value came from, and confidence fields
-# are the carriers. B8 and B2a add their fields here.
+# are the carriers. B2a adds its fields here.
 FIELD_SOURCES = {
     "Quilt.schema_version": "format",
     "QuiltMetadata.name": "derived",
@@ -366,9 +371,69 @@ FIELD_SOURCES = {
     "FinishedSizeBasis.achieved_height": "cv:size_estimate",
     "FinishedSizeBasis.rounding_step": "setting",
     "FinishedSizeBasis.confidence": "confidence",
+    # A read classifies each square (B4a, B4b): the unit's kind, its place and
+    # the fabric of each part are one CV value, and each unit carries its own
+    # confidence, so each kind is its own carrier. Hand-authored maps record 1.0.
+    "PlainUnit.kind": "cv:unit:plain",
+    "PlainUnit.row": "cv:unit:plain",
+    "PlainUnit.col": "cv:unit:plain",
+    "PlainUnit.confidence": "confidence",
+    "HstUnit.kind": "cv:unit:hst",
+    "HstUnit.row": "cv:unit:hst",
+    "HstUnit.col": "cv:unit:hst",
+    "HstUnit.diagonal": "cv:unit:hst",
+    "HstUnit.upper": "cv:unit:hst",
+    "HstUnit.lower": "cv:unit:hst",
+    "HstUnit.confidence": "confidence",
+    "QstUnit.kind": "cv:unit:qst",
+    "QstUnit.row": "cv:unit:qst",
+    "QstUnit.col": "cv:unit:qst",
+    "QstUnit.top": "cv:unit:qst",
+    "QstUnit.right": "cv:unit:qst",
+    "QstUnit.bottom": "cv:unit:qst",
+    "QstUnit.left": "cv:unit:qst",
+    "QstUnit.confidence": "confidence",
+    "CornerUnit.kind": "cv:unit:corner",
+    "CornerUnit.row": "cv:unit:corner",
+    "CornerUnit.col": "cv:unit:corner",
+    "CornerUnit.corners": "cv:unit:corner",
+    # A fraction of the side, so it carries no size estimate of its own.
+    "CornerUnit.leg": "cv:unit:corner",
+    "CornerUnit.confidence": "confidence",
+    "GooseUnit.kind": "cv:unit:goose",
+    "GooseUnit.row": "cv:unit:goose",
+    "GooseUnit.col": "cv:unit:goose",
+    "GooseUnit.points": "cv:unit:goose",
+    "GooseUnit.body": "cv:unit:goose",
+    "GooseUnit.sky": "cv:unit:goose",
+    "GooseUnit.confidence": "confidence",
 }
 
 KINDS = {"user", "derived", "authored", "setting", "format", "provenance", "confidence"}
+
+def one_unit_of_each_kind(confidence: float = 1.0) -> list:
+    """A unit map for a 2 x 4 grid of 12-eighth squares with every kind once:
+    the four one-square kinds on row 0, two geese lying across row 1. The
+    corner leg is 12 x 1/3 = 4 eighths, a whole number."""
+    c = {"confidence": confidence}
+    return [
+        PlainUnit(row=0, col=0, **c),
+        HstUnit(row=0, col=1, diagonal="tl_br", upper="f0", lower="f1", **c),
+        QstUnit(row=0, col=2, top="f0", right="f1", bottom="f0", left="f1", **c),
+        CornerUnit(row=0, col=3, corners={"top_left": "f1"}, leg="1/3", **c),
+        GooseUnit(row=1, col=0, points="up", body="f0", sky="f1", **c),
+        GooseUnit(row=1, col=2, points="down", body="f1", sky="f0", **c),
+    ]
+
+
+UNIT_KINDS = ("plain", "hst", "qst", "corner", "goose")
+
+
+def _unit_of_kind(kind: str, confidence: float):
+    # Validated afresh, so a refused confidence raises.
+    unit = next(u for u in one_unit_of_each_kind() if u.kind == kind)
+    return type(unit).model_validate({**unit.model_dump(), "confidence": confidence})
+
 
 # Each CV carrier, built with one confidence value; a refused value raises.
 CV_CARRIERS = {
@@ -379,7 +444,14 @@ CV_CARRIERS = {
     "cell": lambda v: GridRegion(rows=1, cols=1, cell_size=8, cells=[["r"]], cell_confidence=[[v]]),
     # A default size estimated from a photo carries the estimate's confidence.
     "size_estimate": lambda v: default_basis(confidence=v),
+    **{f"unit:{kind}": (lambda v, kind=kind: _unit_of_kind(kind, v)) for kind in UNIT_KINDS},
 }
+
+
+def _unit_confidences(quilt: Quilt, kind: str) -> list[float] | None:
+    found = [u.confidence for u in quilt.center.unit_map or [] if u.kind == kind]
+    return found or None
+
 
 # Each carrier's confidence on a model, or None where the model lacks it.
 CARRIER_ON_MODEL = {
@@ -389,6 +461,7 @@ CARRIER_ON_MODEL = {
     },
     "cell": lambda q: q.center.cell_confidence,
     "size_estimate": lambda q: q.size_basis.confidence if q.size_basis is not None else None,
+    **{f"unit:{kind}": (lambda q, kind=kind: _unit_confidences(q, kind)) for kind in UNIT_KINDS},
 }
 
 # CV values a read stores with no confidence for part of what they measure:
@@ -400,8 +473,14 @@ UNRECORDED_CONFIDENCE = {"GridRegion.cell_size", "BorderBand.width"}
 # CV values a read does not store at all: the achieved size lives in the size
 # basis, which no read fills yet (#207). Every other CV value must be stored by
 # read_shaped_quilt and so meet the presence check; a new optional CV field
-# fails until it is stored there or named here.
-NOT_STORED_ON_A_READ = {"FinishedSizeBasis.achieved_width", "FinishedSizeBasis.achieved_height"}
+# fails until it is stored there or named here. No read writes a unit map until
+# B4a, so the unit values are named too; unit_shaped_quilt checks their
+# confidences instead.
+UNIT_VALUES = {path for path, source in FIELD_SOURCES.items() if source.startswith("cv:unit:")}
+NOT_STORED_ON_A_READ = {
+    "FinishedSizeBasis.achieved_width",
+    "FinishedSizeBasis.achieved_height",
+} | UNIT_VALUES
 
 # Every variant of each model that holds user facts, built with overrides.
 USER_FACT_MODELS = {
@@ -415,7 +494,15 @@ USER_FACT_MODELS = {
     ],
 }
 
-CARRIER_FIELDS = {"GridRegion.cell_confidence", "Provenance.stage_confidence"}
+CARRIER_FIELDS = {
+    "GridRegion.cell_confidence",
+    "Provenance.stage_confidence",
+    "PlainUnit.confidence",
+    "HstUnit.confidence",
+    "QstUnit.confidence",
+    "CornerUnit.confidence",
+    "GooseUnit.confidence",
+}
 
 
 def read_shaped_quilt() -> Quilt:
@@ -443,6 +530,21 @@ def _carriers(source: str) -> list[str]:
     return source[3:].split("+")
 
 
+def unit_shaped_quilt() -> Quilt:
+    """read_shaped_quilt with a unit map as B4a will write one: every kind,
+    each at a CV confidence below 1.0."""
+    quilt = read_shaped_quilt()
+    center = GridRegion(
+        rows=2,
+        cols=4,
+        cell_size=12,
+        cells=[["f0", "f1", "f0", "f1"], ["f1", "f0", "f1", "f0"]],
+        cell_confidence=[[0.875] * 4, [0.75] * 4],
+        unit_map=one_unit_of_each_kind(confidence=0.625),
+    )
+    return Quilt.model_validate({**quilt.model_dump(), "center": center.model_dump()})
+
+
 def _instances(value) -> list[BaseModel]:
     """Every model instance inside value, value included."""
     if isinstance(value, BaseModel):
@@ -450,9 +552,43 @@ def _instances(value) -> list[BaseModel]:
         for name in type(value).model_fields:
             found += _instances(getattr(value, name))
         return found
-    if isinstance(value, list):
+    if isinstance(value, dict):
+        return [model for item in value.values() for model in _instances(item)]
+    if isinstance(value, (list, tuple)):
         return [model for item in value for model in _instances(item)]
     return []
+
+
+def test_instances_descends_into_every_container():
+    # Comment 6098978109 on #145: a model held in a dict or a tuple is still
+    # walked, so a unit map stored in either cannot hide its values.
+    red = Fabric(id="r", name="Red", color="#cc3333")
+    white = Fabric(id="w", name="White", color="#ffffff")
+    blue = Fabric(id="b", name="Blue", color="#3355cc")
+    found = _instances({"listed": [red], "paired": (white, {"nested": blue}), "text": "r"})
+    assert [f.id for f in found] == ["r", "w", "b"]
+
+
+def test_every_cv_unit_value_finds_its_confidence():
+    # Criterion S7-6 for the unit map: every unit value a read will store
+    # finds its own kind's confidence beside it.
+    quilt = unit_shaped_quilt()
+    assert quilt.schema_version == "1.1"
+    stored = {
+        f"{type(model).__name__}.{name}"
+        for model in _instances(quilt)
+        for name in type(model).model_fields
+        if getattr(model, name) is not None
+    }
+    assert UNIT_VALUES <= stored
+    for path in UNIT_VALUES:
+        for carrier in _carriers(FIELD_SOURCES[path]):
+            assert CARRIER_ON_MODEL[carrier](quilt) is not None, path
+    # Two geese, one of every other kind, all at the read's 0.625.
+    assert CARRIER_ON_MODEL["unit:goose"](quilt) == [0.625, 0.625]
+    assert CARRIER_ON_MODEL["unit:corner"](quilt) == [0.625]
+    # The read without a map stores none of them.
+    assert all(CARRIER_ON_MODEL[f"unit:{kind}"](read_shaped_quilt()) is None for kind in UNIT_KINDS)
 
 
 def _models_in(annotation) -> list[type[BaseModel]]:

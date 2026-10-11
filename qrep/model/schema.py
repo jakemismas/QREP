@@ -1,10 +1,11 @@
 """Pydantic schema for the QREP quilt model.
 
 All lengths are integer eighths of an inch (see qrep.model.units). CV
-confidence lives in three places: provenance.stage_confidence (per CV stage),
-GridRegion.cell_confidence (per cell) and FinishedSizeBasis.confidence (a size
-estimated from the photo). Hand-authored models omit the first two; the
-effective_* helpers fill in the 1.0 defaults. User facts (the confirmed block
+confidence lives in four places: provenance.stage_confidence (per CV stage),
+GridRegion.cell_confidence (per cell), each unit of GridRegion.unit_map (per
+unit, qrep.model.unitmap) and FinishedSizeBasis.confidence (a size estimated
+from the photo). Hand-authored models omit the first two and leave unit
+confidence at 1.0; the effective_* helpers fill in the 1.0 defaults. User facts (the confirmed block
 structure, a typed or preset size) record confidence 1.0 (docs/SPEC.md
 section 8).
 """
@@ -12,13 +13,19 @@ section 8).
 import re
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_serializer, model_validator
+
+from qrep.model.unitmap import Unit, check_unit_map
 
 # The CV pipeline stages that report confidence. Hand-authored models omit
 # stage_confidence entirely and every stage defaults to 1.0.
 STAGES = ("rectify", "palette", "grid", "cells", "repeat", "border")
 
 _HEX_RE = re.compile(r"^#[0-9a-f]{6}$")
+
+# A unit map is new in schema 1.1. A model without one keeps the version it
+# was written with, so its saved bytes do not change.
+UNIT_MAP_SCHEMA_VERSION = "1.1"
 
 
 class QrepSchemaError(ValueError):
@@ -71,6 +78,8 @@ class GridRegion(BaseModel):
     cell_size: int = Field(gt=0, description="finished cell size in eighths")
     cells: list[list[str]]
     cell_confidence: list[list[float]] | None = None
+    # Optional and last; left out of the JSON when absent (_omit_absent_unit_map).
+    unit_map: list[Unit] | None = None
 
     @model_validator(mode="after")
     def _dims_match(self) -> "GridRegion":
@@ -89,6 +98,25 @@ class GridRegion(BaseModel):
                     if not 0.0 <= v <= 1.0:
                         raise ValueError(f"cell confidence {v} outside [0, 1]")
         return self
+
+    @model_validator(mode="after")
+    def _units_tile_the_grid(self) -> "GridRegion":
+        if self.unit_map is not None:
+            check_unit_map(self.unit_map, self.rows, self.cols, self.cell_size)
+        return self
+
+    @model_serializer(mode="wrap")
+    def _omit_absent_unit_map(self, handler):
+        # A region without a map writes exactly the keys it wrote before the
+        # map existed, so committed models and goldens keep their bytes.
+        data = handler(self)
+        if self.unit_map is None:
+            data.pop("unit_map", None)
+        return data
+
+    def unit_map_fabric_ids(self) -> set[str]:
+        """Fabric ids the unit map names beyond the cells; empty without one."""
+        return {f for unit in self.unit_map or [] for f in unit.fabric_ids()}
 
     def effective_cell_confidence(self) -> list[list[float]]:
         """Per-cell confidence; hand-authored grids (no array) default to 1.0."""
@@ -291,11 +319,18 @@ class Quilt(BaseModel):
         used: set[str] = set()
         for row in self.center.cells:
             used.update(row)
+        used.update(self.center.unit_map_fabric_ids())
         used.update(b.fabric_id for b in self.borders)
         used.add(self.binding.fabric_id)
         missing = sorted(used - known)
         if missing:
             raise ValueError(f"fabric ids {missing} referenced but not in palette {sorted(known)}")
+        return self
+
+    @model_validator(mode="after")
+    def _unit_map_is_version_one_one(self) -> "Quilt":
+        if self.center.unit_map is not None and self.schema_version in ("1", "1.0"):
+            self.schema_version = UNIT_MAP_SCHEMA_VERSION
         return self
 
     @model_validator(mode="after")
