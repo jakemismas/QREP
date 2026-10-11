@@ -7,6 +7,7 @@
 import { useEffect, useState } from "react";
 import { EngineChip, Tooltip, useTheme } from "../ui";
 import { useEngine } from "../engine/useEngine";
+import { useEngineStatus } from "../engine/engineStatus";
 import { useProject } from "../state/project";
 
 // MOCK-NOTES.md:603, its em dash replaced (house text rules).
@@ -133,6 +134,7 @@ export function Header({
   onOpenProject: () => void;
 }) {
   const engine = useEngine();
+  const engineStatus = useEngineStatus();
   const { model, goHome, saveToFile } = useProject();
   const hasModel = model !== null;
 
@@ -162,7 +164,7 @@ export function Header({
         </>
       ) : null}
       <Tooltip tip={ENGINE_TIP} placement="below" className="qrep-engine">
-        <EngineChip status={engine.status} onRetry={engine.retry} />
+        <EngineChip status={engineStatus} onRetry={engine.retry} />
       </Tooltip>
       <ThemeToggle />
     </header>

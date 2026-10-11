@@ -7,6 +7,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useEngine } from "../engine/useEngine";
 import type { Engine } from "../engine/useEngine";
+import { useEngineStatus } from "../engine/engineStatus";
 import { EngineError } from "../engine/rpc";
 import type { VisionState } from "../engine/rpc";
 import type { QuiltModel } from "../model/types";
@@ -288,7 +289,7 @@ export function usePhotoState(model: QuiltModel | null): PhotoFlowState {
 
   // PARITY item 17: after the engine is ready and the page is idle, quietly
   // prefetch the vision stack (skipped when the browser signals Save-Data).
-  const enginePhase = engine.status.phase;
+  const enginePhase = useEngineStatus().phase;
   useEffect(() => {
     if (enginePhase !== "ready" || prefetchedRef.current) return;
     const connection = (navigator as { connection?: { saveData?: boolean } }).connection;

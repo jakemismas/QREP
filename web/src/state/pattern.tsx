@@ -101,7 +101,7 @@ function execCommandCopy(text: string): boolean {
 
 export const PatternContext = createContext<PatternApi | null>(null);
 
-export function usePatternState({ model, name, summary }: ModelApi): PatternState {
+export function usePatternState({ model, name, summary, latestModel }: ModelApi): PatternState {
   const engine = useEngine();
   // ToastProvider rebuilds its value on every toast; keyed on that object,
   // the plans effect below would re-run after each toast.
@@ -121,31 +121,34 @@ export function usePatternState({ model, name, summary }: ModelApi): PatternStat
   // PARITY item 1: card metrics and yardage are engine-authoritative. When the
   // Pattern tab is open the three strategies are planned once per model
   // revision; a plan whose model was superseded by a later edit is dropped.
-  // Every edit produces a new model object, so the object is the revision.
+  // Every edit produces a new model object, so the object is the revision,
+  // and the revision advances the moment replaceModel runs (latestModel), not
+  // when this effect next runs.
 
   const plannedRef = useRef<QuiltModel | null>(null);
 
   useEffect(() => {
-    if (!patternActive || !model) return;
+    if (!patternActive || !model || model !== latestModel()) return;
     if (plannedRef.current === model) return; // already requested for this revision
     plannedRef.current = model;
     const json = JSON.stringify(model);
+    const current = () => plannedRef.current === model && latestModel() === model;
     for (const strategy of STRATEGIES) {
       engineRef.current.call<StrategyPlan>("plan", json, strategy).then(
         (result) => {
-          if (plannedRef.current === model) {
+          if (current()) {
             setPlans((prev) => ({ ...prev, [strategy]: result }));
           }
         },
         (err: unknown) => {
-          if (plannedRef.current !== model) return;
+          if (!current()) return;
           const message =
             err instanceof EngineError ? err.message : "Couldn’t work out the plan, try again?";
           toast.push(message, "error");
         },
       );
     }
-  }, [model, patternActive, toast]);
+  }, [model, patternActive, toast, latestModel]);
 
   const resetPlans = useCallback((strategy: SeamStrategy) => {
     setSeamStrategy(strategy);

@@ -25,6 +25,9 @@ export interface ModelApi {
    * screen until the new one lands. */
   replaceModel: (next: QuiltModel | null, fresh: boolean) => void;
   setName: (name: string) => void;
+  /** The model the latest replaceModel installed, ahead of the render that
+   * shows it, so a result that lands late can tell its model was replaced. */
+  latestModel: () => QuiltModel | null;
 }
 
 export const ModelContext = createContext<ModelApi | null>(null);
@@ -86,6 +89,9 @@ export function useModelState(): ModelApi {
   }, [toast]);
 
   const replaceModel = useCallback((next: QuiltModel | null, fresh: boolean) => {
+    // The same model keeps its census and the validation already in flight
+    // for it; no effect would run to send another.
+    if (next === latestRef.current) return;
     // Bump the version now, not in the effect, so a validation still in flight
     // for the replaced model is dropped even if it lands before the next render.
     versionRef.current += 1;
@@ -101,9 +107,11 @@ export function useModelState(): ModelApi {
     drainValidation();
   }, [model, drainValidation]);
 
+  const latestModel = useCallback(() => latestRef.current, []);
+
   return useMemo(
-    () => ({ model, name, summary, replaceModel, setName }),
-    [model, name, summary, replaceModel],
+    () => ({ model, name, summary, replaceModel, setName, latestModel }),
+    [model, name, summary, replaceModel, latestModel],
   );
 }
 
