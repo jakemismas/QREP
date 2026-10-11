@@ -159,6 +159,9 @@ def _draw_chart(c, item, y, cell=18):
     x0, top = 80, y - 24
     c.setFont("Helvetica", 7)
     c.setFillColorRGB(0, 0, 0)
+    if len(item) > 2:
+        # A split part's range label, 14 pt above the chart's top edge.
+        c.drawString(x0, top + 14, item[2])
     for k in range(12):
         c.drawCentredString(x0 + k * cell + cell / 2, top + 4, str(k + 1))
     for r in range(15):
@@ -1148,3 +1151,352 @@ def test_a_step_that_wraps_after_fig_keeps_its_citation(tmp_path):
     got = results(tmp_path, pages, only=UNIT_CHECKS)
     assert {k: r.status for k, r in got.items()} == {k: "pass" for k in UNIT_CHECKS}, \
         {k: r.evidence for k, r in got.items()}
+
+
+# ---------------------------------------------------------------- review 2: merged strip sets
+
+# PATTERN-SPEC section 3 worked example (the DIC fixture: 1 1/2 in finished cells, 12 e), at
+# the U = 40 in (320 e) the example uses; the stored fixture keeps U = 42 in (MATH.md 1.3), so
+# the model below sets 320. Letters by C-02 area order: A cream, B blue (fixture ids c and
+# b). Cut width = finished width + 1/2 in (MATH.md F1); M-04 merges a same-fabric run into
+# one strip.
+# - Strip set 1 (Block A row 1, b b c b b): B 3 + 1/2 = 3 1/2 in, A 1 1/2 + 1/2 = 2 in,
+#   B 3 1/2 in. Segment (S5.5): (1 1/2 + 1/2) x (3 + 1 1/2 + 3 + 1/2) = 2 x 8 in.
+# - Strip set 2 (Block A row 3, c b b b c): A 2 in, B 4 1/2 + 1/2 = 5 in, A 2 in. Segment
+#   2 x (1 1/2 + 4 1/2 + 1 1/2 + 1/2) = 2 x 8 in.
+# - Strip set 3 (Block B end rows, b c c c b): B 2 in, A 5 in, B 2 in; segment 2 x 8 in.
+# - Sets 1 and 3 share the letters B A B, but their widths differ: (B 3 1/2, A 2, B 3 1/2)
+#   against (B 2, A 5, B 2), so M-05 counts two signatures.
+# - MATH.md F3 and V-UNIT-05: per set floor(320 / 16) = 20. Set 1: 2 per Block A x 50 = 100
+#   segments, ceil(100 / 20) = 5 sets; set 2: 1 x 50 = 50, ceil(50 / 20) = 3; set 3: 2 per
+#   Block B x 49 = 98, ceil(98 / 20) = 5 (the worked example's 5, 3 and 5).
+# - Strips, sets x count in the sequence (F3): B1 5 x 2 = 10, A1 5 x 1 = 5; A2 3 x 2 = 6,
+#   B2 3 x 1 = 3; B3 5 x 2 = 10, A3 5 x 1 = 5. Cream: 5 + 6 = 11 strips of 2 in and 5 of
+#   5 in, the worked example's "(5 + 3 x 2) = (11) 2 in strips and (5) 5 in strips".
+# - Quilt center 45 x 55 cells of 1 1/2 in = 67 1/2 x 82 1/2 in (V-BORD-01); checkpoint
+#   67 1/2 + 1/2 = 68 by 82 1/2 + 1/2 = 83 in.
+
+DIC_CHECKS = ("PS-16", "PS-17", "PS-18", "PS-19", "PS-22", "PS-26", "PS-33")
+
+
+def dic_model() -> dict:
+    model = fixture_model()
+    model["settings"]["wof"] = 320
+    # The figures are drawn in the test colors, so the palette carries them.
+    model["palette"]["fabrics"] = [{"id": "c", "name": "Cream", "color": COLORS["A"]},
+                                   {"id": "b", "name": "Blue", "color": COLORS["B"]}]
+    return model
+
+
+def _strip_set(n, pieces, order, press, need, sets, fig, segment='2" x 8"'):
+    return [P(f"Strip set {n}", size=12), *[P(p) for p in pieces],
+            P(f"1. Sew the strips lengthwise in this order: {order}. Press toward {press}. "
+              f"Fig. {n}"),
+            P(f'2. Crosscut ({need}) 2" segments, 20 per set. Fig. {n}'),
+            FIG(*fig),
+            P(f"Each segment should measure {segment}."),
+            P(f"Make {sets}.")]
+
+
+def dic_strip_pages(segment1='2" x 8"', a1='2"', b1='3 1/2"'):
+    cutting = [
+        P("Cutting", size=14),
+        ("fabric", "A", "Cream"),
+        P(f"1. Cut (5) {a1} x WOF strips. Set aside the strips (A1) for strip set 1."),
+        P('2. Cut (6) 2" x WOF strips. Set aside the strips (A2) for strip set 2.'),
+        P('3. Cut (5) 5" x WOF strips. Set aside the strips (A3) for strip set 3.'),
+        ("fabric", "B", "Blue"),
+        P(f"1. Cut (10) {b1} x WOF strips. Set aside the strips (B1) for strip set 1."),
+        P('2. Cut (3) 5" x WOF strips. Set aside the strips (B2) for strip set 2.'),
+        P('3. Cut (10) 2" x WOF strips. Set aside the strips (B3) for strip set 3.'),
+    ]
+    units = [P("Making the units", size=14),
+             P("Two blocks repeat across the quilt, so you sew long strips together and cut "
+               "them into segments instead of cutting every square."),
+             *_strip_set(1, ("B1 (2)", "A1 (1)"), "B1, A1, B1", "B1", 100, 5,
+                         ("BBBB", "AAAA", "BBBB"), segment1),
+             *_strip_set(2, ("A2 (2)", "B2 (1)"), "A2, B2, A2", "B2", 50, 3,
+                         ("AAAA", "BBBB", "AAAA"))]
+    more_units = _strip_set(3, ("B3 (2)", "A3 (1)"), "B3, A3, B3", "B3", 98, 5,
+                            ("BBBB", "AAAA", "BBBB"))
+    assembly = [P("Quilt assembly", size=14), P('The quilt center should measure 68" x 83".')]
+    return [[P("Chain Study", size=24)], cutting, units, more_units, assembly]
+
+
+def test_dic_strip_sets_pass_the_strip_set_checks(tmp_path):
+    got = results(tmp_path, dic_strip_pages(), dic_model(), only=DIC_CHECKS)
+    assert {k: r.status for k, r in got.items()} == {k: "pass" for k in DIC_CHECKS}, \
+        {k: r.evidence for k, r in got.items()}
+
+
+def test_ps26_a_merged_strip_set_segment_sums_its_strip_widths(tmp_path):
+    got = results(tmp_path, dic_strip_pages(), dic_model(), only=("PS-26",))["PS-26"]
+    assert got.status == "pass", got.evidence
+    # One square per strip would give 2 x (3 x 1 1/2 + 1/2) = 2 x 5 in, which set 1's merged
+    # strips (3 + 1 1/2 + 3 + 1/2 = 8 in long) rule out.
+    got = results(tmp_path, dic_strip_pages(segment1='2" x 5"'), dic_model(),
+                  only=("PS-26",))["PS-26"]
+    assert got.status == "fail" and "Strip set 1" in got.evidence, got.evidence
+
+
+def test_ps26_each_strip_must_be_whole_squares_wide(tmp_path):
+    # B1 cut 3 3/4 in (30 e) finishes 30 - 4 = 26 e and A1 cut 1 1/2 in (12 e) finishes 8 e;
+    # neither is a whole number of 12 e squares, though the length still adds up:
+    # 26 + 8 + 26 + 4 = 64 e = 8 in, the printed 2 x 8 in.
+    pages = dic_strip_pages(a1='1 1/2"', b1='3 3/4"')
+    got = results(tmp_path, pages, dic_model(), only=("PS-26",))["PS-26"]
+    assert got.status == "fail" and "not whole" in got.evidence and "B1" in got.evidence, \
+        got.evidence
+
+
+def test_ps33_strip_sets_with_the_same_letters_but_other_widths_differ(tmp_path):
+    # Sets 1 and 3 both read B A B; M-05's signature carries the widths, so they differ. The
+    # throw's FAILING PS-33 case (both sets 4 1/2 in B A B) still repeats.
+    got = results(tmp_path, dic_strip_pages(), dic_model(), only=("PS-33",))["PS-33"]
+    assert got.status == "pass", got.evidence
+
+
+# ---------------------------------------------------------------- review 2: mirror QSTs
+
+
+def test_a_mirror_pair_counts_each_hand(tmp_path):
+    # C-11 writes a mirror pair as "Make 8 (4 of each)": 8 units, 4 of each hand. S5.2 and
+    # Appendix A: one pair of starting squares (one A2, one B2) gives two QSTs, one of each
+    # hand, so 4 of each hand take 4 pairs, the (4) A2 and (4) B2 that Cutting cuts. QST
+    # unit 2, the mirror, makes its own hand: 4, equal to unit 1's 4 of each.
+    pages = units_pages()
+    assert pages[3][10] == P("QST unit 1", size=12) and pages[3][16] == P("Make 4.")
+    pages = _replace_item(pages, 3, 16, P("Make 8 (4 of each)."))
+    got = results(tmp_path, pages, only=UNIT_CHECKS)
+    assert {k: r.status for k, r in got.items()} == {k: "pass" for k in UNIT_CHECKS}, \
+        {k: r.evidence for k, r in got.items()}
+    # 8 is not 2 x 3, so "Make 8 (3 of each)" does not add up.
+    pages = _replace_item(pages, 3, 16, P("Make 8 (3 of each)."))
+    assert results(tmp_path, pages, only=("PS-24",))["PS-24"].status == "fail"
+
+
+# ---------------------------------------------------------------- review 2: figure labels
+
+
+def test_a_small_step_below_a_figure_is_body_text(tmp_path):
+    # L-10 (PS-42): body text is at least 10 pt. Strip set 1's step 2 set at 8 pt with its
+    # baseline 30 - 16 = 14 pt below the figure's bottom edge lies inside the 18 pt label band,
+    # but a step sentence is never a label, so it is 8 pt body text.
+    pages = copy.deepcopy(throw_pages())
+    step = '2. Crosscut (20) 4 1/2" segments, 8 per set. Fig. 1'
+    assert pages[4][7] == P(step) and pages[4][8] == FIG("BBB", "AAA", "BBB")
+    pages[4][7:9] = [("fig_left", ("BBB", "AAA", "BBB")), ("gap", -16), P(step, size=8)]
+    got = results(tmp_path, pages)
+    assert got["PS-42"].status == "fail", got["PS-42"].evidence
+    assert "body '2. Crosscut" in got["PS-42"].evidence, got["PS-42"].evidence
+    assert {k for k, r in got.items() if r.status == "fail"} == {"PS-42"}, \
+        {k: r.evidence for k, r in got.items() if r.status == "fail"}
+
+
+def test_a_small_range_label_beside_the_chart_is_a_figure_label(tmp_path):
+    # S10 labels a chart part "Rows a to b, columns c to d". At 7 pt (the L-10 figure-label
+    # minimum), 14 pt above the chart, it is a figure label; the throw's single part covers
+    # rows 1 to 15 and columns 1 to 12.
+    pages = _replace_item(throw_pages(), 9, 1, ("chart", (), "Rows 1 to 15, columns 1 to 12"))
+    got = results(tmp_path, pages)
+    assert {k: r.evidence for k, r in got.items() if r.status == "fail"} == {}
+
+
+# ---------------------------------------------------------------- review 2: PS-39 fails closed
+
+
+def test_ps39_fails_on_an_empty_reference_folder(tmp_path):
+    refs = tmp_path / "refs"
+    refs.mkdir()
+    got = results(tmp_path, throw_pages(), references=refs)["PS-39"]
+    assert got.status == "fail" and "no reference text" in got.evidence, got.evidence
+
+
+def test_ps39_fails_on_a_folder_it_cannot_read(tmp_path):
+    refs = tmp_path / "refs"
+    refs.mkdir()
+    (refs / "notes.pdf").write_bytes(b"%PDF-1.4 Sew the blocks in each row together")
+    got = results(tmp_path, throw_pages(), references=refs)["PS-39"]
+    assert got.status == "fail" and "1 of 1 reference files" in got.evidence, got.evidence
+    # Counts only: no file name and no reference word reaches the evidence.
+    for secret in ("notes", ".pdf", "sew the blocks"):
+        assert secret not in got.evidence.lower(), got.evidence
+
+
+def test_ps39_fails_when_any_reference_file_is_unreadable(tmp_path):
+    refs = tmp_path / "refs"
+    refs.mkdir()
+    (refs / "notes.txt").write_text("A different text about something else entirely, with no "
+                                    "shared run of words.", encoding="utf-8")
+    # A name that starts with "." is skipped, so the folder still reads cleanly.
+    (refs / ".DS_Store").write_bytes(b"\x00\x01")
+    assert results(tmp_path, throw_pages(), references=refs)["PS-39"].status == "pass"
+    (refs / "extract.docx").write_bytes(b"PK\x03\x04 binary")
+    got = results(tmp_path, throw_pages(), references=refs)["PS-39"]
+    assert got.status == "fail" and "1 of 2 reference files" in got.evidence, got.evidence
+    for secret in ("extract", ".docx", "something else"):
+        assert secret not in got.evidence.lower(), got.evidence
+
+
+# ---------------------------------------------------------------- review 2: PS-07
+
+
+def test_ps07_reads_the_size_on_the_finished_size_line(tmp_path):
+    # throw_model finishes at 60 x 72 in. The size-basis sentence also prints 60 x 72, so only
+    # a check bound to the "Finished size" line sees a wrong size there.
+    pages = edit(throw_pages(), 'Finished size 60" x 72"', 'Finished size 62" x 72"')
+    got = results(tmp_path, pages)["PS-07"]
+    assert got.status == "fail" and "Finished size" in got.evidence, got.evidence
+    pages = edit(throw_pages(), 'Finished size 60" x 72"', '60" x 72"')
+    got = results(tmp_path, pages)["PS-07"]
+    assert got.status == "fail" and "Finished size" in got.evidence, got.evidence
+
+
+# ---------------------------------------------------------------- review 2: [M] coverage
+
+
+def test_ps20_binding_line_carries_no_allowance(tmp_path):
+    # V-BIND-03, 53 1/2 x 67 in (428 x 536 e): T = 2 (53 1/2 + 67) + 10 = 251 in (2008 e);
+    # strips ceil(2008 / 300) = 7; length 7 x 20 = 140 e; qy ceil(140 / 72) = 2 -> 1/2 yd.
+    # With the 10 percent top allowance (F5) it would be ceil(140 x 110 / 100) = 154 e and
+    # ceil(154 / 72) = 3 qy = 3/4 yd, so the allowance changes the printed line.
+    model = sized_model(428, 536)
+
+    def pages(yards):
+        return [[P("Small Plain", size=24)],
+                [P("Fabric requirements", size=14),
+                 ROW([(0, "C"), (20, "Red"), (230, yards),
+                      (290, 'Binding: (7) 2 1/2" x WOF strips')], "C")],
+                [P("Cutting", size=14), ("fabric", "C", "Red"),
+                 P('1. Cut (7) 2 1/2" x WOF strips for binding.')],
+                [P("Finishing", size=14),
+                 P("1. Join the (7) binding strips with diagonal seams. Fig. 1")]]
+
+    got = results(tmp_path, pages("1/2 yd"), model, only=("PS-11", "PS-20"))
+    assert {k: r.status for k, r in got.items()} == {"PS-11": "pass", "PS-20": "pass"}, \
+        {k: r.evidence for k, r in got.items()}
+    got = results(tmp_path, pages("3/4 yd"), model, only=("PS-20",))["PS-20"]
+    assert got.status == "fail" and "C binding" in got.evidence, got.evidence
+
+
+def test_border_plan_matches_join_thresholds_and_the_crib():
+    # V-UNIT-04: k(Lp) = 1 if Lp <= 320 else ceil((Lp - 4) / 316). Each center below is
+    # cells of 1 e, so the side and top lengths land on the thresholds; band b = 1 in (8 e),
+    # cut 8 + 4 = 12 e. F4: Ls = Li + 4, Lt = Wi + 2b + 4.
+    # Center 301 x 316 e: Ls = 316 + 4 = 320, k(320) = 1, per floor(320 / 320) = 1, so
+    # ceil(2 / 1) = 2 strips; Lt = 301 + 16 + 4 = 321, k(321) = ceil(317 / 316) = 2, 2 x 2 = 4
+    # strips; band strips 2 + 4 = 6.
+    model = sized_model(301, 316, cell=1)
+    model["borders"] = [{"fabric_id": "c", "width": 8}]
+    assert pc.border_plan(model) == [
+        {"width": 12, "side": 320, "top": 321, "strips": 6, "k_side": 1, "k_top": 2}]
+    # Center 617 x 632 e: Ls = 632 + 4 = 636, k(636) = ceil(632 / 316) = 2 exactly, 4 strips;
+    # Lt = 617 + 16 + 4 = 637, k(637) = ceil(633 / 316) = 3, 6 strips; band strips 4 + 6 = 10.
+    model = sized_model(617, 632, cell=1)
+    model["borders"] = [{"fabric_id": "c", "width": 8}]
+    assert pc.border_plan(model) == [
+        {"width": 12, "side": 636, "top": 637, "strips": 10, "k_side": 2, "k_top": 3}]
+    # V-BORD-02, crib: center 32 x 48 in (256 x 384 e, 4 in cells), b = 2 in (16 e). Cut
+    # 16 + 4 = 20 e; Ls = 384 + 4 = 388 e > 320, k = ceil(384 / 316) = 2, 4 strips;
+    # Lt = 256 + 32 + 4 = 292 e <= 320, per floor(320 / 292) = 1, ceil(2 / 1) = 2 strips;
+    # 4 + 2 = 6 strips.
+    model = sized_model(256, 384, cell=32)
+    model["borders"] = [{"fabric_id": "c", "width": 16}]
+    assert pc.border_plan(model) == [
+        {"width": 20, "side": 388, "top": 292, "strips": 6, "k_side": 2, "k_top": 1}]
+
+
+def test_backing_plan_matches_tie_total_and_side_vectors():
+    # V-BACK-12, 28 x 28 in (224 e): Wb = Lb = 224 + 64 = 288 e <= 336, n = 1 both ways;
+    # 288 + 36 = 324 e both ways, a tie, kept vertical (one piece, seams "along");
+    # qy ceil(324 / 72) = 5 -> 5 x 72 = 360 e (1 1/4 yd). V-WIDE-07: one panel, no wide line.
+    plan = pc.backing_plan(sized_model(224, 224))
+    assert (plan["panels"], plan["length"], plan["seams"], plan["yards"], plan["wide"]) == \
+        (1, 288, "along", 360, None)
+    # V-BACK-13, 68 x 68 in (544 e): Wb = Lb = 608 e; n = ceil((608 - 8) / 328) =
+    # ceil(600 / 328) = 2 both ways; 2 x 608 + 72 = 1288 e both ways, a tie, kept vertical;
+    # qy ceil(1288 / 72) = 18 -> 1296 e (4 1/2 yd).
+    plan = pc.backing_plan(sized_model(544, 544))
+    assert (plan["panels"], plan["length"], plan["seams"], plan["yards"]) == \
+        (2, 608, "along", 1296)
+    # V-BACK-14, 24 x 58 in (192 x 464 e): Wb = 256 e, Lb = 528 e. Vertical n(256) = 1,
+    # 528 + 36 = 564 e; horizontal n(528) = ceil(520 / 328) = 2, 2 x 256 + 72 = 584 e. Keep
+    # vertical on the total (564 < 584) though 512 < 528 raw; qy ceil(564 / 72) = 8 -> 576 e
+    # (2 yd). F11: one panel, so no wide line.
+    plan = pc.backing_plan(sized_model(192, 464))
+    assert (plan["panels"], plan["length"], plan["seams"], plan["yards"], plan["wide"]) == \
+        (1, 528, "along", 576, None)
+    # V-BACK-01 and V-WIDE-01, queen 92 1/2 x 115 in (740 x 920 e): Wb = 804 e, Lb = 984 e.
+    # Vertical n(804) = ceil(796 / 328) = 3, 3 x 984 + 72 = 3024 e; horizontal n(984) =
+    # ceil(976 / 328) = 3, 3 x 804 + 72 = 2484 e; keep horizontal (seams across), qy
+    # ceil(2484 / 72) = 35 -> 2520 e (8 3/4 yd). Wide: Wb 804 <= 864, Lb 984 > 864, so the
+    # length is Lb = 984 e; 984 + 36 = 1020 e; qy ceil(1020 / 72) = 15 -> 1080 e (3 3/4 yd).
+    plan = pc.backing_plan(sized_model(740, 920))
+    assert (plan["panels"], plan["length"], plan["seams"], plan["yards"], plan["wide"]) == \
+        (3, 804, "across", 2520, 1080)
+    # V-BACK-07 and V-WIDE-04, queen 90 x 108 in (720 x 864 e): Wb = 784 e, Lb = 928 e.
+    # Vertical n(784) = ceil(776 / 328) = 3, 3 x 928 + 72 = 2856 e; horizontal n(928) =
+    # ceil(920 / 328) = 3, 3 x 784 + 72 = 2424 e; keep horizontal, qy ceil(2424 / 72) = 34
+    # -> 2448 e (8 1/2 yd). Wide: Wb 784 fits, Lb 928 > 864, length 928 e; 928 + 36 = 964 e;
+    # qy ceil(964 / 72) = 14 -> 1008 e (3 1/2 yd).
+    plan = pc.backing_plan(sized_model(720, 864))
+    assert (plan["panels"], plan["length"], plan["seams"], plan["yards"], plan["wide"]) == \
+        (3, 784, "across", 2448, 1008)
+
+
+# V-BACK-02 (throw 60 x 72): 4 1/4 yd, (2) panels cut 68 in, seams across. Each edit breaks
+# one number: 4 yd is the length without the 9 in pieced allowance (ceil(1088 / 72) = 16 qy,
+# V-BACK-02's column C); 3 panels is not n(80 in) = ceil(79 / 41) = 2; 80 in is the vertical
+# layout's panel length, not the kept horizontal Wb = 68 in.
+PS12_EDITS = [('4 1/4 yd: 2 lengths of 68"', '4 yd: 2 lengths of 68"'),
+              ('4 1/4 yd: 2 lengths of 68"', '4 1/4 yd: 3 lengths of 68"'),
+              ('4 1/4 yd: 2 lengths of 68"', '4 1/4 yd: 2 lengths of 80"')]
+
+
+@pytest.mark.parametrize("old,new", PS12_EDITS)
+def test_ps12_fails_on_a_wrong_backing_number(tmp_path, old, new):
+    got = results(tmp_path, edit(throw_pages(), old, new), only=("PS-12",))["PS-12"]
+    assert got.status == "fail", got.evidence
+
+
+def test_ps12_fails_on_a_wide_back_line_the_king_does_not_get(tmp_path):
+    # V-BACK-08, king 110 x 108 in (880 x 864 e): Wb = 118 in (944 e), Lb = 116 in (928 e);
+    # vertical n(118) = ceil(117 / 41) = 3, 3 x 116 + 9 = 357 in; horizontal n(116) = 3,
+    # 3 x 118 + 9 = 363 in; keep vertical (seams along), qy ceil(2856 / 72) = 40 -> 10 yd.
+    # V-WIDE-05: Wb 118 > 108 and Lb 116 > 108, so no 108 in line; 3 1/2 yd is the 118 in
+    # wide-back figure, printed against the wrong width.
+    model = sized_model(880, 864)
+
+    def pages(wide):
+        rows = [ROW([(0, "Backing"), (80, '10 yd: 3 lengths of 116" at 42" wide, seams run '
+                                          'along the quilt')])]
+        rows += [ROW([(80, 'or 3 1/2 yd of 108" wide backing')])] if wide else []
+        return [[P("King Plain", size=24)], [P("Fabric requirements", size=14), *rows]]
+
+    assert results(tmp_path, pages(False), model, only=("PS-12",))["PS-12"].status == "pass"
+    got = results(tmp_path, pages(True), model, only=("PS-12",))["PS-12"]
+    assert got.status == "fail" and "shows none" in got.evidence, got.evidence
+
+
+def test_ps13_fails_on_a_wrong_batting_size(tmp_path):
+    # V-BATT-03: 60 x 72 + 2 x 4 in = 68 x 80 in. 64 x 76 in adds the 4 in once per axis; the
+    # twin package still covers it, so only the size is wrong.
+    pages = edit(throw_pages(), '68" x 80", twin', '64" x 76", twin')
+    got = results(tmp_path, pages, only=("PS-13",))["PS-13"]
+    assert got.status == "fail" and "68 x 80" in got.evidence, got.evidence
+
+
+def test_ps13_a_quilt_larger_than_a_king_needs_the_statement(tmp_path):
+    # V-BATT-10: 102 1/2 x 120 in (820 x 960 e) -> 110 1/2 x 128 in; king no (128 > 120;
+    # turned 128 > 124), so no package covers it and the row says "larger than a king".
+    model = sized_model(820, 960)
+
+    def pages(package):
+        return [[P("Wide Plain", size=24)],
+                [P("Fabric requirements", size=14),
+                 ROW([(0, "Batting"), (80, f'110 1/2" x 128", {package} (124" x 120")')])]]
+
+    got = results(tmp_path, pages("larger than a king package"), model, only=("PS-13",))
+    assert got["PS-13"].status == "pass", got["PS-13"].evidence
+    got = results(tmp_path, pages("king package"), model, only=("PS-13",))["PS-13"]
+    assert got.status == "fail" and "larger than a king" in got.evidence, got.evidence

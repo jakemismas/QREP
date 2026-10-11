@@ -21,7 +21,9 @@ imported inside read_pdf, so the module also loads where pypdf is missing.
 It implements every [S] check of section 6 except PS-04 (two generations; A4a, C2a and A6
 carry it) and PS-40 (the web screen; C2's end-to-end test carries it), plus the [M] parts
 that the model JSON can answer. [V] checks are D8's and E4's. PS-39 runs only when a local
-reference directory is passed and reports "not run" otherwise.
+reference directory is passed and reports "not run" otherwise; it reads the .txt, .md and
+.json files there (skipping names that start with "."), and it fails when it reads no
+reference text or when any other file, or a .json it cannot parse, is present.
 
 Text is extracted with pypdf, then normalized as section 6 says: whitespace runs collapse
 to one space and straight double quotes drop out, so 6 1/2" reads 6 1/2. The checker groups
@@ -30,13 +32,15 @@ line of its own. The phrases it parses, all taken from PATTERN-SPEC and MATH.md 
 normalized):
 
 - Cover: the pattern name is the topmost line at the largest size; a line right below it
-  at that size joins it while the joined name still appears in a footer.
+  at that size joins it while the joined name still appears in a footer. The finished size
+  is the "W x H" pair on the first cover line that holds "Finished size" (any case).
 - Section headings: a line that is exactly the PS-02 heading, optionally "(continued)".
 - Footer: the line with "page N of M", the pattern name and "QREP x.y.z", anything at or
   below its baseline, and a line up to 24 pt above it that holds only the name or version.
-- Figure labels: text inside a figure's patches, or within 18 pt of them when it is
-  smaller than 10 pt or reads as a label (a dimension, number or letter; never a sentence,
-  step, heading, piece line or make count).
+- Figure labels: a line whose runs all sit inside a figure's patches, or all within 18 pt
+  of them when the line reads as a label (a dimension, number or letter, or a layout chart
+  part "Rows a to b, columns c to d"; never a sentence, step, heading, piece line or make
+  count). Size plays no part.
 - Subheadings: "HST unit 1", "QST unit 1", "Snowball unit 1", "Flying geese unit 1",
   "Unit 1", "Strip set 1" (Making the units) and "Block 1" (Making the blocks).
 - Logical lines (Cutting, units, blocks): a step or subcut that wraps runs on into the next
@@ -50,13 +54,16 @@ normalized):
   or, numbered or not, "(N) W x WOF strips for binding."; subcuts read "A2: subcut (6)
   strips into (120) 2 squares, 20 per strip." (a rectangle as "W x L rectangles"), and a
   partly used last strip is stated with "last strip" and its piece count; strips cut and
-  then set aside read "Set aside ... (A1) for strip set 1"; unit pieces end "for HST unit
-  1"; spare pieces "(k) spare"; binding strips "for binding"; borders "For each side
-  border, join (k) strips ... trim to L. For the top and bottom borders, join (k) strips
-  each and trim to L.", or "cut (2) pieces L long" for pieces that fit one strip.
+  then set aside read "Set aside ... (A1) for strip set 1", and that step's strip width is
+  the label's cut width in its strip set; unit pieces end "for HST unit 1"; spare pieces
+  "(k) spare"; binding strips "for binding"; borders "For each side border, join (k)
+  strips ... trim to L. For the top and bottom borders, join (k) strips each and trim to
+  L.", or "cut (2) pieces L long" for pieces that fit one strip.
 - Piece lists: a logical line that starts "A1 ... (q)" or "(q) A1" inside a unit or block.
-- Make counts "Make N." (mirror pairs "Make 8 (4 of each)"); checkpoints "should measure
-  W x H", "should measure S square" and "Trim to S square".
+- Make counts "Make N." (mirror pairs "Make 8 (4 of each)", where 4 is each hand's count);
+  checkpoints "should measure W x H", "should measure S square" and "Trim to S square".
+- Strip sets: the sewing order "in this order: B1, A1, B1" and "Crosscut (N) S segments,
+  K per set".
 - Fabric requirements: a row per fabric starting with its letter and ending in "N yd",
   with a swatch; the binding row with "(N) 2 1/2 x WOF strips"; the backing row with
   "N lengths of L", "seams run across the quilt" or "seams run along the quilt" and
@@ -145,10 +152,10 @@ DATE_RES = (re.compile(r"\b\d{4}-\d{2}-\d{2}\b"), re.compile(r"\b\d{1,2}/\d{1,2}
 ALTERNATE_RE = re.compile(r"\balternat(?:e|ive|ively)\b(?! (?:rows?|columns?|blocks?|sides?|"
                           r"directions?)\b)|\bor you can\b|\boptionally\b|"
                           r"\banother (?:method|way|technique)\b", re.IGNORECASE)
-# A figure's dimension labels sit just outside its patches, and only labels are this small:
-# body text is at least 10 pt (L-10), so it never counts as a label.
+# A figure's dimension labels sit just outside its patches. Body text can sit as close, at
+# any size, so a line in this band is a label only when it reads as one (_label_like).
 FIGURE_MARGIN = 18
-FIGURE_LABEL_MAX = 10
+CHART_PART_RE = re.compile(r"^Rows \d+ to \d+, columns \d+ to \d+$")
 # The footer is the "page N of M" line and anything at or below its baseline, plus a line
 # up to 24 pt above it that holds nothing but the name or the version (G-02).
 FOOTER_TOLERANCE = 2
@@ -413,18 +420,18 @@ def _figure_regions(page: Page, palette: list) -> list:
     return [tuple(c) for c in clusters if c[2] - c[0] > 24 and c[3] - c[1] > 24]
 
 
-def _in_region(run: Run, regions, pad=None) -> bool:
-    """Inside a figure, or text smaller than body text within 18 pt of one."""
-    if pad is None:
-        pad = FIGURE_MARGIN if run.size < FIGURE_LABEL_MAX else 0
+def _in_region(run: Run, regions, pad: float = 0) -> bool:
+    """Inside a figure's patch box, or within pad points of it."""
     return any(r[0] - pad <= run.x <= r[2] + pad and r[1] - pad <= run.y <= r[3] + pad
                for r in regions)
 
 
 def _label_like(line: Line) -> bool:
-    """A dimension, row number or letter set beside a figure, at any size. A sentence, a
-    step, a heading, a piece line or a make count stays body text."""
+    """A dimension, row number, letter or layout chart part range set beside a figure, at
+    any size. A sentence, a step, a heading, a piece line or a make count stays body text."""
     text = line.text
+    if CHART_PART_RE.match(text):
+        return True
     if re.search(r"[.!?:]$", text) or text.startswith("Make ") or STEP_RE.match(text) \
             or _heading(text) or UNIT_HEAD_RE.match(text) or BLOCK_HEAD_RE.match(text) \
             or (FABRIC_HEAD_RE.match(text) and line.swatch is not None) or _piece_line(text):
@@ -455,6 +462,8 @@ def _build_lines(page: Page) -> None:
                     s.x1 <= first.x + 1 and s.x0 >= first.x - 48 and \
                     s.y0 <= first.y + first.size and s.y1 >= first.y - 0.5 * first.size:
                 line.swatch = s.fill
+        # Position and content decide, never size, so a small sentence beside a figure is
+        # still body text for PS-42.
         line.figure = all(_in_region(r, page.regions) for r in group) or (
             all(_in_region(r, page.regions, FIGURE_MARGIN) for r in group)
             and _label_like(line))
@@ -985,8 +994,15 @@ def ps07(doc: Doc, opts):
     authored = (doc.model.get("provenance") or {}).get("source", "authored") == "authored"
     if authored and normalize(doc.model["metadata"]["name"]) != doc.name:
         problems.append(f"name {doc.name!r} is not the model's {doc.model['metadata']['name']!r}")
-    if not has_pair(text, w, h):
-        problems.append(f"finished size {fmt(w)} x {fmt(h)} not on page 1")
+    # The size-basis sentence repeats the size, so only the "Finished size" line can show the
+    # finished size itself.
+    size_line = next((ln.text for ln in cover
+                      if re.search(r"\bfinished size\b", ln.text, re.IGNORECASE)), None)
+    if size_line is None:
+        problems.append("no 'Finished size' line on page 1")
+    elif not has_pair(size_line, w, h):
+        problems.append(f"the 'Finished size' line {size_line[:60]!r} does not give the "
+                        f"model's {fmt(w)} x {fmt(h)}")
     if not re.search(r"\bfinished\b", text) or not re.search(
             r"\bblocks?\b[^.]*\bset \d+ x \d+|\bgrid of\b", text):
         problems.append("no build line (blocks and setting, or grid of squares)")
@@ -1276,14 +1292,15 @@ def ps16(doc: Doc, opts):
 
 
 def _set_aside(doc: Doc) -> dict:
-    """{label: (strip set number, strips)} from the Cutting set-aside sentences."""
+    """{label: (strip set number, strips, cut width in eighths)} from the Cutting set-aside
+    sentences; strips and width are None when the step reads no S4 strip cut."""
     out = {}
     for block in cutting_blocks(doc).values():
         for _, text in block["cuts"]:
             m = SET_ASIDE_RE.search(text)
             cut = strip_cut(text)
             if m:
-                out[m.group(1)] = (int(m.group(2)), cut[1] if cut else None)
+                out[m.group(1)] = (int(m.group(2)), *(cut[1:] if cut else (None, None)))
     return out
 
 
@@ -1354,6 +1371,11 @@ def _make(text: str):
     return (int(m.group(1)), int(m.group(2)) if m.group(2) else None) if m else (None, None)
 
 
+def _hand(make, each):
+    """One hand's count: the 4 of C-11's "Make 8 (4 of each)", else the make count."""
+    return each if each is not None else make
+
+
 def _pieces(lines: list) -> dict:
     out = {}
     for ln in lines:
@@ -1371,7 +1393,7 @@ def ps19(doc: Doc, opts):
         for sub in block["subcuts"]:
             spare = re.search(r"\((\d+)\) spare", sub["rest"])
             totals[sub["label"]] = sub["total"] - (int(spare.group(1)) if spare else 0)
-    for label, (_, strips) in _set_aside(doc).items():
+    for label, (_, strips, _) in _set_aside(doc).items():
         totals[label] = strips
     units = _unit_subsections(doc)
     mirrored = {u["mirror_of"] for u in units if u["mirror_of"]}
@@ -1381,7 +1403,7 @@ def ps19(doc: Doc, opts):
                        "text": " ".join(x.text for x in ls)}
                       for h, m, ls in subsections(doc.body("Making the blocks"), BLOCK_HEAD_RE)]
     for g in groups:
-        make, _ = _make(g["text"])
+        make, each = _make(g["text"])
         pieces = _pieces(g["lines"])
         if g["mirror_of"]:
             if pieces:
@@ -1392,8 +1414,8 @@ def ps19(doc: Doc, opts):
                 problems.append(f"{g['head']} lists pieces but no make count")
             continue
         # MATH.md F14: two at a time, so ceil(units / 2) pairs; a mirror pair is one unit
-        # of each hand per pair, so its pairs equal the make count of either hand.
-        sets = make if g["head"] in mirrored else \
+        # of each hand per pair (S5.2, Appendix A), so its pairs equal one hand's count.
+        sets = _hand(make, each) if g["head"] in mirrored else \
             ceil_div(make, 2) if g["kind"] in ("HST", "QST") else make
         for label, q in pieces.items():
             need[label] = need.get(label, 0) + q * sets
@@ -1598,9 +1620,9 @@ def ps24(doc: Doc, opts):
         mine, pair = _make(u["text"]), _make(partner["text"])
         if mine[0] is None:
             problems.append(f"{u['head']} has no make count of its own")
-        elif u["kind"] == "QST" and mine[0] != pair[0]:
-            problems.append(f"{u['head']} makes {mine[0]}, its mirror {pair[0]}: a QST pair "
-                            f"gives one of each hand")
+        elif u["kind"] == "QST" and _hand(*mine) != _hand(*pair):
+            problems.append(f"{u['head']} makes {_hand(*mine)}, its mirror {_hand(*pair)} of "
+                            f"its hand: a QST pair gives one of each hand")
         for make, each in (mine, pair):
             if each is not None and make != 2 * each:
                 problems.append(f"'Make {make} ({each} of each)' does not add up")
@@ -1651,6 +1673,7 @@ def ps25(doc: Doc, opts):
 def ps26(doc: Doc, opts):
     cell = doc.model["center"]["cell_size"]
     cw, ch = doc.model["center"]["cols"] * cell, doc.model["center"]["rows"] * cell
+    aside = _set_aside(doc)
     problems = []
     n = 0
     for u in _unit_subsections(doc):
@@ -1664,8 +1687,23 @@ def ps26(doc: Doc, opts):
                                 f"{fmt(cell)} squares plus 1/2")
         order = re.search(rf"\border:? ((?:{LABEL}, )+{LABEL})", u["text"])
         if u["kind"] == "Strip set" and order:
-            # A segment is one square wide and as long as its strips, each one square.
-            want = sorted((cell + 4, len(order.group(1).split(", ")) * cell + 4))
+            # A segment is one square wide and as long as its strips' finished widths (cut
+            # less 1/2), plus 1/2: a strip merged under M-04 spans several squares (S5.5).
+            labels = order.group(1).split(", ")
+            widths = {x: aside[x][2] if x in aside else None for x in labels}
+            missing = sorted(x for x, w in widths.items() if w is None)
+            odd = sorted(x for x, w in widths.items()
+                         if w is not None and (w <= 4 or (w - 4) % cell))
+            if missing:
+                problems.append(f"{u['head']}: strips {missing} have no set-aside width in "
+                                f"Cutting")
+                continue
+            if odd:
+                problems.append(f"{u['head']}: strips {odd} are cut "
+                                f"{[fmt(widths[x]) for x in odd]}, not whole {fmt(cell)} "
+                                f"squares plus 1/2")
+                continue
+            want = sorted((cell + 4, sum(widths[x] - 4 for x in labels) + 4))
             if sorted(cp[1:]) != want:
                 problems.append(f"{u['head']}: segment {fmt(cp[1])} x {fmt(cp[2])}, its strips "
                                 f"give {fmt(want[0])} x {fmt(want[1])}")
@@ -1867,16 +1905,19 @@ def ps33(doc: Doc, opts):
     construction = doc.text("Making the units", "Making the blocks", "Quilt assembly")
     if ALTERNATE_RE.search(construction):
         problems.append(f"an alternative is offered: {ALTERNATE_RE.search(construction)[0]!r}")
+    aside = _set_aside(doc)
     seqs = []
     for unit in _unit_subsections(doc):
         if unit["kind"] != "Strip set":
             continue
         order = re.search(rf"\border:? ((?:{LABEL}, )+{LABEL})", unit["text"])
-        # A signature is the fabric sequence; two sets differ in labels even when they match.
-        seq = tuple(x[0] for x in order.group(1).split(", ")) if order else ()
+        # M-05: a signature is the sequence of merged pieces with their widths, so it pairs
+        # each fabric letter with its strip's cut width; labels differ even when sets match.
+        labels = order.group(1).split(", ") if order else []
+        seq = tuple((x[0], aside[x][2] if x in aside else None) for x in labels)
         if not 2 <= len(seq) <= 7:
             problems.append(f"{unit['head']} has {len(seq)} strips in its sewing order")
-        if len(set(seq)) < 2:
+        if len({letter for letter, _ in seq}) < 2:
             problems.append(f"{unit['head']} is a single-fabric strip set")
         if seq in seqs or seq[::-1] in seqs:
             problems.append(f"{unit['head']} repeats another set or its reverse")
@@ -1936,26 +1977,41 @@ def _words(text: str) -> list:
     return re.findall(r"[a-z0-9]+(?:'[a-z]+)?", text.lower())
 
 
-def _reference_text(folder: Path) -> str:
+def _reference_text(folder: Path) -> tuple:
+    """(text, files read, files not read) for a reference folder. Names that start with "."
+    are skipped; every other file that is not .txt, .md or parseable .json counts as not
+    read, so PS-39 cannot pass on references it never saw."""
     chunks = []
+    read = unread = 0
+
+    def strings(v):
+        if isinstance(v, str):
+            chunks.append(v)
+        elif isinstance(v, dict):
+            for x in v.values():
+                strings(x)
+        elif isinstance(v, list):
+            for x in v:
+                strings(x)
+
     for path in sorted(folder.rglob("*")):
-        if path.suffix.lower() in (".txt", ".md"):
+        if not path.is_file() or any(p.startswith(".")
+                                     for p in path.relative_to(folder).parts):
+            continue
+        suffix = path.suffix.lower()
+        if suffix in (".txt", ".md"):
             chunks.append(path.read_text(encoding="utf-8", errors="ignore"))
-        elif path.suffix.lower() == ".json":
-            def strings(v):
-                if isinstance(v, str):
-                    chunks.append(v)
-                elif isinstance(v, dict):
-                    for x in v.values():
-                        strings(x)
-                elif isinstance(v, list):
-                    for x in v:
-                        strings(x)
+        elif suffix == ".json":
             try:
                 strings(json.loads(path.read_text(encoding="utf-8", errors="ignore")))
             except ValueError:
-                pass
-    return "\n".join(chunks)
+                unread += 1
+                continue
+        else:
+            unread += 1
+            continue
+        read += 1
+    return "\n".join(chunks), read, unread
 
 
 @check("PS-39")
@@ -1967,17 +2023,24 @@ def ps39(doc: Doc, opts):
     if not folder.is_dir():
         return False, f"reference directory {folder} does not exist"
     mine = _words(doc.all_text())
-    theirs = _words(_reference_text(folder))
+    text, read, unread = _reference_text(folder)
+    theirs = _words(text)
     grams = {tuple(theirs[i:i + 10]) for i in range(len(theirs) - 9)}
     hits = sum(1 for i in range(len(mine) - 9) if tuple(mine[i:i + 10]) in grams)
     names = [n.strip() for n in opts.get("reference_names") or () if n.strip()]
     named = sum(1 for n in names if n.lower() in doc.all_text().lower())
-    # Counts only: the matched words are reference text and stay off every report.
+    # Counts only: the matched words and the file names are private and stay off every report.
+    problems = []
+    if unread:
+        problems.append(f"{unread} of {read + unread} reference files could not be read (only "
+                        f".txt, .md and .json are read)")
+    if not theirs:
+        problems.append(f"no reference text was read ({read} files read)")
     if hits or named:
-        return False, f"{hits} runs of 10 words match the references; {named} reference names " \
-                      f"appear"
-    return True, f"0 runs of 10 words shared with {len(theirs)} reference words; " \
-                 f"{len(names)} names absent"
+        problems.append(f"{hits} runs of 10 words match the references; {named} reference "
+                        f"names appear")
+    return _fail_or_pass(problems, f"0 runs of 10 words shared with {len(theirs)} reference "
+                                   f"words in {read} files; {len(names)} names absent")
 
 
 @check("PS-41")
@@ -2006,9 +2069,8 @@ def ps42(doc: Doc, opts):
         for ln in page.lines:
             cells = len(ln.runs) >= 2 and any(
                 b.x - (a.x + a.width) >= 12 for a, b in zip(ln.runs, ln.runs[1:]))
+            kind = "figure label" if ln.figure else "table" if cells else "body"
             for r in ln.runs:
-                kind = "figure label" if _in_region(r, page.regions) else \
-                    "table" if cells else "body"
                 minimum = {"figure label": 7, "table": 9, "body": 10}[kind]
                 if r.size < minimum - 0.05:
                     problems.append(f"page {page.number}: {kind} {r.text[:20]!r} at "
