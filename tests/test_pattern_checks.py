@@ -200,9 +200,19 @@ def _draw_gap(c, item, y):
     return y - item[1]
 
 
+def _draw_at(c, item, y):
+    # Body text at a fixed baseline, leaving the flow where it was.
+    c.setFillColorRGB(0, 0, 0)
+    c.setFont("Helvetica", 10)
+    c.drawString(54, item[2], item[1])
+    return y
+
+
 DRAW = {"p": _draw_p, "row": _draw_row, "fabric": _draw_fabric, "fig": _draw_fig,
+        "fig_left": lambda c, item, y: _draw_fig(c, item, y, x0=54),
         "render": _draw_render, "square": _draw_square, "chart": _draw_chart,
-        "outline": _draw_outline, "fat_quarter": _draw_fat_quarter, "gap": _draw_gap}
+        "outline": _draw_outline, "fat_quarter": _draw_fat_quarter, "gap": _draw_gap,
+        "at": _draw_at}
 
 
 def render(pages, path, *, name=NAME, footer_size=10, odd_page=None):
@@ -904,3 +914,163 @@ def test_lengths_parse_and_format_in_eighths():
     # 17 qy x 72 e = 1224 e = 34 eighths of a yard = 4 1/4 yd.
     assert pc.fmt_yd(1224) == "4 1/4 yd"
     assert pc.normalize('Cut (8) 6 1/2"  x\nWOF strips.') == "Cut (8) 6 1/2 x WOF strips."
+
+
+# ---------------------------------------------------------------- correctness review regressions
+
+
+def _split_item(pages, page, old, first, second, indent=0):
+    """One paragraph drawn as two physical lines, the way a long line wraps."""
+    pages = copy.deepcopy(pages)
+    items = pages[page]
+    i = next(k for k, it in enumerate(items) if it[0] == "p" and it[1] == old)
+    items[i:i + 1] = [P(first, indent=indent), P(second, indent=indent)]
+    return pages
+
+
+def _s4_wordings(pages):
+    # PATTERN-SPEC S4 words strip-set fabric "Set aside (N) W x WOF strips (A1) for strip
+    # set 1." and binding "(N) 2 1/2 x WOF strips for binding.", neither starting with Cut.
+    pages = edit(pages, 'Cut (6) 4 1/2" x WOF strips. Set aside the strips (B1)',
+                 'Set aside (6) 4 1/2" x WOF strips (B1)')
+    pages = edit(pages, 'Cut (2) 4 1/2" x WOF strips. Set aside the strips (B2)',
+                 'Set aside (2) 4 1/2" x WOF strips (B2)')
+    return _replace_item(pages, 3, 11, P('(8) 2 1/2" x WOF strips for binding.'))
+
+
+def test_s4_set_aside_and_binding_wordings_pass(tmp_path):
+    got = results(tmp_path, _s4_wordings(throw_pages()))
+    assert {k: r.evidence for k, r in got.items() if r.status == "fail"} == {}
+
+
+def test_ps20_checks_a_fabric_cut_only_by_set_aside_steps(tmp_path):
+    # Fabric B: (6 + 2) x 36 e = 288 e of strips; MATH.md F5 purchase ceil(288 x 110 / 100)
+    # = 317 e; ceil(317 / 72) = 5 qy = 1 1/4 yd (V-UNIT-02), so 1 yd is short.
+    pages = edit(_s4_wordings(throw_pages()), "1 1/4 yd", "1 yd")
+    got = results(tmp_path, pages)["PS-20"]
+    assert got.status == "fail" and "fabric B top" in got.evidence, got.evidence
+
+
+def test_ps20_fails_a_row_whose_fabric_cuts_no_strips(tmp_path):
+    # Fabric C keeps its heading and its binding row but cuts no binding strips.
+    got = results(tmp_path, _replace_item(throw_pages(), 3, 11, ("gap", 0)))["PS-20"]
+    assert got.status == "fail" and "C binding" in got.evidence, got.evidence
+
+
+def test_a_piece_longer_than_the_strip_width_fails_without_a_crash(tmp_path):
+    # 42 1/2 in = 340 e > U = 320 e: a 12 1/2 in strip yields floor(320 / 340) = 0 such
+    # pieces, and MATH.md F2 rules that orientation out when the long side exceeds U.
+    pages = edit(throw_pages(), '(10) 12 1/2" squares, 3 per strip',
+                 '(10) 12 1/2" x 42 1/2" rectangles, 3 per strip')
+    got = results(tmp_path, pages)
+    assert list(got) == IMPLEMENTED
+    assert got["PS-20"].status == "fail" and "42 1/2" in got["PS-20"].evidence
+    assert got["PS-33"].status == "fail" and "A3" in got["PS-33"].evidence
+
+
+def test_a_size_outside_eighths_fails_without_a_crash(tmp_path):
+    # 12 1/3 in is no whole eighth (C-09), so no check can compute with it.
+    pages = edit(throw_pages(), '(10) 12 1/2" squares', '(10) 12 1/3" squares')
+    pages = edit(pages, 'Cut (4) 12 1/2" x WOF', 'Cut (4) 12 1/3" x WOF')
+    got = results(tmp_path, pages)
+    assert list(got) == IMPLEMENTED
+    for check_id in ("PS-06", "PS-20", "PS-33"):
+        assert got[check_id].status == "fail", (check_id, got[check_id].evidence)
+
+
+def test_a_check_that_raises_is_reported_as_a_fail(tmp_path, monkeypatch):
+    def broken(doc, opts):
+        raise ValueError("bad input")
+
+    monkeypatch.setitem(pc.CHECKS, "PS-01", broken)
+    got = results(tmp_path, throw_pages())
+    assert list(got) == IMPLEMENTED
+    assert got["PS-01"].status == "fail" and "ValueError: bad input" in got["PS-01"].evidence
+    assert got["PS-02"].status == "pass"
+
+
+def test_a_step_that_wraps_before_a_count_and_label_stays_one_step(tmp_path):
+    # The continuation line starts "(4) B4", which alone would read as a piece list line.
+    pages = _split_item(units_pages(), 3,
+                        "1. Draw a diagonal line on each B4 square, sew one to each corner of A4 "
+                        "and press toward the corner. Fig. 8",
+                        "1. Draw a diagonal line on the back of each of the",
+                        "(4) B4 squares, sew one to each corner of A4 and press toward the "
+                        "corner. Fig. 8")
+    got = results(tmp_path, pages, only=UNIT_CHECKS)
+    assert {k: r.status for k, r in got.items()} == {k: "pass" for k in UNIT_CHECKS}, \
+        {k: r.evidence for k, r in got.items()}
+
+
+def test_a_subcut_that_wraps_before_its_shape_word_parses(tmp_path):
+    pages = _split_item(throw_pages(), 3,
+                        'A3: subcut (4) strips into (10) 12 1/2" squares, 3 per strip. The last '
+                        'strip gives (1).',
+                        'A3: subcut (4) strips into (10) 12 1/2"',
+                        'squares, 3 per strip. The last strip gives (1).', indent=20)
+    got = results(tmp_path, pages)
+    assert {k: r.evidence for k, r in got.items() if r.status == "fail"} == {}
+
+
+def test_body_text_just_below_a_figure_stays_body_text(tmp_path):
+    pages = copy.deepcopy(throw_pages())
+    # Strip set 1's figure drawn at the left margin, as a reportlab Drawing would be, with the
+    # checkpoint baseline 30 - 16 = 14 pt below its bottom edge: inside the 18 pt band that
+    # small figure labels get.
+    assert pages[4][8] == FIG("BBB", "AAA", "BBB")
+    pages[4][8:9] = [("fig_left", ("BBB", "AAA", "BBB")), ("gap", -16)]
+    got = results(tmp_path, pages)
+    assert {k: r.evidence for k, r in got.items() if r.status == "fail"} == {}
+
+
+def test_a_body_line_above_the_footer_is_not_footer(tmp_path):
+    # The footer baseline is y = 30; Block 2's "Make 10." sits 20 pt above it, at y = 50.
+    assert throw_pages()[5][12] == P("Make 10.")
+    got = results(tmp_path, _replace_item(throw_pages(), 5, 12, ("at", "Make 10.", 50)))
+    assert {k: r.evidence for k, r in got.items() if r.status == "fail"} == {}
+
+
+def test_alternate_rows_is_not_an_alternative_method(tmp_path):
+    pages = edit(throw_pages(), "pressing the row seams in one direction",
+                 "pressing the seams of alternate rows in opposite directions")
+    got = results(tmp_path, pages)["PS-33"]
+    assert got.status == "pass", got.evidence
+    pages = edit(throw_pages(), "Sew the blocks in each row together,",
+                 "Alternatively, sew the blocks in each row together,")
+    assert results(tmp_path, pages)["PS-33"].status == "fail"
+
+
+def test_ps28_border_pieces_that_fit_one_strip_need_no_join(tmp_path):
+    # V-BORD-04: center 4 x 4 in, one 1 in band. Strips 1 + 1/2 = 1 1/2 in; sides 4 + 1/2
+    # = 4 1/2 in; top and bottom 4 + 2 x 1 + 1/2 = 6 1/2 in. Both fit 40 in, so k = 1: the
+    # sides come from one strip (floor(40 / 4 1/2) = 8 >= 2) and the top and bottom from
+    # another (floor(40 / 6 1/2) = 6 >= 2), 2 strips in all.
+    model = sized_model(32, 32)
+    model["borders"] = [{"fabric_id": "c", "width": 8}]
+
+    def pages(top):
+        return [[P("Tiny Border", size=24)],
+                [P("Cutting", size=14), ("fabric", "A", "Background"),
+                 P(f'1. Cut (2) 1 1/2" x WOF strips. For the side borders, cut (2) pieces 4 1/2" '
+                   f'long from one strip. For the top and bottom borders, cut (2) pieces {top} '
+                   f'long from the other strip.')],
+                [P("Borders", size=14),
+                 P("1. Measure the quilt through its center and trim the borders to match if "
+                   "needed. Sew the side borders first, then the top and bottom borders. Press "
+                   "toward the border.")]]
+
+    got = results(tmp_path, pages('6 1/2"'), model, only=("PS-28",))["PS-28"]
+    assert got.status == "pass", got.evidence
+    got = results(tmp_path, pages('6"'), model, only=("PS-28",))["PS-28"]
+    assert got.status == "fail", got.evidence
+
+
+def test_a_long_name_that_wraps_on_the_cover_passes(tmp_path):
+    name = "Lantern Grid on a Quiet Winter Evening by the Northern Harbor Wall"
+    # The cover draws the name at 24 pt in a 500 pt column, where it takes two lines.
+    assert len(simpleSplit(name, "Helvetica", 24, 500)) == 2
+    model = throw_model()
+    model["metadata"]["name"] = name
+    pages = _replace_item(throw_pages(), 0, 0, P(name, size=24))
+    got = results(tmp_path, pages, model, render_kw={"name": name})
+    assert {k: r.evidence for k, r in got.items() if r.status == "fail"} == {}

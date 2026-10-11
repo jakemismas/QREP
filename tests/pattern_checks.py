@@ -29,19 +29,28 @@ the text runs into lines itself, because pypdf's plain extraction puts each tabl
 line of its own. The phrases it parses, all taken from PATTERN-SPEC and MATH.md (shown
 normalized):
 
+- Cover: the pattern name is the topmost line at the largest size, with the lines right
+  below it at that size when it wraps.
 - Section headings: a line that is exactly the PS-02 heading, optionally "(continued)".
-- Footer: "page N of M", the pattern name and "QREP x.y.z" on the bottom lines of a page.
+- Footer: the line with "page N of M", the pattern name and "QREP x.y.z", plus anything at
+  or below its baseline.
 - Subheadings: "HST unit 1", "QST unit 1", "Snowball unit 1", "Flying geese unit 1",
   "Unit 1", "Strip set 1" (Making the units) and "Block 1" (Making the blocks).
+- Logical lines (Cutting, units, blocks): a line that wraps runs on into the next one
+  unless it ends in ".", ":" or a "Fig. N" citation, is a heading, subheading, fabric
+  heading or piece line, or the next line starts a step, subheading, subcut, strip cut,
+  "Make N", "Trim to" or "Fig. N".
 - Steps: lines that start "N. "; a step runs on until the next structural line.
-- Cutting: a fabric heading is a letter and name with a swatch to its left; steps read
-  "Cut (N) W x WOF strips."; subcuts read "A2: subcut (6) strips into (120) 2 squares,
-  20 per strip." (a rectangle as "W x L rectangles"), and a partly used last strip is
-  stated with "last strip" and its piece count; strip-set strips read "Set aside ... (A1)
-  for strip set 1"; unit pieces end "for HST unit 1"; spare pieces "(k) spare"; binding
-  strips "for binding"; borders "For each side border, join (k) strips ... trim to L. For
-  the top and bottom borders, join (k) strips each and trim to L."
-- Piece lists: a line that starts "A1 ... (q)" or "(q) A1" inside a unit or block.
+- Cutting: a fabric heading is a letter and name with a swatch to its left; a strip group
+  reads "Cut (N) W x WOF strips.", "Set aside (N) W x WOF strips (A1) for strip set 1."
+  or, numbered or not, "(N) W x WOF strips for binding."; subcuts read "A2: subcut (6)
+  strips into (120) 2 squares, 20 per strip." (a rectangle as "W x L rectangles"), and a
+  partly used last strip is stated with "last strip" and its piece count; strips cut and
+  then set aside read "Set aside ... (A1) for strip set 1"; unit pieces end "for HST unit
+  1"; spare pieces "(k) spare"; binding strips "for binding"; borders "For each side
+  border, join (k) strips ... trim to L. For the top and bottom borders, join (k) strips
+  each and trim to L.", or "cut (2) pieces L long" for pieces that fit one strip.
+- Piece lists: a logical line that starts "A1 ... (q)" or "(q) A1" inside a unit or block.
 - Make counts "Make N." (mirror pairs "Make 8 (4 of each)"); checkpoints "should measure
   W x H", "should measure S square" and "Trim to S square".
 - Fabric requirements: a row per fabric starting with its letter and ending in "N yd",
@@ -114,6 +123,11 @@ SUBCUT_RE = re.compile(
     r"(squares?|rectangles?)\b(.*)$")
 SET_ASIDE_RE = re.compile(rf"Set aside\b[^.]*?\(({LABEL})\)[^.]*?\bstrip set (\d+)")
 CUT_STEP_RE = re.compile(rf"^Cut \((\d+)\) ({NUM}) x WOF strips?\b")
+# PATTERN-SPEC S4 words a strip group three ways: cut, set aside for a strip set, binding.
+STRIP_FORMS = (("cut", CUT_STEP_RE),
+               ("set aside", re.compile(rf"^Set aside \((\d+)\) ({NUM}) x WOF strips?\b")),
+               ("binding", re.compile(rf"^\((\d+)\) ({NUM}) x WOF strips? for binding\b")))
+SUBCUT_START_RE = re.compile(rf"^{LABEL}: subcut\b")
 MAKE_RE = re.compile(r"\bMake (\d+)(?: \((\d+) of each\))?")
 CHECKPOINT_RE = re.compile(
     rf"(?:should measure|Trim(?: each unit)? to) ({NUM})(?: x ({NUM}))?(?: square)?")
@@ -123,8 +137,16 @@ MIRROR_RE = re.compile(r"mirror image of (?:(HST|QST|Snowball|Flying geese) )?un
 DATE_RES = (re.compile(r"\b\d{4}-\d{2}-\d{2}\b"), re.compile(r"\b\d{1,2}/\d{1,2}/\d{2,4}\b"),
             re.compile(r"\b(?:January|February|March|April|May|June|July|August|September|"
                        r"October|November|December) \d{1,2}(?:, \d{4})?\b"))
-ALTERNATE_RE = re.compile(r"\balternat(?:e|ive|ively)\b|\bor you can\b|\boptionally\b|"
-                          r"\banother (?:method|way|technique)\b", re.IGNORECASE)
+# Bare "alternate" stays out: "alternate rows" describes a layout, not a second method.
+ALTERNATE_RE = re.compile(r"\balternative(?:ly)?\b|\balternate (?:method|way|technique)\b|"
+                          r"\bor you can\b|\boptionally\b|\banother (?:method|way|technique)\b",
+                          re.IGNORECASE)
+# A figure's dimension labels sit just outside its patches, and only labels are this small:
+# body text is at least 10 pt (L-10), so it never counts as a label.
+FIGURE_MARGIN = 18
+FIGURE_LABEL_MAX = 10
+# The footer is the "page N of M" line and anything at or below its baseline.
+FOOTER_TOLERANCE = 2
 
 
 # ---------------------------------------------------------------- numbers and text
@@ -364,8 +386,7 @@ def _same_color(a, b) -> bool:
 
 def _figure_regions(page: Page, palette: list) -> list:
     """Bounding boxes of figures: clusters of palette-filled shapes wider and taller than a
-    24 pt swatch, grown by 18 pt so dimension labels just outside the patches count as figure
-    labels. A column of swatches stays out, being one swatch wide."""
+    24 pt swatch. A column of swatches stays out, being one swatch wide."""
     patches = [s for s in page.shapes
                if not s.image and any(_same_color(s.fill, c) for c in palette)]
     clusters = []
@@ -383,12 +404,14 @@ def _figure_regions(page: Page, palette: list) -> list:
                     merged = True
                     break
         clusters.append(box)
-    return [(c[0] - 18, c[1] - 18, c[2] + 18, c[3] + 18) for c in clusters
-            if c[2] - c[0] > 24 and c[3] - c[1] > 24]
+    return [tuple(c) for c in clusters if c[2] - c[0] > 24 and c[3] - c[1] > 24]
 
 
 def _in_region(run: Run, regions) -> bool:
-    return any(r[0] <= run.x <= r[2] and r[1] <= run.y <= r[3] for r in regions)
+    """Inside a figure, or a label smaller than body text within 18 pt of one."""
+    pad = FIGURE_MARGIN if run.size < FIGURE_LABEL_MAX else 0
+    return any(r[0] - pad <= run.x <= r[2] + pad and r[1] - pad <= run.y <= r[3] + pad
+               for r in regions)
 
 
 def _build_lines(page: Page) -> None:
@@ -453,7 +476,7 @@ def build_doc(pages: list, model: dict) -> Doc:
         _build_lines(page)
         footer_y = max((ln.y for ln in page.lines if FOOTER_RE.search(ln.text)), default=None)
         for ln in page.lines:
-            if footer_y is not None and ln.y <= footer_y + 24:
+            if footer_y is not None and ln.y <= footer_y + FOOTER_TOLERANCE:
                 ln.section = "footer"
         lines += page.lines
     current = "cover"
@@ -465,8 +488,22 @@ def build_doc(pages: list, model: dict) -> Doc:
             current = h
         ln.section = current if ln.page > 1 else "cover"
     cover = [ln for ln in lines if ln.page == 1 and ln.section == "cover"]
-    name = max(cover, key=lambda ln: (max(r.size for r in ln.runs), ln.y)).text if cover else ""
-    return Doc(pages, lines, name, model)
+    return Doc(pages, lines, _cover_name(cover), model)
+
+
+def _cover_name(cover: list) -> str:
+    """The topmost cover line at the largest size, joined with the lines right below it at
+    that size, so a name that wraps reads whole."""
+    sizes = [max(r.size for r in ln.runs) for ln in cover]
+    if not sizes:
+        return ""
+    first = next(i for i, s in enumerate(sizes) if s >= max(sizes) - 0.5)
+    parts = []
+    for ln, size in zip(cover[first:], sizes[first:]):
+        if size < max(sizes) - 0.5:
+            break
+        parts.append(ln.text)
+    return " ".join(parts)
 
 
 # ---------------------------------------------------------------- model arithmetic
@@ -601,10 +638,57 @@ def fabric_areas(model: dict) -> dict:
 # ---------------------------------------------------------------- document structure
 
 
+def strip_cut(text: str):
+    """(wording, strips, width in eighths or None) for an S4 strip wording, else None."""
+    for kind, form in STRIP_FORMS:
+        m = form.match(text)
+        if m:
+            return kind, int(m.group(1)), eighths(m.group(2))
+    return None
+
+
+def _piece_line(text: str) -> bool:
+    return bool(PIECE_RE.match(text)) and not SUBCUT_START_RE.match(text)
+
+
+def _ends(ln: Line) -> bool:
+    """Nothing on the next line continues this one."""
+    text = ln.text
+    return bool(re.search(r"[.:!?]$|\bFig\. \d+$", text) or _heading(text)
+                or UNIT_HEAD_RE.match(text) or BLOCK_HEAD_RE.match(text)
+                or (FABRIC_HEAD_RE.match(text) and ln.swatch is not None) or _piece_line(text))
+
+
+def _starts(ln: Line) -> bool:
+    """This line opens a step, subheading, cut, count or figure citation of its own."""
+    text = ln.text
+    return bool(STEP_RE.match(text) or _heading(text) or UNIT_HEAD_RE.match(text)
+                or BLOCK_HEAD_RE.match(text) or SUBCUT_START_RE.match(text)
+                or (FABRIC_HEAD_RE.match(text) and ln.swatch is not None) or strip_cut(text)
+                or re.match(r"Make \d+\b|Trim(?: each unit)? to \d|Fig\. \d", text))
+
+
+def logical(lines: list) -> list:
+    """Physical lines joined into the lines a reader sees. A wrapped line runs on until the
+    next one starts something of its own, so a continuation that begins "(4) B4 squares"
+    stays step text and a subcut that wraps before "squares" still reads as one subcut. A
+    piece list line is then only a line that starts after a finished one."""
+    out = []
+    for ln in lines:
+        if out and not _ends(out[-1]) and not _starts(ln):
+            prev = out[-1]
+            raw = f"{prev.raw} {ln.raw}"
+            out[-1] = Line(prev.page, prev.y, prev.runs + ln.runs, raw, normalize(raw),
+                           prev.section, prev.figure, prev.swatch)
+        else:
+            out.append(ln)
+    return out
+
+
 def steps(lines: list) -> list:
     """Numbered steps as (number, text), each running on until a structural line."""
     out = []
-    for ln in lines:
+    for ln in logical(lines):
         m = STEP_RE.match(ln.text)
         if m:
             out.append([int(m.group(1)), m.group(2)])
@@ -620,13 +704,13 @@ def _structural(text: str) -> bool:
     return bool(_heading(text) or UNIT_HEAD_RE.match(text) or BLOCK_HEAD_RE.match(text)
                 or SUBCUT_RE.match(text) or PIECE_RE.match(text) or FIG_RE.match(text)
                 or text.startswith("Make ") or CHECKPOINT_RE.search(text)
-                or FABRIC_HEAD_RE.match(text))
+                or FABRIC_HEAD_RE.match(text) or strip_cut(text))
 
 
 def subsections(lines: list, head_re) -> list:
-    """(heading text, match, lines) for each subheading in a section."""
+    """(heading text, match, logical lines) for each subheading in a section."""
     out = []
-    for ln in lines:
+    for ln in logical(lines):
         m = head_re.match(ln.text)
         if m and not ln.figure:
             out.append((ln.text, m, []))
@@ -636,10 +720,12 @@ def subsections(lines: list, head_re) -> list:
 
 
 def cutting_blocks(doc: Doc) -> dict:
-    """Cutting grouped by fabric letter: {letter: {"name", "steps", "subcuts", ...}}."""
+    """Cutting grouped by fabric letter: {letter: {"name", "steps", "cuts", "subcuts", ...}}.
+    "cuts" holds (step number or None, text) for every step and for each unnumbered strip
+    line, such as a binding cut written without a step number."""
     blocks = {}
     current = None
-    for ln in doc.body("Cutting"):
+    for ln in logical(doc.body("Cutting")):
         m = FABRIC_HEAD_RE.match(ln.text)
         if m and ln.swatch is not None:
             current = blocks.setdefault(m.group(1), {"name": m.group(2), "lines": []})
@@ -648,6 +734,9 @@ def cutting_blocks(doc: Doc) -> dict:
             current["lines"].append(ln)
     for block in blocks.values():
         block["steps"] = steps(block["lines"])
+        block["cuts"] = list(block["steps"]) + [
+            (None, ln.text) for ln in block["lines"]
+            if not STEP_RE.match(ln.text) and strip_cut(ln.text)]
         block["subcuts"] = []
         step_no = last = None
         for ln in block["lines"]:
@@ -656,10 +745,12 @@ def cutting_blocks(doc: Doc) -> dict:
             if sm:
                 step_no, last = int(sm.group(1)), None
             elif m:
+                size = m.group(4) + (f" x {m.group(5)}" if m.group(5) else "")
+                a, b = eighths(m.group(4)), eighths(m.group(5)) if m.group(5) else None
                 last = {"label": m.group(1), "strips": int(m.group(2)),
-                        "total": int(m.group(3)), "a": eighths(m.group(4)),
-                        "b": eighths(m.group(5)) if m.group(5) else None, "shape": m.group(6),
-                        "rest": m.group(7), "step": step_no}
+                        "total": int(m.group(3)), "a": a, "b": b, "size": size,
+                        "eighths": a is not None and (b is not None or not m.group(5)),
+                        "shape": m.group(6), "rest": m.group(7), "step": step_no}
                 block["subcuts"].append(last)
             elif last is not None and not _structural(ln.text):
                 # A subcut that wraps keeps its tail: the unit it feeds, the last strip.
@@ -1114,12 +1205,12 @@ def ps16(doc: Doc, opts):
         strips_by_step = {}
         for number, text in block["steps"]:
             n_steps += 1
-            m = CUT_STEP_RE.match(text)
-            if not m:
+            cut = strip_cut(text)
+            if not cut:
                 problems.append(f"fabric {letter} step {number} does not read 'Cut (N) W x "
-                                f"WOF strips'")
+                                f"WOF strips' or another S4 strip wording")
                 continue
-            strips_by_step[number] = int(m.group(1))
+            strips_by_step[number] = cut[1]
         used = {}
         for sub in block["subcuts"]:
             n_subs += 1
@@ -1150,11 +1241,11 @@ def _set_aside(doc: Doc) -> dict:
     """{label: (strip set number, strips)} from the Cutting set-aside sentences."""
     out = {}
     for block in cutting_blocks(doc).values():
-        for _, text in block["steps"]:
+        for _, text in block["cuts"]:
             m = SET_ASIDE_RE.search(text)
-            c = CUT_STEP_RE.match(text)
+            cut = strip_cut(text)
             if m:
-                out[m.group(1)] = (int(m.group(2)), int(c.group(1)) if c else None)
+                out[m.group(1)] = (int(m.group(2)), cut[1] if cut else None)
     return out
 
 
@@ -1293,24 +1384,36 @@ def ps20(doc: Doc, opts):
     checked = []
     for letter, block in blocks.items():
         top = binding = 0
-        for _, text in block["steps"]:
-            m = CUT_STEP_RE.match(text)
-            if not m or eighths(m.group(2)) is None:
+        for _, text in block["cuts"]:
+            cut = strip_cut(text)
+            if cut is None:
+                continue  # PS-16 reports a step in no S4 wording
+            if cut[2] is None:
+                problems.append(f"fabric {letter}: strip width in {text[:40]!r} is not in "
+                                f"eighths")
                 continue
-            length = int(m.group(1)) * eighths(m.group(2))
-            if "for binding" in text:
-                binding += length
+            if cut[0] == "binding" or "for binding" in text:
+                binding += cut[1] * cut[2]
             else:
-                top += length
+                top += cut[1] * cut[2]
         for sub in block["subcuts"]:
             step = next((t for n, t in block["steps"] if n == sub["step"]), "")
-            m = CUT_STEP_RE.match(step)
-            width = eighths(m.group(2)) if m else None
+            cut = strip_cut(step)
+            width = cut[2] if cut else None
+            if width is None or not sub["eighths"]:
+                problems.append(f"{sub['label']}: size {sub['size']} or its strip width is not "
+                                f"in eighths")
+                continue
             dims = (sub["a"], sub["a"]) if sub["b"] is None else (sub["a"], sub["b"])
             if width not in dims:
                 problems.append(f"{sub['label']}: strip width {width} is not a side of the piece")
                 continue
             along = dims[1] if width == dims[0] else dims[0]
+            if along > u:
+                # MATH.md F2: a strip yields floor(U / side) = 0 pieces whose side exceeds U.
+                problems.append(f"{sub['label']}: {fmt(along)} is longer than the {fmt(u)} "
+                                f"usable width, so a {fmt(width)} strip yields none")
+                continue
             per = subcut_yield(sub)
             if per != u // along or sub["strips"] != ceil_div(sub["total"], max(per or 1, 1)):
                 problems.append(f"{sub['label']}: MATH.md F2 gives {u // along} per strip and "
@@ -1322,13 +1425,16 @@ def ps20(doc: Doc, opts):
                 if other < mine or (other == mine and along < width):
                     problems.append(f"{sub['label']}: a {fmt(along)} strip uses less fabric")
         for kind, length in (("top", top), ("binding", binding)):
+            row = [r for r in rows if r["letter"] == letter and r["binding"] == (kind ==
+                                                                                "binding")]
             if not length:
+                if row:
+                    problems.append(f"fabric {letter} {kind}: a requirements row, but Cutting "
+                                    f"cuts no {kind} strips of it")
                 continue
             purchase = ceil_div(length * (100 + s["top_margin"]), 100) if kind == "top" \
                 else length
             want = ceil_div(purchase, inc) * inc
-            row = [r for r in rows if r["letter"] == letter and r["binding"] == (kind ==
-                                                                                "binding")]
             if not row or row[0]["yards"] != want // 36:
                 got = fmt(row[0]["yards"]) + " yd" if row and row[0]["yards"] else "no row"
                 problems.append(f"fabric {letter} {kind}: {got}, MATH.md "
@@ -1580,13 +1686,15 @@ def ps28(doc: Doc, opts):
     border_steps = [t for b in cutting_blocks(doc).values() for _, t in b["steps"]
                     if "border" in t]
     problems = []
+    # A piece that fits one strip needs no join (V-BORD-04): "cut (2) pieces L long".
+    length_at = rf"(?:trim(?: each)? to|cut(?: \(\d+\))?(?: pieces?)?) ({NUM})"
     for i, band in enumerate(bands, start=1):
         match = None
         for text in border_steps:
             side = re.search(rf"side borders?\b[^.]*?(?:join \((\d+)\) strips[^.]*?)?"
-                             rf"(?:trim(?: each)? to|cut) ({NUM})", text)
+                             rf"{length_at}", text)
             top = re.search(rf"top and bottom borders?\b[^.]*?(?:join \((\d+)\) strips"
-                            rf"[^.]*?)?(?:trim(?: each)? to|cut) ({NUM})", text)
+                            rf"[^.]*?)?{length_at}", text)
             if side and top and (eighths(side.group(2)), eighths(top.group(2))) == \
                     (band["side"], band["top"]):
                 match = (text, side, top)
@@ -1749,7 +1857,9 @@ def ps33(doc: Doc, opts):
                             f"{ceil_div(need, u // seg)} sets")
     for block in cutting_blocks(doc).values():
         for sub in block["subcuts"]:
-            if max(sub["a"], sub["b"] or 0) > u:
+            if not sub["eighths"]:
+                problems.append(f"{sub['label']}: size {sub['size']} is not in eighths")
+            elif max(sub["a"], sub["b"] or 0) > u:
                 problems.append(f"{sub['label']} is cut longer than the {fmt(u)} strip width")
     return _fail_or_pass(problems, f"one method, reason sentence first, {len(seqs)} strip sets "
                                    f"with distinct multi-fabric signatures")
@@ -1903,7 +2013,10 @@ def run_checks(pdf_path, model, *, references=None, denylist=(), reference_names
     for check_id, fn in CHECKS.items():
         if only and check_id not in only:
             continue
-        ok, evidence = fn(doc, opts)
+        try:
+            ok, evidence = fn(doc, opts)
+        except Exception as exc:  # one malformed value must not hide every other line
+            ok, evidence = False, f"the check raised {type(exc).__name__}: {exc}"
         status = "not run" if ok is None else "pass" if ok else "fail"
         results.append(Result(check_id, status, evidence))
     return results
