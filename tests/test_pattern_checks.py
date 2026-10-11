@@ -1,0 +1,869 @@
+"""Tests for the PATTERN-SPEC section 6 checker in tests/pattern_checks.py (A11).
+
+Every PDF here is drawn directly with the reportlab canvas, never by qrep.export, so the
+checker is tested against documents whose every number was worked out by hand below. The
+complete pattern is a 60" x 72" throw: 20 blocks of 12" (nine-patch blocks alternating with
+plain blocks) from 4" squares, a 6" border and a binding-only fabric. A second document
+carries triangle and stitch-and-flip units. Each check gets a passing case and a failing
+case made by one edit to a passing document.
+"""
+
+import ast
+import copy
+import importlib.util
+import json
+import sys
+from pathlib import Path
+
+import pytest
+from reportlab.lib.colors import HexColor
+from reportlab.lib.utils import simpleSplit
+from reportlab.pdfgen import canvas
+
+import pattern_checks as pc
+
+HERE = Path(__file__).parent
+NAME = "Lantern Grid"
+COLORS = {"A": "#f2e8d5", "B": "#3b5b92", "C": "#b03a2e"}
+IDS = {"A": "c", "B": "b", "C": "r"}
+
+# Every check the checker implements: section 6's [S] checks less PS-04 and PS-40.
+IMPLEMENTED = ["PS-01", "PS-02", "PS-03", "PS-05", "PS-06", "PS-07", "PS-08", "PS-09",
+               "PS-10", "PS-11", "PS-12", "PS-13", "PS-14", "PS-15", "PS-16", "PS-17",
+               "PS-18", "PS-19", "PS-20", "PS-21", "PS-22", "PS-23", "PS-24", "PS-25",
+               "PS-26", "PS-27", "PS-28", "PS-29", "PS-30", "PS-31", "PS-33", "PS-38",
+               "PS-39", "PS-41", "PS-42", "PS-43"]
+
+NINE = ("BAB", "ABA", "BAB")
+PLAIN = ("AAA", "AAA", "AAA")
+
+
+def block_letter(r: int, c: int) -> str:
+    # Blocks of 3 x 3 squares; (block row + block column) even is a nine-patch, so the
+    # top-left block is Block 1 and each row of 4 blocks holds 2 of each.
+    return (NINE if (r // 3 + c // 3) % 2 == 0 else PLAIN)[r % 3][c % 3]
+
+
+def throw_model() -> dict:
+    # Center 12 x 15 squares of 4 in (32 e) = 48 x 60 in; one 6 in (48 e) border band, so
+    # the quilt finishes at 48 + 12 = 60 by 60 + 12 = 72 in.
+    return {
+        "schema_version": "1",
+        "metadata": {"name": NAME, "notes": ""},
+        "palette": {"fabrics": [{"id": IDS[k], "name": n, "color": COLORS[k]}
+                                for k, n in (("A", "Background"), ("B", "Blue"),
+                                             ("C", "Red"))]},
+        "center": {"kind": "grid", "rows": 15, "cols": 12, "cell_size": 32,
+                   "cells": [[IDS[block_letter(r, c)] for c in range(12)] for r in range(15)]},
+        "borders": [{"fabric_id": "c", "width": 48}],
+        "binding": {"fabric_id": "r", "strip_width": 20},
+        "settings": {"seam_allowance": 2, "wof": 320, "binding_strip_width": 20,
+                     "binding_extra": 80, "backing_margin": 64, "backing_width": 336,
+                     "wide_back_width": 864, "backing_pieced_allowance": 72,
+                     "backing_one_piece_allowance": 36, "purchase_increment": 72,
+                     "top_margin": 10},
+        "provenance": {"source": "authored", "stage_confidence": {}},
+        "confirmed_blocks": {"blocks_across": 4, "blocks_down": 5, "squares_across": 3,
+                             "squares_down": 3, "confidence": 1.0},
+        "size_basis": {"source": "typed", "requested_width": 480, "requested_height": 576,
+                       "achieved_width": 480, "achieved_height": 576, "rounding_step": 8,
+                       "confidence": 1.0},
+    }
+
+
+# ---------------------------------------------------------------- drawing
+
+
+def P(text, size=10, indent=0):
+    return ("p", text, size, indent)
+
+
+def ROW(cells, swatch=None, size=10):
+    return ("row", cells, swatch, size)
+
+
+def FIG(*rows):
+    return ("fig", rows)
+
+
+def _fill(c, letter):
+    c.setFillColor(HexColor(COLORS[letter]))
+
+
+def _draw_p(c, item, y):
+    _, text, size, indent = item
+    c.setFillColorRGB(0, 0, 0)
+    c.setFont("Helvetica", size)
+    for line in simpleSplit(text, "Helvetica", size, 500 - indent):
+        c.drawString(54 + indent, y, line)
+        y -= size * 1.4
+    return y - 4
+
+
+def _draw_row(c, item, y):
+    _, cells, swatch, size = item
+    if swatch:
+        _fill(c, swatch)
+        c.rect(54, y - 1, 10, 10, fill=1, stroke=1)
+    c.setFillColorRGB(0, 0, 0)
+    c.setFont("Helvetica", size)
+    for dx, text in cells:
+        c.drawString(70 + dx, y, text)
+    return y - size * 1.6
+
+
+def _draw_fabric(c, item, y):
+    return _draw_row(c, ROW([(0, f"{item[1]} {item[2]}")], item[1]), y)
+
+
+def _draw_fig(c, item, y, cell=14, x0=220):
+    top = y - 24
+    for r, row in enumerate(item[1]):
+        for k, letter in enumerate(row):
+            _fill(c, letter)
+            c.rect(x0 + k * cell, top - (r + 1) * cell, cell, cell, fill=1, stroke=1)
+            c.setFillColorRGB(0, 0, 0)
+            c.setFont("Helvetica", 7)
+            c.drawCentredString(x0 + k * cell + cell / 2, top - (r + 1) * cell + 4, letter)
+    return top - len(item[1]) * cell - 30
+
+
+def _draw_render(c, item, y, label_w='60"', label_h='72"'):
+    # 2 1/2 pt per inch: 4 in squares are 10 pt and the 6 in border is 15 pt.
+    x0, top = 230, y - 20
+    _fill(c, "A")
+    c.rect(x0, top - 180, 150, 180, fill=1, stroke=1)
+    for r in range(15):
+        for k in range(12):
+            _fill(c, block_letter(r, k))
+            c.rect(x0 + 15 + k * 10, top - 15 - (r + 1) * 10, 10, 10, fill=1, stroke=0)
+    c.setFillColorRGB(0, 0, 0)
+    c.setFont("Helvetica", 7)
+    c.drawCentredString(x0 + 75, top - 192, item[1] if len(item) > 1 else label_w)
+    c.drawString(x0 + 156, top - 90, item[2] if len(item) > 2 else label_h)
+    return top - 220
+
+
+def _draw_square(c, item, y):
+    c.setStrokeColorRGB(0, 0, 0)
+    side = item[1] if len(item) > 1 else 72
+    c.rect(54, y - 72, side, side, fill=0, stroke=1)
+    c.setFillColorRGB(0, 0, 0)
+    c.setFont("Helvetica", 10)
+    c.drawString(140, y - 40, 'Print at 100 percent. This square should measure 1" x 1".')
+    return y - 90
+
+
+def _draw_chart(c, item, y, cell=18):
+    dots = item[1] if len(item) > 1 else ()
+    x0, top = 80, y - 24
+    c.setFont("Helvetica", 7)
+    c.setFillColorRGB(0, 0, 0)
+    for k in range(12):
+        c.drawCentredString(x0 + k * cell + cell / 2, top + 4, str(k + 1))
+    for r in range(15):
+        base = top - (r + 1) * cell
+        c.setFillColorRGB(0, 0, 0)
+        c.drawRightString(x0 - 4, base + 6, str(r + 1))
+        for k in range(12):
+            letter = block_letter(r, k)
+            _fill(c, letter)
+            c.rect(x0 + k * cell, base, cell, cell, fill=1, stroke=1)
+            c.setFillColorRGB(1, 1, 1) if letter == "B" else c.setFillColorRGB(0, 0, 0)
+            c.drawCentredString(x0 + k * cell + cell / 2, base + 6, letter)
+            if (r, k) in dots:
+                c.setFillColorRGB(0, 0, 0)
+                c.circle(x0 + k * cell + 14, base + 14, 2, fill=1, stroke=0)
+    return top - 15 * cell - 20
+
+
+def _draw_outline(c, item, y):
+    c.setStrokeColorRGB(0, 0, 0)
+    for r in range(15):
+        for k in range(12):
+            c.rect(245 + k * 10, y - 50 - r * 10, 10, 10, fill=0, stroke=1)
+    return y - 220
+
+
+def _draw_fat_quarter(c, item, y):
+    # An 18 x 21 in fat quarter at 3 pt per inch, labeled inside the outline.
+    top = y - 24
+    _fill(c, "B")
+    c.rect(220, top - 63, 54, 63, fill=1, stroke=1)
+    c.setFillColorRGB(0, 0, 0)
+    c.setFont("Helvetica", 7)
+    c.drawString(226, top - 30, '18" x 21"')
+    return top - 100
+
+
+def _draw_gap(c, item, y):
+    return y - item[1]
+
+
+DRAW = {"p": _draw_p, "row": _draw_row, "fabric": _draw_fabric, "fig": _draw_fig,
+        "render": _draw_render, "square": _draw_square, "chart": _draw_chart,
+        "outline": _draw_outline, "fat_quarter": _draw_fat_quarter, "gap": _draw_gap}
+
+
+def render(pages, path, *, name=NAME, footer_size=10, odd_page=None):
+    c = canvas.Canvas(str(path), pagesize=(612, 792), invariant=1)
+    for n, items in enumerate(pages, start=1):
+        c.setPageSize((612, 790) if n == odd_page else (612, 792))
+        y = 740
+        for item in items:
+            y = DRAW[item[0]](c, item, y)
+        c.setFillColorRGB(0, 0, 0)
+        c.setFont("Helvetica", footer_size)
+        c.drawString(54, 30, f"{name}  |  page {n} of {len(pages)}  |  QREP 0.4.0")
+        c.showPage()
+    c.save()
+
+
+def edit(pages, old, new):
+    """One edit to a passing document; it must change something, or the test proves nothing."""
+    pages = copy.deepcopy(pages)
+    hits = 0
+    for items in pages:
+        for i, item in enumerate(items):
+            if item[0] == "p" and old in item[1]:
+                items[i] = ("p", item[1].replace(old, new), *item[2:])
+                hits += 1
+            elif item[0] == "row" and any(old in t for _, t in item[1]):
+                items[i] = ("row", [(dx, t.replace(old, new)) for dx, t in item[1]], *item[2:])
+                hits += 1
+    assert hits, f"edit found no {old!r}"
+    return pages
+
+
+# ---------------------------------------------------------------- the throw pattern
+
+# Hand computation of every number the throw prints (MATH.md section 1.3 defaults:
+# U = 40 in = 320 e, B = 42 in, BW = 108 in, o = 4 in, w = 2 1/2 in, t = 10 in):
+# - Blocks: 4 across x 5 down = 20; 10 nine-patch (Block 1) and 10 plain (Block 2).
+#   Block finished 3 x 4 = 12 in; checkpoint 12 1/2 in (PATTERN-SPEC S6).
+# - Strip set 1 (B A B, rows 1 and 3 of a nine-patch): 2 per block x 10 = 20 segments,
+#   cut 4 + 1/2 = 4 1/2 in (36 e); per set floor(320 / 36) = 8; sets ceil(20 / 8) = 3
+#   (MATH.md F3). Strips: B1 2 x 3 = 6, A1 1 x 3 = 3.
+# - Strip set 2 (A B A, row 2): 1 per block x 10 = 10 segments; sets ceil(10 / 8) = 2.
+#   Strips: A2 2 x 2 = 4, B2 1 x 2 = 2.
+# - Segment checkpoint: 4 1/2 x (3 x 4 + 1/2) = 4 1/2 x 12 1/2 in.
+# - Plain blocks merge into one piece (PATTERN-SPEC M-04): 10 squares cut 12 1/2 in (100 e);
+#   per strip floor(320 / 100) = 3; strips ceil(10 / 3) = 4; last strip 10 - 3 x 3 = 1
+#   (MATH.md F2).
+# - Border (MATH.md F4): strips 6 1/2 in (52 e); sides Ls = 60 + 1/2 = 60 1/2 in (484 e),
+#   top and bottom Lt = 48 + 12 + 1/2 = 60 1/2 in; both > 40 in, so
+#   k = ceil((484 - 4) / (320 - 4)) = ceil(480 / 316) = 2 (V-UNIT-04, as in V-YIELD-03);
+#   strips 2 x 2 + 2 x 2 = 8.
+# - Fabric A (MATH.md F5): 8 x 52 + 3 x 36 + 4 x 36 + 4 x 100 = 416 + 108 + 144 + 400
+#   = 1068 e; purchase ceil(1068 x 110 / 100) = ceil(1174.8) = 1175 e;
+#   qy ceil(1175 / 72) = ceil(16.32) = 17 -> 4 1/4 yd.
+# - Fabric B: (6 + 2) x 36 = 288 e; purchase 317 e (V-UNIT-02); qy ceil(317 / 72) = 5
+#   -> 1 1/4 yd.
+# - Binding, fabric C: V-BIND-13 (throw 60 x 72): (8) strips, 3/4 yd.
+# - Backing: V-BACK-02: 4 1/4 yd, (2) lengths of 68 in, seams across (horizontal).
+# - Wide back: V-WIDE-02: 2 1/4 yd of 108 in.  Batting: V-BATT-03: 68 x 80 in, twin.
+# - Areas (C-02): Background 130 squares + border, Blue 50 squares, so A Background,
+#   B Blue, C Red (binding only, last).
+# - Quilt center checkpoint: 48 1/2 x 60 1/2 in.
+
+
+def throw_pages():
+    cover = [
+        P(NAME, size=24),
+        P('Finished size 60" x 72"'),
+        P('20 blocks, 12" finished, set 4 x 5, strip pieced'),
+        P("3 fabrics, plus backing"),
+        P('You asked for 60" x 72"; this pattern makes 60" x 72" with 4" finished squares.'),
+        P("QREP recovers the layout of a pictured quilt. If this quilt comes from a designer's "
+          "published pattern, buy that pattern to support the designer."),
+        ("render",),
+    ]
+    requirements = [
+        P("Fabric requirements", size=14),
+        ROW([(0, "A"), (20, "Background"), (230, "4 1/4 yd")], "A"),
+        ROW([(0, "B"), (20, "Blue"), (230, "1 1/4 yd")], "B"),
+        ROW([(0, "C"), (20, "Red"), (230, "3/4 yd"), (290, 'Binding: (8) 2 1/2" x WOF strips')],
+            "C"),
+        ROW([(0, "Backing"), (80, '4 1/4 yd: 2 lengths of 68" at 42" wide, seams run across '
+                                  'the quilt;')]),
+        ROW([(80, 'or 2 1/4 yd of 108" wide backing')]),
+        ROW([(0, "Batting"), (80, '68" x 80", twin package (72" x 90")')]),
+        P('Fabric amounts are rounded up to the next 1/4 yd, and top fabrics include 10 percent '
+          'extra. Strips assume 40" of usable width (WOF). Backing assumes 42" wide fabric with '
+          'the selvages trimmed. Borders are cut across the WOF and joined with straight seams.'),
+        P('Supplies: rotary cutter and mat, 6" x 24" ruler, neutral thread.'),
+        ("square",),
+    ]
+    begin = [
+        P("Before you begin", size=14),
+        P("1. Read the whole pattern before cutting."),
+        P('2. Every piecing seam is 1/4", and every cut size already includes seam allowances.'),
+        P('3. Should-measure sizes are unfinished: they include the 1/4" allowance on every '
+          'edge.'),
+        P("4. RST means right sides together, and yd means yard."),
+        P('5. WOF means width of fabric. Strips are cut across the full width; yields assume '
+          '40" of usable width per strip, a safe planning figure.'),
+        P('6. Backing yardage assumes 42" wide backing fabric with the selvages trimmed, joined '
+          'with 1/2" seams pressed open, 4" past the quilt on every side, in the layout that '
+          'uses less fabric.'),
+        P("7. Press every seam to one side so that seams meet in opposite directions and nest. "
+          "An arrow means press toward the arrow; a dashed line means sew here; a dotted line "
+          "means cut here."),
+        P("8. Fabrics carry letters with a swatch; each piece carries a label such as A1, its "
+          "fabric letter and a number."),
+        P('9. Bind with double-fold binding from 2 1/2" strips joined with diagonal seams, '
+          'mitered at the corners and finished by hand, with 10" extra for the corners and the '
+          'final join.'),
+    ]
+    cutting = [
+        P("Cutting", size=14),
+        ("fabric", "A", "Background"),
+        P('1. Cut (8) 6 1/2" x WOF strips. For each side border, join (2) strips end to end '
+          'with straight seams and trim to 60 1/2". For the top and bottom borders, join (2) '
+          'strips each and trim to 60 1/2".'),
+        P('2. Cut (3) 4 1/2" x WOF strips. Set aside the strips (A1) for strip set 1.'),
+        P('3. Cut (4) 4 1/2" x WOF strips. Set aside the strips (A2) for strip set 2.'),
+        P('4. Cut (4) 12 1/2" x WOF strips.'),
+        P('A3: subcut (4) strips into (10) 12 1/2" squares, 3 per strip. The last strip gives '
+          '(1).', indent=20),
+        ("fabric", "B", "Blue"),
+        P('1. Cut (6) 4 1/2" x WOF strips. Set aside the strips (B1) for strip set 1.'),
+        P('2. Cut (2) 4 1/2" x WOF strips. Set aside the strips (B2) for strip set 2.'),
+        ("fabric", "C", "Red"),
+        P('1. Cut (8) 2 1/2" x WOF strips for binding.'),
+    ]
+    units = [
+        P("Making the units", size=14),
+        P("Two blocks repeat across the quilt, so you sew long strips together and cut them "
+          "into segments instead of cutting every square."),
+        P("Sewing order: strip sets, then blocks, then rows, then borders."),
+        P("Strip set 1", size=12),
+        P("B1 (2)"),
+        P("A1 (1)"),
+        P("1. Sew the strips lengthwise in this order: B1, A1, B1. Press toward B1. Fig. 1"),
+        P('2. Crosscut (20) 4 1/2" segments, 8 per set. Fig. 1'),
+        FIG("BBB", "AAA", "BBB"),
+        P('Each segment should measure 4 1/2" x 12 1/2".'),
+        P("Make 3."),
+        P("Strip set 2", size=12),
+        P("A2 (2)"),
+        P("B2 (1)"),
+        P("1. Sew the strips lengthwise in this order: A2, B2, A2. Press toward B2. Fig. 2"),
+        P('2. Crosscut (10) 4 1/2" segments, 8 per set. Fig. 2'),
+        FIG("AAA", "BBB", "AAA"),
+        P('Each segment should measure 4 1/2" x 12 1/2".'),
+        P("Make 2."),
+    ]
+    blocks = [
+        P("Making the blocks", size=14),
+        P("Block 1", size=12),
+        P("1. Lay out two Strip set 1 segments with one Strip set 2 segment between them. "
+          "Fig. 3"),
+        P("2. Sew the segments together and press the seams toward the center. Fig. 3"),
+        FIG(*NINE),
+        P('Block 1 should measure 12 1/2" square.'),
+        P("Make 10."),
+        P("Block 2", size=12),
+        P("A3 (1)"),
+        P("Block 2 is one A3 square. Fig. 4"),
+        FIG(*PLAIN),
+        P('Block 2 should measure 12 1/2" square.'),
+        P("Make 10."),
+    ]
+    assembly = [
+        P("Quilt assembly", size=14),
+        P("Lay out the blocks in 5 rows of 4, alternating Block 1 and Block 2 as shown in "
+          "Fig. 5."),
+        P("Sew the blocks in each row together, pressing toward Block 2, and join the rows, "
+          "pressing the row seams in one direction."),
+        P('The quilt center should measure 48 1/2" x 60 1/2".'),
+        FIG("BAB", "ABA"),
+    ]
+    borders = [
+        P("Borders", size=14),
+        P("1. Measure the quilt through its center and trim the A borders to match if needed. "
+          "Sew the side borders first, then the top and bottom borders. Press toward the "
+          "border. Fig. 6"),
+        FIG("AAAA", "ABBA", "AAAA"),
+    ]
+    finishing = [
+        P("Finishing", size=14),
+        P('1. Backing: cut 2 lengths of 68", trim the selvages, sew them together along the long '
+          'edges with 1/2" seams and press the seams open. Fig. 7'),
+        FIG("AAAA", "AAAA", "AAAA"),
+        P("2. Layer the backing right side down, then the batting, then the top right side up; "
+          "smooth and baste."),
+        P("3. Quilt as desired; an allover design suits this quilt."),
+        P("4. Join the (8) binding strips with diagonal seams and press them open. Press the "
+          'long strip in half lengthwise. Sew it to the front, stop 1/4" from each corner and '
+          "fold to miter. Join the two ends, turn the binding to the back and stitch it by "
+          "hand. Fig. 8"),
+        FIG("CCC", "CAA", "CAA"),
+    ]
+    chart = [P("Layout chart", size=14), ("chart",)]
+    coloring = [P("Coloring page", size=14), ("outline",)]
+    return [cover, requirements, begin, cutting, units, blocks, assembly, borders, finishing,
+            chart, coloring]
+
+
+def results(tmp_path, pages, model=None, *, render_kw=None, **kw):
+    pdf = tmp_path / "pattern.pdf"
+    render(pages, pdf, **(render_kw or {}))
+    return {r.check: r for r in pc.run_checks(pdf, model or throw_model(), **kw)}
+
+
+def test_complete_pattern_passes_every_check(tmp_path):
+    got = results(tmp_path, throw_pages())
+    assert list(got) == IMPLEMENTED
+    failing = {k: r.evidence for k, r in got.items() if r.status == "fail"}
+    assert failing == {}
+    # PATTERN-SPEC section 6: PS-39 runs only with a local reference directory.
+    assert got["PS-39"].status == "not run"
+    assert all(r.status == "pass" for k, r in got.items() if k != "PS-39")
+
+
+def _bad_page_size(pages):
+    return pages, {"odd_page": 3}
+
+
+def _move(pages, page, src, dst):
+    pages = copy.deepcopy(pages)
+    pages[page].insert(dst, pages[page].pop(src))
+    return pages
+
+
+# One edit per check; each comment says why the edited document breaks that check.
+FAILING = {
+    # PS-01: page 3 is 612 x 790 pt, not Letter.
+    "PS-01": lambda p: _bad_page_size(p),
+    # PS-02: without its heading the Layout chart section is missing.
+    "PS-02": lambda p: edit(p, "Layout chart", "Chart of the layout"),
+    # PS-03: a page shows a date.
+    "PS-03": lambda p: edit(p, "Supplies:", "Printed 2026-10-11. Supplies:"),
+    # PS-05: "difficulty" is banned.
+    "PS-05": lambda p: edit(p, "3 fabrics, plus backing", "3 fabrics, plus backing, difficulty 2"),
+    # PS-06: 3/16 is not a whole eighth.
+    "PS-06": lambda p: edit(p, 'stop 1/4" from', 'stop 3/16" from'),
+    # PS-07: the model uses 3 fabrics (c, b, r).
+    "PS-07": lambda p: edit(p, "3 fabrics, plus backing", "2 fabrics, plus backing"),
+    # PS-10: Blue (50 squares) lettered before Background (130 squares plus the border).
+    "PS-10": lambda p: _swap_rows(p),
+    # PS-11: Finishing says 9 binding strips; MATH.md F7 (V-BIND-13) gives 8.
+    "PS-11": lambda p: edit(p, "Join the (8) binding", "Join the (9) binding"),
+    # PS-12: V-BACK-02 keeps horizontal seams, which run across the quilt.
+    "PS-12": lambda p: edit(p, "seams run across", "seams run along"),
+    # PS-13: V-BATT-03 picks the twin package, not the full.
+    "PS-13": lambda p: edit(p, 'twin package (72" x 90")', 'full package (90" x 96")'),
+    # PS-14: the 10 percent allowance is not stated.
+    "PS-14": lambda p: edit(p, "include 10 percent extra", "include extra"),
+    # PS-15: the WOF rule claims the 40 in is measured after trimming selvages.
+    "PS-15": lambda p: edit(p, "a safe planning figure.", "measured after trimming selvages."),
+    # PS-16: 4 strips x 2 per strip = 8 < 10 squares.
+    "PS-16": lambda p: edit(p, '12 1/2" squares, 3 per strip', '12 1/2" squares, 2 per strip'),
+    # PS-17: strip set 1 lists the cut square A3 instead of its set-aside strip A1.
+    "PS-17": lambda p: edit(p, "A1 (1)", "A3 (1)"),
+    # PS-18: A5 is used in Making the blocks but never cut, and A3 is cut but never used.
+    "PS-18": lambda p: edit(p, "Block 2 is one A3 square", "Block 2 is one A5 square"),
+    # PS-19: 4 sets x 2 B1 strips = 8, but Cutting sets aside 6.
+    "PS-19": lambda p: edit(p, "Make 3.", "Make 4."),
+    # PS-20: MATH.md F5 gives fabric A 4 1/4 yd (hand computation above).
+    "PS-20": lambda p: edit(p, "4 1/4 yd", "4 yd"),
+    # PS-21: a fat quarter offer with no fat quarter diagram in Cutting.
+    "PS-21": lambda p: edit(p, "1 1/4 yd", "1 1/4 yd or 2 fat quarters"),
+    # PS-22: a strip set step cites no figure.
+    "PS-22": lambda p: edit(p, "Press toward B1. Fig. 1", "Press toward B1."),
+    # PS-25: 12 in finished + 1/2 in = 12 1/2 in, not 13 in.
+    "PS-25": lambda p: edit(p, 'Block 1 should measure 12 1/2" square.',
+                            'Block 1 should measure 13" square.'),
+    # PS-26: the center is 48 x 60 in finished, so it measures 48 1/2 x 60 1/2 in.
+    "PS-26": lambda p: edit(p, '48 1/2" x 60 1/2"', '48" x 60"'),
+    # PS-27: a numbered step per row.
+    "PS-27": lambda p: edit(p, "Lay out the blocks in 5 rows", "1. Lay out the blocks in 5 rows"),
+    # PS-28: MATH.md F4 trims the top and bottom borders to 60 1/2 in, not 60 in.
+    "PS-28": lambda p: edit(p, 'each and trim to 60 1/2".', 'each and trim to 60".'),
+    # PS-29: binding before quilting.
+    "PS-29": lambda p: _move(p, 8, 5, 4),
+    # PS-30: the miter step repeated in Borders.
+    "PS-30": lambda p: edit(p, "Press toward the border. Fig. 6",
+                            "Press toward the border and miter the corners. Fig. 6"),
+    # PS-31: one dotted cell, but Before you begin counts none.
+    "PS-31": lambda p: _replace_item(p, 9, 1, ("chart", {(0, 0)})),
+    # PS-33: strip set 2 repeats strip set 1's B A B signature.
+    "PS-33": lambda p: edit(p, "order: A2, B2, A2", "order: B2, A2, B2"),
+    # PS-38: the test square is 60 pt, not 72 pt.
+    "PS-38": lambda p: _replace_item(p, 1, 9, ("square", 60)),
+    # PS-41: the coloring page carries no text but its footer.
+    "PS-41": lambda p: _replace_item(p, 10, 0, ("gap", 20)),
+    # PS-42: the footer is body text, drawn at 8 pt below the 10 pt minimum.
+    "PS-42": lambda p: (p, {"footer_size": 8}),
+    # PS-43: the render labels the width 62 in, a number the text never prints.
+    "PS-43": lambda p: _replace_item(p, 0, 6, ("render", '62"', '72"')),
+}
+
+
+def _swap_rows(pages):
+    pages = copy.deepcopy(pages)
+    rows = pages[1]
+    rows[1] = ROW([(0, "A"), (20, "Blue"), (230, "4 1/4 yd")], "B")
+    rows[2] = ROW([(0, "B"), (20, "Background"), (230, "1 1/4 yd")], "A")
+    return pages
+
+
+def _replace_item(pages, page, index, item):
+    pages = copy.deepcopy(pages)
+    pages[page][index] = item
+    return pages
+
+
+@pytest.mark.parametrize("check_id", sorted(FAILING))
+def test_each_check_fails_on_its_broken_document(tmp_path, check_id):
+    edited = FAILING[check_id](throw_pages())
+    pages, render_kw = edited if isinstance(edited, tuple) else (edited, None)
+    got = results(tmp_path, pages, render_kw=render_kw)
+    assert got[check_id].status == "fail", got[check_id].evidence
+
+
+def test_ps08_denylisted_name_fails(tmp_path):
+    pages = throw_pages()
+    assert results(tmp_path, pages, denylist=["Fable Grid"])["PS-08"].status == "pass"
+    got = results(tmp_path, pages, denylist=["lantern grid"])["PS-08"]
+    assert got.status == "fail", got.evidence
+
+
+def test_ps08_in_the_style_of_fails(tmp_path):
+    pages = edit(throw_pages(), "3 fabrics, plus backing", "3 fabrics, in the style of a modern quilt")
+    assert results(tmp_path, pages)["PS-08"].status == "fail"
+
+
+def test_ps09_estimated_size_needs_the_photo_sentence(tmp_path):
+    model = throw_model()
+    model["size_basis"] = {"source": "default", "achieved_width": 480, "achieved_height": 576,
+                           "rounding_step": 8, "confidence": 0.8}
+    # The typed-size sentence does not say the size is estimated from the photo.
+    assert results(tmp_path, throw_pages(), model)["PS-09"].status == "fail"
+    pages = edit(throw_pages(), 'You asked for 60" x 72"; this pattern makes 60" x 72" with 4" '
+                                'finished squares.',
+                 'The size is estimated from the photo, assuming 4" finished squares.')
+    # PATTERN-SPEC S1: the estimate names the 4 in (32 e) square it assumed.
+    assert results(tmp_path, pages, model)["PS-09"].status == "pass"
+
+
+def test_ps09_without_a_size_basis_does_not_apply(tmp_path):
+    model = throw_model()
+    del model["size_basis"]
+    got = results(tmp_path, throw_pages(), model)["PS-09"]
+    assert got.status == "pass" and "not applicable" in got.evidence
+
+
+def test_ps21_offer_with_its_diagram_passes(tmp_path):
+    pages = edit(throw_pages(), "1 1/4 yd", "1 1/4 yd or 2 fat quarters")
+    pages[3] += [P("Fat quarter cutting diagram for B, Fig. 9."), ("fat_quarter",)]
+    assert results(tmp_path, pages)["PS-21"].status == "pass"
+
+
+def test_ps31_dots_match_the_uncertain_count(tmp_path):
+    model = throw_model()
+    model["provenance"] = {"source": "photo", "stage_confidence": {}}
+    pages = edit(throw_pages(), "1. Read the whole pattern before cutting.",
+                 "1. Read the whole pattern before cutting. (2) squares were read with low "
+                 "confidence; each has a dot on the layout chart.")
+    pages[9][1] = ("chart", {(0, 0), (4, 7)})
+    got = results(tmp_path, pages, model)
+    # Two dots drawn, two squares counted.
+    assert got["PS-31"].status == "pass", got["PS-31"].evidence
+    assert got["PS-15"].status == "pass", got["PS-15"].evidence
+    pages[9][1] = ("chart", {(0, 0)})
+    assert results(tmp_path, pages, model)["PS-31"].status == "fail"
+
+
+def test_ps15_photo_read_needs_the_uncertain_count(tmp_path):
+    model = throw_model()
+    model["provenance"] = {"source": "photo", "stage_confidence": {}}
+    got = results(tmp_path, throw_pages(), model)["PS-15"]
+    assert got.status == "fail" and "low-confidence" in got.evidence
+
+
+# ---------------------------------------------------------------- triangle units
+
+# Units from MATH.md F14 with PATTERN-SPEC L-06's oversize-and-trim mode:
+# - HST unit 1, F = 3 in: squares 3 + 1 = 4 in, trim to 3 1/2 in (as V-TRI-02 at F = 2).
+#   Make 12, two per pair, so ceil(12 / 2) = 6 squares of each fabric. 4 in = 32 e:
+#   floor(320 / 32) = 10 per strip, 1 strip, the last strip gives 6.
+# - QST unit 1 and its mirror QST unit 2, F = 3 in: squares 3 + 1 1/2 = 4 1/2 in, trim to
+#   3 1/2 in (V-TRI-04). One pair makes one unit of each hand (PATTERN-SPEC Appendix A), so
+#   Make 4 of each takes 4 squares of each fabric. 36 e: floor(320 / 36) = 8 per strip.
+# - Flying geese unit 1, 2 x 4 in: rectangle 2 1/2 x 4 1/2 in and two 2 1/2 in squares
+#   (V-TRI-05); Make 4 takes 4 rectangles and 8 squares. The rectangle's 2 1/2 in strip
+#   (20 e) wins over a 4 1/2 in strip (MATH.md F2: 1 x 20 e < 1 x 36 e), floor(320 / 36)
+#   = 8 per strip; squares floor(320 / 20) = 16 per strip.
+# - Snowball unit 1, F = 6 in, corner leg 2 in: base 6 1/2 in, four 2 1/2 in corners
+#   (V-TRI-07); Make 2 takes 2 bases (floor(320 / 52) = 6 per strip) and 8 corners.
+
+
+def units_pages():
+    cover = [P("Starling Units", size=24), P("Unit test document")]
+    requirements = [
+        P("Fabric requirements", size=14),
+        P("Fabric amounts are rounded up to the next 1/4 yd, and top fabrics include 10 percent "
+          'extra. Strips assume 40" of usable width (WOF). Backing assumes 42" wide fabric.'),
+        P('Supplies: rotary cutter and mat, 6" x 24" ruler, neutral thread, a marking tool for '
+          "diagonal lines and a square ruler with a 45 degree line."),
+    ]
+    cutting = [
+        P("Cutting", size=14),
+        ("fabric", "A", "Background"),
+        P('1. Cut (1) 4" x WOF strips.'),
+        P('A1: subcut (1) strip into (6) 4" squares, 10 per strip, for HST unit 1. The last '
+          'strip gives (6).', indent=20),
+        P('2. Cut (1) 4 1/2" x WOF strips.'),
+        P('A2: subcut (1) strip into (4) 4 1/2" squares, 8 per strip, for QST unit 1. The last '
+          'strip gives (4).', indent=20),
+        P('3. Cut (1) 2 1/2" x WOF strips.'),
+        P('A3: subcut (1) strip into (8) 2 1/2" squares, 16 per strip, for Flying geese unit 1. '
+          'The last strip gives (8).', indent=20),
+        P('4. Cut (1) 6 1/2" x WOF strips.'),
+        P('A4: subcut (1) strip into (2) 6 1/2" squares, 6 per strip, for Snowball unit 1. The '
+          'last strip gives (2).', indent=20),
+        ("fabric", "B", "Blue"),
+        P('1. Cut (1) 4" x WOF strips.'),
+        P('B1: subcut (1) strip into (6) 4" squares, 10 per strip, for HST unit 1. The last '
+          'strip gives (6).', indent=20),
+        P('2. Cut (1) 4 1/2" x WOF strips.'),
+        P('B2: subcut (1) strip into (4) 4 1/2" squares, 8 per strip, for QST unit 1. The last '
+          'strip gives (4).', indent=20),
+        P('3. Cut (1) 2 1/2" x WOF strips.'),
+        P('B3: subcut (1) strip into (4) 2 1/2" x 4 1/2" rectangles, 8 per strip, for Flying '
+          'geese unit 1. The last strip gives (4).', indent=20),
+        P('4. Cut (1) 2 1/2" x WOF strips.'),
+        P('B4: subcut (1) strip into (8) 2 1/2" squares, 16 per strip, for Snowball unit 1. The '
+          'last strip gives (8).', indent=20),
+    ]
+    units = [
+        P("Making the units", size=14),
+        P("No block repeats, so you sew the quilt row by row from the layout chart."),
+        P("HST unit 1", size=12),
+        P("A1 (1)"),
+        P("B1 (1)"),
+        P("1. Pair an A1 and a B1 square RST and draw a diagonal line on the back of A1. Fig. 1"),
+        P('2. Sew 1/4" from the line on both sides, cut on the line and press toward B. Fig. 2'),
+        P('3. Trim each unit with the 45 degree line on the seam. Fig. 3'),
+        P('Trim to 3 1/2" square.'),
+        P("Make 12."),
+        P("QST unit 1", size=12),
+        P("A2 (1)"),
+        P("B2 (1)"),
+        P("1. Make two HSTs from the pair without trimming and press them open. Fig. 4"),
+        P("2. Place them RST with contrasting fabrics facing, sew on both sides of the crossing "
+          "diagonal and cut. Fig. 5"),
+        P('Trim to 3 1/2" square.'),
+        P("Make 4."),
+        P("QST unit 2", size=12),
+        P("QST unit 2 is the mirror image of unit 1, made in the same steps. Do not mix the "
+          "two."),
+        P('Trim to 3 1/2" square.'),
+        P("Make 4."),
+        P("Flying geese unit 1", size=12),
+        P("B3 (1)"),
+        P("A3 (2)"),
+        P("1. Draw a diagonal line on each A3 square and sew one to an end of B3; press. Fig. 6"),
+        P("2. Repeat at the other end with the line mirrored and press. Fig. 7"),
+        P('Unit should measure 2 1/2" x 4 1/2".'),
+        P("Make 4."),
+        P("Snowball unit 1", size=12),
+        P("A4 (1)"),
+        P("B4 (4)"),
+        P("1. Draw a diagonal line on each B4 square, sew one to each corner of A4 and press "
+          "toward the corner. Fig. 8"),
+        P('Unit should measure 6 1/2" square.'),
+        P("Make 2."),
+    ]
+    return [cover, requirements, cutting, units]
+
+
+UNIT_CHECKS = ("PS-06", "PS-14", "PS-19", "PS-22", "PS-23", "PS-24")
+
+
+def test_triangle_units_pass(tmp_path):
+    got = results(tmp_path, units_pages(), only=UNIT_CHECKS)
+    assert {k: r.status for k, r in got.items()} == {k: "pass" for k in UNIT_CHECKS}, \
+        {k: r.evidence for k, r in got.items()}
+
+
+UNIT_FAILING = {
+    # PS-06: a rectangle written long side first.
+    "PS-06": ('2 1/2" x 4 1/2" rectangles', '4 1/2" x 2 1/2" rectangles'),
+    # PS-14: triangle units need a marking tool in the supplies.
+    "PS-14": ("a marking tool for diagonal lines and ", ""),
+    # PS-19: ceil(14 / 2) = 7 pairs need 7 squares of each fabric; 6 are cut.
+    "PS-19": ("Make 12.", "Make 14."),
+    # PS-22: an HST step cites no figure.
+    "PS-22": ("on the seam. Fig. 3", "on the seam."),
+    # PS-23: a 4 1/4 in square is neither the exact 3 7/8 in nor the trimmed 4 in (V-TRI-02).
+    "PS-23": ('(6) 4" squares, 10 per strip, for HST', '(6) 4 1/4" squares, 10 per strip, for HST'),
+    # PS-24: the mirror unit loses its warning.
+    "PS-24": (" Do not mix the two.", ""),
+}
+
+
+@pytest.mark.parametrize("check_id", sorted(UNIT_FAILING))
+def test_each_unit_check_fails_on_its_broken_document(tmp_path, check_id):
+    old, new = UNIT_FAILING[check_id]
+    got = results(tmp_path, edit(units_pages(), old, new), only=(check_id,))
+    assert got[check_id].status == "fail", got[check_id].evidence
+
+
+def test_ps23_flying_geese_rectangle_must_match(tmp_path):
+    # V-TRI-05: a 2 x 4 in goose needs a 2 1/2 x 4 1/2 in rectangle, not 2 1/2 x 4 in.
+    pages = edit(units_pages(), '2 1/2" x 4 1/2" rectangles', '2 1/2" x 4" rectangles')
+    assert results(tmp_path, pages, only=("PS-23",))["PS-23"].status == "fail"
+
+
+# ---------------------------------------------------------------- PS-39, CLI, imports
+
+
+def test_ps39_runs_only_with_a_reference_folder(tmp_path):
+    refs = tmp_path / "refs"
+    refs.mkdir()
+    (refs / "notes.txt").write_text("A different text about something else entirely, with no "
+                                    "shared run of words.", encoding="utf-8")
+    pages = throw_pages()
+    assert results(tmp_path, pages)["PS-39"].status == "not run"
+    assert results(tmp_path, pages, references=refs)["PS-39"].status == "pass"
+    # Ten consecutive words of the pattern's own assembly text.
+    (refs / "copy.json").write_text(json.dumps({"page": "Sew the blocks in each row together, "
+                                                        "pressing toward Block 2, and join"}),
+                                    encoding="utf-8")
+    got = results(tmp_path, pages, references=refs)["PS-39"]
+    assert got.status == "fail" and "Sew" not in got.evidence
+
+
+def test_ps39_reference_names_fail(tmp_path):
+    refs = tmp_path / "refs"
+    refs.mkdir()
+    got = results(tmp_path, throw_pages(), references=refs,
+                  reference_names=["Lantern Grid"])["PS-39"]
+    assert got.status == "fail"
+
+
+def test_cli_prints_one_line_per_check(tmp_path, capsys):
+    pdf = tmp_path / "pattern.pdf"
+    model = tmp_path / "model.json"
+    render(throw_pages(), pdf)
+    model.write_text(json.dumps(throw_model()), encoding="utf-8")
+    assert pc.main([str(pdf), str(model)]) == 0
+    out = capsys.readouterr().out.splitlines()
+    assert [line.split()[0] for line in out[:-1]] == IMPLEMENTED
+    assert all(line.split()[1] == "pass:" for line in out[:-1] if not line.startswith("PS-39"))
+    assert [line for line in out if line.startswith("PS-39")][0].startswith("PS-39 not run:")
+    assert out[-1] == "placeholder frames: 0"
+    render(edit(throw_pages(), "Make 3.", "Make 4."), pdf)
+    assert pc.main([str(pdf), str(model)]) == 1
+    assert "PS-19 fail:" in capsys.readouterr().out
+
+
+def test_placeholder_frames_are_counted(tmp_path):
+    pdf = tmp_path / "pattern.pdf"
+    pages = throw_pages()
+    pages[5].append(P("Figure placeholder: block figure not drawn yet"))
+    render(pages, pdf)
+    assert pc.placeholder_frames(pdf, throw_model()) == [6]
+
+
+def test_module_loads_without_pypdf(monkeypatch):
+    monkeypatch.setitem(sys.modules, "pypdf", None)
+    spec = importlib.util.spec_from_file_location("pattern_checks_fresh",
+                                                  HERE / "pattern_checks.py")
+    module = importlib.util.module_from_spec(spec)
+    # dataclass() resolves annotations through sys.modules, so register the fresh copy.
+    monkeypatch.setitem(sys.modules, "pattern_checks_fresh", module)
+    spec.loader.exec_module(module)
+    assert "PS-11" in module.CHECKS
+    with pytest.raises(ImportError):
+        module.read_pdf(HERE / "missing.pdf")
+
+
+def test_checker_imports_nothing_from_qrep():
+    tree = ast.parse((HERE / "pattern_checks.py").read_text(encoding="utf-8"))
+    names = [a.name for n in ast.walk(tree) if isinstance(n, ast.Import) for a in n.names]
+    names += [n.module or "" for n in ast.walk(tree) if isinstance(n, ast.ImportFrom)]
+    assert not [n for n in names if n.split(".")[0] == "qrep"]
+
+
+# ---------------------------------------------------------------- MATH.md recomputation
+
+
+def sized_model(width: int, height: int, cell: int = 4) -> dict:
+    """A plain quilt of the given finished size in eighths, no borders, MATH.md defaults."""
+    model = throw_model()
+    model["center"] = {"kind": "grid", "rows": height // cell, "cols": width // cell,
+                       "cell_size": cell,
+                       "cells": [["c"] * (width // cell) for _ in range(height // cell)]}
+    model["borders"] = []
+    return model
+
+
+def fixture_model() -> dict:
+    return json.loads((HERE / "fixtures" / "double_irish_chain.json").read_text("utf-8"))
+
+
+def test_binding_strips_match_math_vectors():
+    # V-BIND-13: T = 2 (60 + 72) + 10 = 274 in; ceil(274 / 37.5) = 8.
+    assert pc.binding_strips(throw_model()) == 8
+    # V-BIND-09, the fixture at its stored U = 42 in: ceil(2720 / (336 - 20)) = 9.
+    assert pc.binding_strips(fixture_model()) == 9
+
+
+def test_backing_plan_matches_math_vectors():
+    # V-BACK-02 and V-WIDE-02 (throw 60 x 72): horizontal, 2 panels of 68 in (544 e),
+    # 17 qy = 1224 e (4 1/4 yd); wide 9 qy = 648 e (2 1/4 yd); batting 68 x 80 in.
+    plan = pc.backing_plan(throw_model())
+    assert (plan["panels"], plan["length"], plan["seams"], plan["yards"], plan["wide"]) == \
+        (2, 544, "across", 1224, 648)
+    assert plan["batting"] == (544, 640)
+    # V-BACK-09 and V-WIDE-08 (fixture 75 x 90): vertical, 2 panels of 98 in (784 e),
+    # 23 qy = 1656 e (5 3/4 yd); wide 10 qy = 720 e (2 1/2 yd).
+    plan = pc.backing_plan(fixture_model())
+    assert (plan["panels"], plan["length"], plan["seams"], plan["yards"], plan["wide"]) == \
+        (2, 784, "along", 1656, 720)
+    # V-BACK-08 and V-WIDE-05 (king 110 x 108): vertical, 3 panels of 116 in (928 e),
+    # 40 qy = 2880 e (10 yd); no 108 in line.
+    plan = pc.backing_plan(sized_model(880, 864))
+    assert (plan["panels"], plan["length"], plan["seams"], plan["yards"], plan["wide"]) == \
+        (3, 928, "along", 2880, None)
+
+
+def test_batting_package_matches_math_vectors():
+    # V-BATT-03: 68 x 80 in -> twin. V-BATT-08: 100 1/2 x 123 in -> king, turned.
+    # V-BATT-10: 110 1/2 x 128 in -> none ("larger than a king package").
+    assert pc.batting_package(544, 640) == ("twin", 72, 90)
+    assert pc.batting_package(804, 984) == ("king", 124, 120)
+    assert pc.batting_package(884, 1024) is None
+
+
+def test_border_plan_matches_math_vectors():
+    # V-BORD-01 at the fixture's configured U = 42 in: 4 1/4 in strips (34 e), sides 83 in
+    # (664 e) and top and bottom 75 1/2 in (604 e), k = 2 each, 8 strips.
+    assert pc.border_plan(fixture_model()) == [
+        {"width": 34, "side": 664, "top": 604, "strips": 8, "k_side": 2, "k_top": 2}]
+    # V-BORD-03: center 60 x 72, bands of 2 and 5 in at U = 40.
+    model = sized_model(480, 576)
+    model["borders"] = [{"fabric_id": "c", "width": 16}, {"fabric_id": "b", "width": 40}]
+    assert pc.border_plan(model) == [
+        {"width": 20, "side": 580, "top": 516, "strips": 8, "k_side": 2, "k_top": 2},
+        {"width": 44, "side": 612, "top": 596, "strips": 8, "k_side": 2, "k_top": 2}]
+    # V-BORD-04: center 4 x 4, band 1 in: both pairs fit one strip each, 2 strips.
+    model = sized_model(32, 32)
+    model["borders"] = [{"fabric_id": "c", "width": 8}]
+    assert pc.border_plan(model) == [
+        {"width": 12, "side": 36, "top": 52, "strips": 2, "k_side": 1, "k_top": 1}]
+
+
+def test_lengths_parse_and_format_in_eighths():
+    # MATH.md section 1.2: 1 in = 8 e.
+    assert pc.eighths("12 1/2") == 100 and pc.eighths("3/4") == 6 and pc.eighths("40") == 320
+    # 3/16 is no whole eighth. 2/4 still reads as 4 e; PS-06 is what rejects the form.
+    assert pc.eighths("3/16") is None and pc.eighths("2/4") == 4
+    assert pc.fmt(52) == "6 1/2" and pc.fmt(6) == "3/4" and pc.fmt(320) == "40"
+    # 17 qy x 72 e = 1224 e = 34 eighths of a yard = 4 1/4 yd.
+    assert pc.fmt_yd(1224) == "4 1/4 yd"
+    assert pc.normalize('Cut (8) 6 1/2"  x\nWOF strips.') == "Cut (8) 6 1/2 x WOF strips."
