@@ -396,7 +396,7 @@ def _number(text: str) -> float:
 
 # The words that make a size the mount's or the frame's rather than the object's own.
 _MOUNT = re.compile(r"\b(?:mount(?:ed|s)?|frame[ds]?)\b", re.IGNORECASE)
-_UNMOUNTED = re.compile(r"\bwithout\s+(?:a\s+)?(?:mount|frame)\b", re.IGNORECASE)
+_UNMOUNTED = re.compile(r"\bwithout\s+(?:\w+\s+){0,2}(?:mount|frame)", re.IGNORECASE)
 _FEET = re.compile(rf"(?P<ft>\d+)\s*ft\.?\s*(?:(?P<inch>{_NUM})\s*in\b\.?)?", re.IGNORECASE)
 
 
@@ -431,11 +431,15 @@ def parse_finished_size(text: str) -> tuple[float, float] | None:
     mounted, end = [], 0
     for match in pairs:
         before = normalized[end:match.start()]
-        if mounted and not before.strip(" ("):
-            # A pair in parentheses right after another restates it in the other unit.
+        if mounted and not re.search(r"[A-Za-z]", before):
+            # Only punctuation since the last pair, as in "(53.3 x 99.1 cm)" or NMAH's
+            # "40 in x 30 in; 101 cm x 76 cm": the same size restated in the other unit.
             mounted.append(mounted[-1])
         else:
-            mounted.append(bool(_MOUNT.search(before)) and not _UNMOUNTED.search(before))
+            # Only the words of this pair's own clause qualify it, so "Quilt mounted on
+            # linen. Overall: 80 x 70 in." stays the object's size.
+            clause = re.split(r"[.;]", before)[-1]
+            mounted.append(bool(_MOUNT.search(clause)) and not _UNMOUNTED.search(clause))
         end = match.end()
     # The object's own size before its mount's or frame's, inches before centimetres, and
     # otherwise the order the text gives.

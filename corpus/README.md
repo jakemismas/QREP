@@ -11,7 +11,7 @@ reaches any commit stays public, because force pushes are banned.
 | `manifest.csv` | One row per fetched photo: its source, rights flag, hashes, size, tier and class | `scripts/eval/corpus_fetch.py` and the screening step (D3a) |
 | `ATTRIBUTION.md` | Credits for every row, generated from the manifest | `corpus_fetch.py attribution` |
 | `schema/annotation.schema.json` | The annotation format, exported from `scripts/eval/qrep_eval/annotation.py` | `python scripts/eval/qrep_eval/annotation.py` |
-| `annotations/<photo stem>.json` | Proposed truth for tier A and refusal photos; D3b adds verified truth beside it | D3a proposals, D3b ingest, the dev annotate page (C3a) |
+| `annotations/<photo stem>.json` | Proposed truth for tier A and refusal photos, and the passes' claims on the tier B photos they classified; D3b adds verified truth beside it | D3a proposals, D3b ingest, the dev annotate page (C3a) |
 | `images/` | At most 10 downsized copies (800 px or less) for the examples and smoke tests | D3a |
 | `private/` (main checkout only, gitignored) | The image cache and the private tiers; never committed | fetch scripts, D3c |
 
@@ -111,11 +111,11 @@ results. Screened from the image: 279 photos, Met 116, Smithsonian 138 and LACMA
 | Tier | Photos | Share of the 279 | By source | Classes | In the holdout |
 |---|---|---|---|---|---|
 | A | 13 | 4.7 percent | LACMA 5, Smithsonian 8 | squares 8, hst 2, qst 2, snowball 1 | 2 |
-| B | 44 | 15.8 percent | LACMA 7, Met 11, Smithsonian 26 | squares 22, flying_geese 9, hst 7, qst 5, snowball 1 | 13 |
-| R | 132 | 47.3 percent | LACMA 12, Met 57, Smithsonian 63 | applique 39, on_point 32, medallion 21, curve 15, diamond_star 15, hexagon 10 | 42 |
-| X | 90 | 32.3 percent | LACMA 1, Met 48, Smithsonian 41 | whole_cloth 60, partial_view 11, not_a_quilt 10, outside_classes 8, unreadable 1 | 33 |
+| B | 40 | 14.3 percent | LACMA 6, Met 11, Smithsonian 23 | squares 18, flying_geese 9, hst 7, qst 5, snowball 1 | 12 |
+| R | 134 | 48.0 percent | LACMA 13, Met 57, Smithsonian 64 | applique 39, on_point 33, medallion 21, diamond_star 16, curve 15, hexagon 10 | 42 |
+| X | 92 | 33.0 percent | LACMA 1, Met 48, Smithsonian 43 | whole_cloth 60, partial_view 11, not_a_quilt 10, outside_classes 10, unreadable 1 | 34 |
 
-In scope (tiers A and B): 57 of 279, 20.4 percent. The setup screen expected about 15 tier A
+In scope (tiers A and B): 53 of 279, 19.0 percent. The setup screen expected about 15 tier A
 photos across all four sources; with the AIC images blocked, v0 finds 13. The Smithsonian Double
 Irish Chain 2013.67.2 (`smithsonian-saam-2013-67-2`) is an on-point refusal. The NMAH slide
 scans, color slides inside a black film surround (on a blue board, except 556592 on black
@@ -123,7 +123,7 @@ with a ruler), are
 `smithsonian-nmah-556281` to `556284`, `556288` and `556592`; the three in-scope ones (556283,
 556284 and 556288) are tier B, and neither proposal pass found an accession label inside them
 to mask. The masks in v0 cover the labels, captions, rulers and color bars that the passes found
-on nine refusal photos.
+on 11 refusal photos and 4 tier B photos (smithsonian-chndm-1960-73-2, smithsonian-nmaahc-2017-108-6, smithsonian-nmah-556330, smithsonian-nmah-556351).
 
 The first screen (2026-10-10) used a seventh refusal class, `other`, which plan D3a does not
 list. The 52 photos it held were screened again from the image on 2026-10-11 with the six
@@ -135,33 +135,44 @@ on_point, met-701310 applique).
 Round 3 (2026-10-11, after the review of 2d06464) screened the 30 `outside_classes` photos of
 that screen again, each from its image, in two passes that could not see each other (proposed-a
 and proposed-b, from the same sheets and each pass's own zooms). The passes agreed on the tier of
-27 photos. Of the three they split on, met-651206 (medallion against whole cloth) is a painted
-palampore that both passes describe as unpieced, so whole cloth; smithsonian-nmaahc-2017-108-6 (flying geese against diamond star) shows sawtooth stars,
-each a center square with four flying-geese sides and four corner squares on a straight grid,
-so tier B flying_geese; and smithsonian-saam-1998-149-34 is tier B in both passes, qst because
-its hourglass units are not squares. Result: 13 moved to tier B (squares 8, flying_geese 3,
-hst 1, qst 1), smithsonian-saam-2016-5-50 to tier R (medallion), 7 to whole_cloth and
-smithsonian-saam-2000-78 to partial_view (its outer border runs off every edge). Eight stay
-outside_classes, each because no in-scope class and none of the six refusal classes describes
-it: six crazy quilts of irregular shards (met-13647, met-13907, met-19724,
-smithsonian-acm-2002-0001-0001a, smithsonian-saam-1998-8-2, smithsonian-saam-2017-24-35), an
-improvised strip quilt with no grid (smithsonian-nmaahc-2013-162-7), and pinwheels of oblique
-parallelograms (smithsonian-saam-2017-24-6). The 14 photos that left tier X carry both passes'
-class claims and masks in their annotations; both passes masked the pinned paper label of
-smithsonian-nmaahc-2017-108-6. Whether the whole-cloth and outside_classes photos belong in the
+28 photos and split on two: met-651206 (medallion against whole cloth) is a painted palampore
+that both passes describe as unpieced, so whole cloth; smithsonian-nmaahc-2017-108-6 (flying
+geese against diamond star) shows sawtooth stars, each a center square with four flying-geese
+sides and four corner squares on a straight grid, so tier B flying_geese. They split on the class
+of one more, smithsonian-saam-1998-149-34: qst, because its hourglass units are not squares. The
+self-review of that screen then moved four photos that both passes put in tier B, each from its
+image: lacma-60154, a sampler of 49 different blocks whose out-of-scope blocks (about four
+diamond-pieced stars, two curved blocks and an applique basket) QREP must refuse, to R
+diamond_star, its largest out-of-scope kind; smithsonian-saam-1998-149-3, whose pieced columns
+hold squares set on point, to R on_point; and the string quilts smithsonian-saam-2016-5-41 and
+smithsonian-saam-2016-5-42, whose blocks are angled strips and wedges rather than units on a
+grid, to X outside_classes. Result: 9 moved to tier B (squares 4, flying_geese 3, hst 1, qst 1),
+3 to tier R (smithsonian-saam-2016-5-50 medallion, lacma-60154 diamond_star,
+smithsonian-saam-1998-149-3 on_point), 7 to whole_cloth and smithsonian-saam-2000-78 to
+partial_view (its outer border runs off every edge). Ten stay outside_classes, each because no
+in-scope class and none of the six refusal classes describes it: six crazy quilts of irregular
+shards (met-13647, met-13907, met-19724, smithsonian-acm-2002-0001-0001a,
+smithsonian-saam-1998-8-2, smithsonian-saam-2017-24-35), the two string quilts, an improvised
+strip quilt with no grid (smithsonian-nmaahc-2013-162-7), and pinwheels of oblique
+parallelograms (smithsonian-saam-2017-24-6). The 12 photos that left tier X for tiers B and R
+carry both passes' class claims and masks in their annotations. Both passes masked the pinned
+paper label of smithsonian-nmaahc-2017-108-6, and on a re-check of smithsonian-nmah-556330 both
+widened their caption masks to cover its typed accession and catalogue lines. Whether the
+whole-cloth and outside_classes photos belong in the
 refusal tier under a seventh class is a question for Jake on PR #214.
 
 **The v0 eval set** is the rows whose `eval_set` column reads `v0`: every tier A photo (13) and
-78 refusals, weighted toward look-alikes of in-scope quilts: every on_point (32), curve (15),
-diamond_star (15) and hexagon (10) refusal, plus the first three medallion and the first three
+80 refusals, weighted toward look-alikes of in-scope quilts: every on_point (33), curve (15),
+diamond_star (16) and hexagon (10) refusal, plus the first three medallion and the first three
 applique stems in sort order (lacma-54813, lacma-54852, met-13865, met-13867, met-13870,
-met-13874). The holdout takes 2 of the 13 tier A photos and 25 of the 78 refusals, so the
-development side holds 11 and 53. The set was chosen by that rule on 2026-10-11 and is pinned
-photo by photo (`V0_EVAL_SET` in `tests/eval/test_corpus_manifest.py`), because the rule
-re-applied to a grown corpus would pick other photos; round 3's one new refusal is a medallion
-that sorts after the first three, so the set is unchanged. Every tier A and refusal photo has
-an annotation, whether or not it is in the eval set, and so does every tier B photo the passes
-classified (the three slide scans and round 3's 13). Committed copies (`images/`): five tier A photos (all LACMA), one
+met-13874). The holdout takes 2 of the 13 tier A photos and 25 of the 80 refusals, so the
+development side holds 11 and 55. The set was chosen by that rule on 2026-10-11, after round 3,
+and is pinned photo by photo (`V0_EVAL_SET` in `tests/eval/test_corpus_manifest.py`), because
+the rule re-applied to a grown corpus would pick other photos. Round 3 added two refusals to it
+(lacma-60154 and smithsonian-saam-1998-149-3); its third new refusal, a medallion, sorts after
+the first three. Every tier A and refusal photo has an annotation, whether or not it is in the
+eval set, and so does every tier B photo the passes classified (the three slide scans and round
+3's nine). Committed copies (`images/`): five tier A photos (all LACMA), one
 tier B (met-854571) and two on-point refusals (met-13905, lacma-58735), for the examples and the
 smoke tests.
 
@@ -265,8 +276,8 @@ kept one helper script in a shared scratch folder, and it was overwritten, so pa
 for 38 photos were written into pass B's folder for a few minutes before pass B wrote its own.
 Those 38 pass B files were set aside, and a fresh pass B run, which never saw them, classified
 the 38 photos again; those are the proposed-b claims. The tier A frames and counts came from two
-runs per pass, each writing only its own pass's folder, and the command log of each frame run
-shows no read of the other pass's folder. Round 3 (2026-10-11) tiered and classified the
+runs per pass, each writing only its own pass's folder; no frame run's commands named
+`corpus/annotations/` (which held round 1's claims) or the other pass's folder. Round 3 (2026-10-11) tiered and classified the
 30 photos screened again after the review of 2d06464 (v0 counts, above).
 
 How the corners were placed: each pass read every corner by eye, off a ruler view of the whole
@@ -275,8 +286,10 @@ gridded in source pixels), plus zooms it chose itself. No step snaps, refines or
 `corpus_screen.py corners` builds the four corner zooms the same way for both passes, so both
 read the same pixels against the same gridlines; that is why 74 of the 184 tier A corner
 coordinates (x and y of every outer and field corner both passes give) match to the pixel.
-Matching coordinates show that the passes read the same views, not that one saw the other's
-answer, and agreement is not truth: D3b verifies every corner.
+Round 2's passes also match more often than round 1's did on the same five LACMA photos (29
+against 18 of 80 coordinates), and the cause is not established: shared views explain why exact
+matches are possible, not why round 2 has more of them. Exact agreement is therefore weak
+evidence of independence, and agreement is never truth: D3b verifies every corner.
 
 The 13 tier A photos agree on counts in both passes, and their outer corners lie within 0.25
 percent of the image diagonal of each other. Points for D3b:
@@ -304,6 +317,7 @@ Classes that disagree, between the passes or with the screen (`manifest.csv` cla
 | Photo | Screen | proposed-a | proposed-b |
 |---|---|---|---|
 | lacma-59557 | R on_point | on_point | hst |
+| lacma-60154 | R diamond_star | squares | squares |
 | lacma-63229 | A snowball | hst | hst |
 | met-13870 | R medallion | applique | medallion |
 | met-13873 | R applique | on_point | on_point |
@@ -317,6 +331,7 @@ Classes that disagree, between the passes or with the screen (`manifest.csv` cla
 | smithsonian-nmah-556599 | R applique | medallion | applique |
 | smithsonian-saam-1998-149-19 | R medallion | medallion | applique |
 | smithsonian-saam-1998-149-2 | R medallion | medallion | applique |
+| smithsonian-saam-1998-149-3 | R on_point | squares | squares |
 | smithsonian-saam-1998-149-30 | R medallion | on_point | hst |
 | smithsonian-saam-1998-149-32 | R medallion | applique | applique |
 | smithsonian-saam-1998-149-34 | B qst | qst | squares |

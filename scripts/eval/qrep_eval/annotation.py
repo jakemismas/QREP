@@ -14,8 +14,9 @@ request stages.
 Every annotated field is a list of claims, each a value with a provenance code,
 so a later verification sits beside the proposals instead of overwriting them,
 and the eval can count only gate truth (plan section 8.2). Annotation values
-are judgments by people or agents, never engine output, so they carry
-provenance rather than a CV confidence; agent proposals never count as truth.
+are proposals, verifications, copies of a museum record or the screen's calls,
+never engine output, so they carry provenance rather than a CV confidence;
+proposals never count as truth.
 The identity fields (schema_version, photo, sha256, canvas) are not claims:
 they are the key that binds the file to its manifest row, and
 licensed_photo_problems checks each of them against that row.
@@ -384,13 +385,13 @@ def licensed_photo_problems(
     problems = []
     if row.get("license") not in LICENSES:
         problems.append(f"row {photo!r} is licensed {row.get('license')!r}")
-    if row.get("sha256") != sha256:
+    if not (isinstance(sha256, str) and _SHA256.fullmatch(sha256)) or row.get("sha256") != sha256:
         problems.append(f"row {photo!r} binds another source image")
     if stem is not None and Path(photo).stem != stem:
         problems.append(f"file stem {stem!r} is not the photo's stem")
-    if names_canvas and (not isinstance(canvas, list) or [
-        row.get("px_w"), row.get("px_h")
-    ] != [str(n) for n in canvas]):
+    if names_canvas and (not isinstance(canvas, list) or not all(
+        type(n) is int for n in canvas
+    ) or [row.get("px_w"), row.get("px_h")] != [str(n) for n in canvas]):
         problems.append(f"canvas {canvas!r} is not the row's px_w and px_h")
     return problems
 

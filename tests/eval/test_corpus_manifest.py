@@ -234,35 +234,36 @@ def test_eval_refusals_are_weighted_toward_on_point_look_alikes():
 V0_EVAL_SET = frozenset({
     "lacma-30012", "lacma-44818", "lacma-52521", "lacma-52522", "lacma-54813", "lacma-54852",
     "lacma-54853", "lacma-54871", "lacma-54876", "lacma-54904", "lacma-56077", "lacma-58735",
-    "lacma-59557", "lacma-60126", "lacma-61642", "lacma-63229", "lacma-63267", "met-13596",
-    "met-13650", "met-13854", "met-13865", "met-13867", "met-13870", "met-13874", "met-13878",
-    "met-13880", "met-13882", "met-13884", "met-13889", "met-13897", "met-13902", "met-13904",
-    "met-13905", "met-13906", "met-13910", "met-13911", "met-13915", "met-16293", "met-16294",
-    "met-229936", "met-717637", "met-717944", "met-814560", "met-854567", "met-854570",
-    "smithsonian-chndm-1972-28-1", "smithsonian-chndm-1973-45-1", "smithsonian-chndm-1986-27-1",
-    "smithsonian-nmah-556181", "smithsonian-nmah-556281", "smithsonian-nmah-556282",
-    "smithsonian-nmah-556322", "smithsonian-nmah-556331", "smithsonian-saam-1987-80",
-    "smithsonian-saam-1998-149-11", "smithsonian-saam-1998-149-12",
+    "lacma-59557", "lacma-60126", "lacma-60154", "lacma-61642", "lacma-63229", "lacma-63267",
+    "met-13596", "met-13650", "met-13854", "met-13865", "met-13867", "met-13870", "met-13874",
+    "met-13878", "met-13880", "met-13882", "met-13884", "met-13889", "met-13897", "met-13902",
+    "met-13904", "met-13905", "met-13906", "met-13910", "met-13911", "met-13915", "met-16293",
+    "met-16294", "met-229936", "met-717637", "met-717944", "met-814560", "met-854567",
+    "met-854570", "smithsonian-chndm-1972-28-1", "smithsonian-chndm-1973-45-1",
+    "smithsonian-chndm-1986-27-1", "smithsonian-nmah-556181", "smithsonian-nmah-556281",
+    "smithsonian-nmah-556282", "smithsonian-nmah-556322", "smithsonian-nmah-556331",
+    "smithsonian-saam-1987-80", "smithsonian-saam-1998-149-11", "smithsonian-saam-1998-149-12",
     "smithsonian-saam-1998-149-13", "smithsonian-saam-1998-149-14",
     "smithsonian-saam-1998-149-15", "smithsonian-saam-1998-149-17",
     "smithsonian-saam-1998-149-21", "smithsonian-saam-1998-149-23",
     "smithsonian-saam-1998-149-25", "smithsonian-saam-1998-149-26",
-    "smithsonian-saam-1998-149-27", "smithsonian-saam-1998-149-31", "smithsonian-saam-1998-8-3",
-    "smithsonian-saam-2004-15-1", "smithsonian-saam-2004-15-2", "smithsonian-saam-2013-67-11",
-    "smithsonian-saam-2013-67-16", "smithsonian-saam-2013-67-17", "smithsonian-saam-2013-67-2",
-    "smithsonian-saam-2013-67-9", "smithsonian-saam-2016-57-2", "smithsonian-saam-2016-57-7",
-    "smithsonian-saam-2017-24-1", "smithsonian-saam-2017-24-10", "smithsonian-saam-2017-24-11",
-    "smithsonian-saam-2017-24-12", "smithsonian-saam-2017-24-13", "smithsonian-saam-2017-24-15",
-    "smithsonian-saam-2017-24-27", "smithsonian-saam-2017-24-29", "smithsonian-saam-2017-24-3",
-    "smithsonian-saam-2017-24-32", "smithsonian-saam-2017-24-34", "smithsonian-saam-2017-24-4",
-    "smithsonian-saam-2017-24-5", "smithsonian-saam-2017-24-7", "smithsonian-saam-2021-67-2",
+    "smithsonian-saam-1998-149-27", "smithsonian-saam-1998-149-3", "smithsonian-saam-1998-149-31",
+    "smithsonian-saam-1998-8-3", "smithsonian-saam-2004-15-1", "smithsonian-saam-2004-15-2",
+    "smithsonian-saam-2013-67-11", "smithsonian-saam-2013-67-16", "smithsonian-saam-2013-67-17",
+    "smithsonian-saam-2013-67-2", "smithsonian-saam-2013-67-9", "smithsonian-saam-2016-57-2",
+    "smithsonian-saam-2016-57-7", "smithsonian-saam-2017-24-1", "smithsonian-saam-2017-24-10",
+    "smithsonian-saam-2017-24-11", "smithsonian-saam-2017-24-12", "smithsonian-saam-2017-24-13",
+    "smithsonian-saam-2017-24-15", "smithsonian-saam-2017-24-27", "smithsonian-saam-2017-24-29",
+    "smithsonian-saam-2017-24-3", "smithsonian-saam-2017-24-32", "smithsonian-saam-2017-24-34",
+    "smithsonian-saam-2017-24-4", "smithsonian-saam-2017-24-5", "smithsonian-saam-2017-24-7",
+    "smithsonian-saam-2021-67-2",
 })
 
 
 def test_the_eval_set_column_is_the_pinned_v0_set():
-    # 13 tier A + 32 on_point + 15 curve + 15 diamond_star + 10 hexagon + 3 medallion + 3 applique
-    # = 91 photos, the README's count.
-    assert len(V0_EVAL_SET) == 13 + 32 + 15 + 15 + 10 + 3 + 3 == 91
+    # 13 tier A + 33 on_point + 15 curve + 16 diamond_star + 10 hexagon + 3 medallion + 3 applique
+    # = 93 photos, the README's count.
+    assert len(V0_EVAL_SET) == 13 + 33 + 15 + 16 + 10 + 3 + 3 == 93
     marked = {Path(row["file"]).stem for row in rows() if row["eval_set"] == "v0"}
     assert marked == V0_EVAL_SET
 
@@ -516,7 +517,7 @@ def sample(**changes) -> dict:
         "finished_size": [{"value": {"width_in": 72.0, "height_in": 80.0, "approximate": True,
                                      "source_text": "80 x 72 in."},
                            "provenance": "source-record"}],
-        "capture": [{"value": "museum_scan", "provenance": "source-record"}],
+        "capture": [{"value": "museum_scan", "provenance": "screened"}],
     }
     doc.update(changes)
     return doc
@@ -813,7 +814,11 @@ def test_the_licensed_photo_rule_reads_a_gold_layout_by_its_identity_keys():
     assert an.licensed_photo_problems(no_canvas, None, licensed) == []
     # Each named key still binds: a canvas of 999 x 800 against the row's 1000 x 800, a missing
     # or other sha256, and a photo with no row are one problem each.
+    empty_row = {k: v | {"sha256": ""} for k, v in licensed.items()}
+    problems = an.licensed_photo_problems(no_canvas | {"sha256": ""}, None, empty_row)
+    assert len(problems) == 1 and "another source" in problems[0]
     for bad, word in ((gold | {"canvas": [999, 800]}, "canvas"),
+                      (gold | {"canvas": ["1000", "800"]}, "canvas"),
                       (no_canvas | {"sha256": "f" * 64}, "another source image"),
                       ({k: v for k, v in no_canvas.items() if k != "sha256"}, "another source"),
                       (no_canvas | {"photo": "local-photos/IMG_0001.png"}, "no row")):
@@ -824,7 +829,8 @@ def test_the_licensed_photo_rule_reads_a_gold_layout_by_its_identity_keys():
 def test_every_committed_annotation_names_a_licensed_photo():
     # The issue #113 rule, applied by this test until corpus-guard enforces it: every committed
     # annotation or gold JSON, in any subfolder, names a photo with a CC0-1.0 or PDM-1.0 row whose
-    # sha256 and canvas match; an annotation sits under the photo's own stem. Gold files are read
+    # sha256 matches, and whose canvas matches wherever the file names one (an annotation always
+    # does); an annotation sits under the photo's own stem. Gold files are read
     # as plain JSON under any name, because D3b's gold layouts are not annotations.
     by_file = {row["file"]: row for row in rows()}
     assert ANNOTATIONS
@@ -842,7 +848,9 @@ def test_capture_and_device_class_are_the_screens_calls():
     for path in ANNOTATIONS:
         doc = an.load(path)
         for name in ("capture", "device_class"):
-            assert {c.provenance for c in getattr(doc, name)} == {"screened"}, (path.name, name)
+            # A later verified claim may sit beside the screen's, which stays.
+            codes = {c.provenance for c in getattr(doc, name)}
+            assert "screened" in codes and "source-record" not in codes, (path.name, name)
         for name in an.CLAIM_FIELDS:
             if name != "finished_size":
                 codes = {c.provenance for c in getattr(doc, name)}
@@ -864,6 +872,16 @@ def test_annotation_finished_sizes_match_their_rows():
             assert size.source_text == row["dimensions_text"], path.name
             printed = f"~{round(size.width_in, 2):g} x {round(size.height_in, 2):g}"
             assert printed == row["finished_in"], path.name
+
+
+def test_every_annotation_carries_its_rows_finished_size():
+    # The review of 2d06464 found an annotation with no finished size although its record gave
+    # one; an annotation whose row has a finished_in carries it as a source-record claim.
+    by_file = {row["file"]: row for row in rows()}
+    for path in ANNOTATIONS:
+        doc = an.load(path)
+        copied = [c for c in doc.finished_size if c.provenance == "source-record"]
+        assert len(copied) == (1 if by_file[doc.photo]["finished_in"] else 0), path.name
 
 
 def test_tier_a_and_refusal_photos_carry_two_independent_proposals():
@@ -952,6 +970,19 @@ def test_the_fetch_refuses_any_host_off_the_allowlist(url):
          "(53.4 x 99.1 x 3.1 cm)", (36.25, 18.25)),
         # Only a framed size: it is all the text gives, so it stands. 21 in high, 39 in wide.
         ("framed: 21 x 39 in.", (39.0, 21.0)),
+        # The centimetre restatement shares the framed size's status, so inches still win:
+        # 21 in high, 39 in wide, not 53.3 / 2.54 = 20.98 and 99.1 / 2.54 = 39.02.
+        ("framed: 21 x 39 in. (53.3 x 99.1 cm)", (39.0, 21.0)),
+        # The NMAH shape restates after a semicolon: 40 in high, 30 in wide, not the cm pair.
+        ("framed: 40 in x 30 in; 101 cm x 76 cm", (30.0, 40.0)),
+        # "without canvas mount" is the object's own size: 56 1/2 = 56.5 in high,
+        # 69 1/2 = 69.5 in wide.
+        ("H x W ((a) without canvas mount): 56 1/2 x 69 1/2 in.; H x W (with canvas mount): "
+         "60 x 73 in.", (69.5, 56.5)),
+        # A mount named in an earlier sentence does not qualify the next one's size:
+        # 80 in high, 70 in wide.
+        ("Quilt mounted on linen. Overall: 80 x 70 in.; Linen backing: 84 x 74 in.",
+         (70.0, 80.0)),
         ("Dimensions unavailable", None),
     ],
 )
@@ -1506,6 +1537,16 @@ def test_the_downsize_command_checks_its_input_before_it_writes(tmp_path, monkey
     with pytest.raises(SystemExit, match="no manifest row"):
         cs.main(["downsize", str(src), str(out)])
     assert not out.exists()
+    with pytest.raises(SystemExit, match="cannot be read"):
+        cs.main(["downsize", str(tmp_path / "missing.jpg"), str(out)])
+    # With a cleared row for the source, the copy must take the row's cache name, met-1.jpg.
+    row = {"sha256": sha256_file(src), "license": "CC0-1.0", "commit_ok": "yes",
+           "source": "met", "object_id": "1"}
+    monkeypatch.setattr(cs, "read_manifest", lambda: [row])
+    with pytest.raises(SystemExit, match="met-1.jpg"):
+        cs.main(["downsize", str(src), str(tmp_path / "images" / "met-2.jpg")])
+    assert cs.main(["downsize", str(src), str(tmp_path / "images" / "met-1.jpg")]) == 0
+    assert sorted(p.name for p in (tmp_path / "images").iterdir()) == ["met-1.jpg"]
 
 
 def test_a_committed_copy_carries_no_jpeg_comment(tmp_path):

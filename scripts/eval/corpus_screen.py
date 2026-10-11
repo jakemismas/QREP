@@ -24,7 +24,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
-from corpus_fetch import REPO, read_manifest, require_private
+from corpus_fetch import REPO, cache_name, read_manifest, require_private
 from qrep_eval.annotation import LICENSES
 
 # Museum scans run to several thousand pixels; a 700 px tile still shows a 15 x 15 field's
@@ -158,7 +158,10 @@ def committable_row(path: Path, rows: list[dict[str, str]]) -> dict[str, str]:
     """The manifest row that lets path's bytes become a committed copy: the row binding them by
     sha256, licensed CC0-1.0 or PDM-1.0, with commit_ok yes. corpus-guard checks the copy only
     after it is staged; this refuses a photo that may not be committed before it is written."""
-    sha = hashlib.sha256(path.read_bytes()).hexdigest()
+    try:
+        sha = hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError as err:
+        raise NotCommittable(f"{path}: cannot be read ({err.strerror})") from None
     row = next((r for r in rows if r["sha256"] == sha), None)
     if row is None:
         raise NotCommittable(f"{path}: no manifest row binds a source image with sha256 {sha}")
@@ -202,9 +205,13 @@ def main(argv: list[str]) -> int:
     args = parser.parse_args(argv)
     if args.command == "downsize":
         try:
-            committable_row(args.image, read_manifest())
+            row = committable_row(args.image, read_manifest())
         except NotCommittable as err:
             raise SystemExit(f"refusing {err}") from None
+        # The copy keeps its row's cache name, so its manifest row is the one that licenses it.
+        if args.out.name != cache_name(row["source"], row["object_id"]):
+            raise SystemExit(f"refusing {args.out}: this photo's copy is named "
+                             f"{cache_name(row['source'], row['object_id'])}")
         if args.out.resolve().parent != IMAGES.resolve():
             raise SystemExit(f"refusing {args.out}: committed copies go only in {IMAGES}")
     else:
