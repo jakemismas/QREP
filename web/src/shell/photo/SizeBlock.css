@@ -1,0 +1,21 @@
+/* Size block and the results size line. */
+.pf-size { margin-top: 16px; }
+.pf-size-h { margin: 0 0 2px; font: 700 18px var(--serif); color: var(--denim); }
+.pf-size-sub { margin: 0 0 10px; font-size: 13px; color: var(--faint); }
+.pf-size-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.pf-chip { display: inline-flex; flex-direction: column; align-items: center; gap: 1px; padding: 7px 13px; border-radius: 999px; border: 1.5px solid var(--line2); background: var(--card); color: var(--ink2); font: 600 13.5px var(--sans); cursor: pointer; }
+.pf-chip:hover { border-color: var(--accent); }
+.pf-chip[data-suggested] { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(165,80,47,0.18); }
+.pf-chip-hint { font: 500 10.5px var(--sans); color: var(--accent); }
+.pf-size-row { display: flex; align-items: center; gap: 8px; }
+.pf-size-input { width: 108px; padding: 9px 10px; font: 500 14.5px var(--sans); color: var(--ink); background: var(--card); border: 1.5px solid var(--line2); border-radius: 9px; }
+.pf-size-input[data-suggested] { color: var(--faint); }
+.pf-size-x { color: var(--faint); }
+.pf-size-unit { padding: 8px 11px; border-radius: 9px; border: 1.5px solid var(--line2); background: var(--card2); color: var(--ink2); font: 600 12.5px var(--sans); cursor: pointer; }
+.pf-size-unit[data-unit="cm"] { color: var(--accent); border-color: var(--accent); }
+.pf-size-story { display: flex; flex-direction: column; gap: 6px; }
+.pf-size-line { background: none; border: none; padding: 0; text-align: left; font-size: 13.5px; color: var(--accent); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.pf-size-asked { font-size: 12.5px; color: var(--mut); }
+.pf-size-inline { margin-top: 6px; padding: 10px; border: 1px dashed var(--line2); border-radius: 10px; }
+.pf-size-apply { width: auto; margin-top: 8px; padding: 9px 14px; font-size: 14px; }
+@media (max-width: 400px) { .pf-size-chips { max-width: 100%; } }

@@ -1,0 +1,16 @@
+/* Dropzone screen. */
+.pf-home { background: none; border: none; padding: 2px 0; font: 500 15px var(--sans); color: var(--accent); cursor: pointer; }
+.pf-dropzone { display: flex; flex-direction: column; align-items: center; gap: 10px; border: 2.5px dashed var(--line2); border-radius: 18px; background: var(--card2); padding: 40px 26px; text-align: center; cursor: pointer; }
+.pf-dropzone:hover { border-color: var(--accent); background: var(--card); }
+.pf-dropzone:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(165,80,47,0.25); }
+.pf-camera { color: var(--mut); }
+.pf-camera rect, .pf-camera path, .pf-camera circle { fill: none; stroke: currentColor; stroke-width: 2.5; }
+.pf-dz-title { font: 700 20px var(--serif); color: var(--ink); }
+.pf-dz-sub { font-size: 14.5px; color: var(--mut); }
+.pf-file-input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.pf-or { text-align: center; font-size: 13.5px; color: var(--faint); margin: 14px 0; }
+.pf-sample { display: flex; flex-direction: column; gap: 3px; width: 100%; text-align: left; padding: 14px 16px; border-radius: 12px; border: 1.5px solid var(--line2); background: var(--card); color: var(--ink2); cursor: pointer; }
+.pf-sample:hover { background: var(--card2); border-color: var(--accent); }
+.pf-sample-title { font: 600 16px var(--sans); color: var(--ink); }
+.pf-sample-sub { font-size: 13.5px; color: var(--mut); }
+.pf-privacy { margin: 16px 0 0; font-size: 13px; color: var(--faint); text-align: center; }

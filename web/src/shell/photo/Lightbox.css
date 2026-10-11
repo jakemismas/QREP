@@ -1,0 +1,13 @@
+/* Lightbox: a fixed overlay on a tinted scrim. */
+.pf-lb { position: fixed; inset: 0; z-index: 60; }
+.pf-lb-scrim { position: absolute; inset: 0; background: var(--modal-backdrop); }
+.pf-lb-inner { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 18px; pointer-events: none; }
+.pf-lb-bar { display: flex; align-items: center; gap: 10px; pointer-events: auto; }
+.pf-lb-tabs { display: flex; background: var(--card2); border: 1px solid var(--line2); border-radius: 11px; padding: 4px; gap: 4px; }
+.pf-lb-tab { padding: 8px 14px; border: none; border-radius: 8px; background: none; color: var(--ink2); font: 600 14px var(--sans); cursor: pointer; }
+.pf-lb-tab[data-active] { background: var(--card); color: var(--accent); box-shadow: 0 2px 6px var(--shadow); }
+.pf-lb-close { width: 42px; height: 42px; background: var(--card2); border: 1px solid var(--line2); border-radius: 11px; color: var(--ink2); font-size: 17px; cursor: pointer; }
+.pf-lb-stage { pointer-events: auto; max-width: 92vw; max-height: 78vh; overflow: auto; background: var(--card); border-radius: 10px; padding: 14px; box-shadow: 0 24px 60px rgba(0,0,0,0.5); }
+.pf-lb-photo { display: block; max-width: 84vw; max-height: 70vh; width: auto; height: auto; border-radius: 4px; }
+.pf-lb-quilt { width: min(560px, 84vw); }
+.pf-lb-side { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }

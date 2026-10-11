@@ -1,0 +1,46 @@
+/* Results screen. */
+.pf-h2 { margin: 0 0 4px; font: 700 21px var(--serif); color: var(--denim); }
+.pf-hint { margin: 0 0 10px; font-size: 14px; line-height: 1.5; color: var(--faint); }
+.pf-results-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
+.pf-pill { font-size: 14px; font-weight: 700; border-radius: 999px; padding: 8px 15px; border: 1.5px solid var(--pillLn); background: var(--pill); }
+.pf-pill--sage { color: var(--sage); border-color: var(--sageLn); background: var(--sageBg); }
+.pf-pill--amber { color: var(--amber); }
+.pf-pill--accent { color: var(--accent); }
+.pf-results-grid { display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-start; }
+.pf-panel { flex: 0 1 auto; max-width: 340px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 2px 10px var(--shadow); padding: 14px; }
+.pf-panel-eyebrow { font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: var(--faint); font-weight: 700; margin-bottom: 10px; }
+.pf-photo { display: block; max-width: 320px; max-height: 380px; width: auto; height: auto; border-radius: 4px; border: 1px solid var(--line); }
+/* The "Photo cleared" box: shared.css loads first, so .pf-photo would
+   otherwise win these four over .pf-photo--gone. */
+.pf-photo.pf-photo--gone { display: flex; width: 240px; height: 180px; border: 1px dashed var(--line2); }
+.pf-recovered { width: 320px; max-width: 100%; }
+.pf-recovered-cap { display: flex; justify-content: space-between; gap: 10px; font-size: 13.5px; color: var(--mut); padding-top: 8px; }
+.pf-side { flex: 1 1 300px; min-width: 280px; display: flex; flex-direction: column; gap: 16px; }
+.pf-conf-row { display: flex; align-items: center; gap: 11px; padding: 8px 0; border-bottom: 1px dashed var(--line); }
+.pf-conf-label { flex: 1; font-size: 15px; color: var(--ink2); }
+.pf-conf-meter { width: 96px; height: 10px; background: var(--card3); border: 1px solid var(--line); border-radius: 999px; overflow: hidden; flex: none; }
+.pf-conf-pct { width: 38px; text-align: right; font-size: 13.5px; font-weight: 700; color: var(--ink2); flex: none; }
+.pf-conf-word { width: 64px; text-align: right; font-size: 12px; font-weight: 700; flex: none; }
+.pf-tone-text--sage { color: var(--sage); }
+.pf-tone-text--amber { color: var(--amber); }
+.pf-tone-text--accent { color: var(--accent); }
+.pf-toggle { display: flex; align-items: center; gap: 12px; background: none; border: none; padding: 14px 0 4px; cursor: pointer; text-align: left; width: 100%; }
+.pf-toggle-track { width: 46px; height: 27px; flex: none; border-radius: 999px; position: relative; transition: background .15s; background: var(--card3); border: 1.5px solid var(--line2); }
+.pf-toggle-track[data-on] { background: var(--accent); border-color: var(--accent); }
+.pf-toggle-knob { position: absolute; top: 2px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--toggle-knob); box-shadow: 0 1px 4px rgba(0,0,0,0.3); transition: left .15s; }
+.pf-toggle-knob[data-on] { left: 22px; }
+.pf-toggle-label { flex: 1; font-size: 15px; color: var(--ink2); line-height: 1.4; }
+.pf-actions { display: flex; flex-direction: column; gap: 10px; }
+.pf-timing { font-size: 12.5px; color: var(--faint); padding-top: 2px; }
+.pf-fail { border: 1.5px solid var(--accent); border-radius: 14px; padding: 14px; margin-bottom: 12px; background: var(--card2); }
+.pf-fail-title { margin: 0 0 6px; font: 700 19px var(--serif); color: var(--denim); }
+.pf-fail-reason { margin: 0 0 12px; font-size: 14px; color: var(--mut); }
+.pf-fail-actions { display: flex; flex-direction: column; gap: 8px; }
+.pf-tips summary { cursor: pointer; color: var(--accent); font-size: 13.5px; }
+.pf-tips ul { margin: 6px 0 0 18px; padding: 0; font-size: 13px; color: var(--mut); }
+.pf-info { border: 1px solid var(--line2); border-radius: 14px; padding: 12px 14px; margin-bottom: 12px; background: var(--card2); }
+.pf-info-title { margin: 0 0 6px; font: 700 15.5px var(--serif); color: var(--denim); }
+.pf-info-line { margin: 0 0 4px; font-size: 13.5px; color: var(--mut); }
+.pf-disclose summary { cursor: pointer; color: var(--accent); font-size: 13.5px; padding: 4px 0; }
+.pf-wrong-banner { background: var(--pill); border: 1px solid var(--accent); color: var(--accent); border-radius: 9px; padding: 7px 10px; font-size: 12.5px; font-weight: 600; margin: 8px 0; }
+.pf-caption { margin: 6px 0 0; font-size: 13.5px; color: var(--mut); }

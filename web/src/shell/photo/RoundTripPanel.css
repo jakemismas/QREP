@@ -1,0 +1,16 @@
+/* Round-trip check panel. */
+.pf-rt { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; padding-top: 12px; border-top: 2px dashed var(--line2); }
+.pf-rt-head { display: flex; align-items: center; gap: 12px; }
+.pf-rt-title { margin: 0; font: 700 17.5px var(--serif); color: var(--denim); }
+.pf-rt-rule { flex: 1; border-top: 2px dashed var(--line2); }
+.pf-rt-pill { font-size: 12.5px; color: var(--mut); border: 1px solid var(--pillLn); border-radius: 999px; padding: 3px 10px; background: var(--pill); }
+.pf-rt-lede { margin: 0; font-size: 13px; color: var(--faint); line-height: 1.5; }
+.pf-rt-controls { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+.pf-rt-field { display: flex; flex-direction: column; gap: 4px; }
+.pf-rt-field-label { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--faint); }
+.pf-rt-select { padding: 9px 10px; font: 500 14px var(--sans); color: var(--ink2); background: var(--card); border: 1.5px solid var(--line2); border-radius: 9px; cursor: pointer; }
+.pf-rt .pf-btn--secondary { width: auto; }
+.pf-rt-report { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; padding: 10px 12px; border-radius: 10px; font-size: 14px; border: 1px solid var(--line); background: var(--card3); }
+.pf-rt-report--ok { border-color: var(--sageLn); background: var(--sageBg); color: var(--sage); }
+.pf-rt-report--bad { border-color: var(--accent); color: var(--accent); }
+.pf-rt-report-line { font-weight: 700; }
