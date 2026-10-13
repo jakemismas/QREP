@@ -155,6 +155,7 @@ export function usePatternState({
   opened,
   latestOpened,
   censusRequest,
+  quietCensusWhen,
 }: ModelApi): PatternState {
   const engine = useEngine();
   // ToastProvider rebuilds its value on every toast; keyed on that object,
@@ -242,6 +243,13 @@ export function usePatternState({
     },
     onChange: setPdfView,
   });
+
+  // While Your pattern shows the open quilt, a failed census is its error
+  // line's to report, in a plain sentence with Retry; the editor keeps the
+  // engine's message as a toast.
+  useEffect(() => {
+    quietCensusWhen(() => boundRef.current !== null && boundRef.current === latestOpened());
+  }, [quietCensusWhen, latestOpened]);
 
   const leavePattern = useCallback(() => {
     boundRef.current = null;

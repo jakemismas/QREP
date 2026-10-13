@@ -40,6 +40,9 @@ export interface ModelApi {
   censusFailed: boolean;
   /** The census request, which Your pattern's Retry sends again (retryPattern). */
   censusRequest: CensusTarget;
+  /** Install the test for when a failed census raises no error toast: Your
+   * pattern reports it on its own line, with Retry, in a plain sentence. */
+  quietCensusWhen: (quiet: () => boolean) => void;
 }
 
 export const ModelContext = createContext<ModelApi | null>(null);
@@ -168,12 +171,17 @@ export function useModelState(): ModelApi {
   const [opened, setOpened] = useState(0);
   const openedRef = useRef(0);
   const [censusFailed, setCensusFailed] = useState(false);
+  // Read when a census fails, not when the queue is made, so the screen
+  // showing at that moment decides.
+  const quietRef = useRef<() => boolean>(() => false);
 
   const censusRef = useRef<CensusQueue | null>(null);
   censusRef.current ??= new CensusQueue({
     validate: (json) => engineRef.current.validate(json),
     onSummary: setSummary,
-    onError: (message) => toastRef.current.push(message, "error"),
+    onError: (message) => {
+      if (!quietRef.current()) toastRef.current.push(message, "error");
+    },
     onFailedChange: setCensusFailed,
   });
   const censusRequest: CensusTarget = censusRef.current;
@@ -207,6 +215,9 @@ export function useModelState(): ModelApi {
 
   const latestModel = useCallback(() => latestRef.current, []);
   const latestOpened = useCallback(() => openedRef.current, []);
+  const quietCensusWhen = useCallback((quiet: () => boolean) => {
+    quietRef.current = quiet;
+  }, []);
 
   return useMemo(
     () => ({
@@ -220,8 +231,20 @@ export function useModelState(): ModelApi {
       latestOpened,
       censusFailed,
       censusRequest,
+      quietCensusWhen,
     }),
-    [model, name, summary, replaceModel, latestModel, opened, latestOpened, censusFailed, censusRequest],
+    [
+      model,
+      name,
+      summary,
+      replaceModel,
+      latestModel,
+      opened,
+      latestOpened,
+      censusFailed,
+      censusRequest,
+      quietCensusWhen,
+    ],
   );
 }
 

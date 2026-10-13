@@ -15,7 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EngineClient, type WorkerLike } from "../engine/rpc";
 import type { Engine } from "../engine/useEngine";
 import type { ModelSummary, QuiltModel } from "../model/types";
-import { CensusQueue, type ModelApi } from "../state/model";
+import { CensusQueue, useModelState, type ModelApi } from "../state/model";
 import { usePatternState, type YourPatternApi } from "../state/pattern";
 
 const fakes = vi.hoisted(() => ({
@@ -140,7 +140,20 @@ function modelApi(census: CensusQueue): ModelApi {
     latestOpened: () => 1,
     censusFailed: census.failed,
     censusRequest: census,
+    quietCensusWhen: () => {},
   };
+}
+
+/** Render useModelState once and hand back its API. */
+function modelStateFor(): ModelApi {
+  let captured: ModelApi | null = null;
+  function Probe() {
+    captured = useModelState();
+    return null;
+  }
+  renderToString(<Probe />);
+  if (captured === null) throw new Error("the hook did not render");
+  return captured;
 }
 
 /** Render the hook once and hand back Your pattern's API. */
@@ -269,5 +282,46 @@ describe("Your pattern's Retry, through usePatternState", () => {
     workers[0].respond(workers[0].calls()[1].id!, { ok: true, result: CENSUS });
     await settle();
     expect(summaries).toEqual([CENSUS]);
+  });
+});
+
+describe("A failed census's error toast, through useModelState", () => {
+  it("toasts the engine's message in the editor, and nothing while the quiet test holds", async () => {
+    const { client, workers } = bootedClient();
+    fakes.engine = engineFor(client);
+    const state = modelStateFor();
+    // The census queue the hook built; the model effect that asks it for a
+    // census does not run in a server render, so the test asks directly.
+    const census = state.censusRequest as CensusQueue;
+    const message = "internal engine error; see the browser console log";
+
+    census.request(MODEL_JSON);
+    await settle();
+    workers[0].respond(workers[0].calls()[0].id!, BRIDGE_FAILED);
+    await settle();
+    // No quiet test installed, as in the editor: the message is toasted.
+    expect(fakes.toasts).toEqual([[message, "error"]]);
+
+    let quiet = true;
+    state.quietCensusWhen(() => quiet);
+    census.retry();
+    await settle();
+    workers[0].respond(workers[0].calls()[1].id!, BRIDGE_FAILED);
+    await settle();
+    // Hand count: the second failure lands while the test holds, so the one
+    // toast is still the first.
+    expect(fakes.toasts).toHaveLength(1);
+
+    // Read when the census fails, not when it was installed: once it no
+    // longer holds, the next failure is toasted again.
+    quiet = false;
+    census.retry();
+    await settle();
+    workers[0].respond(workers[0].calls()[2].id!, BRIDGE_FAILED);
+    await settle();
+    expect(fakes.toasts).toEqual([
+      [message, "error"],
+      [message, "error"],
+    ]);
   });
 });

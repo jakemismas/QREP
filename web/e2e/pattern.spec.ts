@@ -452,6 +452,94 @@ for (const [retryName, retryId] of [
   });
 }
 
+/** Answer the page's first validate (the census) with the bridge's internal
+ * error, the envelope qrep/bridge.py sends for any engine exception, and
+ * pass every other call and answer through. The client sets the worker's
+ * onmessage once per worker (engine/rpc.ts start), so the wrapped setter
+ * sees every answer. */
+async function failFirstCensus(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    let censusId: number | null = null;
+    let failed = false;
+    const post = Worker.prototype.postMessage;
+    Worker.prototype.postMessage = function (this: Worker, ...args: unknown[]) {
+      const message = args[0] as { type?: string; method?: string; id?: number } | null;
+      if (censusId === null && message?.type === "call" && message.method === "validate") {
+        censusId = message.id ?? null;
+      }
+      return (post as (...rest: unknown[]) => void).apply(this, args);
+    } as typeof Worker.prototype.postMessage;
+    const handler = Object.getOwnPropertyDescriptor(Worker.prototype, "onmessage")!;
+    Object.defineProperty(Worker.prototype, "onmessage", {
+      configurable: true,
+      get(this: Worker) {
+        return handler.get!.call(this);
+      },
+      set(this: Worker, listener: ((event: MessageEvent) => void) | null) {
+        if (listener === null) {
+          handler.set!.call(this, null);
+          return;
+        }
+        handler.set!.call(this, (event: MessageEvent) => {
+          const data = event.data as { type?: string; id?: number } | null;
+          if (!failed && data?.type === "result" && data.id === censusId) {
+            failed = true;
+            listener({
+              data: {
+                type: "result",
+                id: data.id,
+                envelope: {
+                  ok: false,
+                  error: {
+                    kind: "internal",
+                    message: "internal engine error; see the browser console log",
+                  },
+                },
+              },
+            } as MessageEvent);
+            return;
+          }
+          listener(event);
+        });
+      },
+    });
+  });
+}
+
+test("a failed census shows a plain line with no raw toast, and one Retry counts the squares", async ({
+  page,
+}) => {
+  await recordEngineCalls(page);
+  await failFirstCensus(page);
+  await openSample(page);
+  await recordToasts(page);
+
+  // The census failed, the summary did not: the method line shows, and the
+  // census rows say they were not counted, under the census's own line.
+  const error = page.getByTestId("pattern-error");
+  await expect(error.locator(".yp-error-text")).toHaveText(
+    "Your fabrics could not be counted this time. Try again.",
+    { timeout: READY_TIMEOUT },
+  );
+  await expect(page.getByTestId("method-line")).toBeVisible();
+  await expect(page.getByTestId("fabric-census")).toContainText("not counted");
+  await expect(page.getByTestId("fabric-count-b")).toHaveCount(0);
+  // The line is the report: the engine's message reached no toast.
+  expect(await seenToasts(page)).toEqual([]);
+
+  await page.getByTestId("pattern-retry").click();
+  // The design doc's census literal, the element's whole text.
+  await expect(page.getByTestId("fabric-count-b")).toHaveText(/^1,?246 squares$/, {
+    timeout: READY_TIMEOUT,
+  });
+  await expect(page.getByTestId("pattern-error")).toHaveCount(0);
+  // Hand count: the open asked for the census once and the Retry once more;
+  // a bridge error leaves the worker sound, so nothing restarted it.
+  expect(await engineCalls(page, "validate")).toBe(2);
+  await expect(page.getByTestId("engine-chip")).toHaveAttribute("data-engine-phase", "ready");
+  expect(await seenToasts(page)).toEqual([]);
+});
+
 test("Download pattern (PDF) reports busy while it works and saves once for a double tap", async ({
   page,
 }) => {
