@@ -1,0 +1,302 @@
+# Corpus attribution
+
+Generated from corpus/manifest.csv by `python scripts/eval/corpus_fetch.py attribution`;
+edit the manifest, then regenerate. Each image below is dedicated CC0 by its institution
+or marked public domain by it, per its own per-object rights flag. QREP credits every
+institution, and cites LACMA as LACMA asks.
+
+## The Metropolitan Museum of Art (CC0-1.0)
+
+Rights: `isPublicDomain=true` on every object; policy: https://www.metmuseum.org/about-the-met/policies-and-documents/image-resources
+
+- Patchwork quilt (13596). Gift of Mrs. Russell Sage, 1916. https://www.metmuseum.org/art/collection/search/13596
+- Quilt, Marseilles type (13617). Bequest of Maria P. James, 1911. https://www.metmuseum.org/art/collection/search/13617
+- Embroidered and stuffed whitework quilt (13622). Rogers Fund, 1935. https://www.metmuseum.org/art/collection/search/13622
+- Quilt, Marsailles type (13625). Gift of Miss Virginia D. Lyman, 1942. https://www.metmuseum.org/art/collection/search/13625
+- Quilt, Marseilles type (13630). Gift of Mrs. Andrew Galbraith Carey, 1980. https://www.metmuseum.org/art/collection/search/13630
+- Quilt Top, Crazy pattern (13647). Gift of Tracey Blumenreich Zabar, 1989. https://www.metmuseum.org/art/collection/search/13647
+- Crib Quilt, Mill Wheel pattern (13650). Friends of the American Wing Fund, 1989. https://www.metmuseum.org/art/collection/search/13650
+- Wholecloth quilt (13852). Gift of Alfred Reginald Allen, 1986. https://www.metmuseum.org/art/collection/search/13852
+- Quilt, wholecloth calamanco (13853). Sansbury Mills Fund, 1980. https://www.metmuseum.org/art/collection/search/13853
+- Mariner's Compass Quilt (13854). Gift of The Hascoe Foundation, 2011. https://www.metmuseum.org/art/collection/search/13854
+- Wholecloth calamanco quilt (13858). Rogers Fund, 1945. https://www.metmuseum.org/art/collection/search/13858
+- Wholecloth quilt (13859). Gift of Ellen H. Getman, in memory of her husband, Frederick Hutton Getman, 1945. https://www.metmuseum.org/art/collection/search/13859
+- Quilt, Wholecloth calamanco (13860). Rogers Fund, 1958. https://www.metmuseum.org/art/collection/search/13860
+- Wholecloth calamanco quilt (13861). Rogers Fund, 1962. https://www.metmuseum.org/art/collection/search/13861
+- Wholecloth whitework quilt (13862). Bequest of Flora E. Whiting, 1971. https://www.metmuseum.org/art/collection/search/13862
+- George Washington Quilt (13863). Gift of Helen W. Hughart, 1985. https://www.metmuseum.org/art/collection/search/13863
+- Wholecloth quilt (13864). Gift of Mr. and Mrs. Harcourt Amory, 1963. https://www.metmuseum.org/art/collection/search/13864
+- Quilt, Prairie Flower Pattern (13865). Gift of Frances T. Stockwell, 1938. https://www.metmuseum.org/art/collection/search/13865
+- Quilt, Album pattern (13867). Gift of Miss Eliza Polhemus Cobb, 1952. https://www.metmuseum.org/art/collection/search/13867
+- Chintz appliquéd quilt (13869). Gift of Miss Elsey R. Taft, 1970. https://www.metmuseum.org/art/collection/search/13869
+- Chintz appliqued quilt (13870). Bequest of Flora E. Whiting, 1971. https://www.metmuseum.org/art/collection/search/13870
+- Quilt, Rose of Sharon pattern (13872). Bequest of Flora E. Whiting, 1971. https://www.metmuseum.org/art/collection/search/13872
+- Feathered Star pattern quilt with chintz appliques (13873). Bequest of Flora E. Whiting, 1971. https://www.metmuseum.org/art/collection/search/13873
+- Chintz appliquéd quilt (13874). Bequest of Flora E. Whiting, 1971. https://www.metmuseum.org/art/collection/search/13874
+- Quilt, Presentation pattern (13875). Sansbury-Mills Fund, 1974. https://www.metmuseum.org/art/collection/search/13875
+- Quilt, Oak Leaf pattern (13876). Purchase, Mrs. Roger Brunschwig Gift, 1988. https://www.metmuseum.org/art/collection/search/13876
+- Quilt, Album pattern (13877). Bequest of Margaret Brown Potvin, 1987. https://www.metmuseum.org/art/collection/search/13877
+- Honeycomb Quilt (13878). Gift of Mr. and Mrs. William A. Moore, 1923. https://www.metmuseum.org/art/collection/search/13878
+- Quilt, Star of Bethlehem pattern variation (13880). Gift of Mr. and Mrs. Sidney Hosmer, 1948. https://www.metmuseum.org/art/collection/search/13880
+- Quilt, Flying Geese pattern (13881). Gift of Mr. and Mrs. Sidney Hosmer, 1948. https://www.metmuseum.org/art/collection/search/13881
+- Quilt (or decorative throw). Hexagon or Mosaic pattern (13882). Bequest of Carolyn Fiske MacGregor, in memory of her grandmother, Caroline Brooks Gould, 1953. https://www.metmuseum.org/art/collection/search/13882
+- Quilt, Star of Bethlehem pattern variation (13884). Gift of Roger Morton and Dr. Paul C. Morton, 1962. https://www.metmuseum.org/art/collection/search/13884
+- Quilt, Double X pattern (13885). Gift of Mrs. Emanuel Altman, 1962. https://www.metmuseum.org/art/collection/search/13885
+- Quilt, Strip pattern (13886). Bequest of Flora E. Whiting, 1971. https://www.metmuseum.org/art/collection/search/13886
+- Star of Bethlehem Quilt (13889). Gift of Mr. and Mrs. Samuel Schwartz, 1973. https://www.metmuseum.org/art/collection/search/13889
+- Quilt, Center Square and Bars pattern (13891). Gift of Mr. and Mrs. Stanley Tananbaum, 1973. https://www.metmuseum.org/art/collection/search/13891
+- Quilt, Log Cabin pattern, Light and Dark variation (13894). Purchase, Eva Gebhard-Gourgaud Foundation Gift, 1973. https://www.metmuseum.org/art/collection/search/13894
+- Star of Bethlehem Quilt (13897). Sansbury-Mills Fund, 1973. https://www.metmuseum.org/art/collection/search/13897
+- Quilt, Eagle pattern (13899). Gift of Mrs. Jacob Kaplan, 1974. https://www.metmuseum.org/art/collection/search/13899
+- Quilt, Log Cabin pattern, Straight Furrow variation (13901). Purchase, Eva Gebhard-Gourgaud Foundation Gift and funds from various donors, 1974. https://www.metmuseum.org/art/collection/search/13901
+- Quilt, Star of Lemoyne pattern variation (13902). Gift of Mrs. Gilbert Chapman, 1974. https://www.metmuseum.org/art/collection/search/13902
+- Quilt (or decorative throw), Roman Stripes pattern (13903). Gift of Katharine Brigham, 1979. https://www.metmuseum.org/art/collection/search/13903
+- Quilt, Hexagon or Honeycomb pattern (13904). Gift of Mrs. Andrew Galbraith Carey, 1980. https://www.metmuseum.org/art/collection/search/13904
+- Quilt, Nine Patch pattern variation (13905). Gift of Mrs. Andrew Galbraith Carey, 1980. https://www.metmuseum.org/art/collection/search/13905, committed as corpus/images/met-13905.jpg
+- Star of Lemoyne Quilt (13906). Gift of Mrs. Andrew Galbraith Carey, 1980. https://www.metmuseum.org/art/collection/search/13906
+- Quilt (or decorative throw), Crazy pattern (13907). Gift of Mr. and Mrs. John S. Cooper, 1983. https://www.metmuseum.org/art/collection/search/13907
+- Quilt, Contained Crazy pattern (13910). Purchase, Mr. and Mrs. Edward J. Scheider Gift, 1989. https://www.metmuseum.org/art/collection/search/13910
+- Quilt, Star of Bethlehem (13911). Gift of Mrs. George Sands Bryan, in memory of her husband, George Sands Bryan, 1946. https://www.metmuseum.org/art/collection/search/13911
+- Wild Goose Chase Quilt (13912). Gift of Mrs. William Rhinelander Stewart, 1976. https://www.metmuseum.org/art/collection/search/13912
+- Quilt, Fruit Baskets pattern (13915). Gift of Mr. and Mrs. Samuel Schwartz, 1975. https://www.metmuseum.org/art/collection/search/13915
+- Dressing Table Cover Quilt (14129). Gift of Mary Eastwood and Gertrude Knevels, 1940. https://www.metmuseum.org/art/collection/search/14129
+- Quilt, Strip pattern (14197). Purchase, Mrs. Roger Brunschwig Gift, 1990. https://www.metmuseum.org/art/collection/search/14197
+- Quilt, Flying Geese pattern (14199). Gift of Mrs. George A. Mohlman, 1990. https://www.metmuseum.org/art/collection/search/14199
+- Crib Quilt, Album pattern (14200). Purchase, Mrs. Roger Brunschwig Gift, 1991. https://www.metmuseum.org/art/collection/search/14200
+- Wholecloth whitework quilt (14827). Gift of Mrs. Robert Bull. https://www.metmuseum.org/art/collection/search/14827
+- Quilt, calamanco (15999). Purchase, Gift of Joan G. Hancock, in memory of Frances Burrall Henry, by exchange, 1998. https://www.metmuseum.org/art/collection/search/15999
+- Star of Bethlehem Quilt (16293). Gift of Robert E. Cole, in memory of Helen R. Cole, 1998. https://www.metmuseum.org/art/collection/search/16293
+- Quilt, Spiderweb pattern (16294). Gift of Robert E. Cole, in memory of Helen R. Cole, 1998. https://www.metmuseum.org/art/collection/search/16294
+- Tulip Quilt (16295). Gift of Robert E. Cole, in memory of Helen R. Cole, 1998. https://www.metmuseum.org/art/collection/search/16295
+- Wholecloth quilt (16683). Purchase, Gift of Mrs. Russell Sage, by exchange, 1999. https://www.metmuseum.org/art/collection/search/16683
+- Wholecloth whitework quilt (18956). Purchase, Mr. and Mrs. David Lubart Gift, in memory of Katherine J. Lubart, 1944-1975, 2005. https://www.metmuseum.org/art/collection/search/18956
+- Quilt center (19004). Purchase, David S. and Elizabeth W. Quackenbush Gift, 2005. https://www.metmuseum.org/art/collection/search/19004
+- Quilt, Four Eagles pattern (19377). Gift of Jack Ellenberger, 2006. https://www.metmuseum.org/art/collection/search/19377
+- Crazy Quilt (19724). Purchase, David Scott Parker Gift, 2007. https://www.metmuseum.org/art/collection/search/19724
+- Floral Applique Quilt (19818). Purchase, William Cullen Bryant Fellows Gifts, 2008. https://www.metmuseum.org/art/collection/search/19818
+- Woman’s Rights Quilt (21101). Funds from various donors, 2011. https://www.metmuseum.org/art/collection/search/21101
+- Quilt (216513). Rogers Fund, 1909. https://www.metmuseum.org/art/collection/search/216513
+- Quilt (217142). Rogers Fund, 1909. https://www.metmuseum.org/art/collection/search/217142
+- Quilt (219121). Bequest of Mrs. Maria P. James, 1911. https://www.metmuseum.org/art/collection/search/219121
+- Quilt (219512). Rogers Fund, 1913. https://www.metmuseum.org/art/collection/search/219512
+- Quilt (221693). Gift of Mrs. Benjamin Arthur Aycrigg, 1925. https://www.metmuseum.org/art/collection/search/221693
+- Floral Chintz Quilt (221867). Rogers Fund, 1926. https://www.metmuseum.org/art/collection/search/221867
+- Quilt (221868). Rogers Fund, 1926. https://www.metmuseum.org/art/collection/search/221868
+- Quilt (227076). Rogers Fund, 1945. https://www.metmuseum.org/art/collection/search/227076
+- Quilt (227247). Gift of Anna H. Wells, 1946. https://www.metmuseum.org/art/collection/search/227247
+- Quilt (229155). Gift of Mrs. Samuel S. Schwartz, 1967. https://www.metmuseum.org/art/collection/search/229155
+- Quilt (229753). Gift of Dr. and Mrs. Roger Gerry, 1982. https://www.metmuseum.org/art/collection/search/229753
+- Quilt (229930). Rogers Fund and funds from various donors, 1986. https://www.metmuseum.org/art/collection/search/229930
+- Quilt (229936). Purchase, Gift of Adele Pharo Azar, in memory of her late husband, Jemile Wehby Azar, by exchange, 1987. https://www.metmuseum.org/art/collection/search/229936
+- Branches and Vines Quilt (625591). Gift of George E. Schoellkopf, 2013. https://www.metmuseum.org/art/collection/search/625591
+- Palampore Tree of Life Quilt (651206). Purchase, Anonymous Gift and Friends of the American Wing Fund, 2014. https://www.metmuseum.org/art/collection/search/651206
+- Whole cloth quilt (669875). Purchase, Frank P. Stetz Bequest, in loving memory of David Stewart Hull, 2015. https://www.metmuseum.org/art/collection/search/669875
+- Signature Quilt (700692). Gift of Gordon H. Frey, 2015. https://www.metmuseum.org/art/collection/search/700692
+- Crazy Quilt (701310). Gift of the Zelanka Family, in honor of Bernard and Rhoda Zelanka, 2016. https://www.metmuseum.org/art/collection/search/701310
+- Quilt Cover (Futon) (70388). Rogers Fund, 1965. https://www.metmuseum.org/art/collection/search/70388
+- Quilt Cover (Futon) (70389). Rogers Fund, 1965. https://www.metmuseum.org/art/collection/search/70389
+- Quilt Cover (Futon) (70390). Rogers Fund, 1965. https://www.metmuseum.org/art/collection/search/70390
+- Baltimore Album Quilt Top (707454). Purchase, Gift of Mrs. Russell Sage, by exchange and funds from various donors, 2016. https://www.metmuseum.org/art/collection/search/707454
+- Quilt Cover (70760). Funds from various donors, 1983. https://www.metmuseum.org/art/collection/search/70760
+- Quilt Cover (70764). Gift of Mrs. Frederick van Beuren Joy, 1983. https://www.metmuseum.org/art/collection/search/70764
+- Rose Wreath Quilt (717635). Purchase, Bequest of Cecile L. Mayer, by exchange, Gift of Mr. and Mrs. Luke Vincent Lockwood, by exchange, and Morris K. Jesup and Rogers Funds, by exchange, 2016. https://www.metmuseum.org/art/collection/search/717635
+- Sunburst Quilt (717637). Purchase, Bequest of W. Gedney Beatty, by exchange, The Sylmaris Collection, Gift of George Coe Graves, by exchange, and Bequest of Flora E. Whiting, by exchange, 2016. https://www.metmuseum.org/art/collection/search/717637
+- Pictorial Quilt (717944). Friends of the American Wing Fund, 2016. https://www.metmuseum.org/art/collection/search/717944
+- Burgoyne Surrenders or Burgoyne Surrounded Quilt (739503). Purchase, Louis and Virginia Clemente Foundation Inc. Gift, 2017. https://www.metmuseum.org/art/collection/search/739503
+- Quilt or Carpet (77657). Purchase, Friends of Asian Art Gifts, 2012. https://www.metmuseum.org/art/collection/search/77657
+- Thirteen-patch block quilt with Japanesque backing fabric (814560). Gift of Margot Johnson, in honor of my cousin Marilyn Johnson, previous curator in charge of quilts at the Met, 2018. https://www.metmuseum.org/art/collection/search/814560
+- Cat quilt (834757). Gift of Allison L. Reddington, in celebration of the Museum's 150th anniversary, 2020. https://www.metmuseum.org/art/collection/search/834757
+- Crib Quilt (854563). Gift of Karen B. Cohen, in honor of Rochelle C. Rosenberg, 2022. https://www.metmuseum.org/art/collection/search/854563
+- Hearts and Chess Pieces Quilt (854565). Gift of Karen B. Cohen, in honor of Rochelle C. Rosenberg, 2022. https://www.metmuseum.org/art/collection/search/854565
+- Star of Lemoyne Quilt (854566). Gift of Karen B. Cohen, in honor of Rochelle C. Rosenberg, 2022. https://www.metmuseum.org/art/collection/search/854566
+- Quilt, pieced (854567). Gift of Karen B. Cohen, in honor of Rochelle C. Rosenberg, 2022. https://www.metmuseum.org/art/collection/search/854567
+- Chintz Appliqué Quilt (854568). Gift of Karen B. Cohen, in honor of Rochelle C. Rosenberg, 2022. https://www.metmuseum.org/art/collection/search/854568
+- Hearts, Star of Lemoyne, and Honeycomb Quilt (854569). Gift of Karen B. Cohen, in honor of Rochelle C. Rosenberg, 2022. https://www.metmuseum.org/art/collection/search/854569
+- Star of Jerusalem Quilt (854570). Gift of Karen B. Cohen, in honor of Rochelle C. Rosenberg, 2022. https://www.metmuseum.org/art/collection/search/854570
+- Star of Lemoyne Quilt (854571). Gift of Karen B. Cohen, in honor of Rochelle C. Rosenberg, 2022. https://www.metmuseum.org/art/collection/search/854571, committed as corpus/images/met-854571.jpg
+- Quilt, pieced (855671). Gift of Karen B. Cohen, in honor of Rochelle C. Rosenberg, 2022. https://www.metmuseum.org/art/collection/search/855671
+- Quilt, appliqued (855672). Gift of Karen B. Cohen, in honor of Rochelle C. Rosenberg, 2022. https://www.metmuseum.org/art/collection/search/855672
+- Crib quilt, appliqued (855674). Gift of Karen B. Cohen, in honor of Rochelle C. Rosenberg, 2022. https://www.metmuseum.org/art/collection/search/855674
+- Strip Quilt (855677). Gift of Karen B. Cohen, in honor of Rochelle C. Rosenberg, 2022. https://www.metmuseum.org/art/collection/search/855677
+- Quilt top, appliqued (855678). Gift of Karen B. Cohen, in honor of Rochelle C. Rosenberg, 2022. https://www.metmuseum.org/art/collection/search/855678
+- Corded crib quilt (864828). Gift of Karen B. Cohen, in honor of Rochelle C. Rosenberg, 2022. https://www.metmuseum.org/art/collection/search/864828
+- Stuffed and corded crib quilt (864829). Gift of Karen B. Cohen, in honor of Rochelle C. Rosenberg, 2022. https://www.metmuseum.org/art/collection/search/864829
+- Stuffed and corded quilt (864830). Gift of Karen B. Cohen, in honor of Rochelle C. Rosenberg, 2022. https://www.metmuseum.org/art/collection/search/864830
+- Corded quilt (864831). Gift of Karen B. Cohen, in honor of Rochelle C. Rosenberg, 2022. https://www.metmuseum.org/art/collection/search/864831
+- Stuffed quilt (864832). Gift of Karen B. Cohen, in honor of Rochelle C. Rosenberg, 2022. https://www.metmuseum.org/art/collection/search/864832
+- Stuffed and corded quilt (864833). Gift of Karen B. Cohen, in honor of Rochelle C. Rosenberg, 2022. https://www.metmuseum.org/art/collection/search/864833
+
+## Smithsonian Institution (CC0-1.0)
+
+Rights: `media.usage.access=CC0` on every object; policy: https://www.si.edu/openaccess
+
+- Pieced Nine-Patch Quilt with Embroidery Fancy Pieced Quilt (acm_1991.0097.0001). Anacostia Community Museum, Smithsonian Institution. https://collections.si.edu/search/detail/ld1-1643398733817-1643398733870-0
+- Friendship quilt (acm_2002.0001.0001a). Anacostia Community Museum, Smithsonian Institution. https://collections.si.edu/search/detail/ld1-1643398733817-1643398733835-0
+- Quilt (chndm_1934-9-1). Museum purchase from the Mary Hearn Greims Fund. https://collection.cooperhewitt.org/view/objects/asitem/id/53525
+- Quilt (chndm_1937-35-3). Given by Miss Helen S. Stone and Bromley S. Stone. https://collection.cooperhewitt.org/view/objects/asitem/id/56081
+- Quilt (chndm_1951-46-1). Museum purchase through gift of Mrs. Samuel W. Bridgham. https://collection.cooperhewitt.org/view/objects/asitem/id/104474
+- Quilting (chndm_1955-14-6). Museum purchase from Au Panier Fleuri Fund. https://collection.cooperhewitt.org/view/objects/asitem/id/111573
+- Quilt (chndm_1956-181-348). Gift of Mary M. Kenway from the estate of Sarah B. Russell. https://collection.cooperhewitt.org/view/objects/asitem/id/114315
+- Quilt (chndm_1956-42-71). Gift of Mary M. Kenway from the estate of Sarah B. Russell. https://collection.cooperhewitt.org/view/objects/asitem/id/115041
+- Log Cabin (chndm_1957-78-1). Gift of Berta Frey. https://collection.cooperhewitt.org/view/objects/asitem/id/120296
+- Quilt (chndm_1958-131-2). Gift of Miss Bertha Schaefer. https://collection.cooperhewitt.org/view/objects/asitem/id/120855
+- Quilt fragment (chndm_1959-145-1). Gift of Mrs. Benjamin Ginsburg. https://collection.cooperhewitt.org/view/objects/asitem/id/122728
+- Quilt (chndm_1960-145-1). Gift of Mrs. Paul Moore. https://collection.cooperhewitt.org/view/objects/asitem/id/125769
+- Patchwork quilt top (chndm_1960-73-2). Given by Mrs. Walter Miller. https://collection.cooperhewitt.org/view/objects/asitem/id/127590
+- Trailing Vine (chndm_1962-184-1). Given by Miss D. Lorraine Yerkes. https://collection.cooperhewitt.org/view/objects/asitem/id/132091
+- Mariner's Compass (chndm_1972-28-1). Gift of Mrs. Susan Weitzman. https://collection.cooperhewitt.org/view/objects/asitem/id/148691
+- Quilt (chndm_1973-25-1). Thedlow, Inc.. https://collection.cooperhewitt.org/view/objects/asitem/id/150986
+- Double Irish Chain (chndm_1973-45-1). Gift of Mrs. Arthur Stanbury. https://collection.cooperhewitt.org/view/objects/asitem/id/151648
+- Quilt (chndm_1975-16-2). Gift of Edla Cusick in memory of her mother, Aline Bernstein, and Aunt, Ethel Frankau. https://collection.cooperhewitt.org/view/objects/asitem/id/154869
+- Quilt (chndm_1976-68-1). Gift of Josephine Howell. https://collection.cooperhewitt.org/view/objects/asitem/id/156571
+- Quilt (chndm_1978-167-1). Gift of Mrs. Ralph P. Hanes. https://collection.cooperhewitt.org/view/objects/asitem/id/159196
+- Quilt top (chndm_1986-27-1). Museum purchase from Alice Beer Memorial Fund. https://collection.cooperhewitt.org/view/objects/asitem/id/185139
+- Quilt (chndm_1995-50-269-a_b). Bequest of Elinor Merrell. https://collection.cooperhewitt.org/view/objects/asitem/id/210402
+- Quilt (chndm_1995-50-382). Bequest of Elinor Merrell. https://collection.cooperhewitt.org/view/objects/asitem/id/216994
+- Wild Goose Chase (chndm_1995-50-383). Bequest of Elinor Merrell. https://collection.cooperhewitt.org/view/objects/asitem/id/216995
+- Pineapple quilt gifted to Lucy Hardiman Roundtree from Lydia Hardiman (nmaahc_2012.155.10). Collection of the Smithsonian National Museum of African American History and Culture, Gift of the Lyles Station Historic Preservation Corporation. https://nmaahc.si.edu/object/nmaahc_2012.155.10
+- Cream and red appliqued quilted bedcover (nmaahc_2013.162.11). Collection of the Smithsonian National Museum of African American History and Culture. https://nmaahc.si.edu/object/nmaahc_2013.162.11
+- Scrap quilt made by Elizabeth Salter Smith (nmaahc_2013.162.7). Collection of the Smithsonian National Museum of African American History and Culture. https://nmaahc.si.edu/object/nmaahc_2013.162.7
+- Quilt with Drunkard's Path variation blocks hand pieced and hand quilted (nmaahc_2013.215.4). Collection of the Smithsonian National Museum of African American History and Culture, Gift of Dr. Gladys-Marie Fry. https://nmaahc.si.edu/object/nmaahc_2013.215.4
+- Quilted petticoat (nmaahc_2014.180.1). Collection of the Smithsonian National Museum of African American History and Culture, Gift of Aaron and Maureen Robinson and Family. https://nmaahc.si.edu/object/nmaahc_2014.180.1
+- Piecework quilt in saw design made by enslaved persons in Montgomery, Alabama (nmaahc_2017.108.5). Collection of the Smithsonian National Museum of African American History and Culture. https://nmaahc.si.edu/object/nmaahc_2017.108.5
+- Quilt in eight pointed star design made by an enslaved person in Georgia (nmaahc_2017.108.6). Collection of the Smithsonian National Museum of African American History and Culture. https://nmaahc.si.edu/object/nmaahc_2017.108.6
+- Silk Quilt (nmah_556181). Gift of Mrs. Bonita Abernathy. https://collections.si.edu/search/detail/ld1-1643399055209-1643399057642-0
+- 1876 Ellen Harding Baker's "Solar System" Quilt (nmah_556183). Gift of Patricia Hill McCloy and Kathryn Hill Meardon. https://collections.si.edu/search/detail/ld1-1643399055209-1643399064012-0
+- 1790 - 1810 Block-printed Reversible Quilt (nmah_556246). National Museum of American History. https://collections.si.edu/search/detail/ld1-1643398986850-1643399023480-0
+- 1790 - 1810 Block-printed Counterpane (nmah_556247). Credit Line Restricted. https://collections.si.edu/search/detail/ld1-1643398986850-1643399023482-0
+- 1845 - 1852 Baltimore Album Quilt (nmah_556267). Gift of Mrs. C. D. Rhodes. https://collections.si.edu/search/detail/ld1-1643399486815-1643399488371-0
+- 1850 - 1875 Elenor Dolen's Quilt Top (nmah_556281). Gift of Dr. and Mrs. Arthur M. Greenwood. https://collections.si.edu/search/detail/ld1-1643399486815-1643399488659-0
+- 1906 Sarah Butler's "Log Cabin" Pieced Quilt (nmah_556282). Gift of Dr. and Mrs. Arthur M. Greenwood. https://collections.si.edu/search/detail/ld1-1643399486815-1643399488660-0
+- 1850 - 1875 "Shoo-fly" Pieced Quilt (nmah_556283). Gift of Dr. and Mrs. Arthur M. Greenwood. https://collections.si.edu/search/detail/ld1-1643399486815-1643399488661-0
+- 1825 - 1850 "Shakspere's Seven Ages" Pieced Comfort (nmah_556284). Gift of Dr. and Mrs. Arthur M. Greenwood. https://collections.si.edu/search/detail/ld1-1643399486815-1643399488662-0
+- 1835 - 1845 Quaker Trousseau Pieced Quilt (nmah_556285). Gift of Dr. and Mrs. Arthur M. Greenwood. https://collections.si.edu/search/detail/ld1-1643399486815-1643399488664-0
+- 1790 - 1810 Copp Family's "Nine-patch" Pieced Quilt (nmah_556288). Gift of John Brenton Copp. https://collections.si.edu/search/detail/ld1-1643399486815-1643399488856-0
+- 1790 - 1810 Copp Family's Framed Center Pieced Quilt (nmah_556289). Gift of John Brenton Copp. https://collections.si.edu/search/detail/ld1-1643399486815-1643399488857-0
+- 1863 Susannah Pullen's Civil War Quilt (nmah_556322). Gift of Charlotte Pullen Scruton. https://collections.si.edu/search/detail/ld1-1643399486815-1643399493659-0
+- quilt (nmah_556330). Eleanor C. Lewis. https://collections.si.edu/search/detail/ld1-1643399486815-1643399493741-0
+- Mary "Betsy" Totten's "Rising Sun" Quilt (nmah_556331). Gift of Mrs. Marvel Mildred Matthes. https://collections.si.edu/search/detail/ld1-1643399486815-1643399493759-0
+- 1861 Mary Rockhold Teter's "Stars and Stripes" Quilt (nmah_556337). Gift of Eugene A. Teter and Martha Brown Teter. https://collections.si.edu/search/detail/ld1-1643399486815-1643399493805-1
+- 1876 Bradbury Family's 1876 Centennial Quilt (nmah_556351). Gift of Mrs. C.A. Rich (Harriet Rebecca Bradbury Rich). https://collections.si.edu/search/detail/ld1-1643399486815-1643399494211-0
+- 1885 - 1886 Harriet Powers's Bible Quilt (nmah_556462). Gift of Mr. and Mrs. H. M. Heckman. https://collections.si.edu/search/detail/ld1-1643399486815-1643399499457-0
+- 1825 - 1840 Susan Strong's "Great Seal" Quilt (nmah_556469). Credit Line Restricted. https://collections.si.edu/search/detail/ld1-1643399486815-1643399499546-0
+- 1800 - 1825 Elizabeth C. Nunn's "Liberty" Quilted Counterpane (nmah_556490). National Museum of American History. https://collections.si.edu/search/detail/ld1-1643399486815-1643399499811-0
+- 1800 - 1825 Dove-Cator Families "American Eagle" Quilt (nmah_556492). GIft of Carrie T. Brown. https://collections.si.edu/search/detail/ld1-1643399486815-1643399499819-1
+- 1860 - 1875 Machine Quilted Quilt (nmah_556592). Gift of Mr. and Mrs. Samuel Schwartz. https://collections.si.edu/search/detail/ld1-1643399486815-1643399501680-0
+- 1842 Nancy Ward Butler's "Tombstone" Quilt (nmah_556595). Gift of Nancy A. Butler Werdell. https://collections.si.edu/search/detail/ld1-1643399486815-1643399501718-0
+- 1898 Rosina Kalanikauwekiulani Ayers's "Hawaiian Coat-of-Arms" Quilt (nmah_556599). Gift of Adelaide D. McDonough. https://collections.si.edu/search/detail/ld1-1643399486815-1643399501786-0
+- Quilted glazed wool petticoat, 18th century (nmah_640707). National Museum of American History. https://collections.si.edu/search/detail/ld1-1643399486815-1643399501415-1
+- “Burgoyne Surrounded [quilt pattern]” item of ephemera (npm_2009.2033.1.1.9). National Postal Museum. https://postalmuseum.si.edu/object/npm_2009.2033.1.1.9
+- Pillow Sham with Trapunto Quilting (saam_1986.65.350). Smithsonian American Art Museum, Gift of Herbert Waide Hemphill, Jr. and museum purchase made possible by Ralph Cross Johnson. https://americanart.si.edu/collections/search/artwork/?id=31605
+- Fan Quilt, Mt. Carmel (saam_1987.80). Smithsonian American Art Museum, Gift of Herbert Waide Hemphill, Jr.. https://americanart.si.edu/collections/search/artwork/?id=24596
+- Whole-Cloth Quilt (saam_1998.149.1). Smithsonian American Art Museum, Gift of Patricia S. Smith. https://americanart.si.edu/collections/search/artwork/?id=36856
+- Pieced Quilt (one Patch on Patch) (saam_1998.149.11). Smithsonian American Art Museum, Gift of Patricia S. Smith. https://americanart.si.edu/collections/search/artwork/?id=36866
+- Pieced Quilt (Nine Patch Variation on Point) (saam_1998.149.12). Smithsonian American Art Museum, Gift of Patricia S. Smith. https://americanart.si.edu/collections/search/artwork/?id=36867
+- Pieced Quilt (Strips with Four Patch on Point) (saam_1998.149.13). Smithsonian American Art Museum, Gift of Patricia S. Smith. https://americanart.si.edu/collections/search/artwork/?id=36868
+- Pieced Quilt (Nine Patch Variation on Point) (saam_1998.149.14). Smithsonian American Art Museum, Gift of Patricia S. Smith. https://americanart.si.edu/collections/search/artwork/?id=36869
+- Pieced Quilt (Honeycomb) (saam_1998.149.15). Smithsonian American Art Museum, Gift of Patricia S. Smith. https://americanart.si.edu/collections/search/artwork/?id=36870
+- Pieced Quilt (Nine Patch Variation) (saam_1998.149.16). Smithsonian American Art Museum, Gift of Patricia S. Smith. https://americanart.si.edu/collections/search/artwork/?id=36871
+- Pieced Quilt (Sixteen Patch on Point) (saam_1998.149.17). Smithsonian American Art Museum, Gift of Patricia S. Smith. https://americanart.si.edu/collections/search/artwork/?id=36872
+- Appliqued Quilt (Center Medallion) (saam_1998.149.19). Smithsonian American Art Museum, Gift of Patricia S. Smith. https://americanart.si.edu/collections/search/artwork/?id=36874
+- Appliqued Quilt (Center Medallion) (saam_1998.149.2). Smithsonian American Art Museum, Gift of Patricia S. Smith. https://americanart.si.edu/collections/search/artwork/?id=36857
+- Pieced Quilt (Nine Patch) (saam_1998.149.20). Smithsonian American Art Museum, Gift of Patricia S. Smith. https://americanart.si.edu/collections/search/artwork/?id=36875
+- Pieced Quilt (Bricks) (saam_1998.149.21). Smithsonian American Art Museum, Gift of Patricia S. Smith. https://americanart.si.edu/collections/search/artwork/?id=36876
+- Flying Geese (saam_1998.149.22). Smithsonian American Art Museum, Gift of Patricia S. Smith. https://americanart.si.edu/collections/search/artwork/?id=36877
+- Pieced and appliqued Quilt (Sunflower Variation) (saam_1998.149.23). Smithsonian American Art Museum, Gift of Patricia S. Smith. https://americanart.si.edu/collections/search/artwork/?id=36878
+- Pieced Quilt (Lady of the Lake) (saam_1998.149.24). Smithsonian American Art Museum, Gift of Patricia S. Smith. https://americanart.si.edu/collections/search/artwork/?id=36879
+- Pieced and appliqued quilt (Sunburst Variation) (saam_1998.149.25). Smithsonian American Art Museum, Gift of Patricia S. Smith. https://americanart.si.edu/collections/search/artwork/?id=36880
+- Pieced Quilt (Friendship Sampler Strips) (saam_1998.149.26). Smithsonian American Art Museum, Gift of Patricia S. Smith. https://americanart.si.edu/collections/search/artwork/?id=36881
+- Pieced quilt (Variable Star) (saam_1998.149.27). Smithsonian American Art Museum, Gift of Patricia S. Smith. https://americanart.si.edu/collections/search/artwork/?id=36882
+- Pieced quilt (Pinwheel) (saam_1998.149.28). Smithsonian American Art Museum, Gift of Patricia S. Smith. https://americanart.si.edu/collections/search/artwork/?id=36883
+- Pieced and appliqued Friendship Quilt top (Hickory Leaf Variation) (saam_1998.149.29). Smithsonian American Art Museum, Gift of Patricia S. Smith. https://americanart.si.edu/collections/search/artwork/?id=36884
+- Pieced Quilt (Strips) (saam_1998.149.3). Smithsonian American Art Museum, Gift of Patricia S. Smith. https://americanart.si.edu/collections/search/artwork/?id=36858
+- Pieced quilt (Ohio Star) (saam_1998.149.30). Smithsonian American Art Museum, Gift of Patricia S. Smith. https://americanart.si.edu/collections/search/artwork/?id=36885
+- Pieced quilt (Nine Patch on Point) (saam_1998.149.31). Smithsonian American Art Museum, Gift of Patricia S. Smith. https://americanart.si.edu/collections/search/artwork/?id=36886
+- Pieced quilt (Delectable Mountains Variation) (saam_1998.149.32). Smithsonian American Art Museum, Gift of Patricia S. Smith. https://americanart.si.edu/collections/search/artwork/?id=36887
+- Pieced quilt (Flying Geese) (saam_1998.149.33). Smithsonian American Art Museum, Gift of Patricia S. Smith. https://americanart.si.edu/collections/search/artwork/?id=36888
+- Pieced quilt (Strips) (saam_1998.149.34). Smithsonian American Art Museum, Gift of Patricia S. Smith. https://americanart.si.edu/collections/search/artwork/?id=36889
+- Unfinished quilt top (honeycomb) (saam_1998.149.41). Smithsonian American Art Museum, Gift of Patricia S. Smith. https://americanart.si.edu/collections/search/artwork/?id=36896
+- Appliqued Quilt (Center Medallion) (saam_1998.149.5). Smithsonian American Art Museum, Gift of Patricia S. Smith. https://americanart.si.edu/collections/search/artwork/?id=36860
+- Whole-cloth Quilt (saam_1998.149.7). Smithsonian American Art Museum, Gift of Patricia S. Smith. https://americanart.si.edu/collections/search/artwork/?id=36862
+- Whole-Cloth Quilt (saam_1998.149.8). Smithsonian American Art Museum, Gift of Patricia S. Smith. https://americanart.si.edu/collections/search/artwork/?id=36863
+- Crazy Quilt (saam_1998.8.2). Smithsonian American Art Museum, Gift of Dean R. and Darlyene A. Yarian in memory of Nathan Morphew. https://americanart.si.edu/collections/search/artwork/?id=36016
+- Compass Rose Patchwork Quilt (saam_1998.8.3). Smithsonian American Art Museum, Gift of Dean R. and Darlyene A. Yarian in memory of Nathan Morphew. https://americanart.si.edu/collections/search/artwork/?id=36017
+- Amish Crazy Quilt (saam_2000.78). Smithsonian American Art Museum, Museum purchase made possible in part through the Smithsonian Institution Collections Acquisition Program. https://americanart.si.edu/collections/search/artwork/?id=54559
+- Pieced Quilt (saam_2004.15.1). Smithsonian American Art Museum, Gift of Mary Ann Hooker Sturgeon. https://americanart.si.edu/collections/search/artwork/?id=73757
+- Pieced Quilt (saam_2004.15.2). Smithsonian American Art Museum, Gift of Mary Ann Hooker Sturgeon. https://americanart.si.edu/collections/search/artwork/?id=73758
+- Rose of Sharon (saam_2013.67.1). Smithsonian American Art Museum, Gift of Iris and Jay Leonard and Kohler Foundation, Inc.. https://americanart.si.edu/collections/search/artwork/?id=86618
+- Wild Goose Chase (saam_2013.67.10). Smithsonian American Art Museum, Gift of Iris and Jay Leonard and Kohler Foundation, Inc.. https://americanart.si.edu/collections/search/artwork/?id=86627
+- Four Patch Chain Variation (saam_2013.67.11). Smithsonian American Art Museum, Gift of Iris and Jay Leonard and Kohler Foundation, Inc.. https://americanart.si.edu/collections/search/artwork/?id=86628
+- Mennonite Quilt with Embroidered Flowers (saam_2013.67.16). Smithsonian American Art Museum, Gift of Iris and Jay Leonard and Kohler Foundation, Inc.. https://americanart.si.edu/collections/search/artwork/?id=86633
+- Streak of Lightning (saam_2013.67.17). Smithsonian American Art Museum, Gift of Iris and Jay Leonard and Kohler Foundation, Inc.. https://americanart.si.edu/collections/search/artwork/?id=86634
+- Double Irish Chain (saam_2013.67.2). Smithsonian American Art Museum, Gift of Iris and Jay Leonard and Kohler Foundation, Inc.. https://americanart.si.edu/collections/search/artwork/?id=86619
+- Whitework (saam_2013.67.3). Smithsonian American Art Museum, Gift of Iris and Jay Leonard and Kohler Foundation, Inc.. https://americanart.si.edu/collections/search/artwork/?id=86620
+- Postage Stamp Variation with Center Stars (saam_2013.67.4). Smithsonian American Art Museum, Gift of Iris and Jay Leonard and Kohler Foundation, Inc.. https://americanart.si.edu/collections/search/artwork/?id=86621
+- Ocean Waves (saam_2013.67.5). Smithsonian American Art Museum, Gift of Iris and Jay Leonard and Kohler Foundation, Inc.. https://americanart.si.edu/collections/search/artwork/?id=86622
+- Four Patch Variation (saam_2013.67.9). Smithsonian American Art Museum, Gift of Iris and Jay Leonard and Kohler Foundation, Inc.. https://americanart.si.edu/collections/search/artwork/?id=86626
+- Untitled (String Quilt) (saam_2016.5.41). Smithsonian American Art Museum, Gift of Corrine Riley and museum purchase through the Barbara Coffey Quilt Endowment and the Luisita L. and Franz H. Denghausen Endowment. https://americanart.si.edu/collections/search/artwork/?id=110028
+- Untitled (String Quilt) (saam_2016.5.42). Smithsonian American Art Museum, Gift of Corrine Riley and museum purchase through the Barbara Coffey Quilt Endowment and the Luisita L. and Franz H. Denghausen Endowment. https://americanart.si.edu/collections/search/artwork/?id=110061
+- Untitled (Tied Crazy Quilt with Embroidered "Dolly") (saam_2016.5.50). Smithsonian American Art Museum, Gift of Corrine Riley and museum purchase through the Barbara Coffey Quilt Endowment and the Luisita L. and Franz H. Denghausen Endowment. https://americanart.si.edu/collections/search/artwork/?id=110041
+- Untitled (saam_2016.57.10). Smithsonian American Art Museum, Gift of Patricia S. Smith. https://americanart.si.edu/collections/search/artwork/?id=111457
+- Untitled (Baby quilt, "Double Nine Patch") (saam_2016.57.2). Smithsonian American Art Museum, Gift of Patricia S. Smith. https://americanart.si.edu/collections/search/artwork/?id=111449
+- Untitled (Child's quilt, "Pinwheel") (saam_2016.57.3). Smithsonian American Art Museum, Gift of Patricia S. Smith. https://americanart.si.edu/collections/search/artwork/?id=111450
+- Untitled (whole-cloth chintz) (saam_2016.57.4). Smithsonian American Art Museum, Gift of Patricia S. Smith. https://americanart.si.edu/collections/search/artwork/?id=111451
+- Untitled (whole-cloth with border) (saam_2016.57.5). Smithsonian American Art Museum, Gift of Patricia S. Smith. https://americanart.si.edu/collections/search/artwork/?id=111452
+- Untitled ("Nine Patch" in Grid) (saam_2016.57.6). Smithsonian American Art Museum, Gift of Patricia S. Smith. https://americanart.si.edu/collections/search/artwork/?id=111453
+- Untitled (Diagonal Stripes in Square) (saam_2016.57.7). Smithsonian American Art Museum, Gift of Patricia S. Smith. https://americanart.si.edu/collections/search/artwork/?id=111454
+- Untitled (Whole-cloth) (saam_2016.57.8). Smithsonian American Art Museum, Gift of Patricia S. Smith. https://americanart.si.edu/collections/search/artwork/?id=111455
+- Untitled (Floral Appliqué Sampler) (saam_2016.57.9). Smithsonian American Art Museum, Gift of Patricia S. Smith. https://americanart.si.edu/collections/search/artwork/?id=111456
+- Log Cabin Variation: Couthouse Steps (saam_2017.24.1). Smithsonian American Art Museum, Gift of Raymond Vlasin and family, with deepest appreciation for the many friends with whom Claire Vlasin quilted. https://americanart.si.edu/collections/search/artwork/?id=112050
+- Pinwheel Variation (saam_2017.24.10). Smithsonian American Art Museum, Gift of Raymond Vlasin and family, with deepest appreciation for the many friends with whom Claire Vlasin quilted. https://americanart.si.edu/collections/search/artwork/?id=112060
+- Axe Head (saam_2017.24.11). Smithsonian American Art Museum, Gift of Raymond Vlasin and family, with deepest appreciation for the many friends with whom Claire Vlasin quilted. https://americanart.si.edu/collections/search/artwork/?id=112061
+- Baskets (saam_2017.24.12). Smithsonian American Art Museum, Gift of Raymond Vlasin and family, with deepest appreciation for the many friends with whom Claire Vlasin quilted. https://americanart.si.edu/collections/search/artwork/?id=112062
+- Baby Blocks (saam_2017.24.13). Smithsonian American Art Museum, Gift of Raymond Vlasin and family, with deepest appreciation for the many friends with whom Claire Vlasin quilted. https://americanart.si.edu/collections/search/artwork/?id=112064
+- Drunkard's Path Variation (saam_2017.24.15). Smithsonian American Art Museum, Gift of Raymond Vlasin and family, with deepest appreciation for the many friends with whom Claire Vlasin quilted. https://americanart.si.edu/collections/search/artwork/?id=112067
+- Princess Feather (saam_2017.24.2). Smithsonian American Art Museum, Gift of Raymond Vlasin and family, with deepest appreciation for the many friends with whom Claire Vlasin quilted. https://americanart.si.edu/collections/search/artwork/?id=112051
+- Spool (saam_2017.24.20). Smithsonian American Art Museum, Gift of Raymond Vlasin and family, with deepest appreciation for the many friends with whom Claire Vlasin quilted. https://americanart.si.edu/collections/search/artwork/?id=112074
+- Double X (saam_2017.24.21). Smithsonian American Art Museum, Gift of Raymond Vlasin and family, with deepest appreciation for the many friends with whom Claire Vlasin quilted. https://americanart.si.edu/collections/search/artwork/?id=112075
+- Ohio Star (saam_2017.24.27). Smithsonian American Art Museum, Gift of Raymond Vlasin and family, with deepest appreciation for the many friends with whom Claire Vlasin quilted. https://americanart.si.edu/collections/search/artwork/?id=112084
+- Spider Web (saam_2017.24.29). Smithsonian American Art Museum, Gift of Raymond Vlasin and family, with deepest appreciation for the many friends with whom Claire Vlasin quilted. https://americanart.si.edu/collections/search/artwork/?id=112086
+- Sash and Block (saam_2017.24.3). Smithsonian American Art Museum, Gift of Raymond Vlasin and family, with deepest appreciation for the many friends with whom Claire Vlasin quilted. https://americanart.si.edu/collections/search/artwork/?id=112052
+- Courthouse Steps (saam_2017.24.31). Smithsonian American Art Museum, Gift of Raymond Vlasin and family, with deepest appreciation for the many friends with whom Claire Vlasin quilted. https://americanart.si.edu/collections/search/artwork/?id=112088
+- Lone Star (saam_2017.24.32). Smithsonian American Art Museum, Gift of Raymond Vlasin and family, with deepest appreciation for the many friends with whom Claire Vlasin quilted. https://americanart.si.edu/collections/search/artwork/?id=112089
+- Fan Crazy Quilt (saam_2017.24.34). Smithsonian American Art Museum, Gift of Raymond Vlasin and family, with deepest appreciation for the many friends with whom Claire Vlasin quilted. https://americanart.si.edu/collections/search/artwork/?id=112091
+- Crazy Quilt (saam_2017.24.35). Smithsonian American Art Museum, Gift of Raymond Vlasin and family, with deepest appreciation for the many friends with whom Claire Vlasin quilted. https://americanart.si.edu/collections/search/artwork/?id=112092
+- Virginia Star (saam_2017.24.4). Smithsonian American Art Museum, Gift of Raymond Vlasin and family, with deepest appreciation for the many friends with whom Claire Vlasin quilted. https://americanart.si.edu/collections/search/artwork/?id=112053
+- Double Irish Chain (saam_2017.24.5). Smithsonian American Art Museum, Gift of Raymond Vlasin and family, with deepest appreciation for the many friends with whom Claire Vlasin quilted. https://americanart.si.edu/collections/search/artwork/?id=112054
+- The Open Box (saam_2017.24.6). Smithsonian American Art Museum, Gift of Raymond Vlasin and family, with deepest appreciation for the many friends with whom Claire Vlasin quilted. https://americanart.si.edu/collections/search/artwork/?id=112055
+- Waver of the Sea (saam_2017.24.7). Smithsonian American Art Museum, Gift of Raymond Vlasin and family, with deepest appreciation for the many friends with whom Claire Vlasin quilted. https://americanart.si.edu/collections/search/artwork/?id=112056
+- Eight Pointed Star (saam_2017.24.8). Smithsonian American Art Museum, Gift of Raymond Vlasin and family, with deepest appreciation for the many friends with whom Claire Vlasin quilted. https://americanart.si.edu/collections/search/artwork/?id=112057
+- Ocean Waves, with Concentric Squares / Framed Quilt back (saam_2021.67.2). Smithsonian American Art Museum, Gift of Faith and Stephen Brown. https://americanart.si.edu/collections/search/artwork/?id=118658
+
+## Los Angeles County Museum of Art (PDM-1.0)
+
+Rights: `publicDomain=1` on every object; policy: https://www.lacma.org/about/contact-us/terms-use
+
+Citation: Image courtesy of the Los Angeles County Museum of Art, www.lacma.org.
+
+- World War I Fundraiser Quilt, Pierced Quilt, 'Fund-raiser' Quilt (2048). Gift of Sarah Tracy Kroger. https://collections.lacma.org/object/2048
+- Quilt, Quilt, 1845, U.S. (Rhode Island) Cotton, 77 1/2" x 105". "Signature" quilt, nine patch block squares of printed cotton against a red cotton print. Made in Rhode Island in a quilting party for a lady about to be married. (30012). Gift of Mrs. Fred P. Dunn. https://collections.lacma.org/object/30012
+- Quilt, 'Double Irish Chain' (33726). Art Museum Council Fund. https://collections.lacma.org/object/33726
+- Quilt, 'One-Patch' Variation (44818). Gift of The Betty Horton Collection. https://collections.lacma.org/object/44818
+- Quilt for Four Poster Bed, 'Variable Star', Quilt, U.S.A., New England Area, 18th Cen. Quilt. Multicolored and checked wools, patchwork 104 1/2 x 102 (44868). Gift of The Betty Horton Collection. https://collections.lacma.org/object/44868
+- Quilt (52521). Gift of Mr. and Mrs. H. Grant Theis. https://collections.lacma.org/object/52521
+- Quilt (52522). Gift of Mr. and Mrs. H. Grant Theis. https://collections.lacma.org/object/52522
+- Quilt, Harriet duBois, United States, New York, New Paltz Quilt, 1807 Plain and printed cotton, linen 86 x 92 in. (218.4 x 233.7 cm.) (54813). Gift of The Betty Horton Collection. https://collections.lacma.org/object/54813
+- Quilt, 'Sawtooth Star' Variation (54852). Gift of The Betty Horton Collection. https://collections.lacma.org/object/54852
+- Quilt, Quilt, United States, Quilt, c.1870 Plain and printed cottons 76 1/2 x 92 1/2 in. (194.3 x 235.0 cm.) (54853). Gift of The Betty Horton Collection. https://collections.lacma.org/object/54853
+- Quilt, 'Irish Chain' with Whole Cloth Border, United States, Quilt, April 1828 Plain and printed cotton 102 x 103 in. (259.1 x 261.6 cm.) (54871). Gift of The Betty Horton Collection. https://collections.lacma.org/object/54871, committed as corpus/images/lacma-54871.jpg
+- Quilt, 'Ocean Waves' (54874). Gift of The Betty Horton Collection. https://collections.lacma.org/object/54874
+- Quilt, 'Four Patch' and 'Bars' (54876). Gift of The Betty Horton Collection. https://collections.lacma.org/object/54876
+- Quilt, 'Nine Patch Variation' (54904). Gift of The Betty Horton Collection. https://collections.lacma.org/object/54904, committed as corpus/images/lacma-54904.jpg
+- Quilt, 'Flying Geese' and 'Bars' (54905). Gift of The Betty Horton Collection. https://collections.lacma.org/object/54905
+- Quilt (56077). Gift of Herbert Wallerstein and Norma Wallerstein, Trustees. https://collections.lacma.org/object/56077
+- Quilt, 'Evening Star', United States, New Jersey 'Evening Star' Pattern Pieced Quilt, c. 1890 Printed Cotton 93 x 85 in. (236.2 x 215.9 cm.), 'Evening Star' Pattern Pieced (58735). Purchased with funds provided by Carol Thomas White in memory of her husband Roger Plimpton White. https://collections.lacma.org/object/58735, committed as corpus/images/lacma-58735.jpg
+- Quilt, 'Lady of the Lake' (59557). American Quilt Research Center Acquisition Fund. https://collections.lacma.org/object/59557
+- Child's Quilt, 'Zigzag' or 'Streak of Lightning', 'Brick Wall' Child's Quilt, "Brick Wall" Child's Quilt (60126). Gift of Mrs. Gene E. Gregg. https://collections.lacma.org/object/60126, committed as corpus/images/lacma-60126.jpg
+- Sampler Friendship Quilt (60154). Gift of "To a Friend's House" Project. https://collections.lacma.org/object/60154
+- Memorial Quilt, 'Variable Star' (61555). Costume Council Fund. https://collections.lacma.org/object/61555
+- Trueblood Signature Quilt, The Trueblood Quilt (61642). Gift of Dr. Samuel Trueblood. https://collections.lacma.org/object/61642
+- Child's Quilt, 'Square within a Square' (63229). Gift of Felicia Melero Holtzinger. https://collections.lacma.org/object/63229, committed as corpus/images/lacma-63229.jpg
+- Child's Quilt, 'Flying Geese' (63255). Gift of Felicia Melero Holtzinger. https://collections.lacma.org/object/63255
+- Child’s Quilt, 'Hole in the Barn Door' or 'Monkey Wrench' (63267). Gift of Felicia Melero Holtzinger. https://collections.lacma.org/object/63267, committed as corpus/images/lacma-63267.jpg

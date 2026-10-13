@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "photo": "private/cache/smithsonian-saam-1998-149-33.jpg",
+  "sha256": "43ef70e8a016c76fa58bfa6690678b673254880b44193d0b079c6b8ff48fc025",
+  "canvas": [
+    2906,
+    3000
+  ],
+  "construction_class": [
+    {
+      "value": "flying_geese",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "flying_geese",
+      "provenance": "proposed-b"
+    }
+  ],
+  "finished_size": [
+    {
+      "value": {
+        "width_in": 99.0,
+        "height_in": 103.5,
+        "approximate": true,
+        "source_text": "103 1/2 \u00d7 99 in. (262.9 \u00d7 251.5 cm)"
+      },
+      "provenance": "source-record"
+    }
+  ],
+  "capture": [
+    {
+      "value": "museum_scan",
+      "provenance": "screened"
+    }
+  ],
+  "device_class": [
+    {
+      "value": "museum",
+      "provenance": "screened"
+    }
+  ]
+}

@@ -1,0 +1,194 @@
+{
+  "schema_version": 1,
+  "photo": "images/lacma-60126.jpg",
+  "sha256": "82281343382e32ac459b8c4c7f1cb342d2abeb381cac86e569aa90ec1301dc27",
+  "canvas": [
+    3308,
+    4096
+  ],
+  "frame": [
+    {
+      "value": {
+        "outer_edge": {
+          "kind": "outer_edge",
+          "corners": {
+            "top_left": {
+              "x": 88.0,
+              "y": 62.0
+            },
+            "top_right": {
+              "x": 3236.0,
+              "y": 95.0
+            },
+            "bottom_right": {
+              "x": 3241.0,
+              "y": 4004.0
+            },
+            "bottom_left": {
+              "x": 109.0,
+              "y": 4009.0
+            }
+          },
+          "bands": [
+            {
+              "width_squares": 0.1
+            },
+            {
+              "width_squares": 0.9
+            },
+            {
+              "width_squares": 1.0
+            }
+          ]
+        },
+        "field": {
+          "kind": "field",
+          "corners": {
+            "top_left": {
+              "x": 342.0,
+              "y": 320.0
+            },
+            "top_right": {
+              "x": 2988.0,
+              "y": 350.0
+            },
+            "bottom_right": {
+              "x": 2990.0,
+              "y": 3757.0
+            },
+            "bottom_left": {
+              "x": 359.0,
+              "y": 3759.0
+            }
+          }
+        }
+      },
+      "provenance": "proposed-a"
+    },
+    {
+      "value": {
+        "outer_edge": {
+          "kind": "outer_edge",
+          "corners": {
+            "top_left": {
+              "x": 100.0,
+              "y": 62.0
+            },
+            "top_right": {
+              "x": 3226.0,
+              "y": 93.0
+            },
+            "bottom_right": {
+              "x": 3241.0,
+              "y": 4005.0
+            },
+            "bottom_left": {
+              "x": 104.0,
+              "y": 4008.0
+            }
+          },
+          "bands": [
+            {
+              "width_squares": 0.1
+            },
+            {
+              "width_squares": 0.9
+            },
+            {
+              "width_squares": 1.0
+            }
+          ]
+        },
+        "field": {
+          "kind": "field",
+          "corners": {
+            "top_left": {
+              "x": 340.0,
+              "y": 320.0
+            },
+            "top_right": {
+              "x": 2978.0,
+              "y": 345.0
+            },
+            "bottom_right": {
+              "x": 2975.0,
+              "y": 3757.0
+            },
+            "bottom_left": {
+              "x": 358.0,
+              "y": 3760.0
+            }
+          }
+        }
+      },
+      "provenance": "proposed-b"
+    }
+  ],
+  "counts": [
+    {
+      "value": {
+        "blocks_across": 1,
+        "squares_per_block_across": 21,
+        "blocks_down": 1,
+        "squares_per_block_down": 26
+      },
+      "provenance": "proposed-a"
+    },
+    {
+      "value": {
+        "blocks_across": 1,
+        "squares_per_block_across": 21,
+        "blocks_down": 1,
+        "squares_per_block_down": 26
+      },
+      "provenance": "proposed-b"
+    }
+  ],
+  "construction_class": [
+    {
+      "value": "squares",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "squares",
+      "provenance": "proposed-b"
+    }
+  ],
+  "fabrics": [
+    {
+      "value": {
+        "count": 2
+      },
+      "provenance": "proposed-a"
+    },
+    {
+      "value": {
+        "count": 2
+      },
+      "provenance": "proposed-b"
+    }
+  ],
+  "finished_size": [
+    {
+      "value": {
+        "width_in": 44.0,
+        "height_in": 55.75,
+        "approximate": true,
+        "source_text": "44 x 55 3/4 in. (11.8 x 141.6 cm)"
+      },
+      "provenance": "source-record"
+    }
+  ],
+  "capture": [
+    {
+      "value": "museum_scan",
+      "provenance": "screened"
+    }
+  ],
+  "device_class": [
+    {
+      "value": "museum",
+      "provenance": "screened"
+    }
+  ]
+}

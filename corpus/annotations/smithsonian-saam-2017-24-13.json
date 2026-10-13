@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "photo": "private/cache/smithsonian-saam-2017-24-13.jpg",
+  "sha256": "277c11700c258de510abeabf42f34d8065ebff265fa457ac68bdd85c0dceeb09",
+  "canvas": [
+    2620,
+    3000
+  ],
+  "construction_class": [
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-b"
+    }
+  ],
+  "refusal_class": [
+    {
+      "value": "hexagon",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "hexagon",
+      "provenance": "proposed-b"
+    }
+  ],
+  "finished_size": [
+    {
+      "value": {
+        "width_in": 76.0,
+        "height_in": 88.0,
+        "approximate": true,
+        "source_text": "76 \u00d7 88 in. (193.0 \u00d7 223.5 cm)"
+      },
+      "provenance": "source-record"
+    }
+  ],
+  "capture": [
+    {
+      "value": "museum_scan",
+      "provenance": "screened"
+    }
+  ],
+  "device_class": [
+    {
+      "value": "museum",
+      "provenance": "screened"
+    }
+  ],
+  "masks": [
+    {
+      "value": [
+        {
+          "polygon": [
+            {
+              "x": 1990.0,
+              "y": 2985.0
+            },
+            {
+              "x": 2365.0,
+              "y": 2985.0
+            },
+            {
+              "x": 2365.0,
+              "y": 2999.0
+            },
+            {
+              "x": 1990.0,
+              "y": 2999.0
+            }
+          ],
+          "reason": "other"
+        }
+      ],
+      "provenance": "proposed-a"
+    },
+    {
+      "value": [
+        {
+          "polygon": [
+            {
+              "x": 2095.0,
+              "y": 2985.0
+            },
+            {
+              "x": 2360.0,
+              "y": 2985.0
+            },
+            {
+              "x": 2360.0,
+              "y": 2999.0
+            },
+            {
+              "x": 2095.0,
+              "y": 2999.0
+            }
+          ],
+          "reason": "other"
+        }
+      ],
+      "provenance": "proposed-b"
+    }
+  ]
+}

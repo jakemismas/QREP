@@ -1,0 +1,132 @@
+{
+  "schema_version": 1,
+  "photo": "private/cache/smithsonian-nmah-556322.jpg",
+  "sha256": "69b552af3410d92a0b64d0eb9c2b4d90b0d5658e08b8c9381137243760d9ad53",
+  "canvas": [
+    1986,
+    3150
+  ],
+  "frame": [
+    {
+      "value": {
+        "outer_edge": {
+          "kind": "outer_edge",
+          "corners": {
+            "top_left": {
+              "x": 133.0,
+              "y": 42.0
+            },
+            "top_right": {
+              "x": 1920.0,
+              "y": 76.0
+            },
+            "bottom_right": {
+              "x": 1890.0,
+              "y": 3064.0
+            },
+            "bottom_left": {
+              "x": 80.0,
+              "y": 3099.0
+            }
+          },
+          "bands": []
+        }
+      },
+      "provenance": "proposed-a"
+    },
+    {
+      "value": {
+        "outer_edge": {
+          "kind": "outer_edge",
+          "corners": {
+            "top_left": {
+              "x": 133.0,
+              "y": 42.0
+            },
+            "top_right": {
+              "x": 1922.0,
+              "y": 77.0
+            },
+            "bottom_right": {
+              "x": 1890.0,
+              "y": 3066.0
+            },
+            "bottom_left": {
+              "x": 80.0,
+              "y": 3098.0
+            }
+          },
+          "bands": []
+        }
+      },
+      "provenance": "proposed-b"
+    }
+  ],
+  "counts": [
+    {
+      "value": {
+        "blocks_across": 3,
+        "squares_per_block_across": 3,
+        "blocks_down": 5,
+        "squares_per_block_down": 3
+      },
+      "provenance": "proposed-a"
+    },
+    {
+      "value": {
+        "blocks_across": 3,
+        "squares_per_block_across": 3,
+        "blocks_down": 5,
+        "squares_per_block_down": 3
+      },
+      "provenance": "proposed-b"
+    }
+  ],
+  "construction_class": [
+    {
+      "value": "qst",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "qst",
+      "provenance": "proposed-b"
+    }
+  ],
+  "fabrics": [
+    {
+      "value": {
+        "count": 9
+      },
+      "provenance": "proposed-a"
+    },
+    {
+      "value": {
+        "count": 10
+      },
+      "provenance": "proposed-b"
+    }
+  ],
+  "finished_size": [
+    {
+      "value": {
+        "width_in": 50.0,
+        "height_in": 84.0,
+        "approximate": true,
+        "source_text": "overall: 84 in x 50 in; 213 cm x 126 cm"
+      },
+      "provenance": "source-record"
+    }
+  ],
+  "capture": [
+    {
+      "value": "museum_scan",
+      "provenance": "screened"
+    }
+  ],
+  "device_class": [
+    {
+      "value": "museum",
+      "provenance": "screened"
+    }
+  ]
+}

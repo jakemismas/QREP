@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "photo": "private/cache/smithsonian-chndm-1972-28-1.jpg",
+  "sha256": "65bc2131c5275f672645414444057f53204174030cbfc1329457b85d27169820",
+  "canvas": [
+    13376,
+    13029
+  ],
+  "construction_class": [
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-b"
+    }
+  ],
+  "refusal_class": [
+    {
+      "value": "curve",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "curve",
+      "provenance": "proposed-b"
+    }
+  ],
+  "finished_size": [
+    {
+      "value": {
+        "width_in": 100.38,
+        "height_in": 98.44,
+        "approximate": true,
+        "source_text": "H x W: 255 x 250 cm (100 3/8 x 98 7/16 in.)"
+      },
+      "provenance": "source-record"
+    }
+  ],
+  "capture": [
+    {
+      "value": "museum_scan",
+      "provenance": "screened"
+    }
+  ],
+  "device_class": [
+    {
+      "value": "museum",
+      "provenance": "screened"
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "photo": "private/cache/smithsonian-nmaahc-2017-108-5.jpg",
+  "sha256": "c700d1091540a194f804cef8245577cfdb93c1c6c03f58758be20942d8103208",
+  "canvas": [
+    3000,
+    2616
+  ],
+  "construction_class": [
+    {
+      "value": "hst",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "hst",
+      "provenance": "proposed-b"
+    }
+  ],
+  "finished_size": [
+    {
+      "value": {
+        "width_in": 90.5,
+        "height_in": 75.5,
+        "approximate": true,
+        "source_text": "H x W: 90 1/2 \u00d7 75 1/2 in. (229.9 \u00d7 191.8 cm)"
+      },
+      "provenance": "source-record"
+    }
+  ],
+  "capture": [
+    {
+      "value": "museum_scan",
+      "provenance": "screened"
+    }
+  ],
+  "device_class": [
+    {
+      "value": "museum",
+      "provenance": "screened"
+    }
+  ]
+}

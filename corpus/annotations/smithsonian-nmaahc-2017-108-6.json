@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "photo": "private/cache/smithsonian-nmaahc-2017-108-6.jpg",
+  "sha256": "a1e5e68f6c15c84265f2eb2fd750013cc799d5f2b15a2ddf6bfd42386883bcbe",
+  "canvas": [
+    2429,
+    3000
+  ],
+  "construction_class": [
+    {
+      "value": "flying_geese",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-b"
+    }
+  ],
+  "refusal_class": [
+    {
+      "value": "diamond_star",
+      "provenance": "proposed-b"
+    }
+  ],
+  "finished_size": [
+    {
+      "value": {
+        "width_in": 68.0,
+        "height_in": 84.0,
+        "approximate": true,
+        "source_text": "H x W: 84 \u00d7 68 in. (213.4 \u00d7 172.7 cm)"
+      },
+      "provenance": "source-record"
+    }
+  ],
+  "capture": [
+    {
+      "value": "museum_scan",
+      "provenance": "screened"
+    }
+  ],
+  "device_class": [
+    {
+      "value": "museum",
+      "provenance": "screened"
+    }
+  ],
+  "masks": [
+    {
+      "value": [
+        {
+          "polygon": [
+            {
+              "x": 50.0,
+              "y": 1465.0
+            },
+            {
+              "x": 308.0,
+              "y": 1465.0
+            },
+            {
+              "x": 308.0,
+              "y": 1555.0
+            },
+            {
+              "x": 50.0,
+              "y": 1555.0
+            }
+          ],
+          "reason": "label"
+        }
+      ],
+      "provenance": "proposed-a"
+    },
+    {
+      "value": [
+        {
+          "polygon": [
+            {
+              "x": 55.0,
+              "y": 1465.0
+            },
+            {
+              "x": 305.0,
+              "y": 1465.0
+            },
+            {
+              "x": 305.0,
+              "y": 1560.0
+            },
+            {
+              "x": 55.0,
+              "y": 1560.0
+            }
+          ],
+          "reason": "label"
+        }
+      ],
+      "provenance": "proposed-b"
+    }
+  ]
+}
