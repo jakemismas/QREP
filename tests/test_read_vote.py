@@ -1,7 +1,7 @@
 """The block-consistent vote of the confirmed read (ticket B2b).
 
-Every expected value is worked by hand from the rules in
-qrep/vision/read/vote.py (the ticket's algorithm, steps 1 to 8):
+Every expected value is worked by hand from the vote criterion of #137 and
+the rules qrep/vision/read/vote.py states for it:
   majority at a position: the label with the largest summed confidence over
     the blocks of a type; ties go to the larger count, then the lower label;
     a position whose confidences are all 0 uses counts
@@ -10,7 +10,12 @@ qrep/vision/read/vote.py (the ticket's algorithm, steps 1 to 8):
     that equal the pattern over its total confidence (plain share at 0)
   a square of a voting type that differs from its majority takes it below
     the threshold (a Change, with the share) and is a Break otherwise
-  repeat: the smallest row and column periods of the type layout, times the
+  attach: beside a voting type, the block of a type of one copy joins the
+    type a whole number of block periods away (its other blocks set the
+    period) when it agrees with that type's majority on at least the attach
+    share of its squares
+  repeat: the smallest row and column periods of the type layout, each at
+    most half the layout (two whole copies), else the whole layout, times the
     block size; the whole field for a 1 x 1 block, which confirms no repeat
   agreement: over the squares of every type with at least two copies, the
     share whose read before the vote equals their type majority; 0.0 when no
@@ -236,15 +241,17 @@ def test_alternating_types_vote_within_each_type():
     #   2.0 / 2.3 = 20/23 = 0.869565; 0.3 < 0.8, so (3, 1) takes 1. One vote
     #   over all six copies would give label 0 3 x 1.0 + 0.3 = 3.3 against
     #   label 1's 2.0 and keep the misread. Agreement: 53 of 54 squares, 53/54.
-    #   Repeat: rows 0 and 2 match, row 1 differs, py = 2; the columns differ,
-    #   px = 2 (the whole width); (2 x 3, 2 x 3).
-    # Expected: Change (3, 1, 0 -> 1, 20/23), repeat (6, 6).
+    #   Repeat: a period needs two whole copies, p <= 3 // 2 = 1 down, and
+    #   row 1 differs from row 0, so py = 3, the whole height (rows 0 and 2
+    #   alone match, one block, no evidence of a repeat); across p <= 1 and
+    #   the columns differ, px = 2, the whole width; (3 x 3, 2 x 3).
+    # Expected: Change (3, 1, 0 -> 1, 20/23), repeat (9, 6).
     assert result.voted is True
     assert result.changes == (Change(3, 1, 0, 1, _approx(20 / 23)),)
     assert result.breaks == ()
     np.testing.assert_array_equal(result.labels, np.block([[a, b], [b, a], [a, b]]))
     np.testing.assert_array_equal(result.types, [[0, 1], [1, 0], [0, 1]])
-    assert result.repeat == (6, 6)
+    assert result.repeat == (9, 6)
     assert result.agreement == _approx(53 / 54)
 
 
@@ -308,6 +315,75 @@ def test_double_irish_chain_fixture_votes_without_change():
     assert result.agreement == 1.0
     np.testing.assert_array_equal(result.types, np.indices((11, 9)).sum(axis=0) % 2)
     assert result.repeat == (10, 10)
+
+
+@pytest.mark.parametrize("block", [(0, 0), (3, 4), (10, 8)])
+def test_a_varied_copy_keeps_its_breaks_and_the_repeat(block):
+    # Source: criteria 5 and 6 of #137; PR #251 round 1: one varied block
+    #   started its own type, its squares never reached the breaks, and the
+    #   repeat moved with its position.
+    # Inputs: the fixture with every confidence 1.0, then, in the block at
+    #   (bi, bj), block rows 1 (all 5 squares) and 3 (the first 3) flipped
+    #   (A's 0s there read 1, B's 1s read 0), 8 squares at confidence 0.9.
+    #   (0, 0) and (10, 8) are A blocks (bi + bj even), (3, 4) is B.
+    # Arithmetic: total weight 17 x 1.0 + 8 x 0.9 = 24.2. The block equals its
+    #   own type on its 17 unflipped squares, 17 / 24.2 = 0.702, and the
+    #   other type on the 8 squares A and B share plus the 8 flipped ones,
+    #   (8 + 7.2) / 24.2 = 0.628, both under 0.75: a type of one copy. Beside
+    #   A (50 copies) and B (49), it is wild for the period: the other blocks
+    #   alternate, so rows and columns repeat at 2 blocks, and the blocks an
+    #   even number of blocks away share its own type; 0.702 >= 0.5, so it
+    #   joins that type. One varied copy among 49 or more leaves the type's
+    #   majority its clean pattern, so its 8 flipped squares differ, at 0.9
+    #   >= 0.8: 8 breaks, labels kept. Agreement (2475 - 8) / 2475. Types
+    #   (i + j) % 2 as the clean fixture; repeat 2 x 5 = 10 each way.
+    # Expected: 8 breaks at the flipped squares, read the flipped label and
+    #   majority the clean one, at 0.9; no changes; labels unchanged; types
+    #   and repeat (10, 10) as the clean fixture.
+    clean = _fixture_labels()
+    labels = clean.copy()
+    confidence = np.ones(labels.shape)
+    bi, bj = block
+    flipped = [(bi * 5 + 1, bj * 5 + c) for c in range(5)]
+    flipped += [(bi * 5 + 3, bj * 5 + c) for c in range(3)]
+    for r, c in flipped:
+        labels[r, c] = 1 - clean[r, c]
+        confidence[r, c] = 0.9
+    result = vote(labels, confidence, 5, 5)
+    assert result.breaks == tuple(
+        Break(r, c, int(labels[r, c]), int(clean[r, c]), _approx(0.9)) for r, c in sorted(flipped)
+    )
+    assert result.changes == ()
+    np.testing.assert_array_equal(result.labels, labels)
+    np.testing.assert_array_equal(result.types, np.indices((11, 9)).sum(axis=0) % 2)
+    assert result.agreement == _approx(2467 / 2475)
+    assert result.repeat == (10, 10)
+
+
+@pytest.mark.parametrize(
+    ("layout", "repeat"),
+    [
+        # Rows X, Y, Y, X: p <= 4 // 2 = 2; p = 1 compares [Y, Y, X] with
+        #   [X, Y, Y] and p = 2 [Y, X] with [X, Y], both differ, so py = 4,
+        #   the whole height (p = 3 would match the first row with the last).
+        ([[0], [1], [1], [0]], (4, 1)),
+        # Rows X, Y, X, Y: p = 2 matches [X, Y] with [X, Y], two whole copies.
+        ([[0], [1], [0], [1]], (2, 1)),
+    ],
+    ids=["xyyx", "xyxy"],
+)
+def test_a_period_needs_two_whole_copies(layout, repeat):
+    # Source: PR #251 round 1: a period that overlaps only the first block
+    #   with the last is no evidence of a repeat.
+    # Inputs: a field of 1 x 2 blocks, all 0 (X) or all 1 (Y), stacked as the
+    #   layout lists, one block across, confidence 1.0; each type has 2
+    #   copies, so neither votes and no block is wild.
+    # Formula: py = the smallest p <= blocks down // 2 with every row equal
+    #   to the row p above, else blocks down; repeat (py x 1, 1 x 2).
+    # Expected: the listed repeat in blocks, times the 1 x 2 block size.
+    labels = np.repeat(np.array(layout), 2, axis=1)
+    result = _vote(labels, np.ones(labels.shape), 1, 2)
+    assert result.repeat == (repeat[0], repeat[1] * 2)
 
 
 def test_double_irish_chain_misread_takes_its_own_types_majority():
@@ -486,9 +562,11 @@ def test_type_ties_go_to_the_lower_type_id():
     #   t0 = 1000. Pass 2: b0 3/4 vs 2/4, t0; b1 3/4 vs 4/4, t1; b2 4/4, t0.
     #   Ties to the higher id would put b2 in t1 instead and keep it there in
     #   pass 2 (3/4 against t0 = 1100 and t1 = 0000), giving [0, 1, 1].
-    # Expected: types [[0, 1, 0]], repeat (1, 2 x 4).
+    #   Repeat: a period needs two whole copies, p <= 3 // 2 = 1, and [1, 0]
+    #   differs from [0, 1], so px = 3, the whole row.
+    # Expected: types [[0, 1, 0]], repeat (1, 3 x 4).
     np.testing.assert_array_equal(result.types, [[0, 1, 0]])
-    assert result.repeat == (1, 8)
+    assert result.repeat == (1, 12)
 
 
 def test_refinement_pass_reassigns_and_renumbers_types():
@@ -527,8 +605,11 @@ def test_refinement_pass_reassigns_and_renumbers_types():
     #   Agreement: 29 of type 0's 32 squares, and, since type 1 has two
     #   copies, 8 + 6 = 14 of its 16 (b2 differs at positions 0 and 1):
     #   (29 + 14) / (32 + 16) = 43/48.
-    # Repeat: [0, 1, 1, 0, 0, 0] first equals itself shifted at p = 5 ([0] vs
-    #   [0]); px = 5, repeat (1, 5 x 8).
+    # Repeat: a period needs two whole copies, p <= 6 // 2 = 3; shifted by 1,
+    #   2 and 3, [0, 1, 1, 0, 0, 0] differs from itself ([1, 1, 0, 0, 0] vs
+    #   [0, 1, 1, 0, 0], [1, 0, 0, 0] vs [0, 1, 1, 0], [0, 0, 0] vs
+    #   [0, 1, 1]), so px = 6, the whole row: repeat (1, 6 x 8). (p = 5
+    #   would match [0] with [0], one block.)
     # Expected: as listed. Without pass 2 the types would be [0, 0, 0, 1, 1, 1].
     np.testing.assert_array_equal(result.types, [[0, 1, 1, 0, 0, 0]])
     assert result.breaks == (
@@ -538,7 +619,7 @@ def test_refinement_pass_reassigns_and_renumbers_types():
     )
     assert result.changes == ()
     assert result.agreement == _approx(43 / 48)
-    assert result.repeat == (1, 40)
+    assert result.repeat == (1, 48)
 
 
 def test_a_one_by_one_block_confirms_no_repeat():

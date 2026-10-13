@@ -33,6 +33,9 @@ VOTE_MIN_COPIES = 3
 # Two blocks are copies of one type when their confidence-weighted agreement
 # reaches this share of squares.
 TYPE_AGREEMENT = 0.75
+# A block of a type of one copy joins the type its block period predicts
+# when it agrees with that type on at least this share of squares.
+ATTACH_AGREEMENT = 0.5
 # The read fits the light surface only from this many samples: three per
 # coefficient of the six-term quadratic in position.
 SHADING_MIN_SQUARES = 18
@@ -100,6 +103,12 @@ KNOBS: dict[str, Knob] = {
         "not measured: two copies of one block, each with 10 percent misreads, agree on about "
         "1 - 2 x 0.1 = 0.8 of their squares, while the fixture's two Double Irish Chain blocks "
         "agree on 8 of 25 = 0.32",
+    ),
+    "ATTACH_AGREEMENT": Knob(
+        ATTACH_AGREEMENT,
+        "not measured: a copy with 8 of 25 squares changed agrees on 17 / 25 = 0.68 (PR #251 "
+        "round 1), while the fixture's two Double Irish Chain blocks agree on 8 / 25 = 0.32; "
+        "half sits between them",
     ),
     "SHADING_MIN_SQUARES": Knob(
         SHADING_MIN_SQUARES, "not measured: three squares per coefficient of a six-term quadratic"

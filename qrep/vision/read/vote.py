@@ -14,7 +14,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from qrep.vision.read.knobs import TYPE_AGREEMENT, VOTE_MIN_COPIES, VOTE_THRESHOLD
+from qrep.vision.read.knobs import ATTACH_AGREEMENT, TYPE_AGREEMENT, VOTE_MIN_COPIES, VOTE_THRESHOLD
 
 # Weighted sums that tie in exact arithmetic can differ in the last bits
 # with the order numpy sums in, which differs between the native and the
@@ -59,7 +59,8 @@ class Vote:
     breaks are sorted by (row, col). types has shape (blocks down, blocks
     across), numbered by first appearance in raster order. repeat is (down,
     across) in squares, derived only from the confirmed block period and the
-    types, and the whole field for a 1 x 1 block, which confirms no repeat.
+    types, at least two whole copies each way or else the whole field, and
+    the whole field for a 1 x 1 block, which confirms no repeat.
     agreement, in [0, 1], is the share of the squares of every type with at
     least two copies whose read before the vote equals their type majority,
     0.0 when no such type exists or the block is 1 x 1: as an undefined
@@ -111,13 +112,55 @@ def _best(agreement: np.ndarray) -> np.ndarray:
     return (agreement >= agreement.max(axis=1, keepdims=True) - _EPS).argmax(axis=1)
 
 
-def _period(layout: np.ndarray) -> int:
-    """The smallest p with layout[i] == layout[i - p] for every i >= p."""
+def _period(layout: np.ndarray, wild: np.ndarray | None = None) -> int:
+    """The smallest p, at most half the rows, with layout[i] == layout[i - p]
+    wherever neither block is wild; the row count when none. A repeat needs
+    two whole copies: a p past half compares only the first rows with the
+    last, so rows X, Y, Y, X would read as a period of 3."""
     n = layout.shape[0]
-    for p in range(1, n):
-        if np.array_equal(layout[p:], layout[:-p]):
+    if wild is None:
+        wild = np.zeros(layout.shape, dtype=bool)
+    for p in range(1, n // 2 + 1):
+        known = ~(wild[p:] | wild[:-p])
+        if np.all((layout[p:] == layout[:-p]) | ~known):
             return p
     return n
+
+
+def _attach(layout, wild, period, codes, weights, n_labels: int, floor: float) -> np.ndarray:
+    """The layout with each wild block moved to the type its block period
+    predicts when it agrees with that type's majority on at least floor of
+    its squares, renumbered by first appearance.
+
+    The predicted type is the most common one among the blocks that are not
+    wild a whole number of periods away (ties to the lower id). A block with
+    no such neighbor, or one that agrees with it on fewer squares than floor
+    (a block made different on purpose, not a varied copy), keeps its own
+    type."""
+    down, across = period
+    size = codes.shape[1]
+    positions = np.arange(size)
+    out = layout.copy()
+    for i, j in zip(*(axis.tolist() for axis in np.nonzero(wild))):
+        near = layout[i % down :: down, j % across :: across]
+        known = near[~wild[i % down :: down, j % across :: across]]
+        if not known.size:
+            continue
+        t = int(np.bincount(known).argmax())
+        members = np.flatnonzero((layout.ravel() == t) & ~wild.ravel())
+        weight_sum = np.zeros((n_labels, size))
+        count_sum = np.zeros((n_labels, size), dtype=np.int64)
+        np.add.at(weight_sum, (codes[members], positions), weights[members])
+        np.add.at(count_sum, (codes[members], positions), 1)
+        pattern = _majority(weight_sum, count_sum)[0]
+        b = slice(i * layout.shape[1] + j, i * layout.shape[1] + j + 1)
+        agreement = _agreement(codes[b], weights[b], weights[b].sum(axis=1), pattern[None])
+        if agreement[0, 0] >= floor - _EPS:
+            out[i, j] = t
+    kept, seen = np.unique(out, return_index=True)
+    rank = np.empty(int(out.max()) + 1, dtype=np.intp)
+    rank[kept[np.argsort(seen)]] = np.arange(len(kept))
+    return rank[out]
 
 
 def _block_count(name: str, value) -> int:
@@ -212,14 +255,18 @@ def vote(
     threshold: float = VOTE_THRESHOLD,
     min_copies: int = VOTE_MIN_COPIES,
     type_agreement: float = TYPE_AGREEMENT,
+    attach_agreement: float = ATTACH_AGREEMENT,
 ) -> Vote:
     """Types the confirmed blocks and votes within each type.
 
     labels (rows, cols) holds int fabric ids and confidence (rows, cols) each
     square's confidence in [0, 1]; rows is a multiple of block_rows and cols
     of block_cols. A type votes with at least min_copies blocks, and never
-    with a 1 x 1 block. A square of a voting type that differs from its type
-    majority takes it below threshold and is a Break otherwise. Raises
+    with a 1 x 1 block. Beside a voting type, the block of a type of one
+    copy joins the type its block period predicts when it agrees with it on
+    at least attach_agreement of its squares (_attach). A square of a voting
+    type that differs from its type majority takes it below threshold and is
+    a Break otherwise. Raises
     ValueError on any other input. Inputs are never mutated.
     """
     lab = np.asarray(labels)
@@ -253,6 +300,19 @@ def vote(
 
     codes, weights = to_blocks(field_codes), to_blocks(conf)
     types = _type_blocks(codes, weights, len(classes), type_agreement)
+    layout = types.reshape(down, across)
+    # A copy with many squares confidently changed agrees with its type on
+    # too few squares to join it, so typing starts a type of one copy that
+    # never votes: its squares never reach the breaks, and the repeat would
+    # move with where it sits. Beside a type that votes, such a block is wild
+    # for the period that predicts its type; once attached it repeats like
+    # its type, while a block that stays its own type is part of the layout.
+    copies = np.bincount(types)
+    if size > 1 and (copies >= min_copies).any() and (copies == 1).any():
+        wild = copies[layout] == 1
+        period = (_period(layout, wild), _period(layout.T, wild.T))
+        layout = _attach(layout, wild, period, codes, weights, len(classes), attach_agreement)
+        types = layout.ravel()
     n_types = int(types.max()) + 1
 
     weight_sum = np.zeros((len(classes), n_types, size))
@@ -295,7 +355,6 @@ def vote(
         else 0.0
     )
 
-    layout = types.reshape(down, across)
     if size == 1:
         # A 1 x 1 block is the square itself, so its types are the labels,
         # and their period is the pattern's, not a block repeat you confirmed.
