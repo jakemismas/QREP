@@ -29,10 +29,9 @@ import pytest
 import qrep.vision.read
 from qrep.contract import BorderBand, Corners, Counts, FieldFrame, OuterEdgeFrame, Point
 from qrep.vision.read.diagnosis import Diagnosis
-from qrep.vision.read.geometry import confirm
+from qrep.vision.read.geometry import MAX_SQUARES, confirm
 from qrep.vision.read.sample import (
     INSET,
-    MAX_SQUARES,
     MIN_PX_PER_SQUARE,
     P,
     Squares,
@@ -112,7 +111,7 @@ def counts(cols, rows) -> Counts:
 def sample(image, frame, grid):
     height, width = image.shape[:2]
     geometry = confirm(frame, grid, (width, height), Point(x=0, y=0), corners_source="user")
-    return read_squares(image, geometry)
+    return geometry if isinstance(geometry, Diagnosis) else read_squares(image, geometry)
 
 
 def rect_field(x0, y0, x1, y1) -> FieldFrame:
@@ -514,7 +513,7 @@ def polygon(image, quad, fill):
     cv2.fillConvexPoly(image, vertices, fill, shift=4)
 
 
-def test_a_factor_never_shortens_a_side_under_p():
+def test_each_square_takes_the_least_factors_its_sides_allow():
     # Two squares receding along x: x = 400u / (1 + 1.5u), y = 64v / (1 + 1.5u)
     # for u in 0..2, v in 0..1, so corners (0, 0), (800/4 = 200, 0), (200,
     # 64/4 = 16), (0, 64). Vertex x: 0, 400/2.5 = 160, 200; heights at u = 0,
@@ -522,11 +521,9 @@ def test_a_factor_never_shortens_a_side_under_p():
     #   top (5, 0), bottom (160, -38.4)/32 = (5, -1.2), left (0, 2),
     #   right (0, 0.8)
     # The footprint is 5 + 0 = 5 px on x and 1.2 + 2 = 3.2 on y, so the least
-    # factors are ceil(2.5) = 3 and ceil(1.6) = 2. A y factor of 2 would cut
-    # the right side's step to 0.4, under its own 0.8 (a 25.6 px side under
-    # P), so y keeps 1. Of x = 1, 2, 3 with y = 1 the largest residual
-    # footprint is max(5/x, 3.2): 5, 3.2 and 3.2; the tie goes to the smaller
-    # other residual, 5/3 against 5/2, so square 0 takes (3, 1).
+    # factors are ceil(2.5) = 3 and ceil(1.6) = 2. They leave the steps at
+    # 1.67, 1.77, 1 and 0.4, none under half of min(its length, 1): 0.5, 0.5,
+    # 0.5 and 0.4. So (3, 2), the right side at its bound.
     # Square 1: top (1.25, 0), bottom (40, -9.6)/32 = (1.25, -0.3), left
     # (0, 0.8), right (0, 0.5): footprints 1.25 and 1.1, so (1, 1).
     image = np.zeros((64, 200, 3), dtype=np.uint8)
@@ -534,9 +531,27 @@ def test_a_factor_never_shortens_a_side_under_p():
     polygon(image, [(160, 0), (200, 0), (200, 16), (160, 25.6)], (192, 192, 192))
     frame = FieldFrame(kind="field", corners=corners((0, 0), (200, 0), (200, 16), (0, 64)))
     result = sample(image, frame, counts(2, 1))
-    assert result.downsample.tolist() == [[[3, 1], [1, 1]]]
+    assert result.downsample.tolist() == [[[3, 2], [1, 1]]]
     assert_lab(result.lab[0, 0], gray(64))
     assert_lab(result.lab[0, 1], gray(192))
+
+
+def test_a_factor_never_costs_a_side_more_than_half_its_detail():
+    # One square, corners (0, 0), (128, 0), (128, 16), (0, 192): a near left
+    # side of 192 px and a far right side of 16 px. Steps (side / 32): top
+    # (4, 0), bottom (128, -176)/32 = (4, -5.5), left (0, 6), right (0, 0.5).
+    # Footprints 4 + 0 = 4 on x and 5.5 + 6 = 11.5 on y: least factors 2 and
+    # ceil(5.75) = 6. The right step may not drop under 0.5 / 2 = 0.25, so y
+    # takes at most 2. Of the allowed pairs, (2, 2) and (1, 2) share the
+    # largest residual footprint, 11.5 / 2 = 5.75, and (2, 2) has the smaller
+    # other one, 4 / 2 = 2 against 4: (2, 2). Its steps become 2, 3.4, 3 and
+    # 0.25.
+    image = np.zeros((192, 128, 3), dtype=np.uint8)
+    polygon(image, [(0, 0), (128, 0), (128, 16), (0, 192)], (160, 160, 160))
+    frame = FieldFrame(kind="field", corners=corners((0, 0), (128, 0), (128, 16), (0, 192)))
+    result = sample(image, frame, counts(1, 1))
+    assert result.downsample.tolist() == [[[2, 2]]]
+    assert_lab(result.lab[0, 0], gray(160))
 
 
 def test_a_sheared_square_keeps_its_short_side():
@@ -545,17 +560,17 @@ def test_a_sheared_square_keeps_its_short_side():
     # pixel: top and bottom (100, 0)/32 = (3.125, 0), left and right
     # (300, 100)/32 = (9.375, 3.125). The footprint is 3.125 + 9.375 = 12.5 px
     # on x and 0 + 3.125 on y: least factors ceil(6.25) = 7 and
-    # ceil(1.5625) = 2. An x factor over 3 cuts the top step under 1 px
-    # (3.125 / 4 = 0.78), so x takes at most 3, where the residual footprint
-    # is 12.5 / 3 = 4.17 whatever y is; the tie goes to the smaller y
-    # residual, 3.125 / 2 = 1.56, so (3, 2). The slanted step stays
-    # (3.125, 1.5625), 3.49 px long.
+    # ceil(1.5625) = 2. An x factor over 6 cuts the top step under half a
+    # pixel (3.125 / 7 = 0.45), so x takes at most 6, where the residual
+    # footprint is 12.5 / 6 = 2.08 whatever y is; the tie goes to the smaller
+    # y residual, 3.125 / 2 = 1.56, so (6, 2). The top step becomes 0.52 px
+    # and the slanted one (1.5625, 1.5625), 2.21 px long.
     image = np.zeros((100, 500, 3), dtype=np.uint8)
     polygon(image, [(0, 0), (100, 0), (400, 100), (300, 100)], (64, 64, 64))
     polygon(image, [(100, 0), (200, 0), (500, 100), (400, 100)], (192, 192, 192))
     frame = FieldFrame(kind="field", corners=corners((0, 0), (200, 0), (500, 100), (300, 100)))
     result = sample(image, frame, counts(2, 1))
-    assert result.downsample.tolist() == [[[3, 2], [3, 2]]]
+    assert result.downsample.tolist() == [[[6, 2], [6, 2]]]
     assert_lab(result.lab[0, 0], gray(64))
     assert_lab(result.lab[0, 1], gray(192))
 
@@ -573,8 +588,8 @@ def test_each_square_of_a_receding_grid_area_downsamples_on_its_own():
     #     ceil(4 / 2) = 2 on both; halved, the steps are 2, 2.06, 1.5 and 1,
     #     none under 1: (2, 2).
     #   square 1: top (2, 0), bottom (2, -0.5), left (0, 2), right (0, 1.5).
-    #     Footprints 2 and 2.5, least factors 1 and 2; y = 2 cuts the right
-    #     step to 0.75, under 1, so (1, 1).
+    #     Footprints 2 and 2.5, least factors 1 and 2; y = 2 leaves the right
+    #     step at 0.75, over half of min(1.5, 1) = 0.5, so (1, 2).
     #   squares 2 and 3: footprints 1.2 and 0.3 + 1.5 = 1.8; 0.8 and
     #     0.2 + 1.2 = 1.4: (1, 1).
     # The print is a 1 px stripe: even columns black, odd ones white, under
@@ -597,7 +612,7 @@ def test_each_square_of_a_receding_grid_area_downsamples_on_its_own():
         polygon(image, quad, (level, level, level))
     frame = FieldFrame(kind="field", corners=corners((0, 0), (256, 0), (256, 32), (0, 96)))
     result = sample(image, frame, counts(4, 1))
-    assert result.downsample.tolist() == [[[2, 2], [1, 1], [1, 1], [1, 1]]]
+    assert result.downsample.tolist() == [[[2, 2], [1, 2], [1, 1], [1, 1]]]
     assert_lab(result.lab[0, 0], gray(128))
     assert_lab(result.spread[0, 0], (0.0, 0.0, 0.0))
     for c, level in ((1, 32), (2, 160), (3, 224)):
@@ -714,7 +729,7 @@ def test_the_warp_matrix_composes_an_offset_an_origin_and_a_scale():
 def test_the_floor_absorbs_float_noise_and_no_more():
     # An exact 7 px side can compute a hair under 7 when the corners sit
     # between pixels, and the homography solve differs between the native and
-    # Pyodide LAPACK builds. 7 - 1e-12 px reads; 6.999 px does not.
+    # Pyodide LAPACK builds. 7 - 1e-12 px reads; 7 - 1e-5 px does not.
     image = np.full((140, 140, 3), 128, dtype=np.uint8)
     geometry = confirm(
         rect_field(0, 0, 140, 140),
@@ -725,16 +740,17 @@ def test_the_floor_absorbs_float_noise_and_no_more():
     )
     noisy = dataclasses.replace(geometry, pixels_per_square_min=7 - 1e-12)
     assert isinstance(read_squares(image, noisy), Squares)
-    short = read_squares(image, dataclasses.replace(geometry, pixels_per_square_min=6.999))
+    short = read_squares(image, dataclasses.replace(geometry, pixels_per_square_min=7 - 1e-5))
     assert short.code == "too_few_pixels"
-    assert short.pixels_per_square == 6.999
+    assert short.pixels_per_square == 7 - 1e-5
 
 
 def test_a_field_over_the_cap_returns_too_many_squares():
     # MAX_SQUARES = 285 x 285 = 81,225 (see the knobs test). 286 across by
     # 285 down is 81,510 squares, over it; 285 x 285 is not, so that one goes
-    # on to the floor, which refuses it at 100 / 285 = 0.35 px a side. The cap
-    # is checked first, so no oversized field is ever warped.
+    # on to the floor, which refuses it at 100 / 285 = 0.35 px a side. The
+    # geometry checks the cap before it maps a grid vertex, so counts of any
+    # size cost no memory.
     image = np.full((100, 100, 3), 128, dtype=np.uint8)
     over = sample(image, rect_field(0, 0, 100, 100), counts(286, 285))
     assert isinstance(over, Diagnosis)
@@ -744,23 +760,48 @@ def test_a_field_over_the_cap_returns_too_many_squares():
 
 
 def test_a_field_of_many_rows_samples_across_chunks():
-    # 64 across by 70 down at 8 px per square (512 x 560 px). The field
+    # 64 across by 70 down at 32 px per square (2048 x 2240 px), so the warp
+    # is the identity (one output pixel steps 1 px: factor 1). The field
     # converts in chunks of floor(2^21 / (64 x 32 x 32)) = 32 square rows, so
-    # rows 0..31, 32..63 and 64..69, and its warp runs in the same row
-    # chunks. Square (r, c) is the gray at index (3r + c) mod 10 of the
-    # hand-worked table, so every square differs from the ones above and
-    # below it. One output pixel steps 8/32 = 0.25 px: factor 1. Inner pixels
-    # read x = (i + 0.5) x 8/32 - 0.5 = 1.125..5.875 of each square's 0..7.
+    # rows 0..31, 32..63 and 64..69, and its warp runs in the same row chunks.
+    # Square (r, c) has its top 16 rows at gray index k = (3r + c) mod 10 of
+    # the hand-worked table and its bottom 16 at index (k + 1) mod 10, so, as
+    # in the spread test above, its inner rows 6..15 and 16..25 split 200 and
+    # 200 pixels: median (L_top + L_bottom) / 2, spread |L_top - L_bottom| / 2.
+    # Every square differs from the ones above and below it.
     levels = sorted(GRAY_L)
-    image = np.zeros((560, 512, 3), dtype=np.uint8)
+    image = np.zeros((2240, 2048, 3), dtype=np.uint8)
+    expected_lab = np.zeros((70, 64, 3))
+    expected_spread = np.zeros((70, 64, 3))
     for r in range(70):
         for c in range(64):
-            image[8 * r : 8 * r + 8, 8 * c : 8 * c + 8] = levels[(3 * r + c) % 10]
-    result = sample(image, rect_field(0, 0, 512, 560), counts(64, 70))
-    assert result.lab.shape == (70, 64, 3)
-    expected = np.array([[gray(levels[(3 * r + c) % 10]) for c in range(64)] for r in range(70)])
-    assert np.abs(result.lab - expected).max() < TOL
-    assert np.abs(result.spread).max() < TOL
+            k = (3 * r + c) % 10
+            top, bottom = levels[k], levels[(k + 1) % 10]
+            image[32 * r : 32 * r + 16, 32 * c : 32 * c + 32] = top
+            image[32 * r + 16 : 32 * r + 32, 32 * c : 32 * c + 32] = bottom
+            expected_lab[r, c, 0] = (GRAY_L[top] + GRAY_L[bottom]) / 2
+            expected_spread[r, c, 0] = abs(GRAY_L[top] - GRAY_L[bottom]) / 2
+    result = sample(image, rect_field(0, 0, 2048, 2240), counts(64, 70))
+    assert np.abs(result.lab - expected_lab).max() < TOL
+    assert np.abs(result.spread - expected_spread).max() < TOL
+
+
+def test_a_long_strip_is_inset_a_fifth_of_its_band_width_at_each_end():
+    # Counts 4 x 1 and one band of 1 square at 32 px: 6 x 3 squares over
+    # 192 x 96 px. The top strip is x 32..160, y 0..32, 4 squares long,
+    # warped by a translation to 128 x 32 px. Along it the inset is a fifth of
+    # the band's width, 0.2 x 1 x 32 = 6.4 px, so columns 6..121 (116); across
+    # it rows 6..25. Black columns: local 6..45 and 102..121 (60 of the 116),
+    # white elsewhere, so 1200 of the 2320 pixels are black: median L 0 and
+    # spread 0. An inset of a fifth of the strip's own length, 25.6 px, would
+    # keep columns 26..101, 20 black and 56 white: L 100.
+    image = np.full((96, 192, 3), 255, dtype=np.uint8)
+    image[:32, 38:78] = 0
+    image[:32, 134:154] = 0
+    result = sample(image, outer_frame(192, 96, 1.0), counts(4, 1))
+    top = next(s for s in result.strips if (s.band, s.side) == (0, "top"))
+    assert_lab(top.lab, gray(0))
+    assert_lab(top.spread, (0.0, 0.0, 0.0))
 
 
 def test_the_floor_sees_the_side_not_the_bounding_box():

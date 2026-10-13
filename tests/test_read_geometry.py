@@ -244,13 +244,13 @@ def test_a_fractional_band_width_is_kept():
     assert geometry.bands[0].width_squares == 2.5
 
 
-def test_the_crop_offset_places_the_field_in_the_photo():
+def test_the_crop_offset_is_recorded():
     # #101: corners are pixels of the staged crop, and the offset is the
-    # crop's top-left corner in the decoded photo. (10, 20) + (1000, 500) =
-    # (1010, 520); (170, 140) + (1000, 500) = (1170, 640).
+    # crop's top-left corner in the decoded photo. The request carries no crop
+    # scale, so mapping corners into the photo waits for #239.
     geometry = read(GRID_40, offset=Point(x=1000, y=500))
     assert geometry.crop_offset == (1000, 500)
-    approx_quad(geometry.field_in_photo(), [(1010, 520), (1170, 520), (1170, 640), (1010, 640)])
+    approx_quad(geometry.field, [(10, 20), (170, 20), (170, 140), (10, 140)])
 
 
 @pytest.mark.parametrize(
@@ -294,6 +294,9 @@ def test_a_corner_on_the_image_edge_is_inside():
         # clockwise (the turn at TR is 80 x 0.05 + 0.05 x 80 = 8 > 0), but
         # under the 1 px a corner can be placed to, so collinear.
         ("degenerate_quad", ((10, 20), (90, 19.95), (170, 20), (10, 140))),
+        # TR 0.99 px above that line: the turn 80 x 0.99 + 0.99 x 80 = 158.4
+        # is under 1 px times the diagonal, 160.
+        ("degenerate_quad", ((10, 20), (90, 19.01), (170, 20), (10, 140))),
         # TL and TR 0.5 px apart: TR lies 0.3 px from the line through TL and
         # BR (direction (160, 120) / 200, offset (0.5, 0): 0.5 x 120 / 200).
         ("degenerate_quad", ((10, 20), (10.5, 20), (170, 140), (10, 140))),
@@ -311,18 +314,21 @@ def test_a_bad_quad_returns_its_typed_diagnosis(code, quad):
     assert diagnosis.corner is None
 
 
-def test_a_corner_two_pixels_off_its_neighbors_line_is_a_quad():
-    # TR 2 px above the line y = 20 through TL and BR. Each corner's distance
-    # from the line through its two neighbors, |cross| / |diagonal|:
+@pytest.mark.parametrize("y", [18.0, 19.0])
+def test_a_corner_a_pixel_or_more_off_its_neighbors_line_is_a_quad(y):
+    # TR (90, y) lies 20 - y px above the line y = 20 through TL and BR: 2 px,
+    # or exactly 1 px, which is not closer than 1 px (at y = 19 the turn is
+    # 80 x 1 + 1 x 80 = 160, the diagonal 160). At y = 18, each corner's
+    # distance from the line through its two neighbors, |cross| / |diagonal|:
     #   TR: 2 (the line is y = 20)
     #   BR from TR (90, 18) to BL (10, 140), direction (-80, 122), length
     #     sqrt(6400 + 14884) = 145.89: |(-80)(2) - (122)(80)| / 145.89 =
     #     9920 / 145.89 = 68.0
     #   BL from y = 20: 120; TL from BL to TR, direction (80, -122):
     #     |80 x (-120) - (-122) x 0| / 145.89 = 9600 / 145.89 = 65.8
-    # Every one is at least 1 px and every edge longer than 1 px, so the
-    # frame is a quad, however near straight its top edge runs.
-    geometry = read(field((10, 20), (90, 18), (170, 20), (10, 140)))
+    # At y = 19 the last three stay over 60 px. Every edge is longer than
+    # 1 px, so the frame is a quad, however near straight its top edge runs.
+    geometry = read(field((10, 20), (90, y), (170, 20), (10, 140)))
     assert isinstance(geometry, Geometry)
 
 

@@ -32,6 +32,18 @@ Quad = tuple[tuple[float, float], ...]
 # this to the line through its two neighbors, cannot be told from coinciding
 # or collinear corners at the image's resolution.
 _PLACEMENT_PX = 1.0
+# A square side shorter than this does not read (sample.py returns
+# too_few_pixels): L*0.5 stayed at or above 0.98 down to 7 px after JPEG q70
+# with exact corners (exp3); D5 and D10 set the final floor.
+MIN_PX_PER_SQUARE = 7
+# The most squares a read takes. The web stages a crop of at most 2000 px on
+# its longest side (plan C3b), and a side under the floor does not read, so no
+# staged crop holds more than 2000 // 7 = 285 squares a side: 285 x 285 =
+# 81,225, whose warped field takes 81,225 x 32 x 32 x 3 bytes, about 250 MB.
+# A 48 MP crop at the floor would hold about 980,000 squares, about 3 GB. The
+# geometry refuses more before it maps a single grid vertex.
+STAGED_CROP_PX = 2000
+MAX_SQUARES = (STAGED_CROP_PX // MIN_PX_PER_SQUARE) ** 2
 
 
 @dataclass(frozen=True)
@@ -118,11 +130,6 @@ class Geometry:
         cols + 1, 2)."""
         return _grid_vertices(self.field, self.rows, self.cols)
 
-    def field_in_photo(self) -> Quad:
-        """The field quad in the decoded photo's pixels (#101)."""
-        dx, dy = self.crop_offset
-        return tuple((x + dx, y + dy) for x, y in self.field)
-
 
 def homography(quad: Quad, width: float, height: float) -> np.ndarray:
     """The 3 x 3 map from the rectangle [0, width] x [0, height] onto quad,
@@ -161,7 +168,7 @@ def _shape(quad: Quad) -> Diagnosis | None:
     turns = []
     for i in range(4):
         (x0, y0), (x1, y1), (x2, y2) = quad[i - 1], quad[i], quad[(i + 1) % 4]
-        # The two corners beside corner i, which lie opposite each other.
+        # Corner i's neighbors nearly coinciding fold the quad onto itself.
         diagonal = math.hypot(x2 - x0, y2 - y0)
         if diagonal < _PLACEMENT_PX:
             return degenerate
@@ -250,6 +257,14 @@ def confirm(
     if any(n < 1 for n in numbers):
         return Diagnosis(
             code="bad_counts", message=f"every count must be at least 1, got {numbers}"
+        )
+    squares = (counts.blocks_across * counts.squares_per_block_across) * (
+        counts.blocks_down * counts.squares_per_block_down
+    )
+    if squares > MAX_SQUARES:
+        return Diagnosis(
+            code="too_many_squares",
+            message=f"the field holds {squares} squares; the read takes at most {MAX_SQUARES}",
         )
     widths = [band.width_squares for band in getattr(frame, "bands", [])]
     if not all(math.isfinite(w) and w > 0 for w in widths):

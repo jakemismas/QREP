@@ -13,33 +13,23 @@ from dataclasses import dataclass
 import numpy as np
 
 from qrep.vision.read.diagnosis import Diagnosis
-from qrep.vision.read.geometry import Geometry, Quad, apply, homography
+from qrep.vision.read.geometry import MIN_PX_PER_SQUARE, Geometry, Quad, apply, homography
 
 # Warped pixels per square: the confirmed-grid prototype's value (plan B2a).
 P = 32
 # Share of the square's side left out at each seam (plan B2a): the sample is
 # the pixels whose centers lie in the inner 60 percent, 20 of P = 32.
 INSET = 0.2
-# A square side shorter than this returns too_few_pixels: L*0.5 stayed at or
-# above 0.98 down to 7 px after JPEG q70 with exact corners (exp3); D5 and D10
-# set the final floor.
-MIN_PX_PER_SQUARE = 7
 # Float noise in the homography solve, which differs between the native and
-# the Pyodide LAPACK builds, can put an exact 7 px side a hair under 7; the
-# floor allows that much and no more.
+# the Pyodide LAPACK builds, puts an exact 7 px side about 1e-12 px off; the
+# floor (MIN_PX_PER_SQUARE, in geometry.py) allows 1e-6 px, far above that
+# noise and far below any size a photo resolves.
 FLOOR_SLACK_PX = 1e-6
-# The most squares the read warps. The web stages a crop of at most 2000 px on
-# its longest side (plan C3b), and a side under the floor does not read, so no
-# staged crop holds more than 2000 // 7 = 285 squares a side: 285 x 285 =
-# 81,225, whose warped field takes 81,225 x 32 x 32 x 3 bytes, about 250 MB.
-# A 48 MP crop at the floor would hold about 980,000 squares, about 3 GB.
-STAGED_CROP_PX = 2000
-MAX_SQUARES = (STAGED_CROP_PX // MIN_PX_PER_SQUARE) ** 2
 # Float CIELAB takes 12 bytes a pixel and its conversion holds a few such
 # arrays at once, so the field converts, and each warp writes, in bands of
 # square rows of about this many pixels (one square row when a row alone
 # holds more), and the peak stays flat whatever the row count. Band strips
-# are small and convert whole.
+# convert whole, so a band as wide as the field raises the peak (#238).
 CHUNK_PX = 1 << 21
 # Comparisons of computed lengths allow this much float noise.
 _EPS = 1e-9
@@ -71,7 +61,9 @@ _EPSILON = np.float32(0.008856)
 @dataclass(frozen=True)
 class StripSample:
     """The median float CIELAB of one band side's inner region, and its
-    median absolute deviation per channel."""
+    median absolute deviation per channel. Like a square's sample, these are
+    measurements, not model values: the border's labels and their confidence
+    come from them in B2b, with the spread saying how far to trust each."""
 
     band: int
     side: str
@@ -92,7 +84,9 @@ class Squares:
     field, rows x P by cols x P px, kept as uint8 BGR (a quarter of its float
     CIELAB); B3 and B4a convert the parts they read with to_lab. downsample
     has shape (rows, cols, 2): the integer area factors on x and on y applied
-    under each square before the warp, 1 for none.
+    under each square before the warp, 1 for none. Where a region spans a whole
+    image axis that is not a multiple of its factor, the resize rounds, and the
+    scale it applies differs from 1 / factor by under one pixel over the axis.
     """
 
     geometry: Geometry
@@ -165,11 +159,12 @@ def _factors(corners: np.ndarray, widths: np.ndarray, heights: np.ndarray) -> np
     bottom step there plus the larger left or right one. The least factor
     that brings the footprint to 2 px or less, so the warp decimates by no
     more than 2 (exp0), is ceil(footprint / 2). No factor may shorten a step
-    under 1 px, or one already under 1 px at all, because the warp would then
-    lack detail the source held. Where that binds, on a foreshortened or
-    sheared cell, the cell takes the allowed pair whose larger residual
-    footprint is least, ties going to the smaller other one, and its warp
-    aliases a little on that axis instead.
+    under half of min(its length, 1 px), so the warp magnifies the
+    downsampled source by no more than 2 along any side, the mirror of the
+    decimation bound: a side loses at most half its detail, never aliases.
+    Where that binds, on a strongly foreshortened or sheared cell, the cell
+    takes the allowed pair whose larger residual footprint is least, ties
+    going to the smaller other one, and its warp aliases a little there.
     """
     top = (corners[:-1, 1:] - corners[:-1, :-1]) / widths[None, :, None]
     bottom = (corners[1:, 1:] - corners[1:, :-1]) / widths[None, :, None]
@@ -179,7 +174,7 @@ def _factors(corners: np.ndarray, widths: np.ndarray, heights: np.ndarray) -> np
     size = np.abs(steps)
     footprint = size[:, :, :2].max(axis=2) + size[:, :, 2:].max(axis=2)
     least = np.maximum(1, np.ceil(footprint / 2 - _EPS)).astype(int)
-    shortest = np.minimum(np.linalg.norm(steps, axis=-1), 1.0) - _EPS
+    shortest = np.minimum(np.linalg.norm(steps, axis=-1), 1.0) / 2 - _EPS
     best = np.ones_like(least)
     high, low = footprint.max(axis=-1), footprint.min(axis=-1)
     for fx in range(1, int(least[..., 0].max()) + 1):
@@ -270,7 +265,7 @@ def _area_warp(cv2, image: np.ndarray, quad: Quad, width: int, height: int):
 def read_squares(image: np.ndarray, geometry: Geometry) -> Squares | Diagnosis:
     """Samples every square and band strip of the confirmed geometry in a
     BGR uint8 image of the geometry's size, or returns the diagnosis that
-    stops the read: bad_image, too_many_squares or too_few_pixels."""
+    stops the read: bad_image or too_few_pixels."""
     expected = (geometry.image_height, geometry.image_width, 3)
     if not isinstance(image, np.ndarray) or image.shape != expected or image.dtype != np.uint8:
         got = (getattr(image, "shape", None), getattr(image, "dtype", type(image).__name__))
@@ -278,12 +273,6 @@ def read_squares(image: np.ndarray, geometry: Geometry) -> Squares | Diagnosis:
             code="bad_image", message=f"expected a {expected} uint8 BGR image, got {got}"
         )
     rows, cols = geometry.rows, geometry.cols
-    if rows * cols > MAX_SQUARES:
-        return Diagnosis(
-            code="too_many_squares",
-            message=f"the field holds {rows} x {cols} = {rows * cols} squares; the read "
-            f"warps at most {MAX_SQUARES}",
-        )
     if geometry.pixels_per_square_min < MIN_PX_PER_SQUARE - FLOOR_SLACK_PX:
         return Diagnosis(
             code="too_few_pixels",
