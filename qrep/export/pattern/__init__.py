@@ -1,9 +1,10 @@
 """Interim pattern export (E1b): today's booklet behind the v2 pattern contract.
 
-bridge.export_pattern loads build_pattern from here lazily. A4a turns this
-module into the qrep/export/pattern/ package and A4d switches build_pattern
-to the new document; until then it renders the sprint 1 booklet for the
-engine's own choice of method (strip when the grid has a repeating block,
+bridge.export_pattern loads build_pattern from here lazily. The new pattern
+document grows beside it in this package: document.py holds its typed model
+and render.py its page rules (A4a), and A4b to A4d add the sections. Until A4d
+switches build_pattern to that document, it renders the sprint 1 booklet for
+the engine's own choice of method (strip when the grid has a repeating block,
 historical otherwise) and fills the summary from the same purchase lines and
 batting plan the booklet prints, so the screen and the PDF agree (PS-40).
 """
