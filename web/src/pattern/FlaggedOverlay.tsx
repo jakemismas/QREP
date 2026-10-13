@@ -1,8 +1,8 @@
 /**
- * Flagged squares on Your pattern (C2a, issue #96). The count is the read's
- * own (PhotoResult.uncertainCount), and the outlines QuiltCanvas draws come
- * from the read's cell confidences, never from the editor's model. A sample
- * pattern has no read, so the screen shows no flagged line for it.
+ * Flagged squares on Your pattern (C2a, issue #96). The count and the
+ * outlines QuiltCanvas draws both come from the read's own cell confidences
+ * (flags.ts), never from the editor's model. A sample pattern has no read,
+ * so the screen shows no flagged line for it.
  * QuiltCanvas leaves the outlines off squares too small to read, which at Fit
  * is often all of them, so a flagged count comes with a hint to zoom in.
  */

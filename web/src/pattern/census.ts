@@ -2,8 +2,11 @@
  * The census join (C2a, issue #96): one row per fabric of the engine's
  * pattern summary, in its order, with the letter and name the PDF prints
  * (PATTERN-SPEC C-02, C-03, PS-40), the palette color for the swatch, and
- * the square count from the validate census. The fabric id travels only as
- * the row key and the test ids; it is never shown.
+ * the square count from the validate census. The fabric id is the row key
+ * and the test ids, and the letter shown is the engine's letter field, which
+ * equals the fabric id ("b", "c", "f0") until ticket A4b prints A, B and C
+ * (qrep/export/pattern.py sets letter=fabric.id), so for now the census
+ * shows the id as the letter.
  */
 import type { FabricLine } from "../engine/contract";
 import type { Fabric, ModelSummary } from "../model/types";
