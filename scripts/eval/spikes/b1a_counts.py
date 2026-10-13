@@ -1,6 +1,6 @@
 """B1a spike: count suggestions and the tap-one-square seed (issue #134, plan ticket B1a).
 
-Measures four ways to suggest the square counts of a confirmed field on the v0 dev split:
+Measures five ways to suggest the square counts of a confirmed field on the v0 dev split:
 
 - autocorr: the existing detector's autocorrelation period (qrep/vision/grid.py _find_pitch on
   the gray Sobel projection, as estimate_grid builds it), count = extent / pitch.
@@ -126,8 +126,11 @@ def score_ranking(ranking: Sequence, truth) -> Outcome:
 
 def quilter_units(count: int, period: int) -> tuple[int, int]:
     """(blocks, squares per block) of an axis with count squares and a block period in squares."""
-    if 1 < period < count and count % period == 0:
-        return count // period, period
+    # A repeat of two alternating blocks (10 squares) in 55 squares means blocks of
+    # gcd(10, 55) = 5, so the block is the common divisor, not the repeat.
+    block = math.gcd(period, count)
+    if 1 < block < count:
+        return count // block, block
     return 1, count
 
 
@@ -175,7 +178,18 @@ def wilson(k: int, n: int, z: float = 1.96) -> tuple[float, float]:
     denom = 1 + z * z / n
     centre = (p + z * z / (2 * n)) / denom
     half = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / denom
-    return centre - half, centre + half
+    return max(0.0, centre - half), min(1.0, centre + half)
+
+
+def pair(fit: dict[str, float]) -> tuple[float, float]:
+    return fit["edge_ratio"], fit["mad"]
+
+
+def two_part_rejects(wrong: tuple[float, float], truths: Sequence[tuple[float, float]]) -> bool:
+    """exp2's check as plan B3 states it, two scores with one threshold each, set where every
+    truth passes: a (seam-to-centre ratio, within-square chroma MAD) pair is rejected when its
+    ratio is below every truth's or its MAD is above every truth's."""
+    return wrong[0] < min(t[0] for t in truths) or wrong[1] > max(t[1] for t in truths)
 
 
 def decide(top3_recall: float, wrong_fits: Sequence[float], truth_fits: Sequence[float]) -> bool:
@@ -407,8 +421,9 @@ def fit_2d(field: FieldImage, nx: int, ny: int) -> dict[str, float]:
 
 
 def _refine_lag(corr: np.ndarray, lag: int, harmonics: int = 8) -> float:
-    """Sub-pixel pitch, as grid._find_pitch refines it: a parabola through each harmonic's peak,
-    and the mean of peak / k, each harmonic searched near k times the running estimate."""
+    """Sub-pixel pitch from the harmonics, after grid._find_pitch's harmonic average but not
+    the same rule: a parabola through every harmonic's peak, each searched near k times the
+    running estimate, and the mean of peak / k always replaces the integer lag."""
     estimates: list[float] = []
     estimate = float(lag)
     for k in range(1, harmonics + 1):
@@ -539,11 +554,14 @@ def load_photos() -> tuple[list[Photo], list[dict]]:
 
     photos, skipped = [], []
     with (CORPUS / "manifest.csv").open(encoding="utf-8") as handle:
-        rows = [row for row in csv.DictReader(handle) if row["tier"] in ("A", "B")]
+        # The dev split is the v0 eval set outside the holdout (corpus/README.md).
+        rows = [row for row in csv.DictReader(handle)
+                if row["tier"] in ("A", "B") and row["eval_set"] == "v0"]
     for row in rows:
         stem = Path(row["file"]).stem
         if an.in_holdout(row["sha256"]):
-            skipped.append({"stem": stem, "tier": row["tier"], "reason": "holdout"})
+            # Counted, not named: the report never lists holdout photos.
+            skipped.append({"stem": None, "tier": row["tier"], "reason": "holdout"})
             continue
         path = CORPUS / "annotations" / f"{stem}.json"
         doc = an.load(path) if path.exists() else None
@@ -613,7 +631,8 @@ def run_photo(job: tuple[Photo, str, str]) -> list[dict]:
             for trial in range(1 if radius == 0 else TRIALS):
                 corners = jitter_corners(field_corners, radius, rng)
                 field = FieldImage.from_bgr(staged, corners)
-                # The tap: a random true square's centre, in staged pixels, moved by the radius.
+                # The user taps a square's middle on the photo, so the tap error lives in staged
+                # pixels with the same radius as a pin, not in the warped field.
                 i, j = int(rng.integers(nx)), int(rng.integers(ny))
                 centre = ((i + 0.5) * truth_w / nx, (j + 0.5) * truth_h / ny)
                 tap_staged = _map_point(np.linalg.inv(truth_matrix), centre)
@@ -693,19 +712,40 @@ def build_report(records: list[dict], photos: list[Photo], skipped: list[dict], 
                     row["min_truth_fit"] = min(truths) if truths else None
                     row["rejected_per_trial"] = sum(
                         r["fit_top1"]["fit"] < r["fit_truth"]["fit"] for r in per_trial)
+                    row["no_suggestion"] = sum(not r["joint"] for r in in_scope)
+                    # The decision reads exp2 as plan B3 states it: two scores, one threshold
+                    # each, set where every truth passes. The product fit stays as a reading.
+                    truth_pairs = [pair(r["fit_truth"]) for r in in_scope]
+                    rejected = [two_part_rejects(pair(r["fit_top1"]), truth_pairs) for r in per_trial]
+                    row["two_part"] = {
+                        "min_truth_ratio": min((t[0] for t in truth_pairs), default=None),
+                        "max_truth_mad": max((t[1] for t in truth_pairs), default=None),
+                        "rejected": sum(rejected),
+                        "rejected_per_trial": sum(
+                            two_part_rejects(pair(r["fit_top1"]), [pair(r["fit_truth"])])
+                            for r in per_trial),
+                    }
                     summary = summarize(_outcomes(in_scope))
                     row["in_scope"] = summary
-                    row["go"] = bool(summary["n"]) and decide(summary["top3_rate"], wrong, truths)
+                    row["go_product"] = bool(summary["n"]) and decide(summary["top3_rate"], wrong, truths)
+                    row["go"] = bool(summary["n"]) and summary["top3_rate"] >= BAR and all(rejected)
                     groups.append(row)
     zero = [r for r in records if r["radius"] == 0]
-    histogram: dict[str, dict[str, int]] = {}
+    # Every candidate of every trial in quilter units: how often each label was the top-1 and
+    # how often it was among the top 3, with the harmonic alternates of each distinct top-1.
+    histogram: dict[str, dict[str, dict]] = {}
     for r in records:
-        if r["joint"]:
-            key = f"{r['provenance']}|{r['cap']}|{r['method']}|{r['photo']}|r{r['radius']}"
-            units = r["units"][0]
-            label = f"{units[0]}x{units[1]} by {units[2]}x{units[3]}"
-            histogram.setdefault(key, {}).setdefault(label, 0)
-            histogram[key][label] += 1
+        key = f"{r['provenance']}|{r['cap']}|{r['method']}|{r['photo']}|r{r['radius']}"
+        cell = histogram.setdefault(key, {})
+        for rank, units in enumerate(r["units"]):
+            label = "{}x{} by {}x{}".format(*units)
+            entry = cell.setdefault(label, {"top1": 0, "top3": 0})
+            entry["top3"] += 1
+            if rank == 0:
+                entry["top1"] += 1
+                entry.setdefault("alternates", r["alternates"])
+        if not r["joint"]:
+            cell.setdefault("none", {"top1": 0, "top3": 0})["top1"] += 1
     return {
         "header": header,
         "photos": [{"stem": p.stem, "tier": p.tier, "provenances": sorted(p.truth),
@@ -714,7 +754,7 @@ def build_report(records: list[dict], photos: list[Photo], skipped: list[dict], 
         "b6b_functions": B6B_FUNCTIONS,
         "groups": groups,
         "radius0_trials": zero,
-        "top1_units_histogram": histogram,
+        "candidate_units_histogram": histogram,
     }
 
 
@@ -722,15 +762,18 @@ def _fmt(value: float | None) -> str:
     return f"{value:.2f}" if value is not None else "n/a"
 
 
+HEADER_END = "<!-- Run header above, generated by scripts/eval/spikes/b1a_counts.py. -->"
 GENERATED = "<!-- Generated by scripts/eval/spikes/b1a_counts.py below this line. -->"
 
 
 def write_markdown(report: dict, path: Path) -> None:
-    """Write the generated tables after the GENERATED marker, keeping whatever an existing
-    file holds above it (the hand-written reading of the numbers)."""
+    """Write the run header first and the generated tables last, keeping the hand-written
+    reading an existing file holds between the HEADER_END and GENERATED markers (WORKER.md
+    step 4: a report opens with its run header). A file without both markers is refused, so a
+    rerun never discards the reading."""
     h = report["header"]
-    lines = [
-        "# B1a: count suggestions and the tap-one-square seed (generated tables)",
+    head = [
+        "# B1a: count suggestions and the tap-one-square seed",
         "",
         f"- Date: {h['date']}",
         f"- Command: `{h['command']}`",
@@ -739,11 +782,18 @@ def write_markdown(report: dict, path: Path) -> None:
         f"- cv2 {h['cv2']}, numpy {h['numpy']}, Python {h['python']}",
         f"- Inputs: {h['inputs']}",
         "",
-        "## Decision table (tier A dev photos, joint top-3 recall and the fit rule)",
+    ]
+    lines = [
+        "## Decision table (v0 dev photos, joint top-3 recall and the fit rule)",
+        "",
+        "Go uses the two-part fit rule (exp2's two scores, one threshold each, set by the worst "
+        "truth). Intervals treat trials as independent; trials within a photo are correlated, so "
+        "the real uncertainty is wider (effective n near the photo count).",
         "",
         "| Provenance | Cap | Method | Radius px | Top-1 | Top-3 | Harmonic top-1 | Wrong top-1 "
-        "| Max wrong fit | Min truth fit | Rejected per trial | Go |",
-        "|---|---|---|---|---|---|---|---|---|---|---|---|",
+        "| Max wrong fit | Min truth fit | Product rejected per trial | Two-part rejected "
+        "| Two-part rejected per trial | No suggestion | Go |",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for g in report["groups"]:
         s = g["in_scope"]
@@ -753,7 +803,10 @@ def write_markdown(report: dict, path: Path) -> None:
             f"| {g['provenance']} | {g['cap']} | {g['method']} | {g['radius']} "
             f"| {_rate_cell(s, 'top1')} | {_rate_cell(s, 'top3')} | {_rate_cell(s, 'harmonic')} "
             f"| {g['wrong_top1']} | {_fmt(g['max_wrong_fit'])} | {_fmt(g['min_truth_fit'])} "
-            f"| {g['rejected_per_trial']}/{g['wrong_top1']} | {'go' if g['go'] else 'no-go'} |")
+            f"| {g['rejected_per_trial']}/{g['wrong_top1']} "
+            f"| {g['two_part']['rejected']}/{g['wrong_top1']} "
+            f"| {g['two_part']['rejected_per_trial']}/{g['wrong_top1']} "
+            f"| {g['no_suggestion']} | {'go' if g['go'] else 'no-go'} |")
     lines += [
         "",
         "## Periodic and non-periodic quilts, per tier (joint, then per axis)",
@@ -785,9 +838,12 @@ def write_markdown(report: dict, path: Path) -> None:
         lines.append(f"| {r['provenance']} | {r['cap']} | {r['method']} | {r['photo']} | {truth} "
                      f"| {top} | {alt} |")
     existing = path.read_text(encoding="utf-8") if path.exists() else ""
-    kept = existing.split(GENERATED)[0] if GENERATED in existing else ""
-    path.write_text(kept + GENERATED + "\n\n" + "\n".join(lines) + "\n", encoding="utf-8",
-                    newline="\n")
+    if existing and not (HEADER_END in existing and GENERATED in existing):
+        raise SystemExit(f"{path}: no {HEADER_END!r} and {GENERATED!r} markers; refusing to "
+                         "overwrite its hand-written reading")
+    kept = existing.split(HEADER_END)[1].split(GENERATED)[0] if existing else "\n\n"
+    text = "\n".join(head) + HEADER_END + kept + GENERATED + "\n\n" + "\n".join(lines) + "\n"
+    path.write_text(text, encoding="utf-8", newline="\n")
 
 
 def _header(command: str, photos: list[Photo], skipped: list[dict]) -> dict:
@@ -799,7 +855,8 @@ def _header(command: str, photos: list[Photo], skipped: list[dict]) -> dict:
     holdout = sum(s["reason"] == "holdout" for s in skipped)
     return {
         "date": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
-        "command": command, "qrep": qrep.__file__, "git_sha": sha, "cv2": cv2.__version__,
+        "command": command, "qrep": _qrep_path(qrep.__file__), "git_sha": sha,
+        "cv2": cv2.__version__,
         "numpy": np.__version__, "python": sys.version.split()[0],
         "inputs": (f"corpus/manifest.csv tiers A and B outside the holdout; {holdout} holdout rows "
                    f"skipped before any read; read: {used}"),
@@ -807,11 +864,24 @@ def _header(command: str, photos: list[Photo], skipped: list[dict]) -> dict:
     }
 
 
+def _qrep_path(module_file: str) -> str:
+    """The resolved qrep module relative to the checkout that ran the script (the proof that
+    this checkout's code ran), without the local folders above it."""
+    resolved = Path(module_file).resolve()
+    if resolved.is_relative_to(REPO):
+        return f"{resolved.relative_to(REPO).as_posix()} in the checkout that ran this script"
+    return f"<outside this checkout>/{resolved.name}"
+
+
 def _public_arg(arg: str, cache: str) -> str:
-    """A command argument as the report prints it: no local path outside the repo."""
+    """A command argument as the report prints it: no local path outside the repo, in either
+    the --opt value or the --opt=value form, absolute or relative."""
+    if arg.startswith("--") and "=" in arg:
+        key, value = arg.split("=", 1)
+        return f"{key}={_public_arg(value, cache)}"
     if arg == cache:
         return "<main checkout>/corpus/private/cache"
-    if Path(arg).is_absolute():
+    if "/" in arg or "\\" in arg:
         resolved = Path(arg).resolve()
         if resolved.is_relative_to(REPO):
             return resolved.relative_to(REPO).as_posix()
@@ -827,7 +897,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 2) // 2))
     args = parser.parse_args(argv)
     # The cache is a local folder of the main checkout; the report names it, not its path.
-    command = "python scripts/eval/spikes/b1a_counts.py " + " ".join(
+    exe = Path(sys.executable).resolve()
+    python = exe.relative_to(REPO).as_posix() if exe.is_relative_to(REPO) else "python"
+    command = f"{python} scripts/eval/spikes/b1a_counts.py " + " ".join(
         _public_arg(a, args.cache) for a in (argv if argv is not None else sys.argv[1:]))
     photos, skipped = load_photos()
     jobs = [(p, prov, args.cache) for p in photos for prov in sorted(p.truth)]
