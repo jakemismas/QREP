@@ -1,0 +1,33 @@
+/* The flagged-squares line on Your pattern (C2a). */
+.fo-root {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  padding: 14px 16px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+
+.fo-line {
+  margin: 0;
+  flex: 1 1 220px;
+  font: 400 15px/1.4 var(--sans, sans-serif);
+  color: var(--ink2);
+}
+
+.fo-mark {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-right: 8px;
+  vertical-align: -2px;
+  border-radius: 3px;
+  background: var(--uncertain-fill);
+  border: 2px solid var(--uncertain-stroke);
+}
+
+.fo-toggle {
+  cursor: pointer;
+}

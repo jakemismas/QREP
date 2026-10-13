@@ -28,6 +28,9 @@ export interface ModelApi {
   /** The model the latest replaceModel installed, ahead of the render that
    * shows it, so a result that lands late can tell its model was replaced. */
   latestModel: () => QuiltModel | null;
+  /** Counts fresh replacements (a newly opened quilt, or none), so a screen
+   * bound to one quilt can tell an opened quilt from an edit. */
+  opened: number;
 }
 
 export const ModelContext = createContext<ModelApi | null>(null);
@@ -47,6 +50,7 @@ export function useModelState(): ModelApi {
   const [model, setModel] = useState<QuiltModel | null>(null);
   const [name, setName] = useState<string>(DEFAULT_NAME);
   const [summary, setSummary] = useState<ModelSummary | null>(null);
+  const [opened, setOpened] = useState(0);
 
   // ---- coalesced validation (the fabric census) ---------------------------
   //
@@ -98,7 +102,10 @@ export function useModelState(): ModelApi {
     pendingRef.current = null;
     latestRef.current = next;
     setModel(next);
-    if (fresh) setSummary(null);
+    if (fresh) {
+      setSummary(null);
+      setOpened((count) => count + 1);
+    }
   }, []);
 
   useEffect(() => {
@@ -110,8 +117,8 @@ export function useModelState(): ModelApi {
   const latestModel = useCallback(() => latestRef.current, []);
 
   return useMemo(
-    () => ({ model, name, summary, replaceModel, setName, latestModel }),
-    [model, name, summary, replaceModel, latestModel],
+    () => ({ model, name, summary, replaceModel, setName, latestModel, opened }),
+    [model, name, summary, replaceModel, latestModel, opened],
   );
 }
 

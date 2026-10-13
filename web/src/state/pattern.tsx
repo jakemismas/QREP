@@ -2,6 +2,11 @@
  * Pattern state (C1a, issue #146): the seam strategy, the three strategy
  * plans, the engine exports, copy-my-settings and the round-trip demo. Every
  * one of them reads the model from model.tsx's plain state.
+ *
+ * C2a (issue #96) adds Your pattern: which screen shows the open quilt (the
+ * editor, or Your pattern for the sample or a photo read), the pattern
+ * summary that screen shows, and its one pattern PDF. Both engine calls run
+ * through the framework-free controllers in pattern/patternPdf.ts.
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useEngine } from "../engine/useEngine";
@@ -10,6 +15,8 @@ import { EngineError } from "../engine/rpc";
 import type { QuiltModel } from "../model/types";
 import type { SeamStrategy } from "../model/seams";
 import { useToast } from "../ui";
+import { PatternPdfController, PatternSummaryLoader } from "../pattern/patternPdf";
+import type { PdfView, SummaryView } from "../pattern/patternPdf";
 import type { ModelApi } from "./model";
 import { buildSettingsSummary } from "./patternText";
 import type { StrategyPlan } from "./patternText";
@@ -37,6 +44,24 @@ export interface RoundTripApi {
   report: RoundTripReport | null;
 }
 
+/** Which screen shows the open quilt. */
+export type PatternScreen = "editor" | "pattern";
+/** Where the quilt on Your pattern came from: the sample, or a photo read. */
+export type PatternSource = "sample" | "photo";
+
+export interface YourPatternApi {
+  screen: PatternScreen;
+  source: PatternSource;
+  /** Show the next quilt that opens on Your pattern. */
+  showPattern: (source: PatternSource) => void;
+  showEditor: () => void;
+  summary: SummaryView;
+  retrySummary: () => void;
+  pdf: PdfView;
+  savePdf: () => void;
+  retryPdf: () => void;
+}
+
 export interface PatternApi {
   seamStrategy: SeamStrategy;
   plans: Record<SeamStrategy, StrategyPlan | null>;
@@ -44,6 +69,7 @@ export interface PatternApi {
   exportDownload: (kind: ExportKind) => Promise<void>;
   copySettings: () => Promise<boolean>;
   roundtrip: RoundTripApi;
+  yourPattern: YourPatternApi;
 }
 
 /** What the provider that composes this module needs beyond the context value. */
@@ -59,6 +85,11 @@ export interface PatternState {
 export function slugify(name: string): string {
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
   return slug || "quilt";
+}
+
+/** The pattern PDF's file name: the pattern name in kebab case. */
+export function patternFileName(patternName: string): string {
+  return `${slugify(patternName)}.pdf`;
 }
 
 export function base64ToArrayBuffer(b64: string): ArrayBuffer {
@@ -101,7 +132,17 @@ function execCommandCopy(text: string): boolean {
 
 export const PatternContext = createContext<PatternApi | null>(null);
 
-export function usePatternState({ model, name, summary, latestModel }: ModelApi): PatternState {
+function savePatternFile(pdfB64: string, filename: string): void {
+  triggerBlob(base64ToArrayBuffer(pdfB64), filename, "application/pdf");
+}
+
+export function usePatternState({
+  model,
+  name,
+  summary,
+  latestModel,
+  opened,
+}: ModelApi): PatternState {
   const engine = useEngine();
   // ToastProvider rebuilds its value on every toast; keyed on that object,
   // the plans effect below would re-run after each toast.
@@ -156,11 +197,103 @@ export function usePatternState({ model, name, summary, latestModel }: ModelApi)
     plannedRef.current = null;
   }, []);
 
+  // ---- Your pattern (C2a) -------------------------------------------------
+
+  const [screen, setScreen] = useState<PatternScreen>("editor");
+  const [source, setSource] = useState<PatternSource>("sample");
+  const [summaryView, setSummaryView] = useState<SummaryView>({ status: "idle" });
+  const [pdfView, setPdfView] = useState<PdfView>({ status: "idle", message: null });
+
+  const engineCall = useCallback(
+    (method: string, ...args: unknown[]) => engineRef.current.call<unknown>(method, ...args),
+    [],
+  );
+  const loaderRef = useRef<PatternSummaryLoader | null>(null);
+  loaderRef.current ??= new PatternSummaryLoader({ call: engineCall, onChange: setSummaryView });
+  const pdfRef = useRef<PatternPdfController | null>(null);
+  pdfRef.current ??= new PatternPdfController({
+    call: engineCall,
+    save: savePatternFile,
+    onChange: setPdfView,
+  });
+
+  const leavePattern = useCallback(() => {
+    setScreen("editor");
+    loaderRef.current?.clear();
+    pdfRef.current?.reset();
+  }, []);
+
+  // showPattern binds Your pattern to the next quilt that opens (the sample
+  // or the read). A quilt opened any other way, say from the header's Open,
+  // is not that quilt: it goes to the editor, as it did before C2a.
+  const expectOpenRef = useRef(false);
+  const openedRef = useRef(opened);
+  useEffect(() => {
+    if (opened === openedRef.current) return;
+    openedRef.current = opened;
+    if (expectOpenRef.current) {
+      expectOpenRef.current = false;
+      return;
+    }
+    leavePattern();
+  }, [opened, leavePattern]);
+
+  const showPattern = useCallback((next: PatternSource) => {
+    expectOpenRef.current = true;
+    // The plans feed the editor's Pattern tab; Your pattern never asks for them.
+    setPatternActive(false);
+    setSource(next);
+    setScreen("pattern");
+    loaderRef.current?.clear();
+    pdfRef.current?.reset();
+  }, []);
+
+  const showEditor = useCallback(() => {
+    expectOpenRef.current = false;
+    leavePattern();
+  }, [leavePattern]);
+
+  // One summary per model revision; the loader drops a replaced model's.
+  useEffect(() => {
+    if (screen !== "pattern" || !model || model !== latestModel()) return;
+    loaderRef.current?.load(JSON.stringify(model));
+  }, [screen, model, latestModel]);
+
+  const retrySummary = useCallback(() => loaderRef.current?.retry(), []);
+
+  const savePdf = useCallback(() => {
+    if (!model) return;
+    // The engine's pattern name: the validate summary's, else the model's own.
+    const patternName = summary?.name || model.metadata?.name || "";
+    void pdfRef.current?.start(JSON.stringify(model), patternFileName(patternName));
+  }, [model, summary]);
+
+  const retryPdf = useCallback(() => {
+    void pdfRef.current?.retry();
+  }, []);
+
+  const yourPattern = useMemo<YourPatternApi>(
+    () => ({
+      screen,
+      source,
+      showPattern,
+      showEditor,
+      summary: summaryView,
+      retrySummary,
+      pdf: pdfView,
+      savePdf,
+      retryPdf,
+    }),
+    [screen, source, showPattern, showEditor, summaryView, retrySummary, pdfView, savePdf, retryPdf],
+  );
+
   const closePattern = useCallback(() => {
     resetPlans(DEFAULT_STRATEGY);
     setPatternActive(false);
     setRoundtripReport(null);
-  }, [resetPlans]);
+    expectOpenRef.current = false;
+    leavePattern();
+  }, [resetPlans, leavePattern]);
 
   // ---- round-trip demo panel (render -> reverse -> compare) ----------------
 
@@ -277,8 +410,16 @@ export function usePatternState({ model, name, summary, latestModel }: ModelApi)
   );
 
   const api = useMemo<PatternApi>(
-    () => ({ seamStrategy, plans, setPatternActive, exportDownload, copySettings, roundtrip }),
-    [seamStrategy, plans, exportDownload, copySettings, roundtrip],
+    () => ({
+      seamStrategy,
+      plans,
+      setPatternActive,
+      exportDownload,
+      copySettings,
+      roundtrip,
+      yourPattern,
+    }),
+    [seamStrategy, plans, exportDownload, copySettings, roundtrip, yourPattern],
   );
 
   return useMemo(
@@ -295,4 +436,8 @@ export function usePattern(): PatternApi {
 
 export function useRoundTrip(): RoundTripApi {
   return usePattern().roundtrip;
+}
+
+export function useYourPattern(): YourPatternApi {
+  return usePattern().yourPattern;
 }

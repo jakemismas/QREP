@@ -94,19 +94,18 @@ test("L0 photo reverses in-browser to 45x55 with the palette mapped", async ({ p
 
 test("editor and export flows never need opencv", async ({ page }) => {
   // Abort every opencv fetch: S2-S5 surfaces must work untouched (the idle
-  // prefetch may fail silently; that is its contract).
+  // prefetch may fail silently; that is its contract). C2a (issue #96):
+  // the sample pattern's census and Download pattern (PDF) on Your pattern.
   await page.route("**/*opencv*", (route) => route.abort());
   await page.goto("./");
-  await page.getByTestId("open-demo").click();
-  await expect(page.getByTestId("editor")).toBeVisible();
+  await page.getByTestId("see-sample").click();
+  await expect(page.getByTestId("your-pattern")).toBeVisible();
   await expect(page.getByTestId("engine-chip")).toHaveAttribute("data-engine-phase", "ready", {
     timeout: READY_TIMEOUT,
   });
   await expect(page.getByTestId("fabric-count-b")).toHaveText(/1,?246/);
-  await page.getByRole("tab", { name: "Pattern" }).click();
-  await expect(page.getByTestId("strategy-card-strip")).toBeVisible();
   const waiting = page.waitForEvent("download");
-  await page.getByTestId("download-cutlist-csv").click();
+  await page.getByTestId("download-pattern").click();
   await waiting;
   // No error toast anywhere in the flow.
   await expect(page.getByTestId("toast")).not.toContainText(/fail|error/i);

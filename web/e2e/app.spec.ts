@@ -24,10 +24,12 @@ const fixturePath = path.join(repoRoot, "tests", "fixtures", "double_irish_chain
 
 const READY_TIMEOUT = 300_000;
 
-async function openDemo(page: Page): Promise<void> {
+// C2a (issue #96): the hand-authored fixture opens from See a sample
+// pattern onto Your pattern, which shows the quilt and the census.
+async function openSample(page: Page): Promise<void> {
   await page.goto("./");
-  await page.getByTestId("open-demo").click();
-  await expect(page.getByTestId("editor")).toBeVisible();
+  await page.getByTestId("see-sample").click();
+  await expect(page.getByTestId("your-pattern")).toBeVisible();
 }
 
 function chip(page: Page) {
@@ -35,7 +37,7 @@ function chip(page: Page) {
 }
 
 test("demo quilt renders true to scale with correct rulers", async ({ page }) => {
-  await openDemo(page);
+  await openSample(page);
   // #58: the app page carries the product title, not the S0 spike's.
   await expect(page).toHaveTitle("QREP");
   // Fixture finished dims: 600 x 720 eighths = 75" x 90" (design doc).
@@ -99,7 +101,7 @@ test("corrupted JSON shows the error envelope message, not a traceback", async (
 });
 
 test("fabric summary counts match the fixture census via bridge data", async ({ page }) => {
-  await openDemo(page);
+  await openSample(page);
   await expect(chip(page)).toHaveAttribute("data-engine-phase", "ready", {
     timeout: READY_TIMEOUT,
   });

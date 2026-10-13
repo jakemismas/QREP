@@ -1,13 +1,15 @@
 /*
  * Results (photo.state === "results"): side-by-side photo and recovered
  * quilt, per-stage confidence meters, the overall pill, the uncertain toggle,
- * the lightbox and the timing line.
+ * the lightbox and the timing line. C2a (issue #96): See your pattern is the
+ * primary action, and Open in the editor stays beside it until C6a.
  */
 import { useMemo, useState } from "react";
 import { QuiltCanvas } from "../../viewer";
 import { verdictStory } from "../../model/verdictStory";
 import type { QuiltModel } from "../../model/types";
 import { useUncertainty } from "../../state/photo";
+import { useYourPattern } from "../../state/pattern";
 import type { PhotoApi } from "../photoApi";
 import { Lightbox } from "./Lightbox";
 import type { LbTab } from "./Lightbox";
@@ -40,6 +42,7 @@ function parseModel(json: string | undefined | null): QuiltModel | null {
 
 export function ResultsScreen({ photo }: { photo: PhotoApi }) {
   const uncertainty = useUncertainty();
+  const { showPattern, showEditor } = useYourPattern();
   const [lb, setLb] = useState<LbTab | null>(null);
 
   const result = photo.result;
@@ -238,14 +241,30 @@ export function ResultsScreen({ photo }: { photo: PhotoApi }) {
 
           <div className="pf-actions">
             {story.failurePanel ? null : (
-              <button
-                type="button"
-                className="pf-btn pf-btn--primary"
-                data-testid="open-in-editor"
-                onClick={() => photo.openInEditor()}
-              >
-                Open in the editor
-              </button>
+              <>
+                <button
+                  type="button"
+                  className="pf-btn pf-btn--primary"
+                  data-testid="see-pattern"
+                  onClick={() => {
+                    showPattern("photo");
+                    photo.openInEditor();
+                  }}
+                >
+                  See your pattern
+                </button>
+                <button
+                  type="button"
+                  className="pf-btn pf-btn--secondary"
+                  data-testid="open-in-editor"
+                  onClick={() => {
+                    showEditor();
+                    photo.openInEditor();
+                  }}
+                >
+                  Open in the editor
+                </button>
+              </>
             )}
             <button
               type="button"

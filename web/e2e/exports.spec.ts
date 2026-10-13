@@ -38,6 +38,15 @@ async function openPattern(page: Page): Promise<void> {
   await expect(page.getByTestId("strategy-card-strip")).toBeVisible();
 }
 
+async function openSamplePattern(page: Page): Promise<void> {
+  await page.goto("./");
+  await page.getByTestId("see-sample").click();
+  await expect(page.getByTestId("your-pattern")).toBeVisible();
+  await expect(page.getByTestId("engine-chip")).toHaveAttribute("data-engine-phase", "ready", {
+    timeout: READY_TIMEOUT,
+  });
+}
+
 async function downloadBytes(page: Page, testId: string): Promise<{ bytes: Buffer; name: string }> {
   const waiting = page.waitForEvent("download");
   await page.getByTestId(testId).click();
@@ -73,23 +82,16 @@ test("SVG downloads byte-equal the frozen golden and parse sanely", async ({ pag
 });
 
 test("exports are deterministic within a session; PDF saved for pypdf", async ({ page }) => {
-  await openPattern(page);
-  await page.getByTestId("strategy-card-strip").click();
-  const first = await downloadBytes(page, "download-cutlist-csv");
-  const second = await downloadBytes(page, "download-cutlist-csv");
-  expect(second.bytes.equals(first.bytes)).toBe(true);
-  const svg1 = await downloadBytes(page, "download-svg");
-  const svg2 = await downloadBytes(page, "download-svg");
-  expect(svg2.bytes.equals(svg1.bytes)).toBe(true);
-
-  const pdf = await downloadBytes(page, "download-pdf");
-  expect(pdf.name).toBe(`${SLUG}-booklet.pdf`);
+  // C2a (issue #96; REBASELINE.md): the sample pattern's one Download
+  // pattern (PDF) button, twice. The CSV, SVG and yardage parts left this
+  // test; the golden tests keep pinning those bytes.
+  await openSamplePattern(page);
+  const first = await downloadBytes(page, "download-pattern");
+  const pdf = await downloadBytes(page, "download-pattern");
+  expect(pdf.bytes.equals(first.bytes)).toBe(true);
   expect(pdf.bytes.subarray(0, 5).toString("latin1")).toBe("%PDF-");
   mkdirSync(downloadDir, { recursive: true });
   writeFileSync(path.join(downloadDir, "booklet.pdf"), pdf.bytes);
-  // Success toast and a filename per PARITY item 11 for the yardage report.
-  const yardage = await downloadBytes(page, "download-yardage");
-  expect(yardage.name).toBe(`${SLUG}-yardage.txt`);
 });
 
 test("strategy cards show bridge metrics field-for-field", async ({ page }) => {

@@ -2,7 +2,9 @@
  * First-run screen (S2 + S3, issues #42 / #43). Photo entry is an S6 feature,
  * so "Start from a photo" is a visibly disabled teaser here. S3 adds the
  * blank-grid card, the autosave resume banner (with the save age), and the
- * loud autosave-error surface for a foreign schema_version.
+ * loud autosave-error surface for a foreign schema_version. C2a (issue #96)
+ * adds See a sample pattern, which opens the demo quilt on Your pattern; the
+ * demo entry into the editor stays until C6a removes the editor.
  */
 import { useProject } from "../state/project";
 
@@ -61,7 +63,15 @@ export function StartScreen({
   // shell still type-checks before that wiring lands.
   onStartPhoto?: () => void;
 }) {
-  const { openDemo, startBlank, resume, autosaveError, resumeAutosave } = useProject();
+  const { openDemo, startBlank, resume, autosaveError, resumeAutosave, yourPattern } =
+    useProject();
+
+  const seeSample = () => {
+    yourPattern.showPattern("sample");
+    void openDemo().then((opened) => {
+      if (!opened) yourPattern.showEditor();
+    });
+  };
 
   return (
     <div data-testid="start-screen" className="start-screen">
@@ -134,6 +144,15 @@ export function StartScreen({
             onClick={onStartPhoto}
           >
             Start from a photo
+          </button>
+
+          <button
+            type="button"
+            data-testid="see-sample"
+            className="btn btn--secondary"
+            onClick={seeSample}
+          >
+            See a sample pattern
           </button>
 
           <button
