@@ -34,16 +34,17 @@ PHOTOREAL_CAPS = (1400, 2000)
 DEFAULT_SEED = "d4a"
 # What the header says when git cannot answer, as under Pyodide.
 GIT_UNAVAILABLE = "unknown (git unavailable)"
-# The measurements behind corpus.FULL_BUDGET_MP, as #166 comments 6145827537 and
-# 6146146558 record them.
+# The measurements behind corpus.FULL_BUDGET_MP, as #166 comments 6145827537,
+# 6146146558 and 6146429860 record them.
 BUDGET_EVIDENCE = (
     "measured 2026-10-13 on dev photos, each step alone in a fresh process, as peak working set / peak "
-    "commit (#166 comments 6145827537 and 6146146558): at 78e92e3 the automatic read took 0.50 / 1.20 GB "
+    "commit (#166 comments 6145827537, 6146146558 and 6146429860): at 78e92e3 the automatic read took 0.50 / 1.20 GB "
     "at 8.9 MP, 1.18 / 1.88 GB at 15.4 MP and 1.00 / 1.70 GB at 38.9 MP, and under a 5 GB per-process "
     "commit cap both the automatic read (a 456 MiB float32 power spectrum in the padded block "
     "autocorrelation, qrep/vision/repeats.py) and the glare degradation failed on the 117.5 MP scan; "
     "banded in 419388c, glare takes 0.89 / 1.61 GB and the lighting gradient 0.87 / 1.59 GB on that "
-    "scan, while the read still fails as fetched and is not the eval's to change")
+    "scan, while the read still fails as fetched and is not the eval's to change; the scan's low_res_jpeg "
+    "unit, which hands the read 541 x 600 px, takes 0.70 / 1.41 GB as fetched")
 
 
 def _parse(argv):
