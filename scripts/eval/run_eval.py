@@ -4,12 +4,14 @@
 
 Runs the v0 dev split with the auto and auto-corners readers by default and
 writes <stem>.json and <stem>.md; --holdout runs the holdout instead and writes
-<stem>-holdout.json and .md. Report only: it freezes nothing.
+<stem>-holdout.json and .md. Only licensed museum scans run unless --private,
+which writes only where git ignores the report. Report only: it freezes nothing.
 """
 
 import argparse
 import datetime
 import json
+import os
 import shlex
 import subprocess
 import sys
@@ -30,6 +32,8 @@ PHOTOREAL = ("busy_print_squares", "low_contrast_hst")
 PHOTOREAL_CAPS = (1400, 2000)
 STRESS_RESOLUTION = "desktop-2000"
 DEFAULT_SEED = "d4a"
+# What the header says when git cannot answer, as under Pyodide.
+GIT_UNAVAILABLE = "unknown (git unavailable)"
 
 
 def _parse(argv):
@@ -50,39 +54,90 @@ def _parse(argv):
     p.add_argument("--no-photoreal", action="store_true")
     p.add_argument("--start-sha", help="refuse to run unless qrep/vision/ outside read/ equals this SHA's")
     p.add_argument("--workers", type=int, default=1, help="processes for the reads")
+    p.add_argument("--private", action="store_true",
+                   help="admit photos that are not licensed museum scans; the report must be git-ignored")
     return p.parse_args(argv)
 
 
-def _git(*args) -> str | None:
+def _git(runner, *args) -> str | None:
     try:
-        return subprocess.run(["git", *args], capture_output=True, text=True, check=True,
-                              cwd=REPO).stdout.strip()
-    except (OSError, subprocess.CalledProcessError):
+        done = runner(["git", *args], capture_output=True, text=True, cwd=REPO)
+    except OSError:
         return None
+    return done.stdout if done.returncode == 0 else None
 
 
-def _start_sha_check(sha: str) -> str:
-    """Plan 4.4: the automatic read must still be the start SHA's before a baseline."""
+def _start_sha_check(sha: str, runner) -> str:
+    """Plan 4.4: the automatic read must still be the start SHA's before a baseline,
+    both committed and in the working tree the run imports, and the run must import
+    this tree's qrep."""
+    import qrep
+
+    results = []
+    for where, revisions in (("HEAD", [sha, "HEAD"]), ("working tree", [sha])):
+        command = ["git", "diff", "--quiet", *revisions, "--", "qrep/vision/", ":(exclude)qrep/vision/read/"]
+        try:
+            code = runner(command, cwd=REPO).returncode
+        except OSError as error:
+            raise SystemExit(f"start-SHA check could not run: {error}") from error
+        if code != 0:
+            raise SystemExit(f"start-SHA check failed (exit {code}): qrep/vision/ in the {where} "
+                             f"differs from {sha}")
+        results.append(f"{shlex.join(command)} exited 0")
+    location = Path(qrep.__file__).resolve()
+    if not location.is_relative_to(REPO.resolve()):
+        raise SystemExit(f"start-SHA check failed: qrep imports from {location}, outside {REPO}")
+    results.append(f"qrep imports from {location}, inside the repo")
+    return "; ".join(results)
+
+
+def report_paths(out: Path, split: str) -> tuple[Path, Path]:
+    """The report's JSON and Markdown paths, built on the whole name: with_suffix would
+    cut a stem such as v0.4-eval at its dot."""
+    name = out.name + ("-holdout" if split == "holdout" else "")
+    return out.with_name(name + ".json"), out.with_name(name + ".md")
+
+
+def _refuse_unignored(paths, runner) -> None:
+    """A private run's report names private photos, so it may land in a git work tree
+    only where git ignores it; when git cannot answer, the run stops."""
+    folder = paths[0].resolve().parent
+    while not folder.exists():
+        folder = folder.parent
     try:
-        code = subprocess.run(["git", "diff", "--quiet", sha, "HEAD", "--", "qrep/vision/",
-                               ":(exclude)qrep/vision/read/"], cwd=REPO).returncode
+        inside = runner(["git", "rev-parse", "--is-inside-work-tree"], capture_output=True, text=True,
+                        cwd=folder)
+        if inside.returncode != 0 or inside.stdout.strip() != "true":
+            return
+        for path in paths:
+            relative = os.path.relpath(path.resolve(), folder)
+            if runner(["git", "check-ignore", "-q", "--", relative], capture_output=True, text=True,
+                      cwd=folder).returncode != 0:
+                print(f"run_eval: --private would write {path} inside a git work tree where git does "
+                      "not ignore it", file=sys.stderr)
+                raise SystemExit(2)
     except OSError as error:
-        raise SystemExit(f"start-SHA check could not run: {error}") from error
-    if code != 0:
-        raise SystemExit(f"start-SHA check failed (exit {code}): qrep/vision/ differs from {sha}")
-    return f"git diff --quiet {sha} HEAD -- qrep/vision/ ':(exclude)qrep/vision/read/' exited 0"
+        print(f"run_eval: --private could not ask git whether {folder} is tracked: {error}", file=sys.stderr)
+        raise SystemExit(2) from error
 
 
-def _corpus_units(args, photos, readers_, radii) -> list[harness.Unit]:
+def _manifest_name(manifest: Path) -> str:
+    try:
+        return manifest.resolve().relative_to(REPO.resolve()).as_posix()
+    except ValueError:
+        return "a manifest outside the repo"
+
+
+def _corpus_units(args, photos, readers_, radii, workdir_root=None) -> list[harness.Unit]:
     units = []
     for photo in photos:
         truth = corpus.truth_view(photo.annotation)
         common = dict(
             photo=photo.stem, tier=photo.tier, split=photo.split, license=photo.row["license"],
             device_class=photo.device_class, source=str(photo.source),
-            canvas=tuple(photo.annotation.canvas), truth=truth, truth_label=truth.label,
+            canvas=tuple(photo.annotation.canvas), truth=truth, truth_label=truth.label_for(photo.tier),
             readers=readers_, trials=args.trials, seed=args.seed, annotation=photo.annotation,
-            extra={"proposals_agree": _proposals_agree(photo.annotation)},
+            extra={"proposals_agree": _proposals_agree(photo.annotation)}, workdir_root=workdir_root,
         )
         for resolution in args.resolutions.split(","):
             units.append(harness.Unit(group="corpus", resolution=resolution,
@@ -138,7 +193,9 @@ def _run(units, workers):
     return [row for unit in units for row in harness.run_unit(unit)]
 
 
-def main(argv=None) -> int:
+def main(argv=None, *, runner=subprocess.run) -> int:
+    """runner stands in for subprocess.run on every git call, so a test can answer
+    for git."""
     argv = list(sys.argv[1:] if argv is None else argv)
     args = _parse(argv)
     readers_ = tuple(args.reader or ("auto", "auto-corners"))
@@ -147,15 +204,20 @@ def main(argv=None) -> int:
         if reason:
             print(f"run_eval: {reason}", file=sys.stderr)
             raise SystemExit(2)
-    check = _start_sha_check(args.start_sha) if args.start_sha else "not run (no --start-sha)"
     split = "holdout" if args.holdout else "dev"
+    json_path, md_path = report_paths(args.out, split)
+    if args.private:
+        _refuse_unignored((json_path, md_path), runner)
+    check = _start_sha_check(args.start_sha, runner) if args.start_sha else "not run (no --start-sha)"
     radii = tuple(float(r) if "." in r else int(r) for r in args.radii.split(","))
     for resolution in args.resolutions.split(","):
         if resolution not in corpus.RESOLUTIONS:
             raise SystemExit(f"unknown resolution {resolution!r}; choose from {list(corpus.RESOLUTIONS)}")
     cache = args.cache or args.corpus / "private" / "cache"
-    photos = [p for p in corpus.load_photos(args.corpus, cache) if p.split == split]
-    units = _corpus_units(args, photos, readers_, radii)
+    photos = corpus.load_photos(args.corpus, cache, split=split, allow_private=args.private)
+    # A private photo's staged copies stay beside its cache, never in the shared temp.
+    workdir_root = str(cache.resolve().parent) if args.private else None
+    units = _corpus_units(args, photos, readers_, radii, workdir_root)
     if not args.no_photoreal and split == "dev":
         units += _photoreal_units(args, readers_)
     try:
@@ -168,6 +230,8 @@ def main(argv=None) -> int:
     import qrep
 
     manifest = args.corpus / "manifest.csv"
+    status = _git(runner, "status", "--porcelain", "--", "qrep/", "scripts/eval/")
+    sha = _git(runner, "rev-parse", "HEAD")
     tiers = {t: sum(p.tier == t for p in photos) for t in sorted({p.tier for p in photos})}
     disagree = [p.stem for p in photos
                 if p.tier == "A" and not all(_proposals_agree(p.annotation).values())]
@@ -176,19 +240,24 @@ def main(argv=None) -> int:
         "date": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
         "command": "python scripts/eval/run_eval.py " + shlex.join(argv),
         "qrep_path": qrep.__file__,
-        "git_sha": _git("rev-parse", "HEAD") or "unknown (git unavailable)",
+        "git_sha": sha.strip() if sha else GIT_UNAVAILABLE,
         "start_sha_check": check,
+        "git_status": "git status --porcelain -- qrep/ scripts/eval/: " + (
+            GIT_UNAVAILABLE if status is None
+            else "; ".join(line.strip() for line in status.splitlines()) or "clean"),
         "cv2_version": cv2.__version__,
         "decode_path": harness.DECODE_PATH,
         "split": split,
-        "inputs": (f"corpus/manifest.csv eval_set v0 (sha256 {corpus.sha256_of(manifest)}), "
+        "inputs": (f"{_manifest_name(manifest)}, eval_set v0 (sha256 {corpus.sha256_of(manifest)}), "
                    f"{len(photos)} photos in the {split} split by tier {tiers}, annotations from "
                    "corpus/annotations/, source images checked against the manifest sha256"),
         "readers": ", ".join(readers_),
         "simulation": (f"corners from the annotation's outer edge (gate truth, else proposed-a, else "
                        f"proposed-b), jitter radii {list(radii)} px, {args.trials} draws per nonzero "
-                       f"radius, seed {args.seed!r}; true counts; fabric count given to auto-corners "
-                       f"when 2 to 12; picker answer {simulate.PICKER_ANSWER!r} for every photo"),
+                       f"radius, seed {args.seed!r}; auto-corners receives those corners and the fabric "
+                       f"count when 2 to 12; the automatic read takes no counts, so the true counts reach "
+                       f"only the confirmed reader, with the same corners and fabric count; picker answer "
+                       f"{simulate.PICKER_ANSWER!r} for every photo"),
         "resolutions": args.resolutions,
         "degradations": "none" if args.no_degradations else "; ".join(
             f"{d.name} {d.params}" for d in degrade.DEGRADATIONS) + (
@@ -201,16 +270,16 @@ def main(argv=None) -> int:
                                    f"{', '.join(disagree) or 'none'}"),
         "low_confidence_flag": (f"auto readers flag squares below {readers.AUTO_LOW_CONFIDENCE_BELOW} "
                                 "(the old app's UNCERTAIN_THRESHOLD); the confirmed reader flags none "
-                                "until its result carries flags"),
+                                "until its result carries flags (#237); a read with no confidences "
+                                "flags none and its row says confidence_missing"),
     }
-    payload = {"header": header, "aggregate": report.aggregate(rows), "photos": report.per_photo(rows),
+    payload = {"header": header, "aggregate": report.aggregate(rows, runner=runner),
+               "photos": report.per_photo(rows),
                "rows": rows}
-    out = args.out if split == "dev" else args.out.with_name(args.out.name + "-holdout")
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.with_suffix(".json").write_text(json.dumps(payload, indent=1) + "\n", encoding="utf-8",
-                                        newline="\n")
-    out.with_suffix(".md").write_text(report.markdown(payload), encoding="utf-8", newline="\n")
-    print(out.with_suffix(".md"))
+    json_path.parent.mkdir(parents=True, exist_ok=True)
+    json_path.write_text(json.dumps(payload, indent=1) + "\n", encoding="utf-8", newline="\n")
+    md_path.write_text(report.markdown(payload), encoding="utf-8", newline="\n")
+    print(md_path)
     return 0
 
 

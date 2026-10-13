@@ -57,21 +57,35 @@ class TruthView:
     construction: str | None
     provenance: dict[str, str] = field(default_factory=dict)
 
+    def label_for(self, tier: str) -> str:
+        """gate when the truth a tier is scored on is gate truth (plan 5.D), else
+        provisional. A refusal photo is scored on its class alone. Any other photo
+        needs verified frame, counts and class, and a fabric count, when there is
+        one, from the square-truth codes, since a proposed count would grade k."""
+        p = self.provenance
+        if tier == "R":
+            return "gate" if (p.get("refusal_class") in an.FRAME_TRUTH
+                              or p.get("construction_class") in an.FRAME_TRUTH) else "provisional"
+        framed = all(p.get(name) in an.FRAME_TRUTH for name in ("frame", "counts", "construction_class"))
+        fabrics_ok = "fabrics" not in p or p["fabrics"] in an.TRUTH
+        return "gate" if framed and fabrics_ok else "provisional"
+
     @property
     def label(self) -> str:
-        return "gate" if self.provenance and all(
-            code in an.FRAME_TRUTH for code in self.provenance.values()) else "provisional"
+        return self.label_for("A")
 
 
 def truth_view(annotation: an.Annotation) -> TruthView:
-    """Corners, bands, counts and class from verified-jake claims, else from the
-    proposals (labeled provisional). The fabric count also accepts the square-truth
-    codes, since a gold layout's roles fix it."""
+    """Corners, bands, counts, class and refusal class from verified-jake claims, else
+    from the proposals (labeled provisional). The fabric count also accepts the
+    square-truth codes, since a gold layout's roles fix it."""
     framed = an.pick(annotation.frame, an.FRAME_TRUTH) or an.pick(annotation.frame, PROPOSALS)
     counted = an.pick(annotation.counts, an.FRAME_TRUTH) or an.pick(annotation.counts, PROPOSALS)
     built = (an.pick(annotation.construction_class, an.FRAME_TRUTH)
              or an.pick(annotation.construction_class, PROPOSALS))
     fabrics = an.pick(annotation.fabrics, an.TRUTH) or an.pick(annotation.fabrics, PROPOSALS)
+    refusal = (an.pick(annotation.refusal_class, an.FRAME_TRUTH)
+               or an.pick(annotation.refusal_class, PROPOSALS))
     provenance = {}
     corners = None
     bands: list[float] = []
@@ -84,6 +98,10 @@ def truth_view(annotation: an.Annotation) -> TruthView:
         provenance["counts"] = counted.provenance
     if built is not None:
         provenance["construction_class"] = built.provenance
+    if fabrics is not None:
+        provenance["fabrics"] = fabrics.provenance
+    if refusal is not None:
+        provenance["refusal_class"] = refusal.provenance
     return TruthView(
         corners=corners,
         bands=bands,
@@ -123,12 +141,24 @@ def sha256_of(path: Path) -> str:
     return digest.hexdigest()
 
 
-def load_photos(corpus_dir: Path, cache_dir: Path, eval_set: str = "v0") -> list[Photo]:
-    """Every eval-set row with its annotation and its verified source image, in
-    manifest order. A missing or changed source image stops the run: a silently
-    skipped photo would shrink n without saying so."""
+def load_photos(corpus_dir: Path, cache_dir: Path, eval_set: str = "v0", split: str | None = None,
+                allow_private: bool = False) -> list[Photo]:
+    """Every eval-set row in split (None: both) with its annotation and its verified
+    source image, in manifest order. A missing or changed source image stops the run:
+    a silently skipped photo would shrink n without saying so. The split is chosen
+    from the manifest's sha256 before any annotation is read or source hashed, so a
+    dev run never opens a holdout photo. A row that is not a licensed museum scan
+    stops the run unless allow_private: its photo and its report rows stay private
+    (plan 8.2)."""
     with (corpus_dir / "manifest.csv").open(newline="", encoding="utf-8") as handle:
         rows = [row for row in csv.DictReader(handle) if row.get("eval_set") == eval_set]
+    if split is not None:
+        rows = [row for row in rows if split_of(row["sha256"]) == split]
+    if not allow_private:
+        for row in rows:
+            if row.get("license") not in an.LICENSES or row.get("capture") != "museum_scan":
+                raise ValueError(f"{Path(row['file']).stem}: licensed {row.get('license')!r}, "
+                                 f"captured {row.get('capture')!r}; a private photo needs --private")
     photos = []
     for row in rows:
         stem = Path(row["file"]).stem

@@ -14,13 +14,17 @@ from pathlib import Path
 
 import cv2
 
-from qrep.contract import BorderBand, Corners, OuterEdgeFrame, Point, ReadRequest
+from qrep.contract import FABRICS_MAX, FABRICS_MIN, BorderBand, Corners, OuterEdgeFrame, Point, ReadRequest
 from qrep_eval import annotation as an
 from qrep_eval import corpus, degrade, readers, scoring, simulate
 
 DECODE_PATH = ("native: cv2.imread (IMREAD_COLOR), cv2.resize INTER_AREA to the cap with the app's "
                "targetSize rounding, staged to the reader as a lossless PNG")
 HARMONICS = (2.0, 3.0, 0.5, 1 / 3)
+# The outcomes that put a pattern in the user's hands: a warned read still offers the
+# editor and its PDF.
+SHIPS = ("read", "warned")
+SKIP_REASON = "no frame or counts in the annotation to confirm"
 
 
 @dataclass
@@ -48,6 +52,9 @@ class Unit:
     truth_cells: list[list[int]] | None = None
     truth_colors: list[str] | None = None
     extra: dict = field(default_factory=dict)
+    # Where the staged images go; None is the system temp. A private run keeps them
+    # beside its cache.
+    workdir_root: str | None = None
 
 
 def _field_box(corners: list[tuple[float, float]]) -> tuple[float, float, float, float]:
@@ -95,6 +102,23 @@ def _truth_dims(truth: corpus.TruthView) -> tuple[int, int] | None:
     return c.blocks_down * c.squares_per_block_down, c.blocks_across * c.squares_per_block_across
 
 
+def given_fabrics(truth: corpus.TruthView) -> int | None:
+    """The fabric count a simulated user gives: the truth's, when the read accepts it."""
+    count = truth.fabric_count
+    return count if count is not None and FABRICS_MIN <= count <= FABRICS_MAX else None
+
+
+def _received_fabrics(reading: readers.Reading):
+    received = reading.received
+    if "request" in received:
+        return received["request"].get("fabric_count")
+    return received.get("fabrics")
+
+
+def _confidence_missing(reading: readers.Reading) -> bool:
+    return not reading.confidence or not all(reading.confidence)
+
+
 def _harmonic(read: tuple[int, int], true: tuple[int, int]) -> bool:
     if read == true or 0 in read:
         return False
@@ -116,7 +140,12 @@ def score(unit: Unit, reading: readers.Reading) -> dict:
         out["periodic"] = counts.blocks_across * counts.blocks_down > 1
     if unit.truth.fabric_count is not None:
         out["k_truth"] = unit.truth.fabric_count
-        out["k_exact"] = shown and reading.k == unit.truth.fabric_count
+        # A given count forces k (qrep/vision/palette.py extract_palette), so only a
+        # read that chose k on its own is scored on it.
+        if _received_fabrics(reading) is None:
+            out["k_exact"] = shown and reading.k == unit.truth.fabric_count
+    if reading.cells is not None and _confidence_missing(reading):
+        out["confidence_missing"] = True
     if unit.truth_cells is not None:
         out.update(_score_cells(unit, reading))
     return out
@@ -125,14 +154,17 @@ def score(unit: Unit, reading: readers.Reading) -> dict:
 def _score_cells(unit: Unit, reading: readers.Reading) -> dict:
     squares = sum(len(row) for row in unit.truth_cells)
     k_truth = len(unit.truth_colors)
-    if reading.outcome != "read" or reading.cells is None:
+    if reading.outcome not in SHIPS or reading.cells is None:
         # A refusal or a hold ships no PDF: no confident-wrong square, no correct interior.
         return {"squares": squares, "accuracy_many_to_one": None, "accuracy_one_to_one": None,
                 "fully_correct": False, "confident_wrong": 0, "k_mismatch": None}
-    confidence = reading.confidence or [[1.0] * len(row) for row in reading.cells]
+    # A read without confidences says nothing about which squares it doubted, so none
+    # is flagged by confidence; inventing 1.0 would claim a certainty it never stated.
+    missing = _confidence_missing(reading)
+    confidence = [] if missing else reading.confidence
     many = scoring.map_many_to_one(reading.colors, unit.truth_colors)
     one = scoring.map_one_to_one(reading.colors, unit.truth_colors)
-    kwargs = {"low_confidence_below": reading.low_confidence_below,
+    kwargs = {"low_confidence_below": None if missing else reading.low_confidence_below,
               "flagged_regions": reading.flagged_regions}
     m2o = scoring.score_squares(unit.truth_cells, reading.cells, many, confidence, **kwargs)
     o2o = scoring.score_squares(unit.truth_cells, reading.cells, one, confidence, **kwargs)
@@ -155,7 +187,7 @@ def _base_row(unit: Unit) -> dict:
         "photo": unit.photo, "group": unit.group, "tier": unit.tier, "split": unit.split,
         "license": unit.license, "device_class": unit.device_class, "resolution": unit.resolution,
         "condition": unit.condition, "truth": unit.truth_label, "provenance": unit.truth.provenance,
-        "picker": simulate.PICKER_ANSWER, **unit.extra,
+        "picker": simulate.PICKER_ANSWER, "cell_truth": unit.truth_cells is not None, **unit.extra,
     }
 
 
@@ -170,18 +202,19 @@ def _confirmed_request(unit: Unit, token: str, size: tuple[int, int], corners) -
                 n: Point(x=0.0, y=0.0) for n in ("top_left", "top_right", "bottom_right", "bottom_left")}),
                 bands=[BorderBand(width_squares=w) for w in unit.truth.bands]),
             crop_offset=Point(x=0.0, y=0.0), counts=unit.truth.counts,
-            fabric_count=unit.truth.fabric_count)
+            fabric_count=given_fabrics(unit.truth))
     names = ("top_left", "top_right", "bottom_right", "bottom_left")
     frame = request.frame.model_copy(update={"corners": Corners(**{
         n: Point(x=x, y=y) for n, (x, y) in zip(names, corners)})})
-    return request.model_copy(update={"frame": frame})
+    # The same count auto-corners receives, whichever claim to_read_request preferred.
+    return request.model_copy(update={"frame": frame, "fabric_count": given_fabrics(unit.truth)})
 
 
 def run_unit(unit: Unit) -> list[dict]:
     """Every reader trial on one staged image, each as a report row. An error becomes a
     row with outcome error, so the report counts it instead of shrinking n silently."""
     rows: list[dict] = []
-    with tempfile.TemporaryDirectory(prefix="qrep-eval-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="qrep-eval-", dir=unit.workdir_root) as tmp:
         try:
             path, size = stage(unit, Path(tmp))
         except Exception as error:  # noqa: BLE001 - recorded on the row, never swallowed
@@ -191,19 +224,23 @@ def run_unit(unit: Unit) -> list[dict]:
                    if unit.truth.corners is not None else None)
         pitch = (simulate.square_pitch(corners, unit.truth.counts, unit.truth.bands)
                  if corners is not None and unit.truth.counts is not None else None)
-        fabrics = unit.truth.fabric_count
-        if fabrics is not None and not 2 <= fabrics <= 12:
-            fabrics = None
+        fabrics = given_fabrics(unit.truth)
         for name in unit.readers:
             jobs: list[tuple[dict, object]] = []
             if name == "auto":
                 jobs.append(({"radius_px": None}, lambda: readers.read_auto(path, size)))
-            elif corners is not None and unit.truth.counts is not None:
+            elif corners is None or unit.truth.counts is None:
+                # One row, so the report counts the photo it could not confirm.
+                rows.append({**_base_row(unit), "reader": name, "radius_px": 0, "variant": "true",
+                             "outcome": "skipped", "reason": SKIP_REASON,
+                             "received": {"staged_size": list(size)}})
+            else:
                 key = f"{unit.seed}|{unit.photo}|{unit.resolution}|{unit.condition}"
                 for trial in simulate.corner_trials(corners, unit.radii, unit.trials, key, bounds=size):
                     meta = {"radius_px": trial.radius_px, "trial": trial.trial,
                             "radius_squares": simulate.radius_in_squares(trial.radius_px, pitch)
-                            if pitch else None, "variant": "true"}
+                            if pitch else None, "variant": "true",
+                            "moved_px_mean": sum(trial.moved_px) / len(trial.moved_px)}
                     if name == "auto-corners":
                         jobs.append((meta, lambda c=trial.corners: readers.read_auto(path, size, c, fabrics)))
                     else:

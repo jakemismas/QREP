@@ -38,6 +38,9 @@ class CornerTrial:
     radius_px: float
     trial: int
     corners: list[Point]
+    # Each corner's displacement after clamping, which falls short of radius_px where
+    # the photo's edge stopped it.
+    moved_px: tuple[float, float, float, float]
     picker: str = PICKER_ANSWER
 
 
@@ -50,7 +53,8 @@ def corner_trials(
     for radius in radii:
         for trial in range(1 if radius == 0 else trials):
             rng = random.Random(f"{key}|{radius}|{trial}")
-            out.append(CornerTrial(radius, trial, jitter(corners, radius, rng, bounds=bounds)))
+            moved = jitter(corners, radius, rng, bounds=bounds)
+            out.append(CornerTrial(radius, trial, moved, tuple(_side(a, b) for a, b in zip(corners, moved))))
     return out
 
 

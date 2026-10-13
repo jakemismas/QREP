@@ -15,13 +15,14 @@ from dataclasses import dataclass, field
 from qrep.contract import ReadRequest
 
 # The automatic read has no refusal outcome. no_grid shows "Could not read this
-# photo" (a refusal); non_square_repeat shows "squares uncertain" and hides the read
-# behind a disclosure (a hold); the readable verdicts show the read
-# (web/src/model/verdictStory.ts).
+# photo" (a refusal). non_square_repeat shows "squares uncertain" but sets no failure
+# panel (web/src/model/verdictStory.ts:105), and without one the old app still offers
+# "Open in the editor" and so a PDF (web/src/shell/photo/ResultsScreen.tsx:240): a
+# warning, not a hold. The readable verdicts show the read.
 AUTO_OUTCOMES = {
     "readable": "read",
     "readable_no_repeat": "read",
-    "non_square_repeat": "held",
+    "non_square_repeat": "warned",
     "no_grid": "refused",
 }
 # The old app outlines a square as uncertain below this confidence
@@ -155,7 +156,7 @@ def read_confirmed(request: ReadRequest, staged_size: tuple[int, int]) -> Readin
         cell_size_eighths=cell_size,
         band_eighths=bands,
         # B2b and B3 define the new read's flags; until a result carries them,
-        # no square counts as flagged.
+        # no square counts as flagged (#237).
         low_confidence_below=None,
         flagged_regions=[],
         seconds=seconds,

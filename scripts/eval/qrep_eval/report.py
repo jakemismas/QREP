@@ -1,68 +1,101 @@
 """Report-only scorecards: per-tier metrics with n and Wilson intervals (plan 7.2).
 
 Gate rows use gate truth only; rows built on proposals are provisional and
-never count toward a gate. Nothing here freezes a number: D5 measures the new
+never count toward a gate. The unit of n is the photo: the tier, device and
+gate tables take one row per photo, reader, resolution and condition, at true
+corners and true counts. Nothing here freezes a number: D5 measures the new
 read and Jake freezes the gate.
 """
 
 import subprocess
 from collections import Counter, defaultdict
+from pathlib import Path
 from statistics import median
 
 from qrep_eval import corpus, stats
 
+REPO = Path(__file__).resolve().parents[3]
 BLOCKED = ("held", "refused")
+OUTCOMES = ("read", "warned", "held", "refused")
+# Rows that never enter a rate's n; every rate carries their counts instead.
+UNSCORED = ("error", "skipped")
 TIER_NAMES = {"A": "museum tier A (in scope)", "B": "museum tier B (stress)", "R": "refusal tier"}
 # The section 7.2 metrics that wait on another ticket's merge, and the branch prefix
 # that marks it in this tree's history.
-PENDING = {"G3": ("B3", "slice/s5-b3-"), "G6": ("A3", "slice/s5-a3")}
+PENDING = {"G3": ("B3", "slice/s5-b3-"), "G6": ("A3b", "slice/s5-a3b-")}
 
 
-def merged_in_tree(prefix: str) -> bool | None:
+def merged_in_tree(prefix: str, runner=subprocess.run) -> bool | None:
     """Whether a merge of a branch starting with prefix is in HEAD's history; None
     when git cannot answer (as under Pyodide)."""
     try:
-        log = subprocess.run(["git", "log", "--merges", "--oneline", "HEAD"], capture_output=True,
-                             text=True, check=True).stdout
-    except (OSError, subprocess.CalledProcessError):
+        done = runner(["git", "log", "--merges", "--oneline", "HEAD"], capture_output=True, text=True,
+                      cwd=REPO)
+    except OSError:
         return None
-    return prefix in log
+    if done.returncode != 0:
+        return None
+    return prefix in done.stdout
 
 
-def _valid(rows):
-    return [r for r in rows if r["outcome"] != "error"]
+def _scored(rows):
+    return [r for r in rows if r["outcome"] not in UNSCORED]
+
+
+def _with_unscored(rate: dict, rows) -> dict:
+    return {**rate, "errors": sum(r["outcome"] == "error" for r in rows),
+            "skipped": sum(r["outcome"] == "skipped" for r in rows)}
 
 
 def _blocked_rate(rows):
-    rows = _valid(rows)
-    return stats.rate(sum(r["outcome"] in BLOCKED for r in rows), len(rows))
+    scored = _scored(rows)
+    return _with_unscored(stats.rate(sum(r["outcome"] in BLOCKED for r in scored), len(scored)), rows)
 
 
 def _flag_rate(rows, key):
-    rows = [r for r in _valid(rows) if key in r]
-    return stats.rate(sum(bool(r[key]) for r in rows), len(rows))
+    keyed = [r for r in _scored(rows) if key in r]
+    return _with_unscored(stats.rate(sum(bool(r[key]) for r in keyed), len(keyed)), rows)
+
+
+def _trial_count(rows, key=None) -> dict:
+    """k of n trials and the photos behind them, with no interval: the trials of one
+    photo are not independent draws."""
+    scored = _scored(rows)
+    counted = scored if key is None else [r for r in scored if key in r]
+    hits = sum((r["outcome"] in BLOCKED) if key is None else bool(r[key]) for r in counted)
+    return _with_unscored({"k": hits, "n": len(counted), "photos": len({r["photo"] for r in counted})},
+                          rows)
 
 
 def _summary(rows) -> dict:
-    valid = _valid(rows)
+    scored = _scored(rows)
     in_scope = rows and rows[0]["tier"] != "R"
     out = {
         "n_rows": len(rows),
         "n_photos": len({r["photo"] for r in rows}),
-        "errors": len(rows) - len(valid),
-        "outcomes": dict(Counter(r["outcome"] for r in valid)),
-        "verdicts": dict(Counter(r.get("verdict") for r in valid if r.get("verdict"))),
+        "errors": sum(r["outcome"] == "error" for r in rows),
+        "skipped": sum(r["outcome"] == "skipped" for r in rows),
+        "outcomes": dict(Counter(r["outcome"] for r in scored)),
+        "verdicts": dict(Counter(r.get("verdict") for r in scored if r.get("verdict"))),
     }
     if in_scope:
         out["false_warning"] = _blocked_rate(rows)
         out["count_top1"] = _flag_rate(rows, "dims_exact")
         out["harmonic"] = _flag_rate(rows, "harmonic")
         out["fabric_count_exact"] = _flag_rate(rows, "k_exact")
-        radii = [r["radius_squares"] for r in valid if r.get("radius_squares") is not None]
-        out["mean_radius_squares"] = sum(radii) / len(radii) if radii else None
     else:
         out["refusal_recall"] = _blocked_rate(rows)
     return out
+
+
+def _jitter(rows) -> dict:
+    radii = [r["radius_squares"] for r in _scored(rows) if r.get("radius_squares") is not None]
+    return {
+        "n_rows": len(rows),
+        "mean_radius_squares": sum(radii) / len(radii) if radii else None,
+        "false_warning": _trial_count(rows),
+        "count_top1": _trial_count(rows, "dims_exact"),
+    }
 
 
 def _group(rows, *keys):
@@ -72,61 +105,64 @@ def _group(rows, *keys):
     return {k: groups[k] for k in sorted(groups, key=lambda k: tuple(str(v) for v in k))}
 
 
+def _at_true_corners(rows):
+    """One row per photo, reader, resolution and condition: the read with no corners
+    or at 0 px, with the true counts."""
+    return [r for r in rows if r.get("radius_px") in (None, 0) and r.get("variant", "true") == "true"]
+
+
 def _gate_metrics(rows) -> list[dict]:
-    """G1 to G6 per reader and resolution, gate truth and provisional side by side."""
-    corpus_rows = [r for r in rows if r["group"] == "corpus"]
+    """G1, G2, G4 and G5 per reader, device class and resolution over photo rows, gate
+    truth and provisional side by side."""
     out = []
-    for (reader, resolution), group in _group(corpus_rows, "reader", "resolution").items():
+    for (reader, device, resolution), group in _group(rows, "reader", "device_class", "resolution").items():
         for label in ("gate", "provisional"):
             part = [r for r in group if r["truth"] == label]
             in_scope = [r for r in part if r["tier"] == "A"]
-            gold = [r for r in in_scope if "fully_correct" in r and r.get("radius_px") in (None, 0)]
+            gold_rows = [r for r in in_scope if r.get("cell_truth")]
+            gold = _scored(gold_rows)
             squares = sum(r["squares"] for r in gold)
             wrong = sum(r["confident_wrong"] for r in gold)
-            true_corners = [r for r in in_scope if r.get("radius_px") in (None, 0)]
-            entry = {
-                "reader": reader, "resolution": resolution, "truth": label,
-                "G1": stats.rate(sum(r["fully_correct"] for r in gold), len(gold)),
-                "G2": {"k": wrong, "n": squares, "rate": wrong / squares if squares else None},
+            out.append({
+                "reader": reader, "device_class": device, "resolution": resolution, "truth": label,
+                "G1": _with_unscored(stats.rate(sum(bool(r["fully_correct"]) for r in gold), len(gold)),
+                                     gold_rows),
+                # Squares cluster by photo, so the photo count travels with the rate.
+                "G2": {**_with_unscored(stats.rate(wrong, squares), gold_rows), "photos": len(gold)},
                 "G4": _blocked_rate([r for r in part if r["tier"] == "R"]),
-                "G5": _blocked_rate(true_corners),
-            }
-            out.append(entry)
+                "G5": _blocked_rate(in_scope),
+            })
     return out
 
 
-def _pending() -> dict:
+def _pending(runner=subprocess.run) -> dict:
     out = {}
     for metric, (ticket, prefix) in PENDING.items():
-        merged = merged_in_tree(prefix)
+        merged = merged_in_tree(prefix, runner)
         if merged:
             out[metric] = f"n/a: {ticket} is merged in this tree, and wiring {metric} is D5's"
         else:
             out[metric] = f"n/a until {ticket} merges" + ("" if merged is False else " (git unavailable)")
-    out["G3"] += "; the automatic read takes no counts, so a miscount cannot be simulated for it"
+    out["G3"] += ("; the automatic read takes no counts, so a miscount cannot be simulated for it; "
+                  "#237 tracks wiring G3")
     return out
 
 
-def aggregate(rows: list[dict]) -> dict:
+def aggregate(rows: list[dict], *, runner=subprocess.run) -> dict:
     true_rows = [r for r in rows if r.get("variant", "true") == "true"]
     corpus_rows = [r for r in true_rows if r["group"] == "corpus"]
+    photo_rows = _at_true_corners(corpus_rows)
     tier_a = [r for r in corpus_rows if r["tier"] == "A"]
     by_tier = {" | ".join(map(str, k)): _summary(g) for k, g in _group(
-        corpus_rows, "reader", "tier", "resolution").items()}
-    by_device = {}
-    for (reader, device, resolution), group in _group(corpus_rows, "reader", "device_class", "resolution").items():
-        by_device[f"{reader} | {device} | {resolution}"] = {
-            "in_scope": _summary([r for r in group if r["tier"] != "R"]) if any(
-                r["tier"] != "R" for r in group) else None,
-            "refusal": _summary([r for r in group if r["tier"] == "R"]) if any(
-                r["tier"] == "R" for r in group) else None,
-        }
-    jitter = {" | ".join(map(str, k)): _summary(g) for k, g in _group(
+        photo_rows, "reader", "tier", "resolution").items()}
+    by_device = {" | ".join(map(str, k)): _summary(g) for k, g in _group(
+        photo_rows, "reader", "tier", "device_class", "resolution").items()}
+    jitter = {" | ".join(map(str, k)): _jitter(g) for k, g in _group(
         [r for r in tier_a if r.get("radius_px") is not None], "reader", "resolution", "radius_px").items()}
     stress = {" | ".join(map(str, k)): _summary(g) for k, g in _group(
-        [r for r in true_rows if r["group"] == "stress"], "reader", "condition").items()}
-    auto_a = [r for r in tier_a if r["reader"] == "auto"]
-    seconds = [r["seconds"] for r in _valid(true_rows) if "seconds" in r]
+        _at_true_corners([r for r in true_rows if r["group"] == "stress"]), "reader", "condition").items()}
+    auto_a = [r for r in photo_rows if r["tier"] == "A" and r["reader"] == "auto"]
+    seconds = [r["seconds"] for r in _scored(true_rows) if "seconds" in r]
     r1 = {}
     for resolution, group in _group(auto_a, "resolution").items():
         r1[resolution[0]] = {
@@ -138,8 +174,8 @@ def aggregate(rows: list[dict]) -> dict:
         }
     miscounts = [r for r in rows if r.get("variant", "true") != "true"]
     return {
-        "gate_metrics": _gate_metrics(true_rows),
-        "pending": _pending(),
+        "gate_metrics": _gate_metrics(photo_rows),
+        "pending": _pending(runner),
         "by_tier": by_tier,
         "by_device_class": by_device,
         "device_classes_without_photos": sorted(
@@ -160,21 +196,34 @@ def aggregate(rows: list[dict]) -> dict:
     }
 
 
-def _fmt(rate: dict | None) -> str:
-    if not rate or rate.get("n", 0) == 0 or rate.get("rate") is None:
+def _unscored(rate: dict) -> str:
+    text = f", {rate['errors']} errors" if rate.get("errors") else ""
+    return text + (f", {rate['skipped']} skipped" if rate.get("skipped") else "")
+
+
+def _fmt(rate: dict | None, what: str = "", digits: int = 3) -> str:
+    if not rate:
         return "n = 0"
-    text = f"{rate['k']}/{rate['n']} = {rate['rate']:.3f}"
+    if rate.get("n", 0) == 0 or rate.get("rate") is None:
+        return "n = 0" + _unscored(rate)
+    text = f"{rate['k']}/{rate['n']}{' ' + what if what else ''} = {rate['rate']:.{digits}f}"
     if rate.get("wilson95"):
         lo, hi = rate["wilson95"]
-        text += f" [{lo:.3f}, {hi:.3f}]"
+        text += f" [{lo:.{digits}f}, {hi:.{digits}f}]"
     if rate.get("rule_of_three") is not None:
-        text += f", 3/n = {rate['rule_of_three']:.3f}"
-    return text
+        text += f", 3/n = {rate['rule_of_three']:.{digits}f}"
+    return text + _unscored(rate)
+
+
+def _fmt_trials(count: dict) -> str:
+    if count["n"] == 0:
+        return "n = 0" + _unscored(count)
+    return f"{count['k']}/{count['n']} trials, {count['photos']} photos" + _unscored(count)
 
 
 def _outcomes(summary: dict) -> str:
     o = summary["outcomes"]
-    return f"{o.get('read', 0)} / {o.get('held', 0)} / {o.get('refused', 0)}"
+    return " / ".join(str(o.get(name, 0)) for name in OUTCOMES)
 
 
 def _verdicts(summary: dict) -> str:
@@ -186,52 +235,61 @@ def markdown(report: dict) -> str:
     lines = [f"# {h['title']}", ""]
     lines += [f"- {k.replace('_', ' ').capitalize()}: {v}" for k, v in h.items() if k != "title"]
     lines += ["", "Rates read k/n = rate [Wilson 95 percent interval]; a zero count adds its 3/n bound. "
-              "Outcomes read read / held / refused. Provisional rows rest on proposals, never on gate "
+              "Error and skipped rows never enter n; a rate lists them after it. n counts photos: one "
+              "row per photo, reader, resolution and condition, read at true corners and true counts. "
+              "Outcomes read read / warned / held / refused. False warning, refusal recall and G4 and "
+              "G5 count holds and refusals only: a warned read still offers the editor and its PDF. "
+              "Provisional rows rest on proposals, never on gate "
               "truth, and count toward no gate. Nothing here is frozen (plan 7.2).", ""]
     lines += ["## Section 7.2 metrics", "",
-              "| Reader | Resolution | Truth | G1 fully correct interior | G2 confident-wrong squares "
-              "| G4 refusal recall | G5 false warning (true corners) |", "|---|---|---|---|---|---|---|"]
+              "| Reader | Device class | Resolution | Truth | G1 fully correct interior "
+              "| G2 confident-wrong squares | G4 refusal recall | G5 false warning (true corners) |",
+              "|---|---|---|---|---|---|---|---|"]
     for e in a["gate_metrics"]:
         g2 = e["G2"]
-        g2_text = f"{g2['k']}/{g2['n']} squares = {g2['rate']:.4f}" if g2["n"] else "n = 0"
-        lines.append(f"| {e['reader']} | {e['resolution']} | {e['truth']} | {_fmt(e['G1'])} | {g2_text} "
+        lines.append(f"| {e['reader']} | {e['device_class']} | {e['resolution']} | {e['truth']} "
+                     f"| {_fmt(e['G1'])} | {g2['photos']} photos: {_fmt(g2, 'squares', 4)} "
                      f"| {_fmt(e['G4'])} | {_fmt(e['G5'])} |")
     lines += ["", "- G5 for auto counts its read with no corners, since the automatic read takes none; "
-              "auto-corners and confirmed count their 0 px trials."]
+              "auto-corners and confirmed count their 0 px trials.",
+              "- G2 counts squares, which cluster by photo; its interval treats them as independent, so "
+              "it is too narrow. The photo count says how many gold photos stand behind it."]
     lines += [f"- {k}: {v}" for k, v in a["pending"].items()]
-    lines += ["- G1 and G2 need D3b's gold layouts; until a corpus photo has one, they read n = 0 on "
-              "the corpus. The named rows below carry synthetic cell truth.", ""]
+    lines += ["- G1 and G2 need gold layouts, and the harness has no gold-layout loader yet (D3b defines "
+              "corpus/gold/; #237 tracks loading it), so they read n = 0 on the corpus. The named rows "
+              "below carry synthetic cell truth.", ""]
     lines += ["## Per tier and resolution", "",
-              "| Reader | Tier | Resolution | Photos | Rows | Errors | Outcomes | Rate | Count top-1 "
-              "| Fabric count exact | Verdicts |", "|---|---|---|---|---|---|---|---|---|---|---|"]
+              "| Reader | Tier | Resolution | Photos | Rows | Errors | Skipped | Outcomes | Rate "
+              "| Count top-1 | Fabric count exact | Verdicts |", "|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for key, s in a["by_tier"].items():
         reader, tier, resolution = key.split(" | ")
         rate = s.get("false_warning") or s.get("refusal_recall")
         label = "false warning " if "false_warning" in s else "refusal recall "
         lines.append(f"| {reader} | {TIER_NAMES.get(tier, tier)} | {resolution} | {s['n_photos']} "
-                     f"| {s['n_rows']} | {s['errors']} | {_outcomes(s)} | {label}{_fmt(rate)} "
+                     f"| {s['n_rows']} | {s['errors']} | {s['skipped']} | {_outcomes(s)} | {label}{_fmt(rate)} "
                      f"| {_fmt(s.get('count_top1'))} | {_fmt(s.get('fabric_count_exact'))} "
                      f"| {_verdicts(s)} |")
     lines += ["", "## Per device class", "",
-              "| Reader | Device class | Resolution | In scope: false warning | Refusal tier: recall |",
-              "|---|---|---|---|---|"]
-    for key, d in a["by_device_class"].items():
-        reader, device, resolution = key.split(" | ")
-        fw = _fmt(d["in_scope"]["false_warning"]) if d["in_scope"] else "n = 0"
-        rr = _fmt(d["refusal"]["refusal_recall"]) if d["refusal"] else "n = 0"
-        lines.append(f"| {reader} | {device} | {resolution} | {fw} | {rr} |")
+              "| Reader | Tier | Device class | Resolution | Photos | Outcomes | Rate |",
+              "|---|---|---|---|---|---|---|"]
+    for key, s in a["by_device_class"].items():
+        reader, tier, device, resolution = key.split(" | ")
+        rate = (f"false warning {_fmt(s['false_warning'])}" if "false_warning" in s
+                else f"refusal recall {_fmt(s['refusal_recall'])}")
+        lines.append(f"| {reader} | {TIER_NAMES.get(tier, tier)} | {device} | {resolution} | {s['n_photos']} "
+                     f"| {_outcomes(s)} | {rate} |")
     for device in a["device_classes_without_photos"]:
-        lines.append(f"| every reader | {device} | every resolution | n = 0 | n = 0 |")
+        lines.append(f"| every reader | every tier | {device} | every resolution | 0 | none | n = 0 |")
     lines += ["", "## Corner jitter (museum tier A)", "",
+              "Trials of one photo are not independent, so these rows give k/n trials and the photo "
+              "count, with no interval and no 3/n bound.", "",
               "| Reader | Resolution | Radius px | Mean radius in squares | Rows | False warning "
               "| Count top-1 |", "|---|---|---|---|---|---|---|"]
     for key, s in a["jitter"].items():
         reader, resolution, radius = key.split(" | ")
         mean = s.get("mean_radius_squares")
-        lines.append(f"| {reader} | {resolution} | {radius} | {mean:.3f} | {s['n_rows']} "
-                     f"| {_fmt(s['false_warning'])} | {_fmt(s['count_top1'])} |" if mean is not None else
-                     f"| {reader} | {resolution} | {radius} | n/a | {s['n_rows']} "
-                     f"| {_fmt(s['false_warning'])} | {_fmt(s['count_top1'])} |")
+        lines.append(f"| {reader} | {resolution} | {radius} | {'n/a' if mean is None else f'{mean:.3f}'} "
+                     f"| {s['n_rows']} | {_fmt_trials(s['false_warning'])} | {_fmt_trials(s['count_top1'])} |")
     lines += ["", "## Stress: degradations", "", "Parameters: " + h.get("degradations", "none") + ".", "",
               "| Reader | Degradation | Photos | Outcomes | False warning | Count top-1 | Verdicts |",
               "|---|---|---|---|---|---|---|"]
@@ -240,8 +298,10 @@ def markdown(report: dict) -> str:
         lines.append(f"| {reader} | {condition} | {s['n_photos']} | {_outcomes(s)} "
                      f"| {_fmt(s['false_warning'])} | {_fmt(s['count_top1'])} | {_verdicts(s)} |")
     lines += ["", "## Named rows: photoreal fixtures (#82)", "",
-              "Read with their sidecar corners and counts (auto-corners) and without (auto). Cell truth "
-              "is the fixture generator's, so these rows are synthetic, not a gate tier.", "",
+              "auto-corners reads each fixture with its sidecar corners and fabric count, auto with "
+              "neither; the automatic read takes no counts, so the sidecar counts reach only the "
+              "confirmed reader. Cell truth is the fixture generator's, so these rows are synthetic, "
+              "not a gate tier.", "",
               "| Fixture | Cap | Reader | Verdict | Read dims | Truth dims | k read / truth "
               "| Accuracy many-to-one | Accuracy one-to-one | Fully correct | Confident-wrong |",
               "|---|---|---|---|---|---|---|---|---|---|---|"]
@@ -249,7 +309,7 @@ def markdown(report: dict) -> str:
         acc = r.get("accuracy_many_to_one")
         one = r.get("accuracy_one_to_one")
         lines.append(
-            f"| {r['photo']} | {r['resolution']} | {r['reader']} | {r.get('verdict')} "
+            f"| {r['photo']} | {r['resolution']} | {r['reader']} | {r.get('verdict') or r['outcome']} "
             f"| {r.get('read_dims')} | {r.get('truth_dims')} | {r.get('k_read')} / {r.get('k_truth')} "
             f"| {'n/a' if acc is None else f'{acc:.4f}'} | {'n/a' if one is None else f'{one:.4f}'} "
             f"| {r.get('fully_correct', 'n/a')} | {r.get('confident_wrong', 'n/a')} |")
@@ -277,8 +337,7 @@ def markdown(report: dict) -> str:
 def per_photo(rows: list[dict]) -> list[dict]:
     """Museum tier A at true corners (radius 0, or no corners): one line per photo,
     resolution and reader."""
-    picked = [r for r in rows if r["group"] == "corpus" and r["tier"] == "A"
-              and r.get("radius_px") in (None, 0) and r.get("variant", "true") == "true"]
+    picked = [r for r in _at_true_corners(rows) if r["group"] == "corpus" and r["tier"] == "A"]
     out = []
     for (photo, resolution, reader), group in _group(picked, "photo", "resolution", "reader").items():
         r = group[0]
