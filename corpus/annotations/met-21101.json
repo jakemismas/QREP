@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "photo": "private/cache/met-21101.jpg",
+  "sha256": "f728d649cbad52473669ef4a1443698103cce8dfe3534ea8b052c975035d8cfc",
+  "canvas": [
+    3833,
+    3742
+  ],
+  "construction_class": [
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-b"
+    }
+  ],
+  "refusal_class": [
+    {
+      "value": "applique",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "applique",
+      "provenance": "proposed-b"
+    }
+  ],
+  "finished_size": [
+    {
+      "value": {
+        "width_in": 70.0,
+        "height_in": 69.5,
+        "approximate": true,
+        "source_text": "70 \u00d7 69 1/2 in. (177.8 \u00d7 176.5 cm)"
+      },
+      "provenance": "source-record"
+    }
+  ],
+  "capture": [
+    {
+      "value": "museum_scan",
+      "provenance": "screened"
+    }
+  ],
+  "device_class": [
+    {
+      "value": "museum",
+      "provenance": "screened"
+    }
+  ],
+  "masks": [
+    {
+      "value": [
+        {
+          "polygon": [
+            {
+              "x": 120.0,
+              "y": 50.0
+            },
+            {
+              "x": 505.0,
+              "y": 50.0
+            },
+            {
+              "x": 505.0,
+              "y": 138.0
+            },
+            {
+              "x": 120.0,
+              "y": 138.0
+            }
+          ],
+          "reason": "label"
+        }
+      ],
+      "provenance": "proposed-a"
+    },
+    {
+      "value": [
+        {
+          "polygon": [
+            {
+              "x": 132.0,
+              "y": 48.0
+            },
+            {
+              "x": 510.0,
+              "y": 62.0
+            },
+            {
+              "x": 510.0,
+              "y": 138.0
+            },
+            {
+              "x": 132.0,
+              "y": 138.0
+            }
+          ],
+          "reason": "label"
+        }
+      ],
+      "provenance": "proposed-b"
+    }
+  ]
+}

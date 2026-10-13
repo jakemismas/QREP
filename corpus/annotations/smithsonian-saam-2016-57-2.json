@@ -1,0 +1,180 @@
+{
+  "schema_version": 1,
+  "photo": "private/cache/smithsonian-saam-2016-57-2.jpg",
+  "sha256": "bff136de6b8939a314b5edda8f32785dab97a00930db798971278601dc24a03e",
+  "canvas": [
+    2589,
+    3000
+  ],
+  "frame": [
+    {
+      "value": {
+        "outer_edge": {
+          "kind": "outer_edge",
+          "corners": {
+            "top_left": {
+              "x": 73.0,
+              "y": 61.0
+            },
+            "top_right": {
+              "x": 2552.0,
+              "y": 55.0
+            },
+            "bottom_right": {
+              "x": 2561.0,
+              "y": 2948.0
+            },
+            "bottom_left": {
+              "x": 38.0,
+              "y": 2925.0
+            }
+          },
+          "bands": [
+            {
+              "width_squares": 0.35
+            },
+            {
+              "width_squares": 2.3
+            },
+            {
+              "width_squares": 0.9
+            }
+          ]
+        },
+        "field": {
+          "kind": "field",
+          "corners": {
+            "top_left": {
+              "x": 273.0,
+              "y": 203.0
+            },
+            "top_right": {
+              "x": 2342.0,
+              "y": 210.0
+            },
+            "bottom_right": {
+              "x": 2398.0,
+              "y": 2799.0
+            },
+            "bottom_left": {
+              "x": 200.0,
+              "y": 2763.0
+            }
+          }
+        }
+      },
+      "provenance": "proposed-a"
+    },
+    {
+      "value": {
+        "outer_edge": {
+          "kind": "outer_edge",
+          "corners": {
+            "top_left": {
+              "x": 75.0,
+              "y": 55.0
+            },
+            "top_right": {
+              "x": 2548.0,
+              "y": 57.0
+            },
+            "bottom_right": {
+              "x": 2561.0,
+              "y": 2953.0
+            },
+            "bottom_left": {
+              "x": 40.0,
+              "y": 2925.0
+            }
+          },
+          "bands": [
+            {
+              "width_squares": 0.5
+            },
+            {
+              "width_squares": 3.0
+            }
+          ]
+        },
+        "field": {
+          "kind": "field",
+          "corners": {
+            "top_left": {
+              "x": 285.0,
+              "y": 203.0
+            },
+            "top_right": {
+              "x": 2371.0,
+              "y": 210.0
+            },
+            "bottom_right": {
+              "x": 2399.0,
+              "y": 2797.0
+            },
+            "bottom_left": {
+              "x": 200.0,
+              "y": 2763.0
+            }
+          }
+        }
+      },
+      "provenance": "proposed-b"
+    }
+  ],
+  "counts": [
+    {
+      "value": {
+        "blocks_across": 5,
+        "squares_per_block_across": 9,
+        "blocks_down": 6,
+        "squares_per_block_down": 9
+      },
+      "provenance": "proposed-a"
+    },
+    {
+      "value": {
+        "blocks_across": 5,
+        "squares_per_block_across": 9,
+        "blocks_down": 6,
+        "squares_per_block_down": 9
+      },
+      "provenance": "proposed-b"
+    }
+  ],
+  "construction_class": [
+    {
+      "value": "squares",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "squares",
+      "provenance": "proposed-b"
+    }
+  ],
+  "fabrics": [
+    {
+      "value": {
+        "count": 2
+      },
+      "provenance": "proposed-a"
+    },
+    {
+      "value": {
+        "count": 3
+      },
+      "provenance": "proposed-b"
+    }
+  ],
+  "capture": [
+    {
+      "value": "museum_scan",
+      "provenance": "screened"
+    }
+  ],
+  "device_class": [
+    {
+      "value": "museum",
+      "provenance": "screened"
+    }
+  ]
+}

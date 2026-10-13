@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "photo": "private/cache/met-854569.jpg",
+  "sha256": "17ebe138da3847b195d6935d0d4360329fdcdd2207f25661f52fffca12991c45",
+  "canvas": [
+    3846,
+    4000
+  ],
+  "construction_class": [
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-b"
+    }
+  ],
+  "refusal_class": [
+    {
+      "value": "medallion",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "medallion",
+      "provenance": "proposed-b"
+    }
+  ],
+  "finished_size": [
+    {
+      "value": {
+        "width_in": 69.0,
+        "height_in": 70.0,
+        "approximate": true,
+        "source_text": "69 \u00d7 70 in. (175.3 \u00d7 177.8 cm)"
+      },
+      "provenance": "source-record"
+    }
+  ],
+  "capture": [
+    {
+      "value": "museum_scan",
+      "provenance": "screened"
+    }
+  ],
+  "device_class": [
+    {
+      "value": "museum",
+      "provenance": "screened"
+    }
+  ]
+}

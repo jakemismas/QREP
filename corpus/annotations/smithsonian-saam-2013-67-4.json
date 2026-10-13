@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "photo": "private/cache/smithsonian-saam-2013-67-4.jpg",
+  "sha256": "de0edaa876e57979e06dbe795ebb049acdee7f877c7ceac352739b7d24983095",
+  "canvas": [
+    2855,
+    3000
+  ],
+  "construction_class": [
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-b"
+    }
+  ],
+  "refusal_class": [
+    {
+      "value": "medallion",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "medallion",
+      "provenance": "proposed-b"
+    }
+  ],
+  "finished_size": [
+    {
+      "value": {
+        "width_in": 46.0,
+        "height_in": 46.0,
+        "approximate": true,
+        "source_text": "46 x 46 in. (116.8 x 116.8 cm)"
+      },
+      "provenance": "source-record"
+    }
+  ],
+  "capture": [
+    {
+      "value": "museum_scan",
+      "provenance": "screened"
+    }
+  ],
+  "device_class": [
+    {
+      "value": "museum",
+      "provenance": "screened"
+    }
+  ]
+}

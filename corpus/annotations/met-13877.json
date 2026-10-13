@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "photo": "private/cache/met-13877.jpg",
+  "sha256": "4d83343634ef7b7a274e376430710ff052c231e3df805e847c5b4a107ce0e11c",
+  "canvas": [
+    3963,
+    3855
+  ],
+  "construction_class": [
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-b"
+    }
+  ],
+  "refusal_class": [
+    {
+      "value": "applique",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "applique",
+      "provenance": "proposed-b"
+    }
+  ],
+  "finished_size": [
+    {
+      "value": {
+        "width_in": 85.0,
+        "height_in": 83.38,
+        "approximate": true,
+        "source_text": "83 3/8 x 85 in. (211.8 x 215.9 cm)"
+      },
+      "provenance": "source-record"
+    }
+  ],
+  "capture": [
+    {
+      "value": "museum_scan",
+      "provenance": "screened"
+    }
+  ],
+  "device_class": [
+    {
+      "value": "museum",
+      "provenance": "screened"
+    }
+  ]
+}

@@ -1,0 +1,182 @@
+{
+  "schema_version": 1,
+  "photo": "private/cache/smithsonian-saam-1998-149-21.jpg",
+  "sha256": "59469cb3202d1dadb26c9628f7951889c7cb9c0fbcbc5530778ed05a6d3bb8d5",
+  "canvas": [
+    3000,
+    2709
+  ],
+  "frame": [
+    {
+      "value": {
+        "outer_edge": {
+          "kind": "outer_edge",
+          "corners": {
+            "top_left": {
+              "x": 55.0,
+              "y": 27.0
+            },
+            "top_right": {
+              "x": 2972.0,
+              "y": 61.0
+            },
+            "bottom_right": {
+              "x": 2943.0,
+              "y": 2657.0
+            },
+            "bottom_left": {
+              "x": 25.0,
+              "y": 2623.0
+            }
+          },
+          "bands": [
+            {
+              "width_squares": 1.4
+            }
+          ]
+        },
+        "field": {
+          "kind": "field",
+          "corners": {
+            "top_left": {
+              "x": 230.0,
+              "y": 193.0
+            },
+            "top_right": {
+              "x": 2800.0,
+              "y": 213.0
+            },
+            "bottom_right": {
+              "x": 2777.0,
+              "y": 2493.0
+            },
+            "bottom_left": {
+              "x": 203.0,
+              "y": 2467.0
+            }
+          }
+        }
+      },
+      "provenance": "proposed-a"
+    },
+    {
+      "value": {
+        "outer_edge": {
+          "kind": "outer_edge",
+          "corners": {
+            "top_left": {
+              "x": 55.0,
+              "y": 27.0
+            },
+            "top_right": {
+              "x": 2973.0,
+              "y": 57.0
+            },
+            "bottom_right": {
+              "x": 2943.0,
+              "y": 2665.0
+            },
+            "bottom_left": {
+              "x": 25.0,
+              "y": 2631.0
+            }
+          },
+          "bands": [
+            {
+              "width_squares": 1.5
+            }
+          ]
+        },
+        "field": {
+          "kind": "field",
+          "corners": {
+            "top_left": {
+              "x": 230.0,
+              "y": 192.0
+            },
+            "top_right": {
+              "x": 2800.0,
+              "y": 215.0
+            },
+            "bottom_right": {
+              "x": 2777.0,
+              "y": 2501.0
+            },
+            "bottom_left": {
+              "x": 203.0,
+              "y": 2476.0
+            }
+          }
+        }
+      },
+      "provenance": "proposed-b"
+    }
+  ],
+  "counts": [
+    {
+      "value": {
+        "blocks_across": 1,
+        "squares_per_block_across": 22,
+        "blocks_down": 1,
+        "squares_per_block_down": 21
+      },
+      "provenance": "proposed-a"
+    },
+    {
+      "value": {
+        "blocks_across": 1,
+        "squares_per_block_across": 22,
+        "blocks_down": 1,
+        "squares_per_block_down": 21
+      },
+      "provenance": "proposed-b"
+    }
+  ],
+  "construction_class": [
+    {
+      "value": "squares",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "squares",
+      "provenance": "proposed-b"
+    }
+  ],
+  "fabrics": [
+    {
+      "value": {
+        "count": 3
+      },
+      "provenance": "proposed-a"
+    },
+    {
+      "value": {
+        "count": 3
+      },
+      "provenance": "proposed-b"
+    }
+  ],
+  "finished_size": [
+    {
+      "value": {
+        "width_in": 94.0,
+        "height_in": 83.0,
+        "approximate": true,
+        "source_text": "94 \u00d7 83 in. (238.8 \u00d7 210.8 cm)"
+      },
+      "provenance": "source-record"
+    }
+  ],
+  "capture": [
+    {
+      "value": "museum_scan",
+      "provenance": "screened"
+    }
+  ],
+  "device_class": [
+    {
+      "value": "museum",
+      "provenance": "screened"
+    }
+  ]
+}

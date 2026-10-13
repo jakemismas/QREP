@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "photo": "private/cache/smithsonian-saam-2017-24-10.jpg",
+  "sha256": "c455eea47415b4fd41dfc35ad604cfc5af06cfd89d57fc14de1d9a300979ce50",
+  "canvas": [
+    2959,
+    3000
+  ],
+  "construction_class": [
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-b"
+    }
+  ],
+  "refusal_class": [
+    {
+      "value": "on_point",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "on_point",
+      "provenance": "proposed-b"
+    }
+  ],
+  "finished_size": [
+    {
+      "value": {
+        "width_in": 76.5,
+        "height_in": 77.0,
+        "approximate": true,
+        "source_text": "77 \u00d7 76 1/2 in. (195.6 \u00d7 194.3 cm)"
+      },
+      "provenance": "source-record"
+    }
+  ],
+  "capture": [
+    {
+      "value": "museum_scan",
+      "provenance": "screened"
+    }
+  ],
+  "device_class": [
+    {
+      "value": "museum",
+      "provenance": "screened"
+    }
+  ]
+}

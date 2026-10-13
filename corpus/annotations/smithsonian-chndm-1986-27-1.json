@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "photo": "private/cache/smithsonian-chndm-1986-27-1.jpg",
+  "sha256": "acb59b1fdfb7199e5262e2104f6ec172d76b41540c8b9938c579d205cc761151",
+  "canvas": [
+    5038,
+    7721
+  ],
+  "construction_class": [
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-b"
+    }
+  ],
+  "refusal_class": [
+    {
+      "value": "hexagon",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "hexagon",
+      "provenance": "proposed-b"
+    }
+  ],
+  "finished_size": [
+    {
+      "value": {
+        "width_in": 37.0,
+        "height_in": 58.5,
+        "approximate": true,
+        "source_text": "H x W: 148.6 x 94 cm (58 1/2 x 37 in.)"
+      },
+      "provenance": "source-record"
+    }
+  ],
+  "capture": [
+    {
+      "value": "museum_scan",
+      "provenance": "screened"
+    }
+  ],
+  "device_class": [
+    {
+      "value": "museum",
+      "provenance": "screened"
+    }
+  ]
+}

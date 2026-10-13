@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "photo": "private/cache/smithsonian-chndm-1962-184-1.jpg",
+  "sha256": "0b586bdcd02ec1afe79f3e5c6a485897087ecb87fe00777b1ab8fd0733b43863",
+  "canvas": [
+    6965,
+    5287
+  ],
+  "construction_class": [
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-b"
+    }
+  ],
+  "refusal_class": [
+    {
+      "value": "applique",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "applique",
+      "provenance": "proposed-b"
+    }
+  ],
+  "finished_size": [
+    {
+      "value": {
+        "width_in": 41.12,
+        "height_in": 30.69,
+        "approximate": true,
+        "source_text": "H x W: 104.5 x 77.9 cm (41 1/8 x 30 11/16 in.)"
+      },
+      "provenance": "source-record"
+    }
+  ],
+  "capture": [
+    {
+      "value": "museum_scan",
+      "provenance": "screened"
+    }
+  ],
+  "device_class": [
+    {
+      "value": "museum",
+      "provenance": "screened"
+    }
+  ]
+}

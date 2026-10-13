@@ -1,0 +1,188 @@
+{
+  "schema_version": 1,
+  "photo": "private/cache/smithsonian-nmah-556330.jpg",
+  "sha256": "9c36d51be65b2654e59b61e9b9bbe448f71d3c761af5aae7bed8cfa70be68f44",
+  "canvas": [
+    4863,
+    6236
+  ],
+  "construction_class": [
+    {
+      "value": "squares",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "squares",
+      "provenance": "proposed-b"
+    }
+  ],
+  "finished_size": [
+    {
+      "value": {
+        "width_in": 79.0,
+        "height_in": 92.0,
+        "approximate": true,
+        "source_text": "overall: 92 in x 79 in; 234 cm x 201 cm"
+      },
+      "provenance": "source-record"
+    }
+  ],
+  "capture": [
+    {
+      "value": "museum_scan",
+      "provenance": "screened"
+    }
+  ],
+  "device_class": [
+    {
+      "value": "museum",
+      "provenance": "screened"
+    }
+  ],
+  "masks": [
+    {
+      "value": [
+        {
+          "polygon": [
+            {
+              "x": 0.0,
+              "y": 3750.0
+            },
+            {
+              "x": 840.0,
+              "y": 3750.0
+            },
+            {
+              "x": 840.0,
+              "y": 5260.0
+            },
+            {
+              "x": 1020.0,
+              "y": 5260.0
+            },
+            {
+              "x": 1020.0,
+              "y": 6236.0
+            },
+            {
+              "x": 0.0,
+              "y": 6236.0
+            }
+          ],
+          "reason": "label"
+        },
+        {
+          "polygon": [
+            {
+              "x": 1665.0,
+              "y": 1215.0
+            },
+            {
+              "x": 2190.0,
+              "y": 1215.0
+            },
+            {
+              "x": 2190.0,
+              "y": 2700.0
+            },
+            {
+              "x": 1665.0,
+              "y": 2700.0
+            }
+          ],
+          "reason": "label"
+        }
+      ],
+      "provenance": "proposed-a"
+    },
+    {
+      "value": [
+        {
+          "polygon": [
+            {
+              "x": 0.0,
+              "y": 3740.0
+            },
+            {
+              "x": 860.0,
+              "y": 3740.0
+            },
+            {
+              "x": 860.0,
+              "y": 6236.0
+            },
+            {
+              "x": 0.0,
+              "y": 6236.0
+            }
+          ],
+          "reason": "label"
+        },
+        {
+          "polygon": [
+            {
+              "x": 800.0,
+              "y": 5300.0
+            },
+            {
+              "x": 1020.0,
+              "y": 5300.0
+            },
+            {
+              "x": 1020.0,
+              "y": 6236.0
+            },
+            {
+              "x": 800.0,
+              "y": 6236.0
+            }
+          ],
+          "reason": "label"
+        },
+        {
+          "polygon": [
+            {
+              "x": 1670.0,
+              "y": 1220.0
+            },
+            {
+              "x": 2200.0,
+              "y": 1220.0
+            },
+            {
+              "x": 2200.0,
+              "y": 2710.0
+            },
+            {
+              "x": 1670.0,
+              "y": 2710.0
+            }
+          ],
+          "reason": "label"
+        },
+        {
+          "polygon": [
+            {
+              "x": 580.0,
+              "y": 2380.0
+            },
+            {
+              "x": 1420.0,
+              "y": 2380.0
+            },
+            {
+              "x": 1420.0,
+              "y": 2500.0
+            },
+            {
+              "x": 580.0,
+              "y": 2500.0
+            }
+          ],
+          "reason": "label"
+        }
+      ],
+      "provenance": "proposed-b"
+    }
+  ]
+}

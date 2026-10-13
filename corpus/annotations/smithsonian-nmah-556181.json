@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "photo": "private/cache/smithsonian-nmah-556181.jpg",
+  "sha256": "577b5820e832e121e52630798f2afe258a1136495381eddf5d1db6e371817622",
+  "canvas": [
+    11778,
+    11507
+  ],
+  "construction_class": [
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "out_of_scope",
+      "provenance": "proposed-b"
+    }
+  ],
+  "refusal_class": [
+    {
+      "value": "diamond_star",
+      "provenance": "proposed-a"
+    },
+    {
+      "value": "diamond_star",
+      "provenance": "proposed-b"
+    }
+  ],
+  "finished_size": [
+    {
+      "value": {
+        "width_in": 85.0,
+        "height_in": 82.0,
+        "approximate": true,
+        "source_text": "overall: 85 in x 82 in; 216 cm x 209 cm"
+      },
+      "provenance": "source-record"
+    }
+  ],
+  "capture": [
+    {
+      "value": "museum_scan",
+      "provenance": "screened"
+    }
+  ],
+  "device_class": [
+    {
+      "value": "museum",
+      "provenance": "screened"
+    }
+  ]
+}
