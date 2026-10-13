@@ -119,6 +119,18 @@ Your pattern. Plan section 2.1 holds the screen-level rules and copy.
   stays in view from 720 px while the side column scrolls. Until the editor goes (C6a), See your
   pattern is the results screen's primary action, and Open in the editor and the start screen's
   old demo entry stay as secondary actions.
+  Your pattern also sets the finished size and the fabric widths (C2b). A preset chip from
+  bridge.presets(), or a typed width, height or both in inches or centimeters (the shared fraction
+  grammar; centimeters convert at entry), goes to size_pattern, which sizes the opened quilt with
+  no re-read; every size starts from the opened quilt, never a sized copy (section 6.3). The size
+  line shows the achieved size the summary gives, your request beside it when the two differ, and
+  any size you did not set labeled a default with its square size, never a measurement. Fabric
+  width for cutting strips (default 40 in) and Backing fabric width (default 42 in, with a 108 in
+  wide back) are settings in the model sent to export_pattern, so a change asks for the pattern
+  again and shows the width in force (the sample's stored 42 in for cutting until A6). The census
+  shows each fabric's yards, and the shopping lines print the summary's binding, backing,
+  wide-back (only when the engine returns one) and batting lines with both width assumptions.
+  Every amount is the engine's: the screen computes no yardage, backing or batting number.
 
 Unchanged rules that carry forward: photos never leave the device
 (docs/sprint-2/qrep-web-design-doc.md, Persistence policy); the photo is session-only
@@ -246,7 +258,8 @@ bridge's own resize copies leave with A7:
 - Sizing never changes the counts, so the quilt size moves in whole squares and whole blocks: the
   width is the columns times the square size plus twice the border widths, and the height likewise.
   Changing the block count to reach a size is editing, which is out of scope.
-- A typed size or a preset (applied as listed, width first) picks the offered square whose
+- A typed size or a preset (laid in the orientation suggest_preset matches, its long side along
+  the quilt's long side; on a square quilt, as listed) picks the offered square whose
   achieved size (the squares plus the borders scaled to that square and snapped) has the smallest
   combined miss: the sum of the misses on the sides you set, in eighths. With one side set, that
   is the side's own miss. When two squares miss by the same amount, the larger square wins. A
