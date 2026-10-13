@@ -13,7 +13,7 @@ reference and holds each value once.
 from dataclasses import dataclass
 
 from qrep.contract import FABRICS_MAX, FABRICS_MIN
-from qrep.model.finished_size import CELL_MAX, CELL_MIN
+from qrep.model.sizing import CELL_MAX, CELL_MIN, SQUARE_STEP
 from qrep.vision.read.geometry import MIN_PX_PER_SQUARE
 from qrep.vision.read.sample import INSET, P
 
@@ -47,7 +47,7 @@ SILHOUETTE_SAMPLES = 2000
 # Photo pixels per inch assumed for the default size estimate.
 ASSUMED_PPI = 10
 # The default square size snaps to this step within these bounds, in eighths.
-SIZE_STEP = 2
+SIZE_STEP = SQUARE_STEP
 SQUARE_MIN = CELL_MIN
 SQUARE_MAX = CELL_MAX
 # Confidence of the default size estimate.
@@ -109,15 +109,19 @@ KNOBS: dict[str, Knob] = {
         "qrep/vision/pipeline.py ASSUMED_PPI, the renderer's default scale; a photo's real "
         "resolution is unknown (#207)",
     ),
-    "SIZE_STEP": Knob(SIZE_STEP, "1/4 in square sizes (plan A10 and section 2.1, screen 4)"),
+    "SIZE_STEP": Knob(
+        SIZE_STEP,
+        "qrep/model/sizing.py SQUARE_STEP, 1/4 in square sizes (plan A10 and section 2.1, "
+        "screen 4)",
+    ),
     "SQUARE_MIN": Knob(
         SQUARE_MIN,
-        "qrep/model/finished_size.py CELL_MIN, 3/4 in (REBASELINE.md literal B8)",
+        "qrep/model/sizing.py CELL_MIN, 3/4 in (REBASELINE.md literal B8)",
         FROZEN,
     ),
     "SQUARE_MAX": Knob(
         SQUARE_MAX,
-        "qrep/model/finished_size.py CELL_MAX, 4 in (REBASELINE.md literal B9)",
+        "qrep/model/sizing.py CELL_MAX, 4 in (REBASELINE.md literal B9)",
         FROZEN,
     ),
     "SIZE_ESTIMATE_CONFIDENCE": Knob(
