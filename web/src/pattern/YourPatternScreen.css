@@ -1,8 +1,9 @@
 /* Your pattern (C2a). Phone first: heading, method and the PDF button, then
    the photo and quilt stacked, then the details. From 720 px (the app's
-   breakpoint) the quilt sits beside the photo. From 1100 px, where a side
-   column leaves both wide enough to read the rulers, the media becomes a
-   sticky column beside it (ux-22). */
+   breakpoint) the quilt sits beside the photo, and the media row sticks
+   under the header while the details scroll beneath it. From 1100 px, where
+   a side column leaves both wide enough to read the rulers, the media becomes
+   a sticky column beside it (ux-22). */
 .yp-root {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -112,6 +113,31 @@
 @media (min-width: 720px) {
   .yp-media--pair {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+/* Below the side-column layout the details follow the media, so the media
+   row holds the quilt in view: it sticks just under the header, which is
+   60 px tall at these widths (top tucks 2 px under it so no sliver of the
+   details shows between them), and its opaque background hides the details
+   scrolling beneath. The row is about 45vh tall, so the rows below stay
+   readable; the stage leaves room in it for the zoom toolbar, the size
+   caption and the padding. */
+@media (min-width: 720px) and (max-width: 1099.98px) {
+  .yp-media {
+    position: sticky;
+    top: 58px;
+    z-index: 2;
+    padding: 10px 0;
+    background: var(--bg);
+  }
+
+  .yp-quilt .qc-stage {
+    height: clamp(120px, calc(45vh - 110px), 560px);
+  }
+
+  .yp-photo-img {
+    max-height: clamp(120px, calc(45vh - 110px), 560px);
   }
 }
 

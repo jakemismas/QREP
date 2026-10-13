@@ -2,8 +2,8 @@
  * The method in one line (C2a, issue #96): the engine's one-sentence reason
  * only. The method id, strategy cards and plan metrics never show (SPEC.md
  * section 2.5). While the summary loads, a short working line stands in,
- * unless the screen shows an error (working false); a failure or refusal
- * shows in the screen's error line instead.
+ * unless the engine is down and the load waits on Retry (working false); a
+ * failure or refusal shows in the screen's error line instead.
  */
 import type { SummaryView } from "./patternPdf";
 import "./MethodLine.css";

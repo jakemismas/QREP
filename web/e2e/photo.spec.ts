@@ -92,11 +92,46 @@ test("L0 photo reverses in-browser to 45x55 with the palette mapped", async ({ p
   );
 });
 
+interface SeenToast {
+  tone: string;
+  text: string;
+}
+
+/** Record every toast the page shows, from the first page load on; read them
+ * back with seenToasts. The one toast slot shows only the latest, so a check
+ * on the toast showing at the end cannot see an earlier one; a
+ * MutationObserver keeps them all (as recordToasts in pattern.spec.ts). */
+async function recordToasts(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const seen: { tone: string; text: string }[] = [];
+    (window as unknown as { toastRecord: typeof seen }).toastRecord = seen;
+    const take = (node: Node) => {
+      if (!(node instanceof HTMLElement)) return;
+      const toasts = node.matches("[data-testid='toast']")
+        ? [node]
+        : [...node.querySelectorAll<HTMLElement>("[data-testid='toast']")];
+      for (const toast of toasts) {
+        seen.push({ tone: toast.dataset.tone ?? "", text: toast.textContent ?? "" });
+      }
+    };
+    // The script runs before the page has a body, so the observer watches the
+    // whole document.
+    new MutationObserver((mutations) => {
+      for (const mutation of mutations) mutation.addedNodes.forEach(take);
+    }).observe(document, { childList: true, subtree: true });
+  });
+}
+
+function seenToasts(page: Page): Promise<SeenToast[]> {
+  return page.evaluate(() => (window as unknown as { toastRecord: SeenToast[] }).toastRecord);
+}
+
 test("editor and export flows never need opencv", async ({ page }) => {
   // Abort every opencv fetch: S2-S5 surfaces must work untouched (the idle
   // prefetch may fail silently; that is its contract). C2a (issue #96):
   // the sample pattern's census and Download pattern (PDF) on Your pattern.
   await page.route("**/*opencv*", (route) => route.abort());
+  await recordToasts(page);
   await page.goto("./");
   await page.getByTestId("see-sample").click();
   await expect(page.getByTestId("your-pattern")).toBeVisible();
@@ -109,6 +144,16 @@ test("editor and export flows never need opencv", async ({ page }) => {
   await waiting;
   // No error toast anywhere in the flow.
   await expect(page.getByTestId("toast")).not.toContainText(/fail|error/i);
+  // Every toast since the page loaded, not just the one showing now: the
+  // saved file's success toast is among them, so the record is live, and
+  // none is an error or says one.
+  await expect
+    .poll(() => seenToasts(page))
+    .toContainEqual({ tone: "success", text: expect.stringContaining("Saved: your pattern file is ready.") });
+  for (const toast of await seenToasts(page)) {
+    expect(toast.tone, toast.text).not.toBe("error");
+    expect(toast.text).not.toMatch(/fail|error/i);
+  }
   // Your pattern reports its own failures inline, not in a toast.
   await expect(page.getByTestId("pattern-error")).toHaveCount(0);
 });

@@ -250,22 +250,42 @@ async function savePattern(page: Page): Promise<{ bytes: Buffer; name: string }>
 test("a photo becomes a pattern PDF with only GET requests and no stored photo", async ({
   page,
 }) => {
-  const requests: string[] = [];
-  page.on("request", (request) => requests.push(`${request.method()} ${request.url()}`));
+  const requests: { method: string; url: string }[] = [];
+  page.on("request", (request) => requests.push({ method: request.method(), url: request.url() }));
 
   await photoToPattern(page);
   await expectNoConfidence(page);
   await waitForEngine(page);
   const pdf = await savePattern(page);
   expect(pdf.bytes.subarray(0, 5).toString("latin1")).toBe("%PDF-");
+  // The read names its quilt "Recovered quilt" (qrep/vision/pipeline.py, the
+  // QuiltMetadata of a readable photo), and See your pattern keeps that name.
+  // slugify lowercases it to "recovered quilt", and the one space becomes a
+  // hyphen: "recovered-quilt.pdf".
+  expect(pdf.name).toBe("recovered-quilt.pdf");
 
   // Nothing leaves the browser: every request from the first page load to
   // the saved file only reads.
   expect(requests.length).toBeGreaterThan(0);
-  expect(requests.filter((line) => !line.startsWith("GET "))).toEqual([]);
+  expect(requests.filter((request) => request.method !== "GET")).toEqual([]);
+  // And every one reads from the app's own origin, with no data in its
+  // address: the only query any of them carries is the engine files'
+  // contract tag (engineAssetUrl in src/engine/contract.ts). Data and object
+  // URLs name bytes already in the page, so they are not requests out.
+  const origin = new URL(page.url()).origin;
+  const outward = requests.filter(
+    (request) => !request.url.startsWith("data:") && !request.url.startsWith("blob:"),
+  );
+  expect(outward.length).toBeGreaterThan(0);
+  for (const request of outward) {
+    const url = new URL(request.url);
+    expect(url.origin, request.url).toBe(origin);
+    expect(url.search, request.url).toMatch(/^(\?contract=\d+)?$/);
+  }
 
-  // No photo data in any browser storage. IndexedDB holds no database at
-  // all, which is stricter than scanning one for the markers below.
+  // No photo data in any browser storage. IndexedDB holds no database and
+  // the Cache API no cache at all, which is stricter than scanning either
+  // for the markers below.
   const stored = await page.evaluate(async () => {
     const values: string[] = [];
     for (const store of [localStorage, sessionStorage]) {
@@ -275,7 +295,8 @@ test("a photo becomes a pattern PDF with only GET requests and no stored photo",
       }
     }
     const databases = await indexedDB.databases();
-    return { values, databases: databases.map((db) => db.name ?? "") };
+    const caches = await window.caches.keys();
+    return { values, databases: databases.map((db) => db.name ?? ""), caches };
   });
   for (const value of stored.values) {
     // Data and object URLs, raw PNG bytes, and base64 PNG, JPEG and WebP.
@@ -284,6 +305,7 @@ test("a photo becomes a pattern PDF with only GET requests and no stored photo",
     }
   }
   expect(stored.databases).toEqual([]);
+  expect(stored.caches).toEqual([]);
 });
 
 test("See a sample pattern shows the method, the census and no photo, and saves the PDF by name", async ({
@@ -529,6 +551,57 @@ test("a textured photo's flagged squares are counted, outlined, and can be hidde
   await expect(toggle).toHaveAttribute("aria-pressed", "true");
 });
 
+test("See your pattern waits while Apply size runs, then opens the sized read", async ({
+  page,
+}) => {
+  // Keep every apply_finished_size call from the worker until the test lets
+  // it go, so the results screen is seen while the size is still applying.
+  await page.addInitScript(() => {
+    const held: (() => void)[] = [];
+    const hold = window as unknown as { heldApplies: () => number; releaseApplies: () => void };
+    hold.heldApplies = () => held.length;
+    hold.releaseApplies = () => {
+      for (const send of held.splice(0)) send();
+    };
+    const post = Worker.prototype.postMessage;
+    Worker.prototype.postMessage = function (this: Worker, ...args: unknown[]) {
+      const message = args[0] as { type?: string; method?: string } | null;
+      if (message?.type === "call" && message.method === "apply_finished_size") {
+        held.push(() => (post as (...rest: unknown[]) => void).apply(this, args));
+        return;
+      }
+      return (post as (...rest: unknown[]) => void).apply(this, args);
+    } as typeof Worker.prototype.postMessage;
+  });
+  const heldApplies = () =>
+    page.evaluate(() => (window as unknown as { heldApplies: () => number }).heldApplies());
+
+  await photoToResults(page, { pins: false });
+  const see = page.getByTestId("see-pattern");
+  await expect(see).toBeEnabled();
+
+  // The inline size edit, as size.spec.ts drives it.
+  const line = page.getByTestId("size-line");
+  await line.click();
+  await expect(page.getByTestId("size-inline-editor")).toBeVisible();
+  await page.getByTestId("size-width").fill("45");
+  await page.getByTestId("size-width").press("Enter");
+  await page.getByTestId("size-height").fill("54");
+  await page.getByTestId("size-height").press("Enter");
+  await page.getByTestId("size-apply").click();
+  await expect.poll(heldApplies).toBe(1);
+  // The size is still on its way, so See your pattern cannot open the read
+  // as it stood before it.
+  await expect(see).toBeDisabled();
+
+  await page.evaluate(() =>
+    (window as unknown as { releaseApplies: () => void }).releaseApplies(),
+  );
+  await expect(line).toHaveAttribute("data-sized", "true", { timeout: 60_000 });
+  await expect(see).toBeEnabled();
+  await seePattern(page);
+});
+
 // Every start-screen entry that opens or starts something, the resume
 // banner's Continue among them, besides See a sample pattern itself.
 const START_ENTRIES = ["start-photo", "resume-accept", "open-demo", "start-blank", "open-project"];
@@ -682,15 +755,11 @@ test.describe("Your pattern at 1440 x 900", { tag: "@phone" }, () => {
     }
     await page.setViewportSize({ width: 1440, height: 900 });
 
-    // Flagged squares come from the read: a whole count, outlined by default.
-    // The attribute must be there: Number(null) is 0 and would pass.
+    // Flagged squares come from the read: a whole count. The textured test
+    // above covers the outlines and their toggle.
     const flagged = page.getByTestId("flagged-count");
     await expect(flagged).toBeVisible();
     await expect(flagged).toHaveAttribute("data-count", /^\d+$/);
-    const count = Number(await flagged.getAttribute("data-count"));
-    if (count > 0) {
-      await expect(page.getByTestId("flagged-toggle")).toHaveAttribute("aria-pressed", "true");
-    }
 
     await page.getByTestId("open-lightbox").click();
     await expect(page.getByTestId("lightbox")).toBeVisible();
@@ -730,6 +799,54 @@ test.describe("Your pattern on a short desktop", { tag: "@phone" }, () => {
     const innerHeight = await page.evaluate(() => window.innerHeight);
     expect(box.y, "canvas top below the header").toBeGreaterThanOrEqual(headerBottom);
     expect(box.y + box.height, "canvas foot inside the viewport").toBeLessThanOrEqual(innerHeight);
+  });
+});
+
+test.describe("Your pattern on a narrow desktop", { tag: "@phone" }, () => {
+  test.use({ ...DESKTOP_OPTIONS, viewport: { width: 900, height: 700 } });
+
+  /** Scroll to the foot of the page; the quilt canvas and the census's last
+   * row must both be in view there, the row clear of the media above it. */
+  async function expectQuiltAndCensusAtFoot(page: Page, name: string): Promise<number> {
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    await expect.poll(() => page.evaluate(() => window.scrollY), name).toBeGreaterThan(0);
+    const headerBottom = await page
+      .locator(".qrep-header")
+      .evaluate((el) => el.getBoundingClientRect().bottom);
+    const innerHeight = await page.evaluate(() => window.innerHeight);
+    const box = (await page.getByTestId("quilt-canvas").boundingBox())!;
+    expect(box.y, `${name}: canvas top below the header`).toBeGreaterThanOrEqual(headerBottom);
+    expect(box.y + box.height, `${name}: canvas foot inside the viewport`).toBeLessThanOrEqual(
+      innerHeight,
+    );
+    const media = (await page.locator(".yp-media").boundingBox())!;
+    const lastRow = (await page.getByTestId("fabric-census").locator("li").last().boundingBox())!;
+    expect(lastRow.y, `${name}: last census row clear of the media`).toBeGreaterThanOrEqual(
+      media.y + media.height,
+    );
+    expect(lastRow.y + lastRow.height, `${name}: last census row inside the viewport`).toBeLessThanOrEqual(
+      innerHeight,
+    );
+    return page.evaluate(() => window.scrollY);
+  }
+
+  test("the quilt stays in view and the census stays reachable from 720 px", async ({ page }) => {
+    await openSample(page);
+    await waitForEngine(page);
+    await expect(page.getByTestId("fabric-count-c")).toBeVisible();
+    await expectQuiltAndCensusAtFoot(page, "900 x 700");
+
+    // At 450 px tall the page scrolls further than the canvas sits below the
+    // header at rest, so only a quilt held under the header stays in view.
+    await page.setViewportSize({ width: 900, height: 450 });
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+    const headerBottom = await page
+      .locator(".qrep-header")
+      .evaluate((el) => el.getBoundingClientRect().bottom);
+    const atRest = (await page.getByTestId("quilt-canvas").boundingBox())!;
+    const scrolled = await expectQuiltAndCensusAtFoot(page, "900 x 450");
+    expect(scrolled, "scroll distance").toBeGreaterThan(atRest.y - headerBottom);
   });
 });
 
