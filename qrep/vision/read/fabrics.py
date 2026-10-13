@@ -1,10 +1,12 @@
 """Fabrics for the confirmed read: cluster the samples into fabrics, fit one
-shading correction per fabric, and label every square and band strip.
+label-aware shading correction, and label every square and band strip.
 
 Distances are taken in float CIELAB with L* scaled by the L weight, d =
 sqrt((w dL)^2 + da^2 + db^2), because shading moves lightness most (plan
-B2b, vision-06). The read fits the palette and assigns the squares with the
-same correction, which the old detrend did not (vision-07).
+B2b, vision-06). The correction is one light surface, quadratic in
+position, that every fabric's color is scaled by, so each fabric's color is
+a quadratic in position. The read fits the palette and assigns the squares
+with the same correction, which the old detrend did not (vision-07).
 
 numpy only and no random draws: the same code runs under Pyodide (numpy
 2.2) and natively, and gives the same fabrics on both.
@@ -21,6 +23,8 @@ from qrep.vision.read.knobs import (
     KMEANS_ITERATIONS,
     KMEANS_SEEDINGS,
     L_WEIGHT,
+    LIGHT_CONFIDENCE_POWER,
+    LIGHT_MAX_RATIO,
     SHADING_MIN_SQUARES,
     SHADING_ROUNDS,
     SILHOUETTE_SAMPLES,
@@ -33,6 +37,8 @@ CODES: tuple[str, ...] = get_args(Code)
 # The seedings replace k-means++'s random draws with the golden-ratio
 # sequence, which spreads its draws evenly over [0, 1) without a generator.
 _GOLDEN = 0.6180339887498949
+# Light scales L* + 16, not L*, so the light model works on this offset.
+_OFFSET = np.array([16.0, 0.0, 0.0])
 
 
 @dataclass(frozen=True)
@@ -52,11 +58,11 @@ class Refusal:
 class Clusters:
     """One fabric count's clustering of n samples.
 
-    centers has shape (k, 3): each fabric's fitted float CIELAB at the field
-    center, position (0.5, 0.5). labels and confidence have shape (n,); a
-    sample's confidence is (d2 - d1) / d2 over its distances to the
-    shading-corrected colors, at its own position, of the fabrics that hold
-    samples, and 0.0 when fewer than two do. silhouette is the weighted mean
+    centers has shape (k, 3): each fabric's float CIELAB in the light at the
+    field center, fitted from its own samples (_palette). labels and
+    confidence have shape (n,); a sample's confidence is (d2 - d1) / d2 over
+    its distances to the colors, in the light at its own position, of the
+    fabrics that hold samples, and 0.0 when fewer than two do. silhouette is the weighted mean
     silhouette at k, None when undefined, which includes a fabric that holds
     no sample.
     """
@@ -189,47 +195,82 @@ def _kmeans(lab: np.ndarray, weights: np.ndarray, k: int, l_weight: float):
 
 
 def _basis(positions: np.ndarray) -> np.ndarray:
-    """The quadratic basis [1, x', y', x'^2, x'y', y'^2] about the field
-    center, shape (n, 6), so a surface's intercept is its color there."""
+    """The quadratic terms of the light surface about the field center, from
+    [x', y', x'^2, x'y', y'^2], keeping only the terms the positions can fit:
+    a slope along an axis needs two distinct positions on it, a square term
+    three, and x'y' both slopes. A term left in without that is collinear
+    with the fabric intercepts or with another term (on a one-row field y' is
+    fixed, so x'y' copies x'), and a least squares fit would split one slope
+    between them. No constant term, so the surface is 1 at the center."""
     x, y = positions[:, 0] - 0.5, positions[:, 1] - 0.5
-    return np.stack([np.ones_like(x), x, y, x * x, x * y, y * y], axis=1)
+    nx, ny = len(np.unique(x)), len(np.unique(y))
+    terms = [(x, nx >= 2), (y, ny >= 2), (x * x, nx >= 3), (x * y, nx >= 2 and ny >= 2)]
+    terms.append((y * y, ny >= 3))
+    kept = [term for term, fits in terms if fits]
+    return np.stack(kept, axis=1) if kept else np.zeros((len(x), 0))
 
 
-def _fit(basis, lab, weights, labels, previous) -> np.ndarray:
-    """Each label's shading surface, coefficients of shape (k, 6, 3), by
-    weighted least squares per Lab channel over the label's members.
+def _light(basis, lab, weights, labels) -> np.ndarray:
+    """The light at each sample, a factor shared by every fabric: g =
+    exp(basis @ beta), fitted with each fabric's own level by weighted least
+    squares on log(L* + 16) = u[label] + basis @ beta.
 
-    The fit solves for the slopes about the members' weighted mean position
-    and takes the minimum-norm solution, so a label whose members span no
-    extent along a term (one row of squares, say) gets no slope along it
-    instead of a surface that moves its color where it has no members. With
-    a full-rank basis this is the plain weighted least squares fit.
+    Uneven light scales a sample's XYZ by some t, which scales L* + 16, a*
+    and b* alike by t^(1/3) wherever Y > 0.008856, so one surface serves
+    every fabric. It is fitted over every sample at once, so it holds where
+    any fabric has squares; a surface per fabric, fitted only where that
+    fabric lies, swings outside its rows and takes other fabrics' squares.
+    The weight (L* + 16)^2 makes a log residual count as its error in L*.
     """
-    coef = previous.copy()
-    for label in range(len(previous)):
-        members = labels == label
-        count = int(members.sum())
-        if count == 0:
-            continue
-        w = weights[members]
-        colors = lab[members]
-        mean = w @ colors / w.sum()
-        coef[label] = 0.0
-        coef[label, 0] = mean
-        if count < SHADING_MIN_SQUARES:
-            continue
-        terms = basis[members, 1:]
-        middle = w @ terms / w.sum()
-        root = np.sqrt(w)[:, None]
-        slopes = np.linalg.lstsq(root * (terms - middle), root * (colors - mean), rcond=None)[0]
-        coef[label, 1:] = slopes
-        coef[label, 0] = mean - middle @ slopes
-    return coef
+    held = np.unique(labels)
+    level = (labels[:, None] == held[None, :]).astype(float)
+    design = np.concatenate([level, basis], axis=1)
+    offset = lab[:, 0] + 16.0
+    root = np.sqrt(weights) * offset
+    solution = np.linalg.lstsq(root[:, None] * design, root * np.log(offset), rcond=None)[0]
+    return np.exp(basis @ solution[len(held) :])
 
 
-def _expected(basis: np.ndarray, coef: np.ndarray) -> np.ndarray:
-    """Each label's surface at each sample's position, shape (n, k, 3)."""
-    return np.einsum("nb,kbc->nkc", basis, coef)
+def _palette(lab, weights, labels, light, centers) -> np.ndarray:
+    """Each fabric's color in the light at the field center, from its own
+    samples alone: the weighted least squares c in (L* + 16, a*, b*) =
+    g c over its members, c = sum(w g x) / sum(w g^2). An empty fabric
+    keeps its center."""
+    k = len(centers)
+    shifted = lab + _OFFSET
+    totals = np.bincount(labels, weights=weights * light * light, minlength=k)
+    sums = np.stack(
+        [
+            np.bincount(labels, weights=weights * light * shifted[:, c], minlength=k)
+            for c in range(3)
+        ],
+        axis=1,
+    )
+    filled = totals > 0
+    out = centers.copy()
+    out[filled] = sums[filled] / totals[filled, None] - _OFFSET
+    return out
+
+
+def _lit(centers: np.ndarray, light: np.ndarray) -> np.ndarray:
+    """Each fabric's color in the light at each sample, shape (n, k, 3)."""
+    return light[:, None, None] * (centers + _OFFSET)[None, :, :] - _OFFSET
+
+
+def _margins(lab, colors, labels, k: int, l_weight: float) -> np.ndarray:
+    """Each sample's (d2 - d1) / d2 over its distances to colors (n, k, 3) of
+    the fabrics that hold samples, in [0, 1].
+
+    An empty fabric (k above the distinct colors) repeats a held center, so
+    counting it would put d2 at 0 for every square of its twin. With fewer
+    than two held fabrics there is no other fabric to tell a square from, so
+    no margin, never certainty."""
+    held = np.bincount(labels, minlength=k) > 0
+    if held.sum() < 2:
+        return np.zeros(len(lab))
+    nearest = np.sort(np.sqrt(_squared(lab, colors, l_weight))[:, held], axis=1)
+    d1, d2 = nearest[:, 0], nearest[:, 1]
+    return np.where(d2 > 0, (d2 - d1) / np.where(d2 > 0, d2, 1.0), 0.0)
 
 
 def _spread(n: int, m: int) -> np.ndarray:
@@ -314,10 +355,14 @@ def cluster(
     positions (n, 2) as (x, y) in field units, into k fabrics.
 
     Weighted k-means seeds the labels; then up to shading_rounds rounds fit
-    each label's quadratic shading surface and move every sample to the
-    label whose surface at its position is nearest, until the labels repeat.
-    Samples outside the field [0, 1] x [0, 1] are the band strips, which the
-    silhouette always keeps.
+    the light shared by every fabric (_light) and each fabric's color under
+    it (_palette), and move every sample to the fabric whose color in the
+    light at its position is nearest, until the labels repeat. The light is
+    fitted only from SHADING_MIN_SQUARES samples up, and a light that varies
+    more than LIGHT_MAX_RATIO in luminance drops the correction and keeps the
+    k-means read. Samples outside the
+    field [0, 1] x [0, 1] are the band strips, which the silhouette always
+    keeps; the light holds the field edge's value across them.
     """
     if k < 1:
         raise ValueError(f"k must be at least 1, got {k}")
@@ -325,33 +370,34 @@ def cluster(
     weights = np.asarray(weights, dtype=float).reshape(-1)
     positions = np.asarray(positions, dtype=float).reshape(-1, 2)
 
-    centers, labels = _kmeans(lab, weights, k, l_weight)
-    basis = _basis(positions)
-    coef = np.zeros((k, 6, 3))
-    coef[:, 0] = centers
-    for _ in range(shading_rounds):
-        coef = _fit(basis, lab, weights, labels, coef)
-        again = np.argmin(_squared(lab, _expected(basis, coef), l_weight), axis=1)
-        if np.array_equal(again, labels):
-            break
-        labels = again
+    plain = _kmeans(lab, weights, k, l_weight)
+    centers, labels = plain
+    basis = _basis(np.clip(positions, 0.0, 1.0))
+    light = np.ones(len(lab))
+    if len(lab) >= SHADING_MIN_SQUARES and basis.shape[1]:
+        for _ in range(shading_rounds):
+            # A misread square sits near the midpoint between two fabrics, at
+            # a small margin, and on bands of rising lightness every misread
+            # tilts the light the same way; weighting by the margin keeps
+            # those squares from feeding the light that moved them.
+            margin = _margins(lab, _lit(centers, light), labels, k, l_weight)
+            light = _light(basis, lab, weights * margin**LIGHT_CONFIDENCE_POWER, labels)
+            if (light.max() / light.min()) ** 3 > LIGHT_MAX_RATIO:
+                # Light that varies more than any photo's is the fit taking a
+                # change between fabrics for shading, so the read keeps none.
+                light = np.ones(len(lab))
+                centers, labels = plain
+                break
+            centers = _palette(lab, weights, labels, light, centers)
+            again = np.argmin(_squared(lab, _lit(centers, light), l_weight), axis=1)
+            if np.array_equal(again, labels):
+                break
+            labels = again
 
-    expected = _expected(basis, coef)
-    distances = np.sqrt(_squared(lab, expected, l_weight))
-    # An empty fabric (k above the distinct colors) repeats a held center, so
-    # counting it would put d2 at 0 for every square of its twin. With fewer
-    # than two held fabrics there is no other fabric to tell a square from,
-    # so no margin, never certainty.
+    confidence = _margins(lab, _lit(centers, light), labels, k, l_weight)
     held = np.bincount(labels, minlength=k) > 0
-    if held.sum() < 2:
-        confidence = np.zeros(len(lab))
-    else:
-        nearest = np.sort(distances[:, held], axis=1)
-        d1, d2 = nearest[:, 0], nearest[:, 1]
-        confidence = np.where(d2 > 0, (d2 - d1) / np.where(d2 > 0, d2, 1.0), 0.0)
 
-    rows = np.arange(len(lab))
-    corrected = _scale(lab - (expected[rows, labels] - coef[labels, 0]), l_weight)
+    corrected = _scale((lab + _OFFSET) / light[:, None] - _OFFSET, l_weight)
     index, w = _subset(positions, weights)
     silhouette, per_label = _silhouette(corrected[index], w, labels[index], k)
     if not held.all():
@@ -364,7 +410,7 @@ def cluster(
         center_confidence = np.clip(np.nan_to_num(per_label, nan=0.0), 0.0, 1.0)
     return Clusters(
         k=k,
-        centers=coef[:, 0].copy(),
+        centers=centers,
         center_confidence=center_confidence,
         labels=labels,
         confidence=confidence,
@@ -410,9 +456,9 @@ def suggest(
         return best
     if first is not None:
         return first
-    return cluster(
-        lab, weights, positions, max(distinct, 1), l_weight=l_weight, shading_rounds=shading_rounds
-    )
+    # One distinct color: the least count the read offers, its second fabric
+    # empty, so the palette carries no confidence.
+    return cluster(lab, weights, positions, K_MIN, l_weight=l_weight, shading_rounds=shading_rounds)
 
 
 def _samples(squares: Squares) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -479,7 +525,11 @@ def read_fabrics(
         )
 
     centers = result.centers
-    order = np.lexsort((centers[:, 2], centers[:, 1], centers[:, 0]))
+    # A light fit leaves float noise in a center, so colors equal in L*
+    # would order by that noise instead of by a* and b*; rounding keeps the
+    # tie.
+    key = np.round(centers, 6)
+    order = np.lexsort((key[:, 2], key[:, 1], key[:, 0]))
     rank = np.empty(result.k, dtype=int)
     rank[order] = np.arange(result.k)
     labels = rank[result.labels]

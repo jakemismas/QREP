@@ -33,11 +33,17 @@ VOTE_MIN_COPIES = 3
 # Two blocks are copies of one type when their confidence-weighted agreement
 # reaches this share of squares.
 TYPE_AGREEMENT = 0.75
-# A label fits its own shading surface only with this many squares: three per
+# The read fits the light surface only from this many samples: three per
 # coefficient of the six-term quadratic in position.
 SHADING_MIN_SQUARES = 18
 # Rounds of shading fit and reassignment for one fabric count.
 SHADING_ROUNDS = 10
+# The light fit counts each sample at its weight times its margin to this
+# power.
+LIGHT_CONFIDENCE_POWER = 2
+# The most the fitted light may vary across the field, brightest over dimmest
+# luminance; past it the read keeps no shading correction.
+LIGHT_MAX_RATIO = 2.0
 # Lloyd iterations per k-means run, and deterministic seedings per count.
 KMEANS_ITERATIONS = 100
 KMEANS_SEEDINGS = 4
@@ -99,6 +105,18 @@ KNOBS: dict[str, Knob] = {
         SHADING_MIN_SQUARES, "not measured: three squares per coefficient of a six-term quadratic"
     ),
     "SHADING_ROUNDS": Knob(SHADING_ROUNDS, "not measured: a compute bound"),
+    "LIGHT_CONFIDENCE_POWER": Knob(
+        LIGHT_CONFIDENCE_POWER,
+        "synthetic grids only (PR #251 round 1): on 4 bands of rising lightness at noise 4, "
+        "powers 0, 1 and 2 read 0.54 to 0.95, 0.84 to 0.99 and 0.97 to 0.99 of squares "
+        "right; every 30 and 40 percent falloff grid read 1.00 at each power",
+    ),
+    "LIGHT_MAX_RATIO": Knob(
+        LIGHT_MAX_RATIO,
+        "synthetic grids only (PR #251 round 1): a 40 percent falloff fits at 1.66, 4 bands at "
+        "noise 3 and 4 settle under 1.3, and bands at noise 5 drift past 2 within 4 rounds "
+        "and on to 8 and 18",
+    ),
     "KMEANS_ITERATIONS": Knob(KMEANS_ITERATIONS, "not measured: a compute bound"),
     "KMEANS_SEEDINGS": Knob(KMEANS_SEEDINGS, "not measured: a compute bound"),
     "SILHOUETTE_SAMPLES": Knob(

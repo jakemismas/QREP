@@ -280,21 +280,22 @@ def test_an_undefined_silhouette_gives_palette_confidence_zero():
     # confidence to 0, never 1.
     # Inputs: a 4 x 4 grid of one color, (50, 10, 10).
     # Arithmetic: one distinct color, under K_MIN = 2, so no count is tried
-    #   and the read takes k = 1: one fabric, so the silhouette is undefined,
-    #   and with no second fabric to tell a square from, each square's
-    #   confidence is 0.0. A request for k = 2 keeps 2 fabrics, the second
-    #   repeating the first and empty: one fabric holds samples, so the
-    #   silhouette is still undefined and the confidence again 0.0.
-    # Expected: suggested: k 1, palette and k confidence 0.0, every label 0,
-    #   confidence 0.0. Requested: k 2 at confidence 1.0, palette confidence
-    #   0.0, every label 0, confidence 0.0.
+    #   and the read takes K_MIN = 2, the least count criterion 1 allows: the
+    #   second fabric repeats the first and stays empty (distance ties go to
+    #   the lower index), so one fabric holds samples, the silhouette is
+    #   undefined, every center confidence is 0.0, and with no second held
+    #   fabric to tell a square from, each square's confidence is 0.0. A
+    #   request for k = 2 reads the same, at k confidence 1.0.
+    # Expected: suggested: k 2, palette and k confidence 0.0, both centers
+    #   (50, 10, 10), every label 0, confidence 0.0. Requested: k 2 at
+    #   confidence 1.0, palette confidence 0.0, every label 0, confidence 0.0.
     lab = np.tile(np.array([50.0, 10.0, 10.0]), (4, 4, 1))
     suggested = read_fabrics(squares_of(lab))
-    assert suggested.k == 1
+    assert suggested.k == 2
     assert suggested.palette_confidence == 0.0
     assert suggested.k_confidence == 0.0
-    assert suggested.center_confidence.tolist() == [0.0]
-    assert suggested.centers.tolist() == [[50.0, 10.0, 10.0]]
+    assert suggested.center_confidence.tolist() == [0.0, 0.0]
+    assert suggested.centers.tolist() == [[50.0, 10.0, 10.0]] * 2
     assert np.all(suggested.labels == 0)
     assert np.all(suggested.confidence == 0.0)
 
@@ -402,13 +403,14 @@ def test_an_empty_fabric_leaves_the_silhouette_undefined_and_the_margins_clean()
     assert np.all(result.confidence == 1.0)
 
 
-def falloff_grid():
+def falloff_grid(stripes=False):
     """Two grays, a* = b* = 0, on a 16 x 16 checkerboard (dark where r + c is
-    even), lit by a falloff that scales luminance by 1 - 0.02c: 1.0 at
-    column 0 down to 0.7 at column 15."""
+    even), or in column stripes (dark where c is even), lit by a falloff that
+    scales luminance by 1 - 0.02c: 1.0 at column 0 down to 0.7 at column
+    15."""
     rows = cols = 16
     r, c = np.divmod(np.arange(rows * cols), cols)
-    truth = (r + c) % 2
+    truth = c % 2 if stripes else (r + c) % 2
     luminance = np.where(truth == 0, 0.24, 0.30) * (1 - 0.02 * c)
     lab = np.zeros((rows * cols, 3))
     lab[:, 0] = 116 * np.cbrt(luminance) - 16
@@ -448,6 +450,110 @@ def test_the_shading_correction_reads_a_value_only_falloff_grid():
     corrected = read_fabrics(squares_of(lab), 2)
     assert np.array_equal(corrected.labels, truth)
     assert corrected.centers[:, 0] == pytest.approx([52.287, 57.559], abs=0.05)
+
+
+def test_the_shading_correction_reads_stripes_along_the_falloff():
+    # Source: PR #251 round 1 (the stripes case on #248): column stripes run
+    #   along the falloff, so each fabric holds whole columns.
+    # Inputs: falloff_grid(stripes=True): the same two grays and falloff as
+    #   the checkerboard test above, dark on even columns, light on odd.
+    # Arithmetic: as in the checkerboard test, the L* ranges [48.007, 56.088]
+    #   and [52.950, 61.654] overlap, so one threshold misreads a square
+    #   (dark column 0 at 56.088, light column 15 at 52.950). Each fabric
+    #   still holds a column at every other x, so the one light the fabrics
+    #   share is seen across the whole field, and with it the fabrics stay
+    #   at least 4.94 apart in L* in every column.
+    # Expected: with shading_rounds = 0 at least one square is misread; with
+    #   the default correction every square reads its fabric.
+    lab, truth = falloff_grid(stripes=True)
+    plain = read_fabrics(squares_of(lab), 2, shading_rounds=0)
+    assert np.any(plain.labels != truth)
+    corrected = read_fabrics(squares_of(lab), 2)
+    assert np.array_equal(corrected.labels, truth)
+
+
+def bands_of_rising_lightness(sigma, seed):
+    """Four grays, L* 25, 45, 65 and 85 with a* = b* = 0, in 14-row bands of a
+    56 x 44 grid under flat light, plus Gaussian noise of sd sigma on every
+    channel from numpy's PCG64 generator, which draws the same values on
+    every platform."""
+    rows, cols = 56, 44
+    r, c = np.divmod(np.arange(rows * cols), cols)
+    truth = r // 14
+    lab = np.zeros((rows * cols, 3))
+    lab[:, 0] = 25 + 20 * truth
+    lab += np.random.default_rng(seed).normal(0.0, sigma, lab.shape)
+    positions = np.stack([(c + 0.5) / cols, (r + 0.5) / rows], axis=1)
+    return lab, positions, truth
+
+
+def share_right(labels, truth):
+    """The share of squares whose fabric's most common truth is their own."""
+    named = {v: np.bincount(truth[labels == v]).argmax() for v in np.unique(labels)}
+    return float(np.mean(np.array([named[v] for v in labels]) == truth))
+
+
+@pytest.mark.parametrize(("sigma", "least"), [(3, 0.99), (4, 0.98)])
+@pytest.mark.parametrize("seed", [0, 1, 2])
+def test_the_shading_correction_keeps_bands_of_rising_lightness(sigma, least, seed):
+    # Source: PR #251 round 1 (critical): a surface per fabric, fitted only
+    #   over its own rows, swung outside them and read 0.47 to 0.95 of these
+    #   squares right; the light is now one surface every fabric shares.
+    # Inputs: bands_of_rising_lightness(sigma, seed), k = 4.
+    # Formula: d = sqrt((0.5 dL)^2 + da^2 + db^2). Every band has a* = b* =
+    #   0, so a square's da and db are the same to every band's color and
+    #   only dL decides: under flat light it reads its own band unless its L*
+    #   noise passes the midpoint 10 away, |n| > 10.
+    # Arithmetic: sigma 4: P(N > 10 / 4 = 2.5) = 0.00621. The two inner bands
+    #   misread on either side, 2 x 0.00621 = 0.01242, the two outer bands
+    #   on one, 0.00621; on average (2 x 0.01242 + 2 x 0.00621) / 4 =
+    #   0.00932, so an exact flat read gets 1 - 0.00932 = 0.9907 right, with
+    #   sd sqrt(2464 x 0.00932) = 4.8 squares; 0.98 leaves 49 misreads, 5
+    #   sd past the 23 expected. sigma 3: P(N > 3.333) = 0.000429, on average
+    #   0.000644, so 0.99936 right; 0.99 leaves 24 misreads against 1.6.
+    # Expected: at least 0.98 (sigma 4) and 0.99 (sigma 3) of squares right.
+    lab, positions, truth = bands_of_rising_lightness(sigma, seed)
+    result = cluster(lab, np.ones(len(lab)), positions, 4)
+    assert share_right(result.labels, truth) >= least
+
+
+def test_a_light_past_the_cap_keeps_the_plain_read(monkeypatch):
+    # Source: knobs.LIGHT_MAX_RATIO: a fitted light that varies more than
+    #   the cap in luminance drops the correction.
+    # Inputs: falloff_grid(); the cap lowered to 1.0, which any light that
+    #   varies at all passes.
+    # Arithmetic: the falloff scales luminance from 1.0 to 0.7, a ratio of
+    #   1 / 0.7 = 1.43 > 1.0, so the first light fitted passes the cap and
+    #   the read keeps k-means' labels and centers, as with shading_rounds 0.
+    # Expected: labels and centers equal the shading_rounds = 0 read's.
+    lab, _ = falloff_grid()
+    monkeypatch.setattr(fabrics_module, "LIGHT_MAX_RATIO", 1.0)
+    capped = read_fabrics(squares_of(lab), 2)
+    plain = read_fabrics(squares_of(lab), 2, shading_rounds=0)
+    assert np.array_equal(capped.labels, plain.labels)
+    assert np.array_equal(capped.centers, plain.centers)
+
+
+def test_a_fabric_away_from_the_center_shows_its_own_color():
+    # Source: PR #251 round 1: a fabric in rows 0 to 2 shipped #410000 for
+    #   #584982, its own surface carried to the field center.
+    # Inputs: a 55 x 45 grid, rows 0 to 2 at (35, 20, -30), the rest at
+    #   (85, 0, 10), flat light, Gaussian noise of sd 1 on every channel
+    #   (PCG64, seed 0); k = 2.
+    # Arithmetic: the fabric holds 3 x 45 = 135 squares, so the mean of its
+    #   noise has sd 1 / sqrt(135) = 0.086 per channel; its color is its own
+    #   squares' color under the shared light, which flat light leaves near
+    #   1 everywhere, so the center lies within 0.5 (5.8 sd) of (35, 20, -30).
+    # Expected: every square right and the dark center within 0.5 of
+    #   (35, 20, -30) in each channel.
+    rows, cols = 55, 45
+    r, c = np.divmod(np.arange(rows * cols), cols)
+    truth = (r > 2).astype(int)
+    colors = np.array([(35.0, 20.0, -30.0), (85.0, 0.0, 10.0)])
+    lab = colors[truth] + np.random.default_rng(0).normal(0.0, 1.0, (rows * cols, 3))
+    result = read_fabrics(squares_of(lab.reshape(rows, cols, 3)), 2)
+    assert np.array_equal(result.labels.ravel(), truth)
+    assert result.centers[0] == pytest.approx(colors[0], abs=0.5)
 
 
 def test_strips_join_at_their_area_and_their_center():
@@ -551,7 +657,8 @@ def test_fabrics_order_darkest_first_then_by_a_then_b():
     index = (r + c) % 3
     result = read_fabrics(squares_of(colors[index].reshape(6, 6, 3)), 3)
     assert result.labels.reshape(-1).tolist() == np.array([2, 1, 0])[index].tolist()
-    assert result.centers.tolist() == colors[[2, 1, 0]].tolist()
+    # The light, fitted as 1 on a flat grid, leaves float noise in the centers.
+    assert result.centers == pytest.approx(colors[[2, 1, 0]], abs=1e-9)
 
 
 def test_the_silhouette_keeps_every_strip_and_a_golden_ratio_pick_of_squares():
