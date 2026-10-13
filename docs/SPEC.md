@@ -159,8 +159,11 @@ From the confirmed frame and counts, the engine:
   resolution cap (#101), area-downsamples it before the perspective warp when it holds more pixels
   than the read needs (B2a), and samples square interiors inset from the seams;
 - clusters fabrics in float CIELAB with L* weighted 0.5 by default, with value-aware handling:
-  fabrics that differ only in lightness stay apart, and one label-aware shading correction (a
-  quadratic in position for each fabric) applies to both the palette and the assignment. Each
+  fabrics that differ only in lightness stay apart, and one label-aware shading correction applies
+  to both the palette and the assignment: one light shared by every fabric, whose logarithm is
+  quadratic in position, fitted with a level for each fabric, and each fabric's color is its own
+  squares' color under that light. A light that varies more than a provisional cap across the
+  field is taken for a change between fabrics, not shading, and the read keeps no correction. Each
   border band's side strips join the clustering, weighted by their area in squares, so a border
   fabric that never appears in the field still gets its own fabric;
 - suggests the fabric count by silhouette over 2 to 12 when you set none, and refuses the quilt as
@@ -178,11 +181,16 @@ From the confirmed frame and counts, the engine:
   type. A square takes its block's majority only when its own confidence is below the vote
   threshold; every square the vote changes is listed and flagged on Your pattern, and every
   confident square that disagrees keeps its read and is listed as a repeat break, so a deliberate
-  variation is never lost silently. The repeat it reports is a whole multiple of the confirmed
-  block period.
+  variation is never lost silently. A block too different from every type to be a copy joins the
+  type its block period predicts when it agrees with that type on at least half its squares, and
+  only for the repeat and the breaks: the vote never changes its squares, and every square of it
+  that disagrees is listed as a repeat break. The repeat it reports is a whole multiple of the
+  confirmed block period.
 
 Every read knob (the L weight, P, the inset, the fabric-count range, the vote threshold and the
-others) sits in qrep/vision/read/knobs.py with its source, provisional until D5 measures it.
+others) sits in qrep/vision/read/knobs.py with its source, provisional until D5 measures it,
+except the literals REBASELINE.md keeps frozen: the minimum of 3 copies (B5) and the square sizes
+of 3/4 to 4 in (B8 and B9).
 
 A read returns the quilt model and its details: the fabric count used (yours at 1.0, or the
 suggestion with its confidence), a confidence for each palette fabric and each border strip label,
