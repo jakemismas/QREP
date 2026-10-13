@@ -24,10 +24,11 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from qrep.model.schema import Quilt
 
-CONTRACT_VERSION = 2
+CONTRACT_VERSION = 3
 
 # The read's optional fabric count (SPEC.md section 12.1). Below 2 there is
-# nothing to tell apart; above 12, k-means only stalls or fails inside OpenCV.
+# nothing to tell apart; above 12 is a scrappy quilt (SPEC.md section 3), which
+# the read itself refuses as too_many_fabrics.
 FABRICS_MIN = 2
 FABRICS_MAX = 12
 
@@ -121,15 +122,94 @@ def _check_reason(result, success: tuple[str, ...]):
     return result
 
 
+Confidence = Annotated[float, Field(ge=0, le=1, allow_inf_nan=False)]
+
+
+class FabricCount(_Shape):
+    """The fabric count the read used: the one you set (source user, at 1.0)
+    or the read's own suggestion, with that suggestion's confidence."""
+
+    value: int = Field(ge=1)
+    source: Literal["user", "suggestion"]
+    confidence: Confidence
+
+
+class FabricRead(_Shape):
+    """A palette fabric as the read found it: its model id and the confidence
+    of its color."""
+
+    fabric_id: str = Field(min_length=1)
+    confidence: Confidence
+
+
+class StripRead(_Shape):
+    """One side strip of a border band (band 0 is the outermost): the fabric
+    it reads as and the confidence of that label."""
+
+    band: int = Field(ge=0)
+    side: Literal["top", "right", "bottom", "left"]
+    fabric_id: str = Field(min_length=1)
+    confidence: Confidence
+
+
+class VoteChange(_Shape):
+    """A square the block vote changed: the fabric it read, the block
+    majority it took, and the vote's confidence."""
+
+    row: int = Field(ge=0)
+    col: int = Field(ge=0)
+    read: str = Field(min_length=1)
+    voted: str = Field(min_length=1)
+    confidence: Confidence
+
+
+class RepeatBreak(_Shape):
+    """A confidently read square that differs from its block majority. It
+    keeps its read, so a deliberate variation is never voted away."""
+
+    row: int = Field(ge=0)
+    col: int = Field(ge=0)
+    read: str = Field(min_length=1)
+    majority: str = Field(min_length=1)
+    confidence: Confidence
+
+
+class Repeat(_Shape):
+    """The repeat of the read squares, in squares: a whole multiple of the
+    block period you confirmed."""
+
+    across: int = Field(ge=1)
+    down: int = Field(ge=1)
+
+
+class ReadDetails(_Shape):
+    """What the read found beyond the model, each CV value with its
+    confidence (SPEC.md section 4). corners_source says whether you set the
+    corners or kept a suggestion, so evaluation can tell corner error from
+    read error."""
+
+    corners_source: Literal["user", "suggestion"]
+    fabric_count: FabricCount
+    fabrics: list[FabricRead]
+    strips: list[StripRead]
+    repeat: Repeat
+    vote_changes: list[VoteChange]
+    repeat_breaks: list[RepeatBreak]
+
+
 class ReadResult(_Shape):
     outcome: Literal["read", "held", "refused"]
     model: Quilt | None = None
+    details: ReadDetails | None = None
     reason: Reason | None = None
 
     @model_validator(mode="after")
     def _consistent(self):
-        if (self.outcome == "read") != (self.model is not None):
-            raise ValueError("a read result carries the model, and only a read result does")
+        read = self.outcome == "read"
+        if read != (self.model is not None) or read != (self.details is not None):
+            raise ValueError(
+                "a read result carries the model and its details, and only a read result does"
+            )
         return _check_reason(self, ("read",))
 
 
@@ -248,6 +328,13 @@ CONTRACT_MODELS = (
     Counts,
     ReadRequest,
     Reason,
+    FabricCount,
+    FabricRead,
+    StripRead,
+    VoteChange,
+    RepeatBreak,
+    Repeat,
+    ReadDetails,
     ReadResult,
     SizeRequest,
     SizeBasis,

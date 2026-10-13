@@ -14,7 +14,7 @@
  */
 import type { QuiltModel } from "../model/types";
 
-export const CONTRACT_VERSION = 2;
+export const CONTRACT_VERSION = 3;
 
 // ------------------------------------------------------------ read request
 
@@ -85,9 +85,66 @@ export const PATTERN_OUTCOMES = ["pattern_ready", "refused"] as const;
 export const OUTCOMES = ["read", "held", "refused", "sized", "pattern_ready"] as const;
 export type Outcome = (typeof OUTCOMES)[number];
 
+/** The fabric count the read used: yours (at 1.0) or its own suggestion. */
+export interface FabricCount {
+  value: number;
+  source: "user" | "suggestion";
+  confidence: number;
+}
+
+/** A palette fabric as the read found it, with the confidence of its color. */
+export interface FabricRead {
+  fabric_id: string;
+  confidence: number;
+}
+
+/** One side strip of a border band (band 0 is the outermost) and its label. */
+export interface StripRead {
+  band: number;
+  side: "top" | "right" | "bottom" | "left";
+  fabric_id: string;
+  confidence: number;
+}
+
+/** A square the block vote changed, and the vote's confidence. */
+export interface VoteChange {
+  row: number;
+  col: number;
+  read: string;
+  voted: string;
+  confidence: number;
+}
+
+/** A confidently read square that differs from its block majority; it keeps its read. */
+export interface RepeatBreak {
+  row: number;
+  col: number;
+  read: string;
+  majority: string;
+  confidence: number;
+}
+
+/** The repeat of the read squares, in squares, a whole multiple of the block period. */
+export interface Repeat {
+  across: number;
+  down: number;
+}
+
+/** What the read found beyond the model, each CV value with its confidence. */
+export interface ReadDetails {
+  corners_source: "user" | "suggestion";
+  fabric_count: FabricCount;
+  fabrics: FabricRead[];
+  strips: StripRead[];
+  repeat: Repeat;
+  vote_changes: VoteChange[];
+  repeat_breaks: RepeatBreak[];
+}
+
 export interface ReadResult {
   outcome: (typeof READ_OUTCOMES)[number];
   model?: QuiltModel | null;
+  details?: ReadDetails | null;
   reason?: Reason | null;
 }
 
