@@ -157,9 +157,9 @@ export function StartScreen({
 
         <div className="start-actions">
           <p className="start-lede">
-            Lay the quilt flat, take one straight-on shot, and drop it in. You get back a
-            quilt you can repaint, resize and re-plan — with the fabric math done for you.
-            Size is optional: QREP guesses until you set the real one.
+            Lay the quilt flat, take one straight-on shot, and drop it in. You confirm the
+            corners and counts, and QREP works out the pattern with the fabric math done.
+            The pattern prints the size you choose, or a size labeled as a default.
           </p>
 
           <button

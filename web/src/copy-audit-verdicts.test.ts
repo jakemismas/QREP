@@ -112,6 +112,8 @@ describe("S8 entry copy present verbatim", () => {
   });
   it("start-screen lede honest size line", () => {
     const source = readFileSync(path.join(srcRoot, "shell", "StartScreen.tsx"), "utf8");
-    expect(source).toContain("Size is optional: QREP guesses until you set the real one.");
+    // C2b (REBASELINE.md; criterion A3-11): you confirm the corners and counts,
+    // and a size prints only as one you chose or labeled as a default.
+    expect(source).toContain("The pattern prints the size you choose, or a size labeled as a default.");
   });
 });
