@@ -106,9 +106,19 @@ describe("reading and clearing a JPEG's EXIF orientation", () => {
   });
 
   it("leaves a truncated EXIF segment alone instead of throwing", () => {
-    // The APP1 segment cut off after its TIFF header: the IFD it points at is missing.
-    const cut = new Uint8Array([...SOI, ...app1("MM", 6).slice(0, 20)]);
+    // The APP1 segment cut after 40 bytes, so the file ends at 2 + 40 = 42:
+    // the Orientation entry keeps its tag, type and count (34 to 41) but loses
+    // its value at 42. Read past the end, the value would come out as 0.
+    const cut = new Uint8Array([...SOI, ...app1("MM", 6).slice(0, 40)]);
     expect(readOrientation(cut)).toBeNull();
     expect(withoutOrientation(cut)).toBe(cut);
+  });
+
+  it("reads an EXIF id whose sixth byte is not 00", () => {
+    // "Exif" 00 FF: byte 11, the id's sixth, set to FF.
+    const bytes = new Uint8Array([...SOI, ...app1("MM", 6), ...EOI]);
+    bytes[11] = 0xff;
+    expect(readOrientation(bytes)).toBe(6);
+    expect(readOrientation(withoutOrientation(bytes))).toBe(1);
   });
 });

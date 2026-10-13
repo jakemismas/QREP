@@ -55,8 +55,12 @@ function orientationInTiff(bytes: Uint8Array, tiff: number, limit: number): Entr
   return null;
 }
 
-/** "Exif" 00 00 */
-const EXIF_ID = [0x45, 0x78, 0x69, 0x66, 0x00, 0x00];
+/**
+ * "Exif" 00. The id's sixth byte is meant to be 00, but writers vary, so any
+ * value passes: a tag the page missed would still turn the photo.
+ */
+const EXIF_ID = [0x45, 0x78, 0x69, 0x66, 0x00];
+const EXIF_ID_LENGTH = 6;
 
 /** Every Orientation entry in the file's EXIF segments, in file order. */
 function orientationEntries(bytes: Uint8Array): Entry[] {
@@ -82,7 +86,7 @@ function orientationEntries(bytes: Uint8Array): Entry[] {
     const body = pos + 4;
     const end = Math.min(pos + 2 + length, bytes.length);
     if (marker === 0xe1 && EXIF_ID.every((byte, i) => bytes[body + i] === byte)) {
-      const entry = orientationInTiff(bytes, body + EXIF_ID.length, end);
+      const entry = orientationInTiff(bytes, body + EXIF_ID_LENGTH, end);
       if (entry) found.push(entry);
     }
     pos = pos + 2 + length;

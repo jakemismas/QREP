@@ -175,8 +175,8 @@ describe("typed inches and steppers", () => {
   });
 
   it("keeps a quarter-inch border on the quarter-inch grid when it steps", () => {
-    // Source: PR #247 review of 0b7e9a3 (bands.ts:22-23); docs/SPEC.md 6.3
-    // snaps borders to 1/4 in. Every offered square size is a whole number of
+    // Source: PR #247 review of 0b7e9a3 (bands.ts:22-23); plan section 2.1,
+    // Screen 4: border widths in 1/4 in steps. Every offered square size is a whole number of
     // quarter inches (3/4 in to 4 in), so a whole-square step adds one.
     // Inputs: a 1 1/2 in square (12 eighths), a band of 1 square (1 1/2 in)
     // Arithmetic: 1 + 1 = 2 squares, 2 x 1.5 = 3 in; 3 x 4 = 12 quarters, whole

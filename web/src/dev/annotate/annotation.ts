@@ -316,10 +316,15 @@ export function aspectMatches(canvas: [number, number], image: Size): boolean {
  * Why the open photo is not the one the annotation names, or null. The
  * annotation's sha256 is the source image's (corpus/README.md, Annotations),
  * so a photo of the canvas's size must match it; a downsized copy has bytes
- * of its own and is checked by its stem and shape only.
+ * of its own and is checked by its stem and shape only. A photo larger than
+ * the canvas is neither, so it is refused.
  */
 export function photoProblem(annotation: Annotation, image: Size, sha256: string): string | null {
-  const fullSize = image.width === annotation.canvas[0] && image.height === annotation.canvas[1];
+  const [width, height] = annotation.canvas;
+  if (image.width > width || image.height > height) {
+    return `This photo is ${image.width} x ${image.height} px, larger than the annotation's canvas of ${width} x ${height} px: it is another photo.`;
+  }
+  const fullSize = image.width === width && image.height === height;
   if (!fullSize || sha256 === annotation.sha256) return null;
   return `This photo's sha256 is ${sha256}, but the annotation names ${annotation.sha256}: it is another photo.`;
 }

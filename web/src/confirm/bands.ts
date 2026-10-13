@@ -22,7 +22,8 @@ import {
 /**
  * Steppers count whole squares, so they work before a square size is set
  * (#149, comment 6142353076), and every offered square size is a whole number
- * of quarter inches, so a step keeps a border on SPEC 6.3's quarter-inch grid.
+ * of quarter inches, so a step keeps a border in the 1/4 in steps of plan
+ * section 2.1, Screen 4.
  */
 export const BAND_STEP_SQUARES = 1;
 

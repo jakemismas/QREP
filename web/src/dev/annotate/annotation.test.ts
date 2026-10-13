@@ -155,6 +155,11 @@ describe("reading an annotation", () => {
     );
     // Half size, 400 x 300: a downsized copy, not compared.
     expect(photoProblem(annotation, { width: 400, height: 300 }, other)).toBeNull();
+    // Larger, 1000 x 750 (the same shape): neither the photo nor a downsized
+    // copy of it, so it is refused whatever its hash.
+    expect(photoProblem(annotation, { width: 1000, height: 750 }, SHA)).toBe(
+      "This photo is 1000 x 750 px, larger than the annotation's canvas of 800 x 600 px: it is another photo.",
+    );
   });
 
   it("names its photo file by the manifest path's stem", () => {

@@ -67,6 +67,7 @@ interface Photo {
   name: string;
   natural: Size | null;
   sha256: string | null;
+  hashFailed?: boolean;
 }
 
 /** What ending the drill puts back: the verify edits made before it started. */
@@ -158,6 +159,8 @@ export function AnnotatePage() {
   // The counts the drill last recorded, so typing records each entry once.
   const drillCounts = useRef<Counts | null>(null);
   const beforeDrill = useRef<VerifyState | null>(null);
+  // The last width a band handle drag gave, for a drop that gives none.
+  const dragWidth = useRef<number | null>(null);
   // Each photo opened counts up, so a slow read of an earlier one is dropped.
   const photoSeq = useRef(0);
   const [error, setError] = useState<string | null>(null);
@@ -237,7 +240,9 @@ export function AnnotatePage() {
     try {
       bytes = new Uint8Array(await file.arrayBuffer());
     } catch {
-      if (seq === photoSeq.current) setError("This photo could not be read.");
+      if (seq !== photoSeq.current) return;
+      setPhoto(null);
+      setError("This photo could not be read.");
       return;
     }
     if (seq !== photoSeq.current) return;
@@ -257,8 +262,13 @@ export function AnnotatePage() {
     // Yield first, so the photo shows while a large file hashes.
     await new Promise((resolve) => setTimeout(resolve, 0));
     if (seq !== photoSeq.current) return;
-    const sha = sha256Hex(bytes);
-    setPhoto((p) => (p && p.url === url ? { ...p, sha256: sha } : p));
+    try {
+      const sha = sha256Hex(bytes);
+      setPhoto((p) => (p && p.url === url ? { ...p, sha256: sha } : p));
+    } catch {
+      setPhoto((p) => (p && p.url === url ? { ...p, hashFailed: true } : p));
+      setError("This photo's sha256 could not be computed, so the page cannot save or drill it.");
+    }
   };
 
   const onAnnotationFile = async (file: File) => {
@@ -324,7 +334,10 @@ export function AnnotatePage() {
       });
     } else if (set === "band") {
       const width = widthAt(part, point);
-      if (width !== null) setDraft((d) => d && { ...d, bands: withWidth(d.bands, width) });
+      if (width !== null) {
+        dragWidth.current = width;
+        setDraft((d) => d && { ...d, bands: withWidth(d.bands, width) });
+      }
     } else if (set === "square") {
       setSquare((s) => s && (part === "a" ? [point, s[1]] : [s[0], point]));
     }
@@ -335,7 +348,10 @@ export function AnnotatePage() {
     if (id.startsWith("outer.") || id.startsWith("field.")) {
       setDrill((log) => log && recordPin(log, id, point, input, elapsed()));
     } else if (id.startsWith("band.") && draft) {
-      const width = widthAt(id.split(".")[1], point);
+      // A drop past the centre or off the edge gives no width, and the band
+      // keeps the last one the drag gave, so that is the placement.
+      const width = widthAt(id.split(".")[1], point) ?? dragWidth.current;
+      dragWidth.current = null;
       if (width !== null) setDrill((log) => log && recordBands(log, withWidth(draft.bands, width), elapsed()));
     }
   };
@@ -471,7 +487,8 @@ export function AnnotatePage() {
   const requestFrame = draft && pinned ? toRequestFrame(frameMode, pinned, bands) : null;
   // The page hashes every photo, an annotated one too, to check it is the one
   // the annotation names.
-  const hashing = Boolean(photo && !photo.sha256);
+  const hashing = Boolean(photo && !photo.sha256 && !photo.hashFailed);
+  const unhashed = Boolean(photo?.hashFailed);
 
   return (
     <main className="an-page">
@@ -567,7 +584,7 @@ export function AnnotatePage() {
               <section className="an-group" aria-label="Mode">
                 <div className="an-row">
                   {mode === "verify" ? (
-                    <button type="button" className="cf-btn" data-testid="drill-start" disabled={hashing} onClick={startDrill}>
+                    <button type="button" className="cf-btn" data-testid="drill-start" disabled={hashing || unhashed} onClick={startDrill}>
                       Start the pin drill
                     </button>
                   ) : (
@@ -694,7 +711,7 @@ export function AnnotatePage() {
               )}
 
               <section className="an-group an-save" aria-label="Save">
-                <button type="button" className="cf-btn an-primary" data-testid="save" disabled={hashing} onClick={save}>
+                <button type="button" className="cf-btn an-primary" data-testid="save" disabled={hashing || unhashed} onClick={save}>
                   {mode === "drill" ? "Save drill records" : "Save annotation"}
                 </button>
                 {status && (

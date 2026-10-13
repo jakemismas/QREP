@@ -38,11 +38,16 @@ function InchField({ index, width, squareEighths, onSet }: { index: number; widt
   // Three decimals: a dragged width is not a whole quarter inch.
   const shown = squareEighths ? String(Number(squaresToInches(width, squareEighths).toFixed(3))) : "";
   const [text, setText] = useState(shown);
-  useEffect(() => setText(shown), [shown]);
+  // Typed since it last showed a width, even the same digits: a typed width
+  // rounds to 1/4 in, while leaving the field untouched keeps a dragged width.
+  const [edited, setEdited] = useState(false);
+  useEffect(() => {
+    setText(shown);
+    setEdited(false);
+  }, [shown]);
   const apply = () => {
-    // Leaving the field unedited keeps a dragged width: rounding what it
-    // shows to 1/4 in would move the line nobody touched.
-    if (text === shown) return;
+    if (!edited) return;
+    setEdited(false);
     const inches = Number(text);
     if (!squareEighths || !(inches > 0)) return setText(shown);
     const squares = inchesToSquares(inches, squareEighths);
@@ -60,7 +65,10 @@ function InchField({ index, width, squareEighths, onSet }: { index: number; widt
         data-testid={`band-${index + 1}-inches`}
         disabled={squareEighths === null}
         value={text}
-        onChange={(e) => setText(e.target.value)}
+        onChange={(e) => {
+          setText(e.target.value);
+          setEdited(true);
+        }}
         onBlur={apply}
         onKeyDown={(e) => {
           if (e.key === "Enter") apply();

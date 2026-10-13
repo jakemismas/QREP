@@ -847,6 +847,15 @@ if (process.env.SPIKE_BASE_URL) {
       await page.keyboard.press("Tab");
       await expect(inches).not.toBeFocused();
       await expect(widthLabel).toHaveText(dragged);
+      // Typing the shown inches back, key by key, is a typed width, so it rounds
+      // to 1/4 in: the dragged widths 0.7267, 0.75 and 0.7736 squares show 1.09,
+      // 1.125 and 1.16 in (x 1.5, three decimals), none a quarter inch.
+      const shownInches = await inches.inputValue();
+      expect(Number(shownInches) * 4, "the dragged width is off the quarter-inch grid").not.toBe(Math.round(Number(shownInches) * 4));
+      await inches.fill("");
+      await inches.pressSequentially(shownInches);
+      await inches.press("Enter");
+      await expect.poll(async () => Number.isInteger(Number(await inches.inputValue()) * 4), { message: "retyped inches round to 1/4 in" }).toBe(true);
       await inches.fill("1.5");
       await inches.press("Enter");
       // "12" is 12 eighths = 1 1/2 in a square; 1.5 in (already a quarter inch)
@@ -1106,6 +1115,7 @@ if (process.env.SPIKE_BASE_URL) {
       const original = readAnnotation();
       // The page opens on the verified claim, else proposed-a's: the stripped
       // copy has no verified-jake claim in any field, so it opens on proposed-a's.
+      // The check below guards readAnnotation's stripping, not the page.
       const provenances = Object.entries(original)
         .filter(([field]) => !IDENTITY_FIELDS.includes(field))
         .flatMap(([, claims]) => (claims as Claim[]).map((claim) => claim.provenance));
@@ -1222,6 +1232,14 @@ if (process.env.SPIKE_BASE_URL) {
         expect(records[i].t_ms, `record ${i + 1} t_ms`).toBeGreaterThanOrEqual(records[i - 1].t_ms);
       }
 
+      // A band handle dropped past the quilt's centre gives no width there, and
+      // the band keeps the last width the drag gave, so that is still a record.
+      // Band 1 (2 squares) on 2 columns: its left handle sits at u = 2 / (2 + 4)
+      // = 1/3, x = 581 + 2711 / 3 = 1484.7; x 2600 is u = 2019 / 2711 = 0.745,
+      // deeper than 0.5.
+      await mouseDrag(page, "band.left", { x: 2600, y: 2048 }, LACMA_CANVAS);
+      await expect(page.getByTestId("mode")).toHaveText("Pin drill: the annotation is hidden; 7 records");
+
       // Ending the drill gives back the verify draft, the unsaved edit included.
       await page.getByTestId("drill-stop").click();
       await expect(page.getByTestId("mode")).toHaveText("Verifying, starting from proposed-a");
@@ -1233,7 +1251,7 @@ if (process.env.SPIKE_BASE_URL) {
   test.describe("annotate page with touch on an iPhone 13", { tag: "@phone" }, () => {
     test.use(IPHONE_OPTIONS);
 
-    test("one finger drags every pin and a band, two fingers pinch and pan, a zoomed drag maps, and the saved JSON is the hand geometry", async ({
+    test("one finger drags the outer pins and a band handle, two fingers pinch and pan, a zoomed drag maps, and the saved JSON is the hand geometry", async ({
       page,
     }) => {
       const { sha } = await openQuilt(page);
