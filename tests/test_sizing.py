@@ -30,6 +30,7 @@ from qrep.model.schema import (
     QuiltMetadata,
 )
 from qrep.model.sizing import apply_finished_size, round_div, size_pattern
+from qrep.model.unitmap import CornerUnit, PlainUnit
 from qrep.viewer import sizing as viewer_sizing
 
 FIXTURE = Path(__file__).parent / "fixtures" / "double_irish_chain.json"
@@ -55,6 +56,28 @@ def _read_shaped(cell: int, band: int, basis: dict | None = None) -> Quilt:
     data["provenance"] = {"source": "cv", "stage_confidence": {}}
     data["size_basis"] = basis
     return loads(json.dumps(data))
+
+
+def _snowball_grid() -> Quilt:
+    """4 x 4 squares of 12 e in one 16 e border; the top-left square is a
+    snowball corner unit whose leg is 1/3 of the side (12 x 1/3 = 4 e)."""
+    units = [CornerUnit(row=0, col=0, corners={"top_left": "b"}, leg="1/3", confidence=1.0)]
+    units += [
+        PlainUnit(row=r, col=c, confidence=1.0)
+        for r in range(4)
+        for c in range(4)
+        if (r, c) != (0, 0)
+    ]
+    fabrics = [Fabric(id="a", name="A", color="#333366"), Fabric(id="b", name="B", color="#eeeedd")]
+    return Quilt(
+        metadata=QuiltMetadata(name="snowball"),
+        palette=Palette(fabrics=fabrics),
+        center=GridRegion(
+            rows=4, cols=4, cell_size=12, cells=[["a"] * 4 for _ in range(4)], unit_map=units
+        ),
+        borders=[{"fabric_id": "b", "width": 16}],
+        binding=Binding(fabric_id="a"),
+    )
 
 
 def _typed(width: int | None = None, height: int | None = None) -> SizeRequest:
@@ -126,16 +149,33 @@ def test_square_step_is_a_setting():
         sizing.square_sizes(40)
 
 
+def test_the_square_step_setting_is_read_when_sizing(monkeypatch):
+    # Set the step to 1/2 in (4 e): the offered list follows it, as above, and
+    # the DIC at 75 x 90 in still lands on 1 1/2 in (12 e, a multiple of 4):
+    # 45 x 12 + 2 x 30 = 600 and 55 x 12 + 60 = 720, recorded at step 4.
+    monkeypatch.setattr(sizing, "SQUARE_STEP", 4)
+    assert sizing.square_sizes() == (8, 12, 16, 20, 24, 28, 32)
+    result = size_pattern(load(FIXTURE), _typed(600, 720))
+    assert result.model.center.cell_size == 12
+    assert result.model.size_basis.rounding_step == 4
+
+
 def test_border_snaps_to_quarter_inch_within_floor_and_cap():
     # 21 e (2 5/8 in): round_div(21, 2) = (21 + 1) // 2 = 11 -> 22 e (2 3/4 in)
     assert sizing.snap_border(21) == 22
     # 30 e (3 3/4 in) is already a whole quarter inch
     assert sizing.snap_border(30) == 30
-    # 1 e: round_div(1, 2) = (1 + 1) // 2 = 1 -> 2 e, the BAND_FLOOR
+    # 1 e: round_div(1, 2) = (1 + 1) // 2 = 1 -> 2 e; the rounding alone
+    # reaches the BAND_FLOOR from any width of at least one eighth
     assert sizing.snap_border(1) == 2
     # 113 e: round_div(113, 2) = 57 -> 114 e, above the cap -> 112 e
     assert sizing.snap_border(113) == 112
     assert sizing.snap_border(400) == 112
+    # no border is zero or less wide
+    with pytest.raises(ValueError, match="border width"):
+        sizing.snap_border(0)
+    with pytest.raises(ValueError, match="border width"):
+        sizing.snap_border(-10)
 
 
 # ---------------------------------------------------------------------------
@@ -172,13 +212,29 @@ def test_size_at_snaps_the_border_widths_you_choose():
     assert (sized.finished_width, sized.finished_height) == (584, 704)
 
 
-def test_size_at_refuses_a_square_off_the_list_or_a_wrong_border_count():
+def test_size_at_snaps_kept_borders_and_drops_the_basis():
+    # The read-shaped DIC keeps its 23 e border, which snaps:
+    # round_div(23, 2) = (23 + 1) // 2 = 12 -> 24 e (3 in). At 1 1/4 in:
+    # 45 x 10 + 2 x 24 = 498, 55 x 10 + 48 = 598.
+    sized = sizing.size_at(_read_shaped(9, 23), 10)
+    assert [band.width for band in sized.borders] == [24]
+    assert (sized.finished_width, sized.finished_height) == (498, 598)
+    # A typed basis says 600 x 720; at 2 in squares the quilt is 780 x 940,
+    # so the stale basis goes.
+    typed = size_pattern(load(FIXTURE), _typed(600, 720)).model
+    assert sizing.size_at(typed, 16).size_basis is None
+
+
+def test_size_at_refuses_a_square_off_the_list_or_a_wrong_border():
     # 1 1/8 in (9 e) is not a whole quarter inch
     with pytest.raises(ValueError, match="square"):
         sizing.size_at(load(FIXTURE), 9)
     # the DIC has one border band, so two widths do not fit it
     with pytest.raises(ValueError, match="border"):
         sizing.size_at(load(FIXTURE), 12, [20, 20])
+    # a border of no width
+    with pytest.raises(ValueError, match="border width"):
+        sizing.size_at(load(FIXTURE), 12, [0])
 
 
 # ---------------------------------------------------------------------------
@@ -203,6 +259,7 @@ def test_dic_at_75_by_90_returns_exactly_75_by_90():
         achieved_width=600,
         achieved_height=720,
     )
+    # A typed size is a user fact at 1.0 (CLAUDE.md; schema.py's basis rule).
     assert result.model.size_basis == FinishedSizeBasis(
         source="typed",
         requested_width=600,
@@ -280,8 +337,19 @@ def test_a_preset_records_its_size_as_requested():
         achieved_width=600,
         achieved_height=720,
     )
+    # a preset is a user fact at 1.0, like a typed size
     assert result.model.size_basis.source == "preset"
     assert result.model.size_basis.confidence == 1.0
+
+
+def test_a_size_you_set_on_a_read_stays_a_user_fact():
+    # The read's own estimate is unmeasured (0.0, below), but a typed or
+    # preset size is yours, so its basis stands at 1.0 on a read as well.
+    read = _read_shaped(9, 23)
+    typed = size_pattern(read, _typed(600, 720)).model.size_basis
+    preset = size_pattern(read, SizeRequest(source="preset", preset="Twin")).model.size_basis
+    assert (typed.source, typed.confidence) == ("typed", 1.0)
+    assert (preset.source, preset.confidence) == ("preset", 1.0)
 
 
 def test_an_unknown_preset_is_refused():
@@ -350,26 +418,46 @@ def test_a_default_keeps_the_estimate_confidence_a_read_recorded():
     assert result.model.size_basis.rounding_step == 2
 
 
+def test_a_default_from_a_read_without_provenance_is_not_hand_authored():
+    # A model that drops its provenance defaults to "authored", but its
+    # squares were read at confidence 0.3, so the estimate is a read's: 0.0.
+    data = json.loads(dumps(_read_shaped(9, 23)))
+    data["center"]["cell_confidence"] = [[0.3] * 45 for _ in range(55)]
+    del data["provenance"]
+    result = size_pattern(loads(json.dumps(data)), SizeRequest(source="default"))
+    assert result.model.size_basis.confidence == 0.0
+
+
 def test_a_default_refuses_a_size_you_set():
-    # A typed size replaced the read's estimate, so no estimate is left to
-    # label as one.
+    # A typed or preset size replaced the read's estimate, so no estimate is
+    # left to label as one.
     typed = size_pattern(load(FIXTURE), _typed(600, 720)).model
     with pytest.raises(ValueError, match="typed"):
         size_pattern(typed, SizeRequest(source="default"))
+    preset = size_pattern(load(FIXTURE), SizeRequest(source="preset", preset="Twin")).model
+    with pytest.raises(ValueError, match="preset"):
+        size_pattern(preset, SizeRequest(source="default"))
 
 
 @pytest.mark.parametrize(
-    "request_",
+    ("request_", "achieved"),
     [
-        SizeRequest(source="typed", width=688, height=540),
-        SizeRequest(source="preset", preset="Queen"),
-        SizeRequest(source="default"),
+        # 86 x 67.5 in: 400 x 480, worked in test_the_sample_at_86_by_67_5
+        (SizeRequest(source="typed", width=688, height=540), (400, 480)),
+        # Queen 90 x 108 in = 720 x 864 e. Width: 1 3/4 in gives 45 x 14 + 2 x 36
+        # = 702 (short by 18), 2 in gives 800 (over by 80) -> 14. Height:
+        # 55 x 14 + 72 = 842 (short by 22), 55 x 16 + 80 = 960 (over by 96)
+        # -> 14. So 702 x 842.
+        (SizeRequest(source="preset", preset="Queen"), (702, 842)),
+        # the model's own 600 x 720, met exactly at 1 1/2 in
+        (SizeRequest(source="default"), (600, 720)),
     ],
     ids=["typed", "preset", "default"],
 )
-def test_every_basis_matches_its_sized_model(request_):
+def test_every_basis_matches_its_sized_model(request_, achieved):
     result = size_pattern(load(FIXTURE), request_)
     model, basis, stored = result.model, result.basis, result.model.size_basis
+    assert (model.finished_width, model.finished_height) == achieved
     assert (basis.achieved_width, basis.achieved_height) == (
         model.finished_width,
         model.finished_height,
@@ -404,25 +492,84 @@ def test_apply_finished_size_takes_a_step():
     assert achieved["width"] == 260
 
 
-def test_borders_never_exceed_the_cap():
-    # 10 x 13 at 12 e with a 100 e border, asked for 250 in (2000 e) wide:
-    # every square misses short, so the largest, 32 e, wins. The border would
-    # scale to round_div(100 x 32, 12) = 3206 // 12 = 267 e and stops at the
-    # 112 e cap: 13 x 32 + 2 x 112 = 416 + 224 = 640 e.
+def test_the_one_eighth_step_keeps_the_sprint_3_reconcile():
+    # The DIC asked for 690 e (86 1/4 in) tall at the default step. Sprint 3
+    # rounds the exact cell: round_div(690 x 12, 55 x 12 + 2 x 30)
+    # = round_div(8280, 720) = (8280 + 360) // 720 = 12, border
+    # round_div(30 x 12, 12) = 30, so 600 x 720. It stays 12 although 11 e
+    # (55 x 11 + 2 x round_div(330, 12) = 605 + 56 = 661, short by 29) misses
+    # by less than 12 e (720, over by 30): the default step is the sprint 3
+    # rule, kept exactly for its callers.
+    updated, _requested, achieved = apply_finished_size(load(FIXTURE), None, 690)
+    assert updated.center.cell_size == 12
+    assert (achieved["width"], achieved["height"]) == (600, 720)
+
+
+def test_pattern_borders_never_exceed_the_cap():
+    # 10 x 13 at 12 e with a 100 e border, asked for 250 in (2000 e) wide in
+    # 1/4 in steps: every square misses short, so the largest, 32 e, wins. The
+    # border would scale to 2 x round_div(100 x 32, 2 x 12)
+    # = 2 x (3212 // 24) = 266 e and stops at the 112 e cap:
+    # 13 x 32 + 2 x 112 = 416 + 224 = 640 e.
     quilt = _grid_model(10, 13, 12, 100)
-    updated, _requested, achieved = apply_finished_size(quilt, 2000, None)
+    updated, _requested, achieved = apply_finished_size(quilt, 2000, None, step=2)
     assert updated.center.cell_size == 32
     assert updated.borders[0].width == 112
     assert achieved["width"] == 640
 
 
-def test_apply_finished_size_drops_a_stale_basis():
-    # Sized to 75 x 90 in by a typed size, then resized to 502 e wide on the
-    # v1 path: the basis would still say 600 x 720, so it goes.
+def test_pattern_borders_never_fall_below_the_floor():
+    # 10 x 13 at 32 e with a 1 e border, asked for 10 in (80 e) wide in 1/4 in
+    # steps. At 3/4 in the border scales to 2 x round_div(1 x 6, 2 x 32)
+    # = 2 x (38 // 64) = 0 and rises to the 2 e floor: 13 x 6 + 2 x 2 = 82
+    # (over by 2); at 1 in it is 0 again, so 2 e: 13 x 8 + 4 = 108 (over by
+    # 28) -> 3/4 in with a 2 e border.
+    quilt = _grid_model(10, 13, 32, 1)
+    updated, _requested, achieved = apply_finished_size(quilt, 80, None, step=2)
+    assert updated.center.cell_size == 6
+    assert updated.borders[0].width == 2
+    assert achieved["width"] == 82
+
+
+@pytest.mark.parametrize("step", [1, 2], ids=["sprint-3", "pattern"])
+def test_apply_finished_size_drops_a_stale_basis(step):
+    # Sized to 75 x 90 in by a typed size, then resized to 502 e wide: the
+    # basis would still say 600 x 720, so it goes on either path.
     typed = size_pattern(load(FIXTURE), _typed(600, 720)).model
     assert typed.size_basis is not None
-    resized, _requested, _achieved = apply_finished_size(typed, 502, None, step=2)
+    resized, _requested, _achieved = apply_finished_size(typed, 502, None, step=step)
     assert resized.size_basis is None
+
+
+# ---------------------------------------------------------------------------
+# corner units keep their legs whole
+# ---------------------------------------------------------------------------
+
+
+def test_sizing_skips_squares_that_break_a_corner_leg():
+    # A 1/3 leg stays whole only on squares divisible by 3, so the 1/4 in list
+    # narrows to 6, 12, 18, 24 and 30 e. Width 108 e on _snowball_grid, its
+    # border 2 x round_div(16 s, 24):
+    #   12 e: border 2 x (204 // 24) = 16, 4 x 12 + 32 = 80, short by 28
+    #   18 e: border 2 x (300 // 24) = 24, 4 x 18 + 48 = 120, over by 12
+    #   24 e: border 2 x (396 // 24) = 32, 4 x 24 + 64 = 160, over by 52
+    # -> 18 e (2 1/4 in), 120 x 120, leg 18 / 3 = 6 e. (16 e would meet 108
+    # exactly, 4 x 16 + 2 x 22, but leaves the leg at 16/3 e.)
+    result = size_pattern(_snowball_grid(), _typed(width=108))
+    assert result.model.center.cell_size == 18
+    assert (result.basis.achieved_width, result.basis.achieved_height) == (120, 120)
+    # the sized model loads again, corner legs and all
+    assert loads(dumps(result.model)).center.cell_size == 18
+
+
+def test_a_square_that_breaks_a_corner_leg_is_refused():
+    # 16 e is on the 1/4 in list, but a 1/3 leg of it is 16/3 e
+    with pytest.raises(ValueError, match="corner leg"):
+        sizing.size_at(_snowball_grid(), 16)
+    # The sprint 3 rule picks round_div(108 x 12, 4 x 12 + 2 x 16)
+    # = round_div(1296, 80) = 1336 // 80 = 16 e: refused, never rounded.
+    with pytest.raises(ValueError, match="corner leg"):
+        apply_finished_size(_snowball_grid(), 108, None)
 
 
 # ---------------------------------------------------------------------------
