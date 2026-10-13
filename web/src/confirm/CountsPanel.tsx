@@ -8,18 +8,22 @@ import { useEffect, useState } from "react";
 import { axisLabel, COUNT_MAX, parseCount, type AxisCount } from "./counts";
 import "./confirm.css";
 
+/** A stepper press is one entry; typing is several, settled when the field is left or Enter is pressed. */
+export type CountInput = "step" | "type";
+
 interface StepperProps {
   label: string;
   value: number;
   testId: string;
-  onChange: (value: number) => void;
+  onChange: (value: number, input: CountInput) => void;
+  onSettle?: () => void;
 }
 
 /** A whole-number field with minus and plus buttons; a typed value applies once it is valid. */
-export function CountStepper({ label, value, testId, onChange }: StepperProps) {
+export function CountStepper({ label, value, testId, onChange, onSettle }: StepperProps) {
   const [text, setText] = useState(String(value));
   useEffect(() => setText(String(value)), [value]);
-  const set = (next: number) => onChange(Math.min(COUNT_MAX, Math.max(1, next)));
+  const set = (next: number) => onChange(Math.min(COUNT_MAX, Math.max(1, next)), "step");
   return (
     <div className="cf-stepper">
       <button
@@ -42,9 +46,15 @@ export function CountStepper({ label, value, testId, onChange }: StepperProps) {
         onChange={(e) => {
           setText(e.target.value);
           const parsed = parseCount(e.target.value);
-          if (parsed !== null) onChange(parsed);
+          if (parsed !== null) onChange(parsed, "type");
         }}
-        onBlur={() => setText(String(value))}
+        onBlur={() => {
+          setText(String(value));
+          onSettle?.();
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") onSettle?.();
+        }}
       />
       <button
         type="button"
@@ -63,10 +73,11 @@ export function CountStepper({ label, value, testId, onChange }: StepperProps) {
 interface AxisProps {
   axis: "across" | "down";
   value: AxisCount;
-  onChange: (value: AxisCount) => void;
+  onChange: (value: AxisCount, input: CountInput) => void;
+  onSettle?: () => void;
 }
 
-function AxisRow({ axis, value, onChange }: AxisProps) {
+function AxisRow({ axis, value, onChange, onSettle }: AxisProps) {
   return (
     <fieldset className="cf-counts__axis">
       <legend className="cf-counts__legend">{axis === "across" ? "Across" : "Down"}</legend>
@@ -75,14 +86,16 @@ function AxisRow({ axis, value, onChange }: AxisProps) {
           label={`blocks ${axis}`}
           testId={`counts-${axis}-blocks`}
           value={value.blocks}
-          onChange={(blocks) => onChange({ ...value, blocks })}
+          onChange={(blocks, input) => onChange({ ...value, blocks }, input)}
+          onSettle={onSettle}
         />
         <span className="cf-counts__times">blocks x</span>
         <CountStepper
           label={`squares per block ${axis}`}
           testId={`counts-${axis}-squares`}
           value={value.squaresPerBlock}
-          onChange={(squaresPerBlock) => onChange({ ...value, squaresPerBlock })}
+          onChange={(squaresPerBlock, input) => onChange({ ...value, squaresPerBlock }, input)}
+          onSettle={onSettle}
         />
         <span className="cf-counts__times">squares</span>
       </div>
@@ -96,16 +109,18 @@ function AxisRow({ axis, value, onChange }: AxisProps) {
 interface Props {
   across: AxisCount;
   down: AxisCount;
-  onChange: (across: AxisCount, down: AxisCount) => void;
+  onChange: (across: AxisCount, down: AxisCount, input: CountInput) => void;
+  /** A typed count is final: its field was left, or Enter was pressed. */
+  onSettle?: () => void;
   /** Starts marking one square to seed the counts; absent hides the button. */
   onMeasure?: () => void;
 }
 
-export function CountsPanel({ across, down, onChange, onMeasure }: Props) {
+export function CountsPanel({ across, down, onChange, onSettle, onMeasure }: Props) {
   return (
     <section className="cf-counts" aria-label="Counts">
-      <AxisRow axis="across" value={across} onChange={(next) => onChange(next, down)} />
-      <AxisRow axis="down" value={down} onChange={(next) => onChange(across, next)} />
+      <AxisRow axis="across" value={across} onChange={(next, input) => onChange(next, down, input)} onSettle={onSettle} />
+      <AxisRow axis="down" value={down} onChange={(next, input) => onChange(across, next, input)} onSettle={onSettle} />
       {onMeasure && (
         <button type="button" className="cf-btn" data-testid="measure-square" onClick={onMeasure}>
           Count from one square

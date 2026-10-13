@@ -76,6 +76,14 @@ const ZOOM_MAX = 8;
 const ZOOM_STEP = 1.5;
 const FIT: View = { scale: 1, x: 0, y: 0 };
 
+/** Each pin's hit area, square, in CSS px at every zoom (criteria U3-3). */
+export const PIN_HIT_PX = 44;
+// The stage pads the photo by half a hit area and clips outside that, so a
+// pin on the photo's edge keeps its whole box. Zoom, pan and pinch work in
+// the box inside the gutter, and the pan clamp keeps the photo's edge at
+// least a gutter inside the stage's edge at every zoom.
+const GUTTER_PX = PIN_HIT_PX / 2;
+
 function clampView(view: View, width: number, height: number): View {
   const scale = Math.min(ZOOM_MAX, Math.max(1, view.scale));
   return {
@@ -135,15 +143,26 @@ export function PinLayer({
     return snapToPixel(displayToSource(client, r, canvas), canvas);
   };
 
+  /** The stage inside its gutter, where the view lays out the photo. */
   const stageSize = () => {
     const r = stageRef.current?.getBoundingClientRect();
-    return { left: r?.left ?? 0, top: r?.top ?? 0, width: r?.width ?? 0, height: r?.height ?? 0 };
+    if (!r) return { left: 0, top: 0, width: 0, height: 0 };
+    return {
+      left: r.left + GUTTER_PX,
+      top: r.top + GUTTER_PX,
+      width: Math.max(0, r.width - 2 * GUTTER_PX),
+      height: Math.max(0, r.height - 2 * GUTTER_PX),
+    };
   };
 
   const endDrag = (place: boolean) => {
     const current = drag.current;
     if (!current) return;
     drag.current = null;
+    // React renders a pointermove's update at a lower priority than the drop's,
+    // so the last move can render after the loupe closes. Repeating it here
+    // shows the pin where it was dropped in the same frame.
+    if (current.moved) onMove(current.id, current.last, "pointer");
     setDragging(null);
     // A tap that never moved the pin places nothing, so the drill logs only real placements.
     if (place && current.moved) onPlace?.(current.id, current.last, "pointer");
@@ -276,6 +295,7 @@ export function PinLayer({
         ref={stageRef}
         className="cf-pins__stage"
         data-testid="pin-stage"
+        style={{ padding: GUTTER_PX }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerEnd}
@@ -318,6 +338,8 @@ export function PinLayer({
               aria-label={`${pin.label}, at ${pin.point.x}, ${pin.point.y}. Arrow keys move it.`}
               aria-pressed={pin.id === activeId}
               style={{
+                width: PIN_HIT_PX,
+                height: PIN_HIT_PX,
                 left: `${(pin.point.x / canvas.width) * 100}%`,
                 top: `${(pin.point.y / canvas.height) * 100}%`,
                 transform: `translate(-50%, -50%) scale(${1 / view.scale})`,

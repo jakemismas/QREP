@@ -90,6 +90,40 @@ describe("a dragged inner line", () => {
     expect(handles.left.x).toBeCloseTo(40, 9);
   });
 
+  it("puts a trapezoid's handles at the rectified midpoints of the inner line", () => {
+    // Source: PR #247 review of 0b7e9a3 (bands.test.ts:93), a hand vector.
+    // Inputs: the trapezoid (0, 0), (400, 0), (300, 200), (100, 200); 10 x 6
+    // squares; one band 1.25 squares wide.
+    // The homography (geometry.ts squareToQuad): sx = 0 - 400 + 300 - 100 =
+    // -200, sy = 0; dx1 = 100, dx2 = -200, dy1 = -200, dy2 = 0; det = 0 -
+    // (-200 x -200) = -40000; g = (0 - 0) / det = 0; h = (0 - (-200 x -200)) /
+    // det = 1; a = 400, b = 100 + 100 = 200, c = 0, d = 0, e = 200 + 200 = 400,
+    // f = 0. So x = (400u + 200v) / (v + 1) and y = 400v / (v + 1).
+    // The inner line: u0 = 1.25 / (10 + 2.5) = 0.1, u1 = 0.9;
+    // v0 = 1.25 / (6 + 2.5) = 1.25 / 8.5, v1 = 7.25 / 8.5.
+    // Left (0.1, 0.5): x = (40 + 100) / 1.5 = 93.33, y = 200 / 1.5 = 133.33.
+    // Right (0.9, 0.5): x = (360 + 100) / 1.5 = 306.67, y = 133.33.
+    // Top (0.5, v0): x = (200 + 200 v0) / (v0 + 1) = 200; y = 400 x 1.25 /
+    // (1.25 + 8.5) = 500 / 9.75 = 51.28.
+    // Bottom (0.5, v1): x = 200; y = 400 x 7.25 / (7.25 + 8.5) = 2900 / 15.75 = 184.13.
+    // The left side's pixel midpoint would sit at y = (51.28 + 184.13) / 2 = 117.70.
+    const trapezoid: Quad = [
+      { x: 0, y: 0 },
+      { x: 400, y: 0 },
+      { x: 300, y: 200 },
+      { x: 100, y: 200 },
+    ];
+    const handles = bandHandles(squareToQuad(trapezoid), 10, 6, [{ width_squares: 1.25 }], 0);
+    expect(handles.left.x).toBeCloseTo(280 / 3, 9);
+    expect(handles.left.y).toBeCloseTo(400 / 3, 9);
+    expect(handles.right.x).toBeCloseTo(920 / 3, 9);
+    expect(handles.right.y).toBeCloseTo(400 / 3, 9);
+    expect(handles.top.x).toBeCloseTo(200, 9);
+    expect(handles.top.y).toBeCloseTo(500 / 9.75, 9);
+    expect(handles.bottom.x).toBeCloseTo(200, 9);
+    expect(handles.bottom.y).toBeCloseTo(2900 / 15.75, 9);
+  });
+
   it("reads a handle dragged in perspective through the rectified plane", () => {
     // Round trip on a trapezoid: the handle drawn for a 1.25 square band,
     // dragged nowhere, reads back as 1.25 squares from every side.
@@ -131,12 +165,21 @@ describe("typed inches and steppers", () => {
     expect(squaresToInches(2, 12)).toBe(3);
   });
 
-  it("steps a band by a quarter square and never to zero", () => {
-    // Steppers count squares, so they need no square size (decision on #149,
-    // comment 6142353076). Arithmetic: 2.15 + 0.25 = 2.4; 0.3 - 0.25 = 0.05;
-    // 0.1 - 0.25 is not positive, so the width stays 0.1
-    expect(stepBand(2.15, 1)).toBe(2.4);
-    expect(stepBand(0.3, -1)).toBe(0.05);
-    expect(stepBand(0.1, -1)).toBe(0.1);
+  it("steps a band by a whole square and never to zero", () => {
+    // Steppers count whole squares, so they need no square size (decision on
+    // #149, comment 6142353076). Arithmetic: 2.15 + 1 = 3.15; 1.3333 - 1 =
+    // 0.3333; 1 - 1 = 0 is not positive, so the width stays 1
+    expect(stepBand(2.15, 1)).toBe(3.15);
+    expect(stepBand(1.3333, -1)).toBe(0.3333);
+    expect(stepBand(1, -1)).toBe(1);
+  });
+
+  it("keeps a quarter-inch border on the quarter-inch grid when it steps", () => {
+    // Source: PR #247 review of 0b7e9a3 (bands.ts:22-23); docs/SPEC.md 6.3
+    // snaps borders to 1/4 in. Every offered square size is a whole number of
+    // quarter inches (3/4 in to 4 in), so a whole-square step adds one.
+    // Inputs: a 1 1/2 in square (12 eighths), a band of 1 square (1 1/2 in)
+    // Arithmetic: 1 + 1 = 2 squares, 2 x 1.5 = 3 in; 3 x 4 = 12 quarters, whole
+    expect(squaresToInches(stepBand(1, 1), 12)).toBe(3);
   });
 });

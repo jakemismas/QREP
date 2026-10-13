@@ -19,8 +19,12 @@ import {
   type UVRange,
 } from "./geometry";
 
-/** Steppers count squares, so they work before a square size is set (#149, comment 6142353076). */
-export const BAND_STEP_SQUARES = 0.25;
+/**
+ * Steppers count whole squares, so they work before a square size is set
+ * (#149, comment 6142353076), and every offered square size is a whole number
+ * of quarter inches, so a step keeps a border on SPEC 6.3's quarter-inch grid.
+ */
+export const BAND_STEP_SQUARES = 1;
 
 export type BandSide = "top" | "right" | "bottom" | "left";
 

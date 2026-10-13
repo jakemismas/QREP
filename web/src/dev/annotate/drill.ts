@@ -1,11 +1,11 @@
 /**
  * Pin drill records (C3a, issue #149; plan section 9, item 4). The drill
  * hides any loaded annotation, so the placements are unprompted (plan
- * section 8.2), and logs each placed pin and each count entered with the
- * photo id. D10 scores them against verified truth; nothing here computes
- * an error.
+ * section 8.2), and logs each placed pin, each band placed and each count
+ * entered with the photo id. D10 scores them against verified truth; nothing
+ * here computes an error.
  */
-import type { Counts, Point } from "../../engine/contract";
+import type { BorderBand, Counts, Point } from "../../engine/contract";
 import { neutralInset, type FrameMode } from "../../confirm/frame";
 import type { Draft } from "./annotation";
 
@@ -21,7 +21,8 @@ export interface DeviceInfo {
 
 export type DrillRecord =
   | { seq: number; t_ms: number; kind: "pin"; pin: PinId; x: number; y: number; input: "pointer" | "key" }
-  | { seq: number; t_ms: number; kind: "counts"; counts: Counts };
+  | { seq: number; t_ms: number; kind: "counts"; counts: Counts }
+  | { seq: number; t_ms: number; kind: "bands"; bands: BorderBand[] };
 
 export interface DrillLog {
   drill_version: 1;
@@ -66,6 +67,17 @@ export function recordPin(log: DrillLog, pin: PinId, point: Point, input: "point
 
 export function recordCounts(log: DrillLog, counts: Counts, tMs: number): DrillLog {
   const record: DrillRecord = { seq: log.records.length + 1, t_ms: tMs, kind: "counts", counts: { ...counts } };
+  return { ...log, records: [...log.records, record] };
+}
+
+/** A band placement: the end of a handle drag, a step or a typed width, with every band's width. */
+export function recordBands(log: DrillLog, bands: readonly BorderBand[], tMs: number): DrillLog {
+  const record: DrillRecord = {
+    seq: log.records.length + 1,
+    t_ms: tMs,
+    kind: "bands",
+    bands: bands.map((band) => ({ width_squares: band.width_squares })),
+  };
   return { ...log, records: [...log.records, record] };
 }
 

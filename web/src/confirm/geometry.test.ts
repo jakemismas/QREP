@@ -140,6 +140,31 @@ describe("grid lines", () => {
     expect(lines.horizontal.slice(1, 4).map(([a]) => a.y)).toEqual([150, 250, 350]);
   });
 
+  it("draws a trapezoid's middle lines where perspective puts them, not halfway", () => {
+    // Source: PR #247 review of 0b7e9a3 (geometry.test.ts:123), a hand vector.
+    // Inputs: TRAPEZOID, 2 x 2 squares.
+    // The middle row line (v = 0.5) passes through the square's center, where
+    // the diagonals cross, (200, 400 / 3) (test above). The top and bottom
+    // edges are both horizontal, so they meet at infinity and the line through
+    // the center toward that point is horizontal: y = 400 / 3 = 133.33. It
+    // runs from the left edge x = y / 2 = 66.67 to the right edge
+    // x = 400 - y / 2 = 333.33. Halfway between the edges would be y = 100.
+    // The middle column line (u = 0.5) runs from the center toward where the
+    // side edges meet: x = y / 2 and x = 400 - y / 2 cross at (200, 400), so it
+    // is x = 200, from (200, 0) to (200, 200).
+    const lines = gridLines(squareToQuad(TRAPEZOID), 2, 2);
+    const [left, right] = lines.horizontal[1];
+    expect(left.x).toBeCloseTo(200 / 3, 9);
+    expect(left.y).toBeCloseTo(400 / 3, 9);
+    expect(right.x).toBeCloseTo(1000 / 3, 9);
+    expect(right.y).toBeCloseTo(400 / 3, 9);
+    const [top, bottom] = lines.vertical[1];
+    expect(top.x).toBeCloseTo(200, 9);
+    expect(top.y).toBeCloseTo(0, 9);
+    expect(bottom.x).toBeCloseTo(200, 9);
+    expect(bottom.y).toBeCloseTo(200, 9);
+  });
+
   it("draws only inside a sub-range of the unit square", () => {
     // Inputs: the same quad, 2 columns across u from 0.25 to 0.75
     // Arithmetic: u 0.25 is x 100 + 0.25 x 400 = 200; u 0.5 is 300; u 0.75 is 400;

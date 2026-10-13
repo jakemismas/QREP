@@ -195,7 +195,9 @@ function pick<T>(claims: Claim<T>[] | undefined, order: string[]): Claim<T> | un
     const found = claims?.find((claim) => claim.provenance === code);
     if (found) return found;
   }
-  return undefined;
+  // A field with only other codes still opens on a claim: frameProvenances
+  // lists them in file order, so Start from shows this one as chosen.
+  return claims?.[0];
 }
 
 /** The provenance codes that have a frame claim, best first. */
@@ -206,7 +208,7 @@ export function frameProvenances(annotation: Annotation): string[] {
 
 /**
  * The values the page opens with: each field's verified claim, else proposer
- * A's, else proposer B's, or a chosen provenance first.
+ * A's, else proposer B's, else its first claim, or a chosen provenance first.
  */
 export function startingValues(annotation: Annotation, provenance?: string) {
   const order = provenance ? [provenance, ...DEFAULT_ORDER.filter((c) => c !== provenance)] : DEFAULT_ORDER;
@@ -308,6 +310,18 @@ export function serializeAnnotation(annotation: Annotation): string {
 export function aspectMatches(canvas: [number, number], image: Size): boolean {
   const canvasRatio = canvas[0] / canvas[1];
   return Math.abs(image.width / image.height - canvasRatio) / canvasRatio <= 0.01;
+}
+
+/**
+ * Why the open photo is not the one the annotation names, or null. The
+ * annotation's sha256 is the source image's (corpus/README.md, Annotations),
+ * so a photo of the canvas's size must match it; a downsized copy has bytes
+ * of its own and is checked by its stem and shape only.
+ */
+export function photoProblem(annotation: Annotation, image: Size, sha256: string): string | null {
+  const fullSize = image.width === annotation.canvas[0] && image.height === annotation.canvas[1];
+  if (!fullSize || sha256 === annotation.sha256) return null;
+  return `This photo's sha256 is ${sha256}, but the annotation names ${annotation.sha256}: it is another photo.`;
 }
 
 /** The file name without folders or extension: annotations/<stem>.json. */

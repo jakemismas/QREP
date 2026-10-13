@@ -79,9 +79,12 @@ export function seedFromSquare(
   const b = toUV(square[1]);
   const du = Math.abs(b.u - a.u);
   const dv = Math.abs(b.v - a.v);
+  // The outer edge spans 1 in the rectified plane, and the bands take
+  // bandSquares squares of the marked size off each side; what is left is
+  // the field's span, so the estimate is seedSquares over it.
   return {
-    across: clampCount(1 / du - 2 * bandSquares),
-    down: clampCount(1 / dv - 2 * bandSquares),
+    across: seedSquares(1 - 2 * bandSquares * du, du),
+    down: seedSquares(1 - 2 * bandSquares * dv, dv),
   };
 }
 

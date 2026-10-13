@@ -1,7 +1,7 @@
 /**
  * Border bands, a list set inward from the outer edge (C3a, issue #149; plan
  * section 2.1; Critique: CR-cv-25). Set a band by dragging its inner line on
- * the photo, with steppers in quarter squares, or by a typed width in inches
+ * the photo, with steppers in whole squares, or by a typed width in inches
  * rounded to 1/4 in. Inches need the finished square size; until it is set
  * the inch field is disabled and the other two ways still work (#149,
  * comment 6142353076).
@@ -40,6 +40,9 @@ function InchField({ index, width, squareEighths, onSet }: { index: number; widt
   const [text, setText] = useState(shown);
   useEffect(() => setText(shown), [shown]);
   const apply = () => {
+    // Leaving the field unedited keeps a dragged width: rounding what it
+    // shows to 1/4 in would move the line nobody touched.
+    if (text === shown) return;
     const inches = Number(text);
     if (!squareEighths || !(inches > 0)) return setText(shown);
     const squares = inchesToSquares(inches, squareEighths);

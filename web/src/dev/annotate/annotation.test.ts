@@ -9,10 +9,12 @@ import {
   aspectMatches,
   annotatedFrame,
   AnnotationError,
+  frameProvenances,
   isNoBorderFrame,
   newAnnotation,
   sameStem,
   parseAnnotation,
+  photoProblem,
   photoStem,
   saveProblems,
   serializeAnnotation,
@@ -118,6 +120,41 @@ describe("reading an annotation", () => {
     expect(start.constructionClass).toBe("hst");
     // A chosen provenance wins.
     expect(startingValues(proposed(), "proposed-b").frame?.outer_edge.corners).toEqual(FIELD);
+  });
+
+  it("starts from the first claim when no claim has a default code, so Start from can pick it", () => {
+    // Source: PR #247 review of 0b7e9a3 (AnnotatePage.tsx:504): with only
+    // other codes the page started from nothing, and the Start from list
+    // showed its first code as chosen while it was not.
+    const other: Annotation = {
+      ...proposed(),
+      frame: [
+        { value: { outer_edge: { kind: "outer_edge", corners: FIELD, bands: [] }, field: null }, provenance: "adjudicated" },
+        { value: { outer_edge: { kind: "outer_edge", corners: OUTER, bands: [] }, field: null }, provenance: "screened" },
+      ],
+      counts: [{ value: COUNTS, provenance: "adjudicated" }],
+    };
+    expect(frameProvenances(other)).toEqual(["adjudicated", "screened"]);
+    const start = startingValues(other);
+    expect(start.provenance).toBe("adjudicated");
+    expect(start.frame?.outer_edge.corners).toEqual(FIELD);
+    expect(start.counts).toEqual(COUNTS);
+    expect(startingValues(other, "screened").frame?.outer_edge.corners).toEqual(OUTER);
+  });
+
+  it("refuses a full-size photo whose sha256 is not the annotation's", () => {
+    // Source: PR #247 review of 0b7e9a3 (AnnotatePage.tsx:173). The
+    // annotation's sha256 is the source image's (corpus/README.md,
+    // Annotations), so only a photo of the canvas's size can be compared; a
+    // downsized copy has its own bytes and passes on its shape alone.
+    const annotation = proposed();
+    const other = "0".repeat(64);
+    expect(photoProblem(annotation, { width: 800, height: 600 }, SHA)).toBeNull();
+    expect(photoProblem(annotation, { width: 800, height: 600 }, other)).toBe(
+      `This photo's sha256 is ${other}, but the annotation names ${SHA}: it is another photo.`,
+    );
+    // Half size, 400 x 300: a downsized copy, not compared.
+    expect(photoProblem(annotation, { width: 400, height: 300 }, other)).toBeNull();
   });
 
   it("names its photo file by the manifest path's stem", () => {

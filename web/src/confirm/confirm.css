@@ -30,7 +30,9 @@
 }
 
 /* touch-action none hands every touch on the photo to the pointer handlers:
-   one finger on a pin drags it, two fingers pinch and pan. */
+   one finger on a pin drags it, two fingers pinch and pan. PinLayer.tsx pads
+   the stage by half a pin's hit area, and overflow clips outside that
+   padding, so a pin on the photo's edge stays whole. */
 .cf-pins__stage {
   position: relative;
   overflow: hidden;
@@ -69,11 +71,10 @@
   gap: 8px;
 }
 
-/* The button is the 44 x 44 px hit area; the ring inside it is what you see. */
+/* The button is the hit area, PIN_HIT_PX square (PinLayer.tsx sets its size);
+   the ring inside it is what you see. */
 .cf-pin {
   position: absolute;
-  width: 44px;
-  height: 44px;
   margin: 0;
   padding: 0;
   border: 0;

@@ -8,10 +8,10 @@
  * it (web/scripts/compose-site.mjs).
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { Corners, Point } from "../../engine/contract";
+import type { BorderBand, Corners, Counts, Point } from "../../engine/contract";
 import { bandHandles, bandTotal, fieldQuad, roundWidth, widthFromHandle, type BandSide } from "../../confirm/bands";
 import { BandsControl } from "../../confirm/BandsControl";
-import { CountsPanel } from "../../confirm/CountsPanel";
+import { CountsPanel, type CountInput } from "../../confirm/CountsPanel";
 import { fromCounts, seedAxis, seedFromSquare, toCounts, type AxisCount } from "../../confirm/counts";
 import {
   CORNER_LABELS,
@@ -35,6 +35,7 @@ import {
   isNoBorderFrame,
   newAnnotation,
   parseAnnotation,
+  photoProblem,
   photoStem,
   sameStem,
   saveProblems,
@@ -45,7 +46,17 @@ import {
   type ConstructionClass,
   type Draft,
 } from "./annotation";
-import { createDrill, drillStart, recordCounts, recordPin, serializeDrill, type DeviceInfo, type DrillLog } from "./drill";
+import {
+  createDrill,
+  drillStart,
+  recordBands,
+  recordCounts,
+  recordPin,
+  serializeDrill,
+  type DeviceInfo,
+  type DrillLog,
+} from "./drill";
+import { withoutOrientation } from "./orientation";
 import { sha256Hex } from "./sha256";
 import "./annotate.css";
 
@@ -57,6 +68,16 @@ interface Photo {
   natural: Size | null;
   sha256: string | null;
 }
+
+/** What ending the drill puts back: the verify edits made before it started. */
+interface VerifyState {
+  draft: Draft;
+  fieldVisible: boolean;
+  frameMode: FrameMode;
+}
+
+const sameCounts = (a: Counts, b: Counts) =>
+  (Object.keys(a) as (keyof Counts)[]).every((key) => a[key] === b[key]);
 
 /** 3/4 in to 4 in in 1/4 in steps, in eighths: CELL_MIN 6 to CELL_MAX 32 (plan A10). */
 const SQUARE_SIZES = Array.from({ length: 14 }, (_, i) => 6 + 2 * i);
@@ -134,6 +155,11 @@ export function AnnotatePage() {
   const [squareEighths, setSquareEighths] = useState<number | null>(null);
   const [drill, setDrill] = useState<DrillLog | null>(null);
   const drillStartMs = useRef(0);
+  // The counts the drill last recorded, so typing records each entry once.
+  const drillCounts = useRef<Counts | null>(null);
+  const beforeDrill = useRef<VerifyState | null>(null);
+  // Each photo opened counts up, so a slow read of an earlier one is dropped.
+  const photoSeq = useRef(0);
   const [error, setError] = useState<string | null>(null);
   const [problems, setProblems] = useState<string[]>([]);
   const [status, setStatus] = useState<string | null>(null);
@@ -144,13 +170,15 @@ export function AnnotatePage() {
       ? [photo.natural.width, photo.natural.height]
       : null;
   const shapeOk = !annotation || !photo?.natural || aspectMatches(annotation.canvas, photo.natural);
-  const ready = Boolean(photo?.natural && canvas && shapeOk && draft);
+  const mismatch =
+    annotation && photo?.natural && photo.sha256 ? photoProblem(annotation, photo.natural, photo.sha256) : null;
+  const ready = Boolean(photo?.natural && canvas && shapeOk && !mismatch && draft);
 
-  // Opening a photo, an annotation or another starting claim, or ending a
-  // drill, resets the draft; a running drill keeps its own neutral start.
+  // Opening a photo, an annotation or another starting claim resets the
+  // draft. Starting and ending a drill set it themselves.
   const natural = photo?.natural ?? null;
   useEffect(() => {
-    if (!natural || mode === "drill") return;
+    if (!natural) return;
     if (annotation && !aspectMatches(annotation.canvas, natural)) return;
     const start = draftFrom(annotation, annotation ? annotation.canvas : [natural.width, natural.height], startFrom);
     setDraft(start.draft);
@@ -159,7 +187,7 @@ export function AnnotatePage() {
     setFrameMode(start.frameMode);
     setActiveBand(null);
     setSquare(null);
-  }, [annotation, natural, startFrom, mode]);
+  }, [annotation, natural, startFrom]);
 
   // Revoke a photo's object URL only once another photo replaces it.
   const photoUrl = photo?.url;
@@ -197,29 +225,40 @@ export function AnnotatePage() {
   const elapsed = () => Math.round(performance.now() - drillStartMs.current);
 
   const onPhoto = async (file: File) => {
+    const seq = ++photoSeq.current;
     setError(null);
     setStatus(null);
     setProblems([]);
     if (mode === "drill") setMode("verify");
     setDrill(null);
+    beforeDrill.current = null;
     setDraft(null);
-    const url = URL.createObjectURL(file);
+    let bytes: Uint8Array<ArrayBuffer>;
+    try {
+      bytes = new Uint8Array(await file.arrayBuffer());
+    } catch {
+      if (seq === photoSeq.current) setError("This photo could not be read.");
+      return;
+    }
+    if (seq !== photoSeq.current) return;
+    // Pins index the pixels as the file stores them, so the page shows them
+    // that way whatever the EXIF orientation says (orientation.ts).
+    const url = URL.createObjectURL(new Blob([withoutOrientation(bytes)], { type: file.type }));
     setPhoto({ url, name: file.name, natural: null, sha256: null });
     // An annotation names its photo; keeping it for another photo would save
-    // that photo's pins under the first one's identity.
+    // that photo's pins under the first one's identity. A photo with the
+    // same stem is checked by its sha256 once that is known (photoProblem).
     const keep = annotation !== null && sameStem(annotation.photo, file.name);
     if (annotation && !keep) {
       setAnnotation(null);
       setStatus(`Closed the annotation for ${annotation.photo}: it names another photo.`);
     }
     if (!keep) setPhotoPath(file.name);
-    if (keep) return;
-    try {
-      const sha = sha256Hex(new Uint8Array(await file.arrayBuffer()));
-      setPhoto((p) => (p && p.url === url ? { ...p, sha256: sha } : p));
-    } catch {
-      setError("This photo could not be read to compute its sha256.");
-    }
+    // Yield first, so the photo shows while a large file hashes.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    if (seq !== photoSeq.current) return;
+    const sha = sha256Hex(bytes);
+    setPhoto((p) => (p && p.url === url ? { ...p, sha256: sha } : p));
   };
 
   const onAnnotationFile = async (file: File) => {
@@ -234,6 +273,7 @@ export function AnnotatePage() {
       }
       if (mode === "drill") setMode("verify");
       setDrill(null);
+      beforeDrill.current = null;
       setStartFrom(undefined);
       setAnnotation(parsed);
     } catch (err) {
@@ -241,13 +281,37 @@ export function AnnotatePage() {
     }
   };
 
-  const setCounts = (across: AxisCount, down: AxisCount) => {
-    const before = draft && toCounts(draft.across, draft.down);
-    const after = toCounts(across, down);
-    setDraft((d) => d && { ...d, across, down });
-    const changed = !before || (Object.keys(after) as (keyof typeof after)[]).some((k) => after[k] !== before[k]);
-    if (drill && changed) setDrill((log) => log && recordCounts(log, after, elapsed()));
+  /** One counts record per entry: a counts value the drill has not recorded last. */
+  const recordCountsEntry = (counts: Counts) => {
+    if (!drill || (drillCounts.current && sameCounts(drillCounts.current, counts))) return;
+    drillCounts.current = counts;
+    setDrill((log) => log && recordCounts(log, counts, elapsed()));
   };
+
+  // Typing redraws the grid at once but records only when the field settles,
+  // so "12" is one entry, not "1" and then "12".
+  const setCounts = (across: AxisCount, down: AxisCount, input: CountInput = "step") => {
+    setDraft((d) => d && { ...d, across, down });
+    if (input === "step") recordCountsEntry(toCounts(across, down));
+  };
+
+  const settleCounts = () => {
+    if (draft) recordCountsEntry(toCounts(draft.across, draft.down));
+  };
+
+  const setBands = (next: BorderBand[]) => {
+    setDraft((d) => d && { ...d, bands: next });
+    if (drill) setDrill((log) => log && recordBands(log, next, elapsed()));
+  };
+
+  /** The active band's width read from its handle at point, or null when the point gives none. */
+  const widthAt = (side: string, point: Point): number | null => {
+    if (!homography || activeBand === null || !draft) return null;
+    const width = widthFromHandle(homography, side as BandSide, point, cols, rows, draft.bands, activeBand);
+    return width === null ? null : roundWidth(width);
+  };
+  const withWidth = (bands: BorderBand[], width: number) =>
+    bands.map((b, i) => (i === activeBand ? { width_squares: width } : b));
 
   const onMove = (id: string, point: Point) => {
     const [set, part] = id.split(".");
@@ -258,24 +322,27 @@ export function AnnotatePage() {
         const base = key === "field" ? (d.field ?? derivedField(d)) : d.outer;
         return { ...d, [key]: { ...base, [part]: point } };
       });
-    } else if (set === "band" && homography && activeBand !== null && draft) {
-      const width = widthFromHandle(homography, part as BandSide, point, cols, rows, draft.bands, activeBand);
-      if (width !== null) {
-        setDraft((d) => d && { ...d, bands: d.bands.map((b, i) => (i === activeBand ? { width_squares: roundWidth(width) } : b)) });
-      }
+    } else if (set === "band") {
+      const width = widthAt(part, point);
+      if (width !== null) setDraft((d) => d && { ...d, bands: withWidth(d.bands, width) });
     } else if (set === "square") {
       setSquare((s) => s && (part === "a" ? [point, s[1]] : [s[0], point]));
     }
   };
 
   const onPlace = (id: string, point: Point, input: PinInput) => {
-    if (drill && (id.startsWith("outer.") || id.startsWith("field."))) {
+    if (!drill) return;
+    if (id.startsWith("outer.") || id.startsWith("field.")) {
       setDrill((log) => log && recordPin(log, id, point, input, elapsed()));
+    } else if (id.startsWith("band.") && draft) {
+      const width = widthAt(id.split(".")[1], point);
+      if (width !== null) setDrill((log) => log && recordBands(log, withWidth(draft.bands, width), elapsed()));
     }
   };
 
   const startDrill = () => {
-    if (!identity || !canvas || !identity.sha256) return;
+    if (!identity || !canvas || !identity.sha256 || !draft) return;
+    beforeDrill.current = { draft, fieldVisible, frameMode };
     const start = drillStart(canvas);
     setMode("drill");
     setDraft(frameMode === "field" ? { ...start, field: start.outer } : start);
@@ -283,15 +350,25 @@ export function AnnotatePage() {
     setActiveBand(null);
     setSquare(null);
     setDrill(createDrill(identity, frameMode, deviceInfo(), new Date().toISOString()));
+    drillCounts.current = toCounts(start.across, start.down);
     drillStartMs.current = performance.now();
     setStatus(null);
     setProblems([]);
   };
 
-  // The reset effect restores the verify draft once mode is verify again.
+  // Ending the drill puts back the verify edits from before it, saved or not.
   const stopDrill = () => {
+    const saved = beforeDrill.current;
+    beforeDrill.current = null;
     setMode("verify");
     setDrill(null);
+    setActiveBand(null);
+    setSquare(null);
+    if (saved) {
+      setDraft(saved.draft);
+      setFieldVisible(saved.fieldVisible);
+      setFrameMode(saved.frameMode);
+    }
   };
 
   const changeFrameMode = (next: FrameMode) => {
@@ -392,7 +469,9 @@ export function AnnotatePage() {
   }
 
   const requestFrame = draft && pinned ? toRequestFrame(frameMode, pinned, bands) : null;
-  const hashing = Boolean(photo && !annotation && !photo.sha256);
+  // The page hashes every photo, an annotated one too, to check it is the one
+  // the annotation names.
+  const hashing = Boolean(photo && !photo.sha256);
 
   return (
     <main className="an-page">
@@ -448,7 +527,13 @@ export function AnnotatePage() {
       )}
 
       {/* The stage renders before the photo's size is known: its img element is what measures it. */}
-      {photo && shapeOk && (
+      {mismatch && (
+        <p className="an-error" role="alert" data-testid="sha-error">
+          {mismatch} Open the photo the annotation names.
+        </p>
+      )}
+
+      {photo && shapeOk && !mismatch && (
         <div className="an-main">
           <div className="an-stage">
             <PinLayer
@@ -557,7 +642,7 @@ export function AnnotatePage() {
                   </label>
                   <BandsControl
                     bands={draft.bands}
-                    onChange={(next) => setDraft({ ...draft, bands: next })}
+                    onChange={setBands}
                     activeBand={activeBand}
                     onSelect={setActiveBand}
                     squareEighths={squareEighths}
@@ -566,7 +651,13 @@ export function AnnotatePage() {
               )}
 
               <section className="an-group" aria-label="Counts">
-                <CountsPanel across={draft.across} down={draft.down} onChange={setCounts} onMeasure={square ? undefined : startSquare} />
+                <CountsPanel
+                  across={draft.across}
+                  down={draft.down}
+                  onChange={setCounts}
+                  onSettle={settleCounts}
+                  onMeasure={square ? undefined : startSquare}
+                />
                 {square && (
                   <div className="an-row">
                     <span className="an-note">Drag the two green pins to opposite corners of one square.</span>

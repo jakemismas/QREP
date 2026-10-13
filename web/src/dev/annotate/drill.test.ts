@@ -4,7 +4,7 @@
  * the photo id, for D10 to score against verified truth.
  */
 import { describe, expect, it } from "vitest";
-import { createDrill, drillStart, recordCounts, recordPin, serializeDrill } from "./drill";
+import { createDrill, drillStart, recordBands, recordCounts, recordPin, serializeDrill } from "./drill";
 
 const IDENTITY = {
   photo: "images/lacma-54871.jpg",
@@ -38,6 +38,19 @@ describe("the drill log", () => {
       { seq: 1, t_ms: 1500, kind: "pin", pin: "outer.top_left", x: 101, y: 52, input: "pointer" },
       { seq: 2, t_ms: 1800, kind: "pin", pin: "outer.top_left", x: 100, y: 52, input: "key" },
       { seq: 3, t_ms: 2400, kind: "counts", counts },
+    ]);
+  });
+
+  it("records each band placement with every band's width", () => {
+    // Source: PR #247 review of 0b7e9a3 (AnnotatePage.tsx:271-275): band
+    // placements were not logged. The record copies the list, so a later edit
+    // cannot change it.
+    let log = createDrill(IDENTITY, "outer_edge", DEVICE, "2026-10-13T10:00:00.000Z");
+    const bands = [{ width_squares: 1 }, { width_squares: 2.3333 }];
+    log = recordBands(log, bands, 900);
+    bands[0].width_squares = 5;
+    expect(log.records).toEqual([
+      { seq: 1, t_ms: 900, kind: "bands", bands: [{ width_squares: 1 }, { width_squares: 2.3333 }] },
     ]);
   });
 

@@ -57,6 +57,11 @@ describe("composed Pages artifact", () => {
   // absence here is the compose script's doing, not a missing page.
   it("leaves the dev annotate page and its entry assets out", () => {
     expect(existsSync(path.join(webRoot, "dist", "annotate.html"))).toBe(true);
+    // The build names the page's entry chunk annotate-*, the name the compose
+    // filter matches; a renamed chunk would fail here instead of shipping.
+    const built = readFileSync(path.join(webRoot, "dist", "annotate.html"), "utf8");
+    expect(built).toMatch(/assets\/annotate-[\w-]+\.js/);
+    expect(readdirSync(path.join(webRoot, "dist", "assets")).some((name) => name.startsWith("annotate-"))).toBe(true);
     expect(existsSync(path.join(siteDir, "annotate.html"))).toBe(false);
     const assets = readdirSync(path.join(siteDir, "assets"));
     expect(assets.filter((name) => name.startsWith("annotate-"))).toEqual([]);
