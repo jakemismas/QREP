@@ -842,9 +842,12 @@ def _read_model(geometry, squares, fabrics, voted, knobs) -> tuple[Quilt, ReadDe
                 index = ids.index(strip.fabric_id)
                 votes[index] = votes.get(index, 0.0) + strip.confidence
         fabric = min(votes, key=lambda index: (-votes[index], index))
-        # A band caps at 14 in (BAND_MAX, REBASELINE.md literal C3), as sizing
-        # caps it, so a wide band at an estimated square size cannot exceed it.
-        width = _snap(band.width_squares * cell, knobs.SIZE_STEP, knobs.SIZE_STEP, BAND_MAX)
+        # A band is its width in squares times the square size (the S7-5c
+        # replacement), in whole eighths; the pattern rounds it to 1/4 in when
+        # you size it. It caps at 14 in (BAND_MAX, REBASELINE.md literal C3),
+        # as sizing caps it, so a wide band at an estimated square size cannot
+        # exceed it.
+        width = _snap(band.width_squares * cell, 1, BAND_MIN, BAND_MAX)
         borders.append(BorderBand(fabric_id=ids[fabric], width=width))
 
     # The cells stage weighs every labeled area alike: each square counts

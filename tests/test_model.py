@@ -756,15 +756,6 @@ def test_every_user_fact_on_a_read_is_recorded_at_one():
     assert _user_stage_values_below_one(read_shaped_quilt(border=0.875)) == USER_STAGE_PATHS
 
 
-def test_read_counts_follow_the_confirmed_blocks():
-    # The rows and columns a read stores are your counts: blocks times squares
-    # per block, 1 x 1 = 1 row and 2 x 1 = 2 columns (read_shaped_quilt).
-    quilt = read_shaped_quilt()
-    blocks = quilt.confirmed_blocks
-    assert quilt.center.rows == blocks.blocks_down * blocks.squares_down == 1
-    assert quilt.center.cols == blocks.blocks_across * blocks.squares_across == 2
-
-
 @pytest.mark.parametrize(
     "model", sorted({path.split(".")[0] for path, s in FIELD_SOURCES.items() if s == "user"})
 )

@@ -1164,6 +1164,48 @@ def test_read_confirmed_caps_a_wide_band_at_14_inches(tmp_path):
     assert (basis["achieved_width"], basis["achieved_height"]) == (248, 248)
 
 
+def test_read_confirmed_keeps_a_band_in_whole_eighths(tmp_path):
+    # Source: the S7-5c replacement in #137: a band is its width in squares
+    #   times the square size; PR #251 round 1 found it snapped to 1/4 in.
+    # Inputs: a 72 x 72 px image, the outer edge at the image edge; a field
+    #   of 2 x 2 squares of 16 px inside one band of 1.25 squares (20 px) on
+    #   each side, 2 x 16 + 2 x 20 = 72 px; the band red, the field gray 64
+    #   and gray 192 as in the wide band test above; three fabrics requested.
+    # Arithmetic: square size 16 px x 8 / 10 px per inch = 12.8 eighths,
+    #   rounded to the 2-eighth step: 12.8 / 2 = 6.4, so 6 x 2 = 12. The band:
+    #   1.25 x 12 = 15 eighths, whole, so 15 (a 1/4 in snap would give 16).
+    #   Size: 2 x 12 + 2 x 15 = 54 each way.
+    # Expected: square 12, one red band of 15, achieved 54 by 54, rounding
+    #   step 2.
+    import cv2
+    import numpy as np
+
+    image = np.full((72, 72, 3), (0, 0, 255), dtype=np.uint8)
+    for r in range(2):
+        for c in range(2):
+            level = 64 if (r + c) % 2 == 0 else 192
+            image[20 + 16 * r : 36 + 16 * r, 20 + 16 * c : 36 + 16 * c] = level
+    path = tmp_path / "eighths_band.png"
+    cv2.imwrite(str(path), image)
+    counts = {
+        "blocks_across": 1,
+        "blocks_down": 1,
+        "squares_per_block_across": 2,
+        "squares_per_block_down": 2,
+    }
+    request = _image_request(
+        path, (72, 72), counts, frame_kind="outer_edge", bands=[1.25], fabric_count=3
+    )
+    result = ok_result(bridge.read_confirmed(request))
+    assert result["outcome"] == "read"
+    model = result["model"]
+    assert model["center"]["cell_size"] == 12
+    assert model["borders"] == [{"fabric_id": "f1", "width": 15}]
+    basis = model["size_basis"]
+    assert (basis["achieved_width"], basis["achieved_height"]) == (54, 54)
+    assert basis["rounding_step"] == 2
+
+
 def test_read_confirmed_reads_a_non_ascii_path(l0_render, tmp_path):
     # Windows: cv2.imread cannot open a path outside the ANSI code page, so a
     # photo staged under a name with an e-acute must still read. The bytes are
@@ -1185,6 +1227,28 @@ def test_read_confirmed_reports_an_empty_image_file_as_value(tmp_path):
     error = error_of(bridge.read_confirmed(_image_request(empty, (100, 100), L0_COUNTS)))
     assert error["kind"] == "value"
     assert "empty.png" in error["message"]
+
+
+def test_a_read_result_carries_details_on_a_read_and_only_there(l0_render):
+    # Source: qrep/contract.py ReadResult: a read result carries the model
+    #   and its details, and only a read result does; PR #251 round 1 found
+    #   no test of the refusal branch.
+    # Inputs: the L0 read's result; the same with details null; a refused
+    #   result with a reason and no model, with and without the read's
+    #   details.
+    # Expected: the read validates and fails without its details; the
+    #   refused result validates without details and fails with them.
+    from pydantic import ValidationError
+
+    result = ok_result(bridge.read_confirmed(l0_request(*l0_render)))
+    ReadResult.model_validate(result)
+    with pytest.raises(ValidationError, match="only a read result"):
+        ReadResult.model_validate({**result, "details": None})
+    reason = {"code": "too_many_fabrics", "message": "the quilt may hold more fabrics"}
+    refused = {"outcome": "refused", "model": None, "details": None, "reason": reason}
+    ReadResult.model_validate(refused)
+    with pytest.raises(ValidationError, match="only a read result"):
+        ReadResult.model_validate({**refused, "details": result["details"]})
 
 
 def test_read_confirmed_refuses_more_fabrics_than_the_cap(tmp_path):
