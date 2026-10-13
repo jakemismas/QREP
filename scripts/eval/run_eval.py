@@ -264,7 +264,7 @@ def main(argv=None, *, runner=subprocess.run) -> int:
     units = _corpus_units(args, photos, readers_, radii, str(workdir_root) if workdir_root else None)
     if not args.no_photoreal and split == "dev":
         units += _photoreal_units(args, readers_)
-    decode_path, decode_errors = harness.DECODE_PATH, []
+    decode_path, decode_errors, planned = harness.DECODE_PATH, [], units
     if args.decode != "native":
         try:
             units, decode_errors, versions = decode.browser_units(units, cache / "decoded", args.decode)
@@ -315,7 +315,7 @@ def main(argv=None, *, runner=subprocess.run) -> int:
                        f"only the confirmed reader, with the same corners and fabric count; picker answer "
                        f"{simulate.PICKER_ANSWER!r} for every photo"),
         "resolutions": args.resolutions,
-        "full_resolution_budget": _budget_line(units, rows),
+        "full_resolution_budget": _budget_line(planned, rows),
         "degradations": "none" if args.no_degradations else "; ".join(
             f"{d.name} {d.params}" for d in degrade.DEGRADATIONS) + (
             ", applied at every requested resolution, at true corners, to museum tier A photos "

@@ -108,6 +108,10 @@ def test_a_valid_sidecar_loads_and_yields_its_factors(tmp_path):
     ({"factors": [0.5, 0.5]}, "factors"),
     ({"png_sha256": "f" * 64}, "png"),
     ({"version": 0}, "version"),
+    ({"key": "other__phone-1400"}, "answers job"),
+    ({"steps": "createImageBitmap(blob); crop; drawImage"}, "decode steps"),
+    # The cap's scale is 1400 / 3000 = 0.46667; 0.5 is another cap's.
+    ({"scale": 0.5}, "scale"),
 ])
 def test_a_sidecar_that_does_not_match_its_job_is_refused(tmp_path, override, message):
     job = _job(tmp_path, canvas=(3000, 2000), cap=1400)
@@ -179,8 +183,13 @@ def test_browser_units_read_the_png_with_scaled_corners(tmp_path):
     stress = dataclasses.replace(clean, group="stress", condition="glare")
     job = decode.jobs_for([clean])[0]
     png, _ = _decoded(tmp_path, job, (1400, 933))
-    units, errors, versions = decode.browser_units([clean, stress], tmp_path / "decoded", "chromium")
+    # A full-size unit over the 50 MP budget (10000 x 6000 = 60 MP) is never staged, so it
+    # passes through unchanged and needs no decode; dropping it would shrink n.
+    over = _unit(source, canvas=(10000, 6000), cap=None, resolution="full", corners=corners, photo="big")
+    units, errors, versions = decode.browser_units([clean, stress, over], tmp_path / "decoded", "chromium")
     assert errors == [] and versions == {VERSION}
+    assert units[2] is over
+    units = units[:2]
     for unit, original in zip(units, (clean, stress)):
         assert unit.source == str(png) and unit.canvas == (1400, 933) and unit.cap is None
         assert unit.condition == original.condition and unit.resolution == "phone-1400"
@@ -212,13 +221,13 @@ def test_browser_units_turn_a_browser_failure_into_error_rows(tmp_path):
 
 def test_pixel_diff_counts_pixels_and_the_largest_channel_difference():
     # Two 2 x 2 BGR images. Pixel (0, 0) differs by 3 in one channel; pixel (1, 1) by 7
-    # and 2 in two channels; pixel (0, 1) by 245 = |250 - 5|, which uint8 subtraction would
-    # wrap to 11. Differing pixels: 3 of 4; largest channel difference: 245.
+    # and 2 in two channels; pixel (0, 1) by 245 = |5 - 250|, where uint8 a - b would wrap
+    # to (5 - 250) mod 256 = 11. Differing pixels: 3 of 4; largest channel difference: 245.
     a = np.zeros((2, 2, 3), dtype=np.uint8)
     b = a.copy()
     b[0, 0, 1] = 3
     b[1, 1, 0], b[1, 1, 2] = 7, 2
-    a[0, 1, 2], b[0, 1, 2] = 250, 5
+    a[0, 1, 2], b[0, 1, 2] = 5, 250
     assert decode.pixel_diff(a, b) == {"pixels": 4, "differing": 3, "largest": 245}
     assert decode.pixel_diff(a, a) == {"pixels": 4, "differing": 0, "largest": 0}
     with pytest.raises(ValueError, match="shape"):
@@ -226,13 +235,14 @@ def test_pixel_diff_counts_pixels_and_the_largest_channel_difference():
 
 
 def test_pixel_diff_bands_give_the_same_counts_as_one_pass():
-    # 1030 rows cross the 512-row bands twice. Rows 0, 511, 512 and 1029 each get one
-    # pixel off by 1 to 4: 4 differing pixels, largest 4.
+    # 1030 rows cross the 512-row bands twice. Rows 0, 511, 512 and 1029 get one pixel
+    # off by 2, 9, 1 and 4: 4 differing pixels, largest 9, which sits in the first band so
+    # a later band cannot overwrite it.
     a = np.full((1030, 3, 3), 100, dtype=np.uint8)
     b = a.copy()
-    for value, row in enumerate((0, 511, 512, 1029), start=1):
+    for value, row in zip((2, 9, 1, 4), (0, 511, 512, 1029)):
         b[row, 1, 0] = 100 + value
-    assert decode.pixel_diff(a, b) == {"pixels": 3090, "differing": 4, "largest": 4}
+    assert decode.pixel_diff(a, b) == {"pixels": 3090, "differing": 4, "largest": 9}
 
 
 def _reading(cells, confidence, *, colors=("#ff0000", "#0000ff"), outcome="read", threshold=0.9):
@@ -249,6 +259,28 @@ def test_label_diff_maps_the_palettes_before_comparing():
     browser = _reading([[1, 0], [0, 1]], [[1.0, 1.0], [1.0, 1.0]], colors=("#0000ff", "#ff0000"))
     out = decode.label_diff(native, browser)
     assert (out["squares"], out["differing"], out["differing_confident"], out["g9"]) == (4, 0, 0, True)
+    # A three-fabric cycle tells the mapping's direction apart (a two-fabric swap is its
+    # own inverse). Native red 0, blue 1, green 2; browser blue 0, green 1, red 2. Browser
+    # cells [2, 0, 1] are red, blue, green, so mapped browser to native they read [0, 1, 2],
+    # the native cells: 0 differing. Mapped the other way they would read [1, 2, 0]: 3.
+    cycle = decode.label_diff(_reading([[0, 1, 2]], [[1.0] * 3], colors=("#ff0000", "#0000ff", "#00ff00")),
+                              _reading([[2, 0, 1]], [[1.0] * 3], colors=("#0000ff", "#00ff00", "#ff0000")))
+    assert (cycle["differing"], cycle["g9"]) == (0, True)
+    # The browser read finds two fabrics where native found three (k 2 against 3): browser
+    # red 0, blue 1 map to native 0, 1; the native green square (0, 2) is read red, so 1 differs.
+    fewer = decode.label_diff(_reading([[0, 1, 2]], [[1.0] * 3], colors=("#ff0000", "#0000ff", "#00ff00")),
+                              _reading([[0, 1, 0]], [[1.0] * 3]))
+    assert (fewer["differing"], fewer["g9"], fewer["k"]) == (1, False, [3, 2])
+    # Two close blues, each a shade off in the browser (as a colour-profile conversion
+    # leaves them). By colour alone browser #3d5d89 sits nearer native #3e5e88 and
+    # #3b5b8b nearer #3a5a8c, which would cross the pair and make all 6 squares differ.
+    # The cells are identical, so browser fabric 0 shares 3 squares with native 0 and
+    # none with native 1, and likewise 1 with 1: paired by shared squares, 0 differ.
+    cells = [[0, 1, 0], [1, 0, 1]]
+    close = decode.label_diff(_reading(cells, [[1.0] * 3] * 2, colors=("#3a5a8c", "#3e5e88")),
+                              _reading(cells, [[1.0] * 3] * 2, colors=("#3d5d89", "#3b5b8b")))
+    assert (close["differing"], close["g9"]) == (0, True)
+    assert decode.pair_fabrics(cells, cells, ["#3a5a8c", "#3e5e88"], ["#3d5d89", "#3b5b8b"]) == [0, 1]
 
 
 def test_label_diff_applies_the_g9_rule_to_squares_above_the_threshold():
@@ -267,6 +299,11 @@ def test_label_diff_applies_the_g9_rule_to_squares_above_the_threshold():
     # read, so it counts and G9 fails.
     out = decode.label_diff(_reading(native.cells, [[1.0, 0.95], [1.0, 1.0]]), _reading(browser.cells, low))
     assert (out["differing_confident"], out["differing_confident_both"], out["g9"]) == (1, 0, False)
+    # Exactly 0.9 in both reads is at the threshold, not below it: the app flags only
+    # below (web/src/state/photo.tsx, value < UNCERTAIN_THRESHOLD), so it counts.
+    edge = [[1.0, 0.9], [1.0, 1.0]]
+    out = decode.label_diff(_reading(native.cells, edge), _reading(browser.cells, edge))
+    assert (out["differing_confident"], out["g9"]) == (1, False)
     # A read with no confidences flags nothing, so every square is above the threshold.
     out = decode.label_diff(_reading(native.cells, None), _reading(browser.cells, low))
     assert (out["differing_confident"], out["g9"]) == (1, False)
@@ -290,24 +327,24 @@ def test_label_diff_fails_g9_on_another_outcome_or_grid_and_passes_two_refusals(
     assert (out["differing"], out["g9"], out["k"]) == (1, False, [2, 3])
 
 
-def _dev_png(width, height):
-    """A flat image whose sha256 lands in the dev split."""
+def _split_png(width, height, split="dev"):
+    """A flat image whose sha256 lands in split."""
     for value in range(256):
         ok, data = cv2.imencode(".png", np.full((height, width, 3), value, dtype=np.uint8))
-        if corpus.split_of(hashlib.sha256(data.tobytes()).hexdigest()) == "dev":
+        if corpus.split_of(hashlib.sha256(data.tobytes()).hexdigest()) == split:
             return data.tobytes()
-    raise AssertionError("no flat image landed in the dev split")
+    raise AssertionError(f"no flat image landed in the {split} split")
 
 
-def _corpus(tmp_path, width=2800, height=1400):
+def _corpus(tmp_path, width=2800, height=1400, stem="a-dev", split="dev"):
     root, cache = tmp_path / "corpus", tmp_path / "cache"
     (root / "annotations").mkdir(parents=True)
     cache.mkdir()
-    data = _dev_png(width, height)
+    data = _split_png(width, height, split)
     sha = hashlib.sha256(data).hexdigest()
-    (cache / "a-dev.png").write_bytes(data)
+    (cache / f"{stem}.png").write_bytes(data)
     claim = {"provenance": "proposed-a"}
-    doc = {"schema_version": 1, "photo": "private/cache/a-dev.png", "sha256": sha, "canvas": [width, height],
+    doc = {"schema_version": 1, "photo": f"private/cache/{stem}.png", "sha256": sha, "canvas": [width, height],
            "capture": [{"provenance": "screened", "value": "museum_scan"}],
            "construction_class": [{**claim, "value": "squares"}],
            "frame": [{**claim, "value": {"outer_edge": {"kind": "outer_edge", "bands": [], "corners": {
@@ -316,12 +353,12 @@ def _corpus(tmp_path, width=2800, height=1400):
            "counts": [{**claim, "value": {"blocks_across": 1, "blocks_down": 1,
                                           "squares_per_block_across": 6, "squares_per_block_down": 6}}],
            "fabrics": [{**claim, "value": {"count": 2}}]}
-    (root / "annotations" / "a-dev.json").write_text(json.dumps(doc), encoding="utf-8")
+    (root / "annotations" / f"{stem}.json").write_text(json.dumps(doc), encoding="utf-8")
     with (root / "manifest.csv").open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=["file", "license", "sha256", "file_sha256", "px_w", "px_h",
                                                     "tier", "class", "capture", "eval_set"])
         writer.writeheader()
-        writer.writerow({"file": "private/cache/a-dev.png", "license": "CC0-1.0", "sha256": sha, "file_sha256": "",
+        writer.writerow({"file": f"private/cache/{stem}.png", "license": "CC0-1.0", "sha256": sha, "file_sha256": "",
                          "px_w": str(width), "px_h": str(height), "tier": "A", "class": "squares",
                          "capture": "museum_scan", "eval_set": "v0"})
     return root, cache
@@ -379,7 +416,7 @@ def test_run_eval_decode_reads_the_browser_pngs_with_scaled_corners(monkeypatch,
     # Native stays the default, and its header keeps the native text.
     calls.clear()
     assert run_eval.main([*argv[:-2], "--out", str(out) + "-native"], runner=_outside_git) == 0
-    assert {c[0] for c in calls} != {"chromium"}
+    assert len(calls) == 4 and "chromium" not in {c[0] for c in calls}
     native = json.loads(out.with_name("r-native.json").read_text(encoding="utf-8"))["header"]
     assert native["decode_path"] == harness.DECODE_PATH
 
@@ -412,3 +449,20 @@ def test_parity_pairs_route_skips_errors_and_reads(monkeypatch):
                    ("chromium", "auto-corners", "skipped", None, None),
                    ("webkit", "auto", "error", None, None),
                    ("webkit", "auto-corners", "skipped", None, None)]
+
+
+def test_run_decode_opens_the_holdout_only_when_asked(monkeypatch, tmp_path):
+    # A corpus whose one photo lands in the holdout split. By default the job list is the
+    # dev split's: no corpus photo, only the photoreal fixtures (2 fixtures at 2 sizes).
+    # With --holdout it is that photo at the phone cap, and no fixture, as run_eval reads
+    # fixtures on the dev split only.
+    monkeypatch.syspath_prepend(str(Path(run_eval.__file__).parent / "decode"))
+    import run_decode
+
+    root, cache = _corpus(tmp_path, stem="a-hold", split="holdout")
+    base = ["--corpus", str(root), "--cache", str(cache), "--port", "4999", "--resolutions", "phone-1400",
+            "--no-degradations"]
+    dev = run_decode.units_for(run_decode._parse(base), cache)
+    assert sorted({u.photo for u in dev}) == ["busy_print_squares", "low_contrast_hst"]
+    held = run_decode.units_for(run_decode._parse([*base, "--holdout"]), cache)
+    assert [(u.photo, u.split, u.cap) for u in held] == [("a-hold", "holdout", 1400)]

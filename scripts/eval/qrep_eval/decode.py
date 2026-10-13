@@ -140,15 +140,22 @@ def load_decoded(decoded_dir: Path, browser: str, job: Job) -> Decoded:
     _check(sidecar.get("browser") == browser, key, f"sidecar browser {sidecar.get('browser')!r}, expected {browser}")
     _check(sidecar.get("source_sha256") == job.sha256, key, "the sidecar's source_sha256 is not the source's")
     _check(sidecar.get("cap") == job.cap, key, f"sidecar cap {sidecar.get('cap')!r}, the job's is {job.cap!r}")
+    _check(sidecar.get("key") == job.key, key, f"the sidecar answers job {sidecar.get('key')!r}")
     version = str(sidecar.get("browser_version"))
     if sidecar.get("error") is not None:
         return Decoded(None, None, None, version, str(sidecar["error"]), sidecar)
+    # Another decode path (the crop-aware one of #101, say) writes other steps.
+    _check(sidecar.get("steps") == STEPS, key, f"decode steps {sidecar.get('steps')!r} are not {STEPS!r}")
     source = tuple(sidecar.get("source_size") or ())
     _check(source == tuple(job.canvas), key,
            f"the browser decoded a source size of {source}, the canvas is {tuple(job.canvas)}")
     size = tuple(sidecar.get("decoded_size") or ())
     target = corpus.cap_size(*job.canvas, job.cap)
     _check(size == target, key, f"decoded size {size} is not targetSize {target}")
+    longest = max(job.canvas)
+    scale = job.cap / longest if job.cap is not None and longest > job.cap else 1.0
+    _check(abs(float(sidecar.get("scale", -1)) - scale) <= FACTOR_SLACK, key,
+           f"recorded scale {sidecar.get('scale')!r} is not the cap's {scale}")
     recorded = tuple(sidecar.get("factors") or ())
     expected = factors(job.canvas, size)
     _check(len(recorded) == 2 and all(abs(a - b) <= FACTOR_SLACK for a, b in zip(recorded, expected)), key,
@@ -190,12 +197,15 @@ def browser_units(units, decoded_dir: Path, browser: str):
     return kept, errors, versions
 
 
+def steps_text() -> str:
+    return (f"each image is decoded as the app's stage step does (web/src/state/photo.tsx), {STEPS}, through "
+            "Playwright; at full size the canvas takes the image's own size. The reader reads that PNG with "
+            "cv2.imread (lossless), degraded where its condition says, and the corners scale by the sidecar's "
+            "per-axis factors (decoded / source size)")
+
+
 def describe(browser: str, versions) -> str:
-    return (f"browser: {browser} {', '.join(sorted(versions)) or 'unknown'}: each image is decoded as the app's "
-            f"stage step does (web/src/state/photo.tsx), {STEPS}, through Playwright; at full size the canvas "
-            "takes the image's own size. The reader reads that PNG with cv2.imread (lossless), degraded where "
-            "its condition says, and the corners scale by the sidecar's per-axis factors (decoded / source "
-            "size)")
+    return f"browser: {browser} {', '.join(sorted(versions)) or 'unknown'}: {steps_text()}"
 
 
 def pixel_diff(a: np.ndarray, b: np.ndarray) -> dict:
@@ -223,12 +233,43 @@ def _flagged(reading, r: int, c: int) -> bool:
     return confidence[r][c] < threshold
 
 
+def pair_fabrics(native_cells, browser_cells, native_colors, browser_colors) -> list[int | None]:
+    """Each browser fabric's native partner, one to one, pairing the fabrics that share
+    the most squares, then the least total colour distance on a tie. Fabric identity is
+    which squares a fabric covers: the browser converts a photo's colour profile and cv2
+    does not, so the same fabric can come back a shade off, and two close fabrics paired
+    by colour alone could cross. A browser fabric left over maps to None."""
+    m, n = len(browser_colors), len(native_colors)
+    shared = [[0] * n for _ in range(m)]
+    for native_row, browser_row in zip(native_cells, browser_cells):
+        for fabric, other in zip(native_row, browser_row):
+            if 0 <= other < m and 0 <= fabric < n:
+                shared[other][fabric] += 1
+    cost = [[scoring.delta_e(scoring.srgb_to_lab(b), scoring.srgb_to_lab(a)) for a in native_colors]
+            for b in browser_colors]
+    # Exact search over subsets of native fabrics (at most 12, qrep/contract.py
+    # FABRICS_MAX), scoring (squares shared, -colour distance).
+    states: dict[int, tuple[int, float, tuple]] = {0: (0, 0.0, ())}
+    for b in range(m):
+        nxt: dict[int, tuple[int, float, tuple]] = {}
+        for mask, (agree, distance, pairs) in states.items():
+            options = [(mask, (agree, distance, pairs + (None,)))]
+            options += [(mask | 1 << a, (agree + shared[b][a], distance - cost[b][a], pairs + (a,)))
+                        for a in range(n) if not mask & 1 << a]
+            for key, value in options:
+                if key not in nxt or value[:2] > nxt[key][:2]:
+                    nxt[key] = value
+        states = nxt
+    return list(max(states.values(), key=lambda v: v[:2])[2]) if m else []
+
+
 def label_diff(native, browser) -> dict:
     """The browser read against the native read under the G9 rule (plan 7.2): every
     square above the confidence threshold must carry the same fabric. A square counts
-    when either read shows it unflagged. The browser's fabrics map one to one onto the
-    native fabrics by colour (scoring.map_one_to_one), so a reordered palette is no
-    difference, and a browser fabric with no partner differs wherever it is used."""
+    when either read shows it unflagged. Fabrics pair by pair_fabrics, so a reordered
+    or slightly shifted palette is no difference, and a browser fabric with no partner
+    differs wherever it is used; palette_delta_e reports the largest colour distance
+    between paired fabrics."""
     out = {"outcomes": [native.outcome, browser.outcome], "verdicts": [native.verdict, browser.verdict],
            "dims": [[native.rows, native.cols], [browser.rows, browser.cols]], "k": [native.k, browser.k],
            "squares": None, "differing": None, "differing_confident": None, "differing_confident_both": None}
@@ -242,7 +283,9 @@ def label_diff(native, browser) -> dict:
     shape = [len(row) for row in native.cells]
     if shape != [len(row) for row in browser.cells]:
         return {**out, "match": "dims", "g9": False}
-    mapping = scoring.map_one_to_one(browser.colors, native.colors)
+    mapping = pair_fabrics(native.cells, browser.cells, native.colors, browser.colors)
+    paired = [scoring.delta_e(scoring.srgb_to_lab(browser.colors[b]), scoring.srgb_to_lab(native.colors[a]))
+              for b, a in enumerate(mapping) if a is not None]
     differing = confident = both = 0
     for r, (native_row, browser_row) in enumerate(zip(native.cells, browser.cells)):
         for c, (fabric, other) in enumerate(zip(native_row, browser_row)):
@@ -254,7 +297,8 @@ def label_diff(native, browser) -> dict:
             confident += any(shown)
             both += all(shown)
     return {**out, "match": "compared", "g9": confident == 0, "squares": sum(shape), "differing": differing,
-            "differing_confident": confident, "differing_confident_both": both}
+            "differing_confident": confident, "differing_confident_both": both,
+            "palette_delta_e": round(max(paired, default=0.0), 2)}
 
 
 def available_memory_gb() -> float:

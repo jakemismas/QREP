@@ -15,6 +15,7 @@ sha256, so a stopped run resumes. Public rows only, dev split only. Report only.
 
 import argparse
 import datetime
+import hashlib
 import json
 import shlex
 import statistics
@@ -40,6 +41,11 @@ from qrep_eval import corpus, decode, harness, readers, simulate, stats  # noqa:
 
 READERS = ("auto", "auto-corners")
 DECODES = ("native", *decode.BROWSERS)
+# The eval code a read depends on besides qrep/: staging, the reader wrapper and the
+# corner trial. A change to any of them makes every cached read stale.
+READ_PATH = ("harness.py", "readers.py", "simulate.py", "corpus.py")
+# Exit code for a stop on free memory, which a rerun resumes; any other failure is 1.
+MEMORY_STOP = 3
 KEEP = ("outcome", "verdict", "rows", "cols", "colors", "cells", "confidence", "low_confidence_below", "seconds")
 
 
@@ -102,6 +108,31 @@ def read_task(task) -> list[dict]:
     return json.loads(json.dumps(out))
 
 
+class MemoryStop(RuntimeError):
+    pass
+
+
+def _code_digest() -> str:
+    """The qrep tree as committed plus the eval files a read runs through. A dirty
+    qrep/ is refused, since its tree hash would not describe what ran."""
+    if _git("status", "--porcelain", "--", "qrep/"):
+        raise SystemExit("run_parity: qrep/ has uncommitted changes; commit them so cached reads stay keyed")
+    import cv2 as cv
+
+    digest = hashlib.sha256(f"{_git('rev-parse', 'HEAD:qrep') or 'unknown'}|cv2 {cv.__version__}".encode())
+    for name in READ_PATH:
+        digest.update((EVAL / "qrep_eval" / name).read_bytes())
+    return digest.hexdigest()[:16]
+
+
+def _inputs_digest(unit) -> str:
+    """What the simulated user gives a read: corners, counts, fabric count, seed."""
+    truth = unit.truth
+    payload = [truth.corners, truth.counts.model_dump() if truth.counts else None,
+               harness.given_fabrics(truth, unit.truth_label), unit.seed, list(unit.readers)]
+    return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()[:16]
+
+
 def _reading(result: dict) -> readers.Reading:
     return readers.Reading(**{k: result[k] for k in KEEP}, cell_size_eighths=None, band_eighths=[],
                            flagged_regions=[], received={})
@@ -109,7 +140,11 @@ def _reading(result: dict) -> readers.Reading:
 
 def _image_id(unit, name: str, jobs: dict, sidecars: dict) -> str:
     job = jobs[decode.job_key(unit.photo, unit.resolution)]
-    return job.sha256 + f"|{job.cap}" if name == "native" else sidecars[(name, job.key)].sidecar["png_sha256"]
+    if name == "native":
+        return job.sha256 + f"|{job.cap}"
+    sidecar = sidecars[(name, job.key)].sidecar
+    # A failed decode has no PNG; read_task records its error as the read's.
+    return sidecar.get("png_sha256") or f"error|{sidecar.get('error')}"
 
 
 def run_reads(units, args, decoded_dir: Path, jobs: dict, sidecars: dict) -> dict:
@@ -117,16 +152,20 @@ def run_reads(units, args, decoded_dir: Path, jobs: dict, sidecars: dict) -> dic
     work = decoded_dir / "parity-work"
     work.mkdir(parents=True, exist_ok=True)
     cache_file = work / "reads.jsonl"
-    tree = _git("rev-parse", "HEAD:qrep") or "unknown"
+    code = _code_digest()
     done = {}
     if cache_file.exists():
         for line in cache_file.read_text(encoding="utf-8").splitlines():
-            entry = json.loads(line)
+            try:
+                entry = json.loads(line)
+            except ValueError:
+                continue  # a line cut short by a killed run; its read runs again
             done[tuple(entry["key"])] = entry["results"]
     tasks, results = [], {}
     for unit in units:
         for name in DECODES:
-            key = (unit.photo, unit.resolution, name, tree, _image_id(unit, name, jobs, sidecars))
+            key = (unit.photo, unit.resolution, name, code, _inputs_digest(unit),
+                   _image_id(unit, name, jobs, sidecars))
             if key in done:
                 results[key[:3]] = done[key]
             else:
@@ -141,8 +180,8 @@ def run_reads(units, args, decoded_dir: Path, jobs: dict, sidecars: dict) -> dic
     def check_memory(before):
         free = decode.available_memory_gb()
         if free < args.min_free_gb:
-            raise SystemExit(f"run_parity: free memory {free:.2f} GB is under {args.min_free_gb} GB before "
-                             f"{before}; rerun to resume")
+            raise MemoryStop(f"free memory {free:.2f} GB is under {args.min_free_gb} GB before {before}; "
+                             "rerun to resume")
 
     if args.workers == 1:
         for key, task in tasks:
@@ -169,8 +208,8 @@ def run_pixels(units, decoded_dir: Path, args) -> dict:
         for unit in units:
             free = decode.available_memory_gb()
             if free < args.min_free_gb:
-                raise SystemExit(f"run_parity: free memory {free:.2f} GB is under {args.min_free_gb} GB")
-            _, path, _ = harness.stage(unit, Path(tmp))
+                raise MemoryStop(f"free memory {free:.2f} GB is under {args.min_free_gb} GB")
+            path, _ = harness.stage(unit, Path(tmp))
             native = cv2.imread(path, cv2.IMREAD_COLOR)
             row = {}
             for browser in decode.BROWSERS:
@@ -258,11 +297,13 @@ def markdown(header: dict, self_checks: list[str], pixels: dict, units, rows: li
               "G9 holds for a pair when both reads have the same outcome and, if they show a pattern, the "
               "same grid and the same fabric on every square that either read shows unflagged (confidence "
               "at or above the reader's threshold; a read with no confidences flags nothing). Two refusals "
-              "show nothing and hold. Fabrics map one to one by colour (scoring.map_one_to_one) before "
-              "squares are compared.", "",
+              "show nothing and hold. Fabrics pair one to one by the squares they share, then by colour "
+              "(decode.pair_fabrics), before squares are compared. A pair is one photo at one resolution, "
+              "read by one reader in native and in one browser.", "",
               "| Browser | Resolution | Reader | Pairs | Same outcome | Nothing shown | Both shown | Same grid | "
-              "G9 holds | Squares differing (above threshold / all) | Errors | Skipped |",
-              "|---|---|---|---|---|---|---|---|---|---|---|---|"]
+              "G9 holds | Squares differing above threshold / differing / compared | Largest paired-fabric "
+              "Delta E | Errors | Skipped |",
+              "|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for browser in decode.BROWSERS:
         for resolution in dict.fromkeys(r["resolution"] for r in rows):
             for reader in READERS:
@@ -277,20 +318,26 @@ def markdown(header: dict, self_checks: list[str], pixels: dict, units, rows: li
                     f"| {browser} | {resolution} | {reader} | {len(done)} | {_rate(len(same), len(done))} | "
                     f"{len(same) - len(shown)} | {len(shown)} | {len(grid)}/{len(shown)} | "
                     f"{_rate(sum(r['g9'] is True for r in done), len(done))} | "
-                    f"{sum(r['differing_confident'] for r in grid)} / {sum(r['differing'] for r in grid)} | "
+                    f"{sum(r['differing_confident'] for r in grid)} / {sum(r['differing'] for r in grid)} / "
+                    f"{sum(r['squares'] for r in grid)} | "
+                    f"{max((r['palette_delta_e'] for r in grid), default=0):g} | "
                     f"{sum(r['status'] == 'error' for r in group)} | {sum(r['status'] == 'skipped' for r in group)} |")
-    moves = Counter((r["browser"], r["outcomes"][0], r["outcomes"][1]) for r in rows
-                    if r["status"] == "compared" and r["match"] == "outcome")
-    lines += ["", "Outcome changes (native to browser): " + (
-        "; ".join(f"{b} {a} to {c}: {n}" for (b, a, c), n in sorted(moves.items())) or "none") + "."]
+    lines += [""]
+    for browser in decode.BROWSERS:
+        pairs = [r for r in rows if r["browser"] == browser and r["status"] == "compared"]
+        moves = Counter((r["resolution"], r["reader"], *r["outcomes"]) for r in pairs if r["match"] == "outcome")
+        lines.append(f"- Outcome changes, native to {browser}, of {len(pairs)} compared pairs: " + (
+            "; ".join(f"{res} {reader} {a} to {c}: {n}" for (res, reader, a, c), n in sorted(moves.items()))
+            or "none") + ".")
     lines += ["", "Pairs where the reads differ, or both show a pattern:", "",
               "| Photo | Resolution | Reader | Browser | Native outcome, grid, k | Browser outcome, grid, k | "
-              "Squares differing (above threshold / all) | G9 |", "|---|---|---|---|---|---|---|---|"]
+              "Squares differing above threshold / differing / compared | G9 |", "|---|---|---|---|---|---|---|---|"]
     for r in rows:
         if r["status"] != "compared" or (r["match"] == "nothing shown"):
             continue
         (no, bo), (nd, bd), (nk, bk) = r["outcomes"], r["dims"], r["k"]
-        squares = f"{r['differing_confident']} / {r['differing']}" if r["differing"] is not None else "n/a"
+        squares = (f"{r['differing_confident']} / {r['differing']} / {r['squares']}" if r["differing"] is not None
+                   else "n/a")
         lines.append(f"| {r['photo']} | {r['resolution']} | {r['reader']} | {r['browser']} | {no}, {nd[0]} x {nd[1]}, "
                      f"{nk} | {bo}, {bd[0]} x {bd[1]}, {bk} | {squares} | {'holds' if r['g9'] else 'fails'} |")
     errors = [r for r in rows if r["status"] == "error"]
@@ -318,10 +365,14 @@ def main(argv=None) -> int:
     folder = decoded_dir / "selfcheck"
     check_jobs, images = run_decode.self_check_inputs(folder)
     self_checks = [run_decode.self_check_result(folder, b, check_jobs, images) for b in decode.BROWSERS]
-    pixels = run_pixels(units, decoded_dir, args)
     wanted = set(args.read_resolutions.split(","))
     read_units = [u for u in units if u.resolution in wanted or u.group == "named"]
-    rows = compare(read_units, run_reads(read_units, args, decoded_dir, jobs, sidecars))
+    try:
+        pixels = run_pixels(units, decoded_dir, args)
+        rows = compare(read_units, run_reads(read_units, args, decoded_dir, jobs, sidecars))
+    except MemoryStop as stop:
+        print(f"run_parity: {stop}", file=sys.stderr)
+        return MEMORY_STOP
 
     import cv2 as cv
     import qrep
@@ -345,7 +396,7 @@ def main(argv=None) -> int:
         "browsers": "; ".join(f"{b} {', '.join(v)}" for b, v in versions.items()) +
                     f", driven headless by Playwright {', '.join(playwright)} (scripts/eval/decode/browser_decode.mjs)",
         "native_decode_path": harness.DECODE_PATH,
-        "browser_decode_path": decode.describe("chromium or webkit", []).split(": ", 1)[1],
+        "browser_decode_path": decode.steps_text(),
         "inputs": (f"corpus/manifest.csv, eval_set v0 (sha256 {corpus.sha256_of(manifest)}), {len(photos)} photos "
                    f"in the dev split by tier {tiers}, and the photoreal fixtures busy_print_squares and "
                    "low_contrast_hst at 1400 and 2000 px; source images checked against the manifest sha256; "

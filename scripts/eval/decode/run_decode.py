@@ -7,10 +7,12 @@ unit stages (full size and the 2000 and 1400 caps, and the photoreal fixtures at
 their own size), and runs browser_decode.mjs once per browser. PNGs and sidecars
 land in <cache>/decoded/<browser>/, which git ignores. A self-check first decodes
 two generated PNGs: at full size the browser must return every pixel unchanged, and
-at the phone cap the size must be targetSize's; the generated PNGs are the same
+at the phone cap the size must be corpus.cap_size's (the eval's copy of the app's
+targetSize rounding, which the driver repeats in the page); the generated PNGs are the same
 bytes on every run, so a rerun rechecks the decodes that browser version made. Every
 sidecar is then checked
-(decode.load_decoded). Dev split only: the holdout is never opened. A rerun skips
+(decode.load_decoded). The dev split by default; --holdout decodes the sealed holdout
+instead, for the gate measurement alone (plan 8.2), so no development run opens it. A rerun skips
 images already decoded by the same browser version.
 """
 
@@ -47,6 +49,8 @@ def _parse(argv):
                    help="skip the full-size decodes only a degradation needs")
     p.add_argument("--no-photoreal", action="store_true")
     p.add_argument("--private", action="store_true", help="admit rows under other licenses")
+    p.add_argument("--holdout", action="store_true",
+                   help="decode the sealed holdout instead of the dev split; only the gate measurement runs it")
     p.add_argument("--port", type=int, default=int(os.environ.get("QREP_E2E_PORT") or 0) or None,
                    help="the loopback port for the driver (default: QREP_E2E_PORT)")
     p.add_argument("--min-free-gb", type=float, default=4.0)
@@ -63,9 +67,12 @@ def units_for(args, cache: Path):
             args.resolutions, "--radii", "0", "--trials", "1"]
     argv += ["--no-degradations"] * args.no_degradations + ["--private"] * args.private
     eval_args = run_eval._parse(argv)
-    photos = corpus.load_photos(args.corpus, cache, split="dev", allow_private=args.private)
+    holdout = getattr(args, "holdout", False)
+    photos = corpus.load_photos(args.corpus, cache, split="holdout" if holdout else "dev",
+                                allow_private=args.private)
     units = run_eval._corpus_units(eval_args, photos, ("auto",), (0,))
-    if not args.no_photoreal:
+    # run_eval reads the photoreal fixtures on the dev split only.
+    if not args.no_photoreal and not holdout:
         units += run_eval._photoreal_units(eval_args, ("auto",))
     return units
 
@@ -115,7 +122,7 @@ def self_check_result(folder: Path, browser: str, jobs, images) -> str:
     return (f"{browser} {full.browser_version}: a {jobs[0].canvas[0]} x {jobs[0].canvas[1]} random PNG at full "
             f"size came back with 0 of {diff['pixels']} pixels changed; a {jobs[1].canvas[0]} x "
             f"{jobs[1].canvas[1]} PNG at the {jobs[1].cap} cap came back {capped.size[0]} x {capped.size[1]}, "
-            "targetSize's size")
+            "the size corpus.cap_size gives")
 
 
 def self_check(decoded_dir: Path, browser: str, args) -> str:

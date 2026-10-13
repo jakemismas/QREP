@@ -29,9 +29,12 @@ const SIDECAR_VERSION = 1;
 const STEPS =
   "createImageBitmap(blob); canvas at targetSize(width, height, cap); " +
   "drawImage(bitmap, 0, 0, width, height); canvas.toBlob(image/png)";
-// Free memory, in GB, under which a decode in flight is abandoned: the 4 GB floor
-// checked between images, less the headroom one 40 MP decode takes.
-const LOW_MEMORY = 3.5;
+// Headroom, in GB, one 40 MP decode takes below the floor checked between images:
+// a decode in flight is abandoned under the floor less this.
+const IN_FLIGHT_HEADROOM = 0.5;
+// A renderer that dies is retried once in a fresh browser before its error counts as
+// the browser's answer, since on a machine short of memory the crash may be the host's.
+const ATTEMPTS = 2;
 const TYPES = { ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png" };
 
 function parse(argv) {
@@ -138,6 +141,8 @@ function done(job, out, browserVersion) {
   return (
     sidecar.version === SIDECAR_VERSION &&
     sidecar.error == null &&
+    sidecar.key === job.key &&
+    sidecar.steps === STEPS &&
     sidecar.browser_version === browserVersion &&
     sidecar.source_sha256 === job.sha256 &&
     sidecar.cap === job.cap
@@ -166,15 +171,6 @@ async function main() {
         stopped = `free memory ${freeGb().toFixed(2)} GB is under ${args.minFreeGb} GB before ${job.key}`;
         break;
       }
-      if (!browser.isConnected()) browser = await launch();
-      const page = await browser.newPage();
-      let starved = false;
-      const watch = setInterval(() => {
-        if (freeGb() < LOW_MEMORY) {
-          starved = true;
-          page.close().catch(() => {});
-        }
-      }, 1000);
       const base = {
         version: SIDECAR_VERSION,
         key: job.key,
@@ -184,41 +180,60 @@ async function main() {
         source_sha256: job.sha256,
         cap: job.cap,
       };
-      const started = Date.now();
-      try {
-        await page.goto(`http://127.0.0.1:${args.port}/`);
-        const result = await page.evaluate(decodeInPage, { index, cap: job.cap });
-        const upload = uploads.get(job.key);
-        if (!upload) throw new Error("the page reported success but no PNG arrived");
-        const png = path.join(args.out, `${job.key}.png`);
-        fs.renameSync(upload.part, png);
-        const [w, h] = result.source;
-        const [dw, dh] = result.decoded;
-        writeJson(path.join(args.out, `${job.key}.json`), {
-          ...base,
-          source_size: result.source,
-          decoded_size: result.decoded,
-          scale: result.scaled ? job.cap / Math.max(w, h) : 1.0,
-          factors: [dw / w, dh / h],
-          steps: STEPS,
-          png_sha256: upload.sha256,
-          seconds: (Date.now() - started) / 1000,
-          decoded_at: new Date().toISOString(),
-        });
-        decoded += 1;
-      } catch (error) {
-        if (starved) {
-          stopped = `free memory fell under ${LOW_MEMORY} GB while decoding ${job.key}`;
+      let lastError = null;
+      for (let attempt = 1; attempt <= ATTEMPTS && !stopped; attempt += 1) {
+        if (!browser.isConnected()) browser = await launch();
+        const page = await browser.newPage();
+        let starved = false;
+        const watch = setInterval(() => {
+          if (freeGb() < args.minFreeGb - IN_FLIGHT_HEADROOM) {
+            starved = true;
+            page.close().catch(() => {});
+          }
+        }, 1000);
+        const started = Date.now();
+        try {
+          await page.goto(`http://127.0.0.1:${args.port}/`);
+          const result = await page.evaluate(decodeInPage, { index, cap: job.cap });
+          const upload = uploads.get(job.key);
+          if (!upload) throw new Error("the page reported success but no PNG arrived");
+          const png = path.join(args.out, `${job.key}.png`);
+          fs.renameSync(upload.part, png);
+          const [w, h] = result.source;
+          const [dw, dh] = result.decoded;
+          writeJson(path.join(args.out, `${job.key}.json`), {
+            ...base,
+            source_size: result.source,
+            decoded_size: result.decoded,
+            scale: result.scaled ? job.cap / Math.max(w, h) : 1.0,
+            factors: [dw / w, dh / h],
+            steps: STEPS,
+            png_sha256: upload.sha256,
+            seconds: (Date.now() - started) / 1000,
+            decoded_at: new Date().toISOString(),
+          });
+          decoded += 1;
+          lastError = null;
           break;
+        } catch (error) {
+          if (starved) {
+            stopped = `free memory fell under ${args.minFreeGb - IN_FLIGHT_HEADROOM} GB while decoding ${job.key}`;
+          } else {
+            lastError = error;
+            console.error(`${job.key}: attempt ${attempt}: ${error.message ?? error}`);
+          }
+        } finally {
+          clearInterval(watch);
+          uploads.delete(job.key);
+          await page.close().catch(() => {});
+          if (lastError && !browser.isConnected()) await browser.close().catch(() => {});
         }
+      }
+      if (stopped) break;
+      if (lastError) {
         // A browser failure is a measured outcome: run_eval turns it into error rows.
-        writeJson(path.join(args.out, `${job.key}.json`), { ...base, error: String(error.message ?? error) });
+        writeJson(path.join(args.out, `${job.key}.json`), { ...base, error: String(lastError.message ?? lastError) });
         failed += 1;
-        console.error(`${job.key}: ${error.message ?? error}`);
-      } finally {
-        clearInterval(watch);
-        uploads.delete(job.key);
-        await page.close().catch(() => {});
       }
     }
   } finally {
