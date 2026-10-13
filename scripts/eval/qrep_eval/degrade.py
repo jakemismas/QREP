@@ -27,7 +27,7 @@ PATCH_CENTER = (0.6, 0.6)
 PATCH_SIDE = 0.25
 PATCH_GRAY = 128
 # Glare and the gradient work in float64 one band of rows at a time: over a whole
-# 117 MP scan their float copies passed 5 GB in one process, while a band of a
+# 117 MP scan their float copies exceeded 5 GB in one process, while a band of a
 # 10292 px wide scan holds about 63 MB per copy. The formula per pixel is unchanged.
 BAND_ROWS = 256
 

@@ -1519,3 +1519,39 @@ def test_a_stage_error_on_an_unframed_photo_stays_an_error(tmp_path):
     errors = report.aggregate(rows, runner=_no_git)["errors"]
     assert [(e["photo"], e["reader"], e["radius_px"], e["trial"], e["variant"]) for e in errors] == [
         ("r1", "auto-corners", 0, None, "true")]
+
+
+def test_the_budget_holds_on_the_holdout_and_follows_every_trial(monkeypatch, tmp_path):
+    # The budget applies on every split (#166 comment 6146139041), so the same unit on
+    # the holdout is skipped too. Radii 0, 2, 4, 6 and 8 with 3 trials at each nonzero
+    # radius: auto-corners stands in 1 + 4 x 3 = 13 rows, and each jitter radius above 0
+    # lists its 3 trials as skipped, none scored.
+    monkeypatch.setattr(readers, "read_auto", _no_read)
+    monkeypatch.setattr(harness, "stage", _no_read)
+    corners = [(100.0, 100.0), (10192.0, 100.0), (10192.0, 11315.0), (100.0, 11315.0)]
+    unit = dataclasses.replace(
+        _plain_unit(tmp_path / "never-opened.png", canvas=(10292, 11415), corners=corners,
+                    counts=Counts(blocks_across=1, blocks_down=1, squares_per_block_across=4,
+                                  squares_per_block_down=4),
+                    readers_=("auto", "auto-corners"), radii=(0, 2, 4, 6, 8)), split="holdout", trials=3)
+    rows = harness.run_unit(unit)
+    assert all(r["split"] == "holdout" and r["outcome"] == "skipped" and r["skip_kind"] == corpus.OVER_BUDGET
+               for r in rows)
+    corner = [(r["radius_px"], r["trial"]) for r in rows if r["reader"] == "auto-corners"]
+    assert corner == [(0, 0)] + [(radius, trial) for radius in (2, 4, 6, 8) for trial in range(3)]
+    jitter = report.aggregate(rows, runner=_no_git)["jitter"]
+    for radius in (2, 4, 6, 8):
+        entry = jitter[f"auto-corners | full | {radius}"]
+        assert (entry["n_rows"], entry["false_warning"]["n"], entry["false_warning"]["skipped"]) == (3, 0, 3)
+
+
+def test_the_skip_reason_and_the_budget_evidence_say_what_was_measured():
+    # The reason the decision asks for, with the budget's number, and the header's
+    # evidence holding the figures #166 comments 6145827537, 6146146558 and 6146429860
+    # record, typed here from those comments.
+    assert corpus.over_budget_reason() == ("as fetched exceeds the eval's 50 MP budget; the app caps every "
+                                           "photo at 2000 px")
+    for figure in ("5 GB per-process commit cap", "117.5 MP", "0.50 / 1.20 GB at 8.9 MP",
+                   "1.18 / 1.88 GB at 15.4 MP", "1.00 / 1.70 GB at 38.9 MP", "456 MiB float32 power spectrum",
+                   "0.89 / 1.61 GB", "0.87 / 1.59 GB", "0.70 / 1.41 GB", "541 x 600 px"):
+        assert figure in run_eval.BUDGET_EVIDENCE, figure

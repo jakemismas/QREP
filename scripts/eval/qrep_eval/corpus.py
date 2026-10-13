@@ -33,7 +33,7 @@ PROPOSALS = ("proposed-a", "proposed-b")
 
 
 # The largest image a unit reads as fetched, in megapixels (#166 comment 6145839899).
-# The automatic read itself passed a 5 GB per-process commit cap at 117.5 MP, and the
+# The automatic read itself exceeded a 5 GB per-process commit cap at 117.5 MP, and the
 # read is not the eval's to change; the app caps every photo at 2000 px anyway.
 FULL_BUDGET_MP = 50
 # A row's skip_kind for a unit over the budget; the report counts these by kind, since
