@@ -3,23 +3,27 @@
 These photos show other people's designs and possibly people, so they live only in the main
 checkout's gitignored corpus/private/ (plan sections 5.D and 8). For each photo the intake:
 
-- refuses a root that git does not ignore, or that sits in a linked worktree, so nothing it
-  writes can be staged or left behind for a worktree's teardown;
-- hashes the source (sha256, which the D3a holdout rule reads) and stores a copy whose metadata
-  is rebuilt from an allowlist: make, model and orientation survive, and everything else (the
-  GPS IFD, the Exif sub-IFD, XMP, IPTC, comments, PNG text chunks and the secondary images an
-  iPhone JPEG carries after its primary image) is dropped without re-encoding a pixel. The copy
-  is then re-read and refused if any location tag, or other pixels, come back;
+- refuses a root that git does not ignore, that sits in a linked worktree, or where git cannot
+  answer, so nothing it writes can be staged or left behind for a worktree's teardown, and puts
+  a `.gitignore` of `*` in the root so even an old checkout without the ignore rules skips it;
+- stores a copy whose metadata is rebuilt from an allowlist: make, model and orientation
+  survive, and everything else (the GPS IFD, the Exif sub-IFD, IFD1 and its thumbnail, XMP,
+  IPTC, comments, PNG text chunks, JFIF thumbnails and the secondary images an iPhone JPEG
+  carries after its primary image) is dropped without re-encoding a pixel. The copy is then
+  re-read and refused if any metadata beyond the allowlist, or other pixels, come back;
+- binds everything to that stored copy: the corpus never keeps the received file, so the
+  manifest's sha256, the annotation's sha256, the D3a holdout rule and the dev annotate page
+  all read the stored copy's hash, and received_sha256 only catches a file that arrives twice;
 - records the capture, so a screenshot never counts as a phone capture: the private tier comes
   from it, and a capture that contradicts the file's own metadata needs the operator's word;
 - appends a row to corpus/private/manifest.csv and writes a D3a annotation sidecar,
-  corpus/private/annotations/<stem>.json, that proposals and the dev annotate page fill in.
+  corpus/private/annotations/<stem>.json, for the proposals and the dev annotate page.
 
 The report subcommand writes docs/sprint-5/evidence/D3c-private-tiers.md, which holds counts per
 private tier, tier and split and nothing else; tests/eval/test_private_intake.py parses it back.
 
-Run from a checkout (the default root is the main checkout's corpus/private/, found through git,
-so a run from a worktree writes there too):
+Run from any checkout; both commands use the main checkout's corpus/private/, found through git,
+and take no other root, so a private photo cannot be written anywhere else from the command line:
   python scripts/eval/private_intake.py ingest PHOTO --source S --capture C --ownership O \\
       --tier T --class K [--device-class D] [--capture-confirmed] [--claims F] [--regression F]
   python scripts/eval/private_intake.py report
@@ -47,7 +51,7 @@ from corpus_fetch import CLASSES_BY_TIER
 from qrep_eval import annotation as an
 
 COLUMNS = (
-    "file", "license", "source", "source_name", "sha256", "file_sha256", "px_w", "px_h",
+    "file", "license", "source", "source_name", "sha256", "received_sha256", "px_w", "px_h",
     "orientation", "capture", "capture_evidence", "device_make", "device_model", "device_class",
     "ownership", "private_tier", "tier", "class", "split", "ingested",
 )
@@ -63,8 +67,10 @@ STEM_PREFIX = {"phone_capture": "cap", "screenshot": "shot"}
 TIERS = tuple(CLASSES_BY_TIER)
 SPLITS = ("dev", "holdout")
 # The intake records proposals and copies of a source's record; truth comes only from Jake on
-# the dev annotate page and from D3b's gold layouts (plan section 8.2), and it sets the
-# screened capture and device class itself.
+# the dev annotate page and from D3b's gold layouts (plan section 8.2). It sets the capture and
+# device class itself as screened: the intake is the screen for a private photo, and both come
+# from how the photo was acquired (with the file's metadata as evidence when it has any, in the
+# capture_evidence column), as a museum photo's come from its source.
 CLAIM_PROVENANCES = ("proposed-a", "proposed-b", "source-record")
 OWN_CLAIMS = ("capture", "device_class")
 
@@ -73,22 +79,26 @@ KEPT_TAGS = (MAKE, MODEL, ORIENTATION)
 EXIF_IFD = 0x8769
 EXPOSURE_TAGS = (0x829A, 0x829D)  # ExposureTime, FNumber: every camera writes them
 USER_COMMENT = 0x9286
-# Orientations 5 to 8 turn the stored image a quarter turn, so it displays with width and height
-# swapped; annotation coordinates follow the displayed image, as the browser decodes it.
-QUARTER_TURNS = (5, 6, 7, 8)
 METADATA_KEYS = ("xmp", "XML:com.adobe.xmp", "photoshop", "comment", "Comment", "mp", "mpinfo",
                  "flashpix")
 
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
-# Image data and color only: the PNG chunks a decoder needs to show the same pixels.
-PNG_KEEP = frozenset({b"IHDR", b"PLTE", b"IDAT", b"IEND", b"tRNS", b"cHRM", b"gAMA", b"iCCP",
-                      b"sBIT", b"sRGB", b"pHYs", b"cICP", b"mDCV", b"cLLI"})
+# Image data and color only, the chunks a decoder needs to show the same pixels, each with the
+# payload length its definition allows (None: any), so no kept chunk can carry extra bytes.
+PNG_KEEP = {b"IHDR": (13,), b"PLTE": None, b"IDAT": None, b"IEND": (0,), b"tRNS": None,
+            b"cHRM": (32,), b"gAMA": (4,), b"iCCP": None, b"sBIT": (1, 2, 3, 4), b"sRGB": (1,),
+            b"pHYs": (9,), b"cICP": (4,), b"mDCV": (24,), b"cLLI": (8,)}
 SOI, EOI, SOS = 0xD8, 0xD9, 0xDA
 STANDALONE = frozenset(range(0xD0, 0xD8)) | {0x01}
+# JFIF's APP0 up to its density fields (identifier, version, units, two densities), and Adobe's
+# APP14 through its color transform byte; the bytes past them are a thumbnail or padding.
+JFIF_HEAD, ADOBE_LENGTH = 12, 12
 
 REPORT = Path("docs/sprint-5/evidence/D3c-private-tiers.md")
 MAIN_ROOT = "<main checkout>/corpus/private"
 OTHER_ROOT = "<root>"
+# The checkout folder the report names: the main checkout, or a worktree named for its ticket.
+QREP_SHOWN = re.compile(r"(QREP|[a-z][a-z0-9]{0,7})/qrep/__init__\.py")
 
 
 class IntakeError(Exception):
@@ -175,21 +185,27 @@ def _split_jpeg(data: bytes) -> tuple[list[tuple[int | None, bytes]], bytes]:
         in_scan = in_scan or marker == SOS
 
 
-def _jpeg_keeps(marker: int | None, part: bytes) -> bool:
+def _segment(marker: int, payload: bytes) -> bytes:
+    return bytes([0xFF, marker]) + (len(payload) + 2).to_bytes(2, "big") + payload
+
+
+def _jpeg_kept(marker: int | None, part: bytes) -> bytes | None:
+    """The part as the stored copy carries it, or None when it is dropped."""
     if marker is None or marker in (SOS, EOI) or marker in STANDALONE:
-        return True
+        return part
     if 0xC0 <= marker <= 0xCF and marker != 0xC8:  # frame headers, Huffman and arithmetic tables
-        return True
+        return part
     if marker in (0xDB, 0xDD):  # quantization tables, restart interval
-        return True
+        return part
     payload = part[4:]
-    if marker == 0xE0:
-        return payload.startswith((b"JFIF\x00", b"JFXX\x00"))
-    if marker == 0xE2:
-        return payload.startswith(b"ICC_PROFILE\x00")
-    if marker == 0xEE:  # Adobe's color transform, which decoding needs
-        return payload.startswith(b"Adobe")
-    return False
+    if marker == 0xE0 and payload.startswith(b"JFIF\x00") and len(payload) >= JFIF_HEAD + 2:
+        # The density fields stay; the thumbnail goes, and its size bytes read 0 x 0.
+        return _segment(0xE0, payload[:JFIF_HEAD] + b"\x00\x00")
+    if marker == 0xE2 and payload.startswith(b"ICC_PROFILE\x00"):
+        return part  # color data a decoder applies; phones write a standard profile here
+    if marker == 0xEE and payload.startswith(b"Adobe") and len(payload) >= ADOBE_LENGTH:
+        return _segment(0xEE, payload[:ADOBE_LENGTH])  # its color transform, which decoding needs
+    return None
 
 
 def _split_png(data: bytes) -> tuple[list[tuple[bytes, bytes]], bytes]:
@@ -209,16 +225,31 @@ def _split_png(data: bytes) -> tuple[list[tuple[bytes, bytes]], bytes]:
             return chunks, data[i:]
 
 
+def _png_keeps(kind: bytes, chunk: bytes) -> bool:
+    if kind not in PNG_KEEP:
+        return False
+    lengths = PNG_KEEP[kind]
+    return lengths is None or len(chunk) - 12 in lengths
+
+
 def _png_chunk(kind: bytes, payload: bytes) -> bytes:
     crc = zlib.crc32(kind + payload).to_bytes(4, "big")
     return len(payload).to_bytes(4, "big") + kind + payload + crc
 
 
-def _kept_exif(data: bytes) -> bytes | None:
-    """The source's make, model and orientation as a fresh EXIF block ("Exif\\0\\0" first), or
-    None when it has none of them."""
-    with Image.open(io.BytesIO(data)) as im:
-        source = im.getexif()
+def _raw_exif(im: Image.Image) -> Image.Exif:
+    """The file's own EXIF block. Image.getexif() also copies an XMP orientation into its
+    answer, which would promote an orientation no viewer applies into the stored copy."""
+    exif = Image.Exif()
+    raw = im.info.get("exif")
+    if raw:
+        exif.load(raw)
+    return exif
+
+
+def _allowlisted(source: Image.Exif) -> bytes | None:
+    """Make, model and orientation as a fresh EXIF block ("Exif\\0\\0" first), or None when
+    the source has none of them."""
     kept = Image.Exif()
     for tag in KEPT_TAGS:
         if tag in source:
@@ -229,14 +260,15 @@ def _kept_exif(data: bytes) -> bytes | None:
 def clean_copy(data: bytes) -> bytes:
     """The photo with its metadata rebuilt from the allowlist and its image data byte for byte."""
     fmt = detect_format(data)
-    exif = _kept_exif(data)
+    with Image.open(io.BytesIO(data)) as im:
+        exif = _allowlisted(_raw_exif(im))
     if fmt == "JPEG":
         parts, _after_end = _split_jpeg(data)
-        kept = [(marker, part) for marker, part in parts if _jpeg_keeps(marker, part)]
+        kept = [(marker, _jpeg_kept(marker, part)) for marker, part in parts]
         # JFIF wants its APP0 first, and EXIF its APP1 next.
-        app0 = b"".join(part for marker, part in kept if marker == 0xE0)
-        rest = b"".join(part for marker, part in kept if marker != 0xE0)
-        app1 = b"" if exif is None else b"\xff\xe1" + (len(exif) + 2).to_bytes(2, "big") + exif
+        app0 = b"".join(part for marker, part in kept if marker == 0xE0 and part)
+        rest = b"".join(part for marker, part in kept if marker != 0xE0 and part)
+        app1 = b"" if exif is None else _segment(0xE1, exif)
         return b"\xff\xd8" + app0 + app1 + rest
     chunks, _after_end = _split_png(data)
     out, placed = [PNG_SIGNATURE], exif is None
@@ -244,36 +276,41 @@ def clean_copy(data: bytes) -> bytes:
         if kind == b"IDAT" and not placed:
             out.append(_png_chunk(b"eXIf", exif[len(b"Exif\x00\x00"):]))
             placed = True
-        if kind in PNG_KEEP:
+        if _png_keeps(kind, chunk):
             out.append(chunk)
     return b"".join(out)
 
 
 def location_traces(data: bytes) -> list[str]:
-    """What metadata beyond the allowlist a photo still carries; [] when none."""
+    """What a photo carries beyond the allowlist, in any block; [] when nothing."""
     fmt = detect_format(data)
     traces = []
     with Image.open(io.BytesIO(data)) as im:
-        exif = im.getexif()
+        exif = _raw_exif(im)
         extra = sorted(set(exif) - set(KEPT_TAGS))
         if extra:
             traces.append("EXIF tags " + ", ".join(f"0x{tag:04x}" for tag in extra))
+        raw = im.info.get("exif")
+        # Byte for byte the block the allowlist builds from those tags, so nothing hides in a
+        # sub-IFD, IFD1, its thumbnail or the gaps between them.
+        if raw and raw != _allowlisted(exif) and not extra:
+            traces.append("an EXIF block with more than make, model and orientation")
         traces += [f"{key} metadata" for key in METADATA_KEYS if key in im.info]
         if fmt == "PNG" and im.text:
             traces.append("PNG text chunks")
     if fmt == "JPEG":
         parts, after_end = _split_jpeg(data)
         app1 = [part for marker, part in parts if marker == 0xE1]
-        dropped = [marker for marker, part in parts
-                   if marker != 0xE1 and not _jpeg_keeps(marker, part)]
-        if dropped:
-            traces.append("JPEG segments " + ", ".join(f"0xff{m:02x}" for m in dropped))
+        changed = [marker for marker, part in parts
+                   if marker != 0xE1 and _jpeg_kept(marker, part) != part]
+        if changed:
+            traces.append("JPEG segments " + ", ".join(f"0xff{m:02x}" for m in changed))
         if len(app1) > 1 or any(not part[4:].startswith(b"Exif\x00\x00") for part in app1):
             traces.append("an APP1 segment other than one EXIF block")
     else:
         chunks, after_end = _split_png(data)
-        dropped = sorted({kind.decode("latin-1") for kind, _ in chunks
-                          if kind not in PNG_KEEP | {b"eXIf"}})
+        dropped = sorted({kind.decode("latin-1") for kind, chunk in chunks
+                          if kind != b"eXIf" and not _png_keeps(kind, chunk)})
         if dropped:
             traces.append("PNG chunks " + ", ".join(dropped))
     if after_end:
@@ -303,7 +340,7 @@ def default_root() -> Path:
     found = _git(Path(__file__).resolve().parent, "rev-parse", "--path-format=absolute",
                  "--git-common-dir")
     if found.returncode:
-        raise IntakeError("cannot find the main checkout; pass --root")
+        raise IntakeError(f"cannot find the main checkout: {found.stderr.strip()}")
     return Path(found.stdout.strip()).resolve().parent / "corpus" / "private"
 
 
@@ -312,10 +349,17 @@ def check_root(root: Path) -> Path:
     root = Path(os.path.abspath(root))
     probe = root
     while not probe.exists():
+        if probe.parent == probe:
+            raise IntakeError(f"no folder of {root} exists, not even its drive")
         probe = probe.parent
     top = _git(probe, "rev-parse", "--show-toplevel")
     if top.returncode:
-        return root  # outside every checkout, so nothing written there can be staged
+        # Only git's own answer that no repository holds the folder clears it; any other
+        # failure (dubious ownership, a broken config) could hide a checkout, so it refuses.
+        if "not a git repository" not in top.stderr:
+            raise IntakeError(f"git cannot tell whether {root} is in a checkout: "
+                              f"{top.stderr.strip()}")
+        return root
     toplevel = Path(top.stdout.strip()).resolve()
     common = _git(probe, "rev-parse", "--path-format=absolute", "--git-common-dir")
     if common.returncode or Path(common.stdout.strip()).resolve().parent != toplevel:
@@ -386,11 +430,12 @@ def _capture_evidence(intake: Intake, exif_ifd: dict, xmp: bytes) -> str:
     exposure = any(tag in exif_ifd for tag in EXPOSURE_TAGS)
     comment = exif_ifd.get(USER_COMMENT, b"")
     comment = comment if isinstance(comment, bytes) else str(comment).encode()
+    # iOS marks a screenshot in the EXIF user comment, and in a PNG's XMP.
     marked = b"screenshot" in comment.lower() or b"screenshot" in xmp.lower()
     if intake.capture == "camera":
         if marked:
-            raise IntakeError("the file's EXIF marks it a screenshot, and a screenshot never "
-                              "counts as a phone capture")
+            raise IntakeError("the file's metadata marks it a screenshot, and a screenshot "
+                              "never counts as a phone capture")
         if not exposure and not intake.capture_confirmed:
             raise IntakeError("a camera capture without camera exposure data (ExposureTime or "
                               "FNumber), which messaging apps strip; send the original, or pass "
@@ -417,10 +462,14 @@ def _device_class(intake: Intake, model: str) -> str:
     return device
 
 
-def _check_claims(claims: dict) -> dict:
+def _check_claims(claims) -> dict:
+    if not isinstance(claims, dict):
+        raise IntakeError("claims must be a JSON object of claim lists")
     for field, entries in claims.items():
         if field not in an.CLAIM_FIELDS or field in OWN_CLAIMS:
             raise IntakeError(f"{field!r} is not a claim field the intake accepts")
+        if not isinstance(entries, list):
+            raise IntakeError(f"{field} must be a list of claims")
         for entry in entries:
             code = entry.get("provenance") if isinstance(entry, dict) else None
             if code in an.TRUTH:
@@ -432,7 +481,7 @@ def _check_claims(claims: dict) -> dict:
     return claims
 
 
-def _check_pins(pins: list) -> list:
+def _check_pins(pins) -> list:
     def number(value) -> bool:
         return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(
             value)
@@ -458,35 +507,46 @@ def ingest(photo: Path, intake: Intake, root: Path, *, today: str | None = None,
 
     Every check runs before the first write, so a refused photo leaves the root as it was."""
     tier = _check_intake(intake)
-    claims = _check_claims(claims or {})
+    claims = _check_claims({} if claims is None else claims)
     if regression is not None:
         _check_pins(regression)
     root = check_root(root)
     photo = Path(photo)
     data = photo.read_bytes()
     fmt = detect_format(data)
-    sha = hashlib.sha256(data).hexdigest()
+    received = hashlib.sha256(data).hexdigest()
+    try:
+        with Image.open(io.BytesIO(data)) as im:
+            exif = _raw_exif(im)
+            exif_ifd = dict(exif.get_ifd(EXIF_IFD))
+            xmp = im.info.get("xmp", im.info.get("XML:com.adobe.xmp", b""))
+            width, height = im.size
+        stored = clean_copy(data)
+        traces = location_traces(stored)
+        same_pixels = _pixels(stored) == _pixels(data)
+    except (OSError, SyntaxError, ValueError) as err:
+        raise IntakeError(f"Pillow cannot read this photo whole: {err}") from err
+    if traces:
+        raise IntakeError(f"metadata survived the clean ({'; '.join(traces)}); nothing stored")
+    if not same_pixels:
+        raise IntakeError("the stored copy decodes to other pixels; nothing stored")
+    sha = hashlib.sha256(stored).hexdigest()
     rows = read_manifest(root)
     for row in rows:
-        if row["sha256"] == sha:
+        if received in (row["received_sha256"], row["sha256"]) or sha == row["sha256"]:
             raise IntakeError(f"this photo is already ingested as {row['file']}")
 
-    with Image.open(io.BytesIO(data)) as im:
-        exif = im.getexif()
-        exif_ifd = dict(exif.get_ifd(EXIF_IFD))
-        xmp = im.info.get("xmp", im.info.get("XML:com.adobe.xmp", b""))
-        width, height = im.size
     xmp = xmp if isinstance(xmp, bytes) else str(xmp).encode()
     evidence = _capture_evidence(intake, exif_ifd, xmp)
     make, model = _text(exif.get(MAKE)), _text(exif.get(MODEL))
     device = _device_class(intake, model)
     orientation = exif.get(ORIENTATION, 1)
     orientation = orientation if orientation in range(1, 9) else 1
-    if orientation in QUARTER_TURNS:
-        width, height = height, width
 
     stem = f"{STEM_PREFIX[tier]}-{sha[:12]}"
     file = f"private/photos/{stem}{'.jpg' if fmt == 'JPEG' else '.png'}"
+    # The canvas is the stored pixels, which annotations index whatever the orientation says
+    # (corpus/README.md, Annotations; the dev page's orientation.ts); the row keeps the tag.
     doc = {
         "schema_version": an.SCHEMA_VERSION,
         "photo": file,
@@ -500,20 +560,13 @@ def ingest(photo: Path, intake: Intake, root: Path, *, today: str | None = None,
     except ValidationError as err:
         raise IntakeError(f"the sidecar is not a valid annotation: {err}") from err
 
-    stored = clean_copy(data)
-    traces = location_traces(stored)
-    if traces:
-        raise IntakeError(f"metadata survived the clean ({'; '.join(traces)}); nothing stored")
-    if _pixels(stored) != _pixels(data):
-        raise IntakeError("the stored copy decodes to other pixels; nothing stored")
-
     row = {
         "file": file,
         "license": LICENSE,
         "source": intake.source.strip(),
         "source_name": photo.name,
         "sha256": sha,
-        "file_sha256": hashlib.sha256(stored).hexdigest(),
+        "received_sha256": received,
         "px_w": str(width),
         "px_h": str(height),
         "orientation": str(orientation),
@@ -531,6 +584,8 @@ def ingest(photo: Path, intake: Intake, root: Path, *, today: str | None = None,
     }
     # The manifest row goes last, so a run that dies midway leaves no row for a missing file,
     # and running it again rewrites the same files.
+    if not (root / ".gitignore").exists():
+        _write(root / ".gitignore", b"*\n")
     _write(root / "photos" / Path(file).name, stored)
     _write(root / "annotations" / f"{stem}.json",
            (json.dumps(doc, indent=2) + "\n").encode("utf-8"))
@@ -577,7 +632,8 @@ for byte, so it can hold nothing else.
   `phone_capture`, and a direct or nested screenshot is `screenshot`, so a screenshot never
   counts as a phone capture.
 - The tier is D3a's (A clean in scope, B in-scope stress, R refusal, X excluded), and the split
-  is D3a's holdout rule (corpus/README.md). The run reads the private manifest only.
+  is D3a's holdout rule (corpus/README.md) applied to the stored copy's sha256. The run reads
+  the private manifest only.
 - Targets (plan section 9, item 5): at least 20 in-scope phone captures and at least 10
   in-scope shop screenshots. The phone tier reads unmeasured below 10 photos, and the release
   holds until it has 10 (plan section 7.2).
@@ -624,7 +680,7 @@ def render_report(header: ReportHeader, table: dict[tuple[str, str, str], int]) 
 
 def parse_report(text: str) -> tuple[ReportHeader, dict[tuple[str, str, str], int]]:
     """The header and counts a rendered report holds; render_report(*parse_report(t)) is t
-    exactly when t holds nothing else."""
+    exactly when t holds nothing else. Every header field is a fixed vocabulary or pattern."""
 
     def field(pattern: str) -> re.Match:
         found = re.search(pattern, text, re.MULTILINE)
@@ -638,7 +694,7 @@ def parse_report(text: str) -> tuple[ReportHeader, dict[tuple[str, str, str], in
     header = ReportHeader(
         date=field(r"^- Date: (\d{4}-\d{2}-\d{2})$").group(1),
         root=root,
-        qrep=field(r"^- qrep: `([^`\n]+)`$").group(1),
+        qrep=field(rf"^- qrep: `({QREP_SHOWN.pattern})`$").group(1),
         sha=sha.group(1),
         clean=sha.group(2) == "clean tree",
     )
@@ -662,7 +718,9 @@ def run_header(root: Path) -> ReportHeader:
     try:
         shown = qrep_path.relative_to(checkout.parent).as_posix()
     except ValueError:
-        shown = f"<outside the checkout>/{qrep_path.name}"
+        shown = ""
+    if not QREP_SHOWN.fullmatch(shown):
+        raise IntakeError(f"qrep resolves to {qrep_path}, not this checkout's qrep/")
     main = Path(root).resolve() == default_root().resolve()
     return ReportHeader(date=datetime.date.today().isoformat(),
                         root=MAIN_ROOT if main else OTHER_ROOT, qrep=shown,
@@ -675,7 +733,12 @@ def run_header(root: Path) -> ReportHeader:
 
 
 def _json_file(path: str | None):
-    return None if path is None else json.loads(Path(path).read_text(encoding="utf-8"))
+    if path is None:
+        return None
+    try:
+        return json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as err:
+        raise IntakeError(f"cannot read {path} as JSON: {err}") from err
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -683,7 +746,6 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
     add = sub.add_parser("ingest", help="store one private photo with its manifest row")
     add.add_argument("photo", type=Path)
-    add.add_argument("--root", type=Path, help="default: the main checkout's corpus/private")
     add.add_argument("--source", required=True, help="where the photo came from")
     add.add_argument("--capture", required=True, choices=tuple(PRIVATE_TIERS))
     add.add_argument("--ownership", required=True,
@@ -696,11 +758,10 @@ def main(argv: list[str] | None = None) -> int:
     add.add_argument("--claims", help="a JSON file of annotation claims (proposals only)")
     add.add_argument("--regression", help="a JSON list of earlier runs' pins to keep")
     rep = sub.add_parser("report", help="write the counts-only report")
-    rep.add_argument("--root", type=Path, help="default: the main checkout's corpus/private")
     rep.add_argument("--out", type=Path, default=REPORT)
     args = parser.parse_args(argv)
     try:
-        root = args.root or default_root()
+        root = default_root()
         if args.command == "ingest":
             row = ingest(args.photo, Intake(args.source, args.capture, args.ownership, args.tier,
                                             args.klass, args.device_class,

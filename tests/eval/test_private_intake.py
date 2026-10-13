@@ -13,6 +13,7 @@ import re
 import shutil
 import subprocess
 import sys
+import zlib
 from pathlib import Path
 
 import pytest
@@ -37,18 +38,19 @@ MAKE, MODEL, ORIENTATION = 0x010F, 0x0110, 0x0112
 EXIF_IFD, GPS_IFD = 0x8769, 0x8825
 EXPOSURE_TIME, F_NUMBER, USER_COMMENT = 0x829A, 0x829D, 0x9286
 
-# Fake coordinates; each needle below is planted once and must not survive the intake.
-GPS = {0: b"\x02\x02\x00\x00", 1: "N", 2: (40.0, 26.0, 46.0), 3: "W", 4: (79.0, 58.0, 56.0)}
+# Fake coordinates a second of arc off 0 degrees north and east, in the sea; each needle below
+# is planted once and must not survive the intake.
+GPS = {0: b"\x02\x02\x00\x00", 1: "N", 2: (0.0, 0.0, 1.0), 3: "E", 4: (0.0, 0.0, 1.0)}
 XMP = (
     '<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF '
     'xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description '
-    'xmlns:exif="http://ns.adobe.com/exif/1.0/" exif:GPSLatitude="40,26.766N" '
-    'exif:GPSLongitude="79,58.933W"/></rdf:RDF></x:xmpmeta>'
+    'xmlns:exif="http://ns.adobe.com/exif/1.0/" exif:GPSLatitude="0,0.017N" '
+    'exif:GPSLongitude="0,0.017E"/></rdf:RDF></x:xmpmeta>'
 )
-COMMENT = "Testhamlet 40.4461N 79.9822W"
+COMMENT = "Testhamlet 0.0003N 0.0003E"
 IPTC_CITY = b"Testville"
 ICC = b"QREP-test-icc-profile"
-NEEDLES = (b"GPSLatitude", b"40,26.766N", b"Testhamlet", IPTC_CITY, b"SecondaryModel")
+NEEDLES = (b"GPSLatitude", b"0,0.017N", b"Testhamlet", IPTC_CITY, b"SecondaryModel")
 
 
 def picture(size=(64, 48)) -> Image.Image:
@@ -195,7 +197,7 @@ def test_clean_jpeg_has_no_location_and_the_same_pixels():
     # The planted metadata is really there before the clean, so the checks below are not
     # vacuous: Pillow reads the GPS IFD, and every needle sits in the source bytes.
     with Image.open(io.BytesIO(source)) as im:
-        assert im.getexif().get_ifd(GPS_IFD)[2] == (40.0, 26.0, 46.0)
+        assert im.getexif().get_ifd(GPS_IFD)[2] == (0.0, 0.0, 1.0)
     assert all(needle in source for needle in NEEDLES)
 
     stored = pi.clean_copy(source)
@@ -250,12 +252,15 @@ def test_intake_stores_a_copy_without_location_and_a_complete_manifest_row(tmp_p
     row = pi.ingest(photo, intake(ownership="owned by the tester; traditional nine patch"),
                     root, today="2026-10-13")
 
-    sha = hashlib.sha256(photo.read_bytes()).hexdigest()
-    # Stem rule: "cap-" for a camera capture, then the first 12 hex digits of the source sha256.
-    stem = "cap-" + sha[:12]
-    stored = root / "photos" / f"{stem}.jpg"
-    assert stored.is_file()
+    received = hashlib.sha256(photo.read_bytes()).hexdigest()
+    (stored,) = (root / "photos").iterdir()
     assert_location_free(stored.read_bytes())
+    # Everything binds the stored copy, the only one the corpus keeps.
+    sha = hashlib.sha256(stored.read_bytes()).hexdigest()
+    assert sha != received
+    # Stem rule: "cap-" for a camera capture, then the first 12 hex digits of that sha256.
+    stem = "cap-" + sha[:12]
+    assert stored.name == f"{stem}.jpg"
 
     assert list(row) == list(pi.COLUMNS)
     assert all(row[column] for column in pi.COLUMNS)
@@ -265,12 +270,14 @@ def test_intake_stores_a_copy_without_location_and_a_complete_manifest_row(tmp_p
         "source": "test-phone",
         "source_name": "IMG_0001.JPG",
         "sha256": sha,
-        "file_sha256": hashlib.sha256(stored.read_bytes()).hexdigest(),
-        # Orientation 6 turns the stored 64 x 48 image a quarter turn, so it shows 48 x 64.
-        "px_w": "48",
-        "px_h": "64",
+        "received_sha256": received,
+        # The stored pixels, 64 x 48, which annotations index whatever the orientation tag
+        # says (corpus/README.md, Annotations); the tag, 6, is kept beside them.
+        "px_w": "64",
+        "px_h": "48",
         "orientation": "6",
         "capture": "camera",
+        # The source carries ExposureTime and FNumber, which only a camera writes.
         "capture_evidence": "exif",
         "device_make": "FakePhoneCo",
         "device_model": "iPhone 99",
@@ -280,13 +287,14 @@ def test_intake_stores_a_copy_without_location_and_a_complete_manifest_row(tmp_p
         "private_tier": "phone_capture",
         "tier": "A",
         "class": "squares",
-        # The D3a holdout rule, computed here from hashlib's digest, not from the intake.
+        # The D3a holdout rule, computed here from hashlib's digest of the stored copy.
         "split": "holdout" if int(sha[:8], 16) % 3 == 0 else "dev",
         "ingested": "2026-10-13",
     }
     assert pi.read_manifest(root) == [row]
-    # The source is untouched.
-    assert hashlib.sha256(photo.read_bytes()).hexdigest() == sha
+    assert hashlib.sha256(photo.read_bytes()).hexdigest() == received
+    # A .gitignore of * keeps the folder out of git even in a checkout without the ignore rules.
+    assert (root / ".gitignore").read_text() == "*\n"
 
 
 @needs_git
@@ -301,6 +309,7 @@ def test_sidecar_is_a_valid_annotation_with_the_screened_capture(tmp_path):
     doc = an.load(root / "annotations" / f"{stem}.json")
     assert doc.photo == row["file"]
     assert doc.sha256 == row["sha256"]
+    # png() saves picture((64, 48)), and the canvas is the stored width and height.
     assert list(doc.canvas) == [64, 48]
     assert [(c.provenance, c.value) for c in doc.capture] == [("screened", "nested_screenshot")]
     assert [(c.provenance, c.value) for c in doc.device_class] == [("screened", "phone")]
@@ -366,6 +375,7 @@ def test_capture_must_match_the_exposure_data_unless_the_operator_confirms_it(tm
     with pytest.raises(pi.IntakeError, match="exposure"):
         pi.ingest(no_exposure, intake(), root)
     row = pi.ingest(no_exposure, intake(capture_confirmed=True), root)
+    # No exposure data, so the camera capture rests on the operator's word.
     assert (row["capture"], row["capture_evidence"]) == ("camera", "operator")
 
     exposed = write(tmp_path / "e.jpg", jpeg(size=(32, 32), extras=False))
@@ -379,6 +389,7 @@ def test_capture_must_match_the_exposure_data_unless_the_operator_confirms_it(tm
 def test_device_class_comes_from_the_model_or_the_operator(tmp_path):
     root = tmp_path / "private"
     tablet = write(tmp_path / "t.jpg", jpeg(ex=exif(model="iPad Air"), extras=False))
+    # Rule: a model that starts with iPad is a tablet.
     assert pi.ingest(tablet, intake(), root)["device_class"] == "tablet"
     unnamed = write(tmp_path / "u.jpg", jpeg(size=(40, 40), ex=exif(make="", model=""),
                                              extras=False))
@@ -387,8 +398,10 @@ def test_device_class_comes_from_the_model_or_the_operator(tmp_path):
     conflict = write(tmp_path / "c.jpg", jpeg(size=(41, 41), extras=False))
     with pytest.raises(pi.IntakeError, match="device"):
         pi.ingest(conflict, intake(device_class="tablet"), root)
-    with pytest.raises(pi.IntakeError):
-        pi.ingest(conflict, intake(device_class="museum"), root)
+    # With no model to conflict with, the museum class is refused on its own: a private photo
+    # is never a museum's.
+    with pytest.raises(pi.IntakeError, match="device class 'museum'"):
+        pi.ingest(unnamed, intake(device_class="museum"), root)
 
 
 @needs_git
@@ -539,3 +552,171 @@ def test_committed_report_holds_aggregates_only():
     assert not re.search(r"\.(jpe?g|png|heic|heif|webp|gif|tiff?)\b", text, re.IGNORECASE)
     assert not re.search(r"IMG_|image0|local-photos|shot-|cap-", text)
     assert not re.search(r"\b\d{3,5} ?x ?\d{3,5}\b", text)
+
+
+# ---------------------------------------------------------------------------------------------
+# Regression tests from the self-review of 0c6062c
+# ---------------------------------------------------------------------------------------------
+
+
+def chunk(kind: bytes, payload: bytes) -> bytes:
+    return (len(payload).to_bytes(4, "big") + kind + payload
+            + zlib.crc32(kind + payload).to_bytes(4, "big"))
+
+
+def plain_jpeg() -> bytes:
+    buf = io.BytesIO()
+    picture().save(buf, "JPEG", quality=90)
+    return buf.getvalue()
+
+
+def plain_png() -> bytes:
+    buf = io.BytesIO()
+    picture().save(buf, "PNG")
+    return buf.getvalue()
+
+
+def test_thumbnail_and_padding_inside_kept_jpeg_segments_are_dropped():
+    data = plain_jpeg()
+    assert data[2:4] == b"\xff\xe0"
+    end = 4 + int.from_bytes(data[4:6], "big")
+    # JFIF 1.01, no units, density 1 x 1, then a 4 x 1 thumbnail: 4 x 1 x 3 = 12 RGB bytes.
+    app0 = b"JFIF\x00\x01\x01\x00\x00\x01\x00\x01" + bytes([4, 1]) + b"THUMBNEEDLE!"
+    # Adobe APP14: version 100, flags 0 and 0, transform 1 (YCbCr), then 11 bytes of padding.
+    app14 = b"Adobe\x00\x64\x00\x00\x00\x00\x01" + b"ADOBENEEDLE"
+    source = data[:2] + segment(0xE0, app0) + segment(0xEE, app14) + data[end:]
+    assert b"THUMBNEEDLE!" in source and b"ADOBENEEDLE" in source
+    assert any("JPEG segments" in trace for trace in pi.location_traces(source))
+
+    stored = pi.clean_copy(source)
+    assert b"THUMBNEEDLE!" not in stored and b"ADOBENEEDLE" not in stored
+    # The APP0 keeps its first 12 bytes (identifier, version, units, densities) and reads its
+    # thumbnail size as 0 x 0: a 14-byte payload, so a length field of 16.
+    assert stored[2:6] == b"\xff\xe0\x00\x10"
+    assert stored[6:20] == b"JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00"
+    assert pi.location_traces(stored) == []
+    assert decoded(stored) == decoded(source)
+
+
+def test_png_chunk_longer_than_its_definition_is_dropped():
+    data = plain_png()
+    # IHDR follows the 8-byte signature as 4 + 4 + 13 + 4 = 25 bytes, so it ends at byte 33.
+    # pHYs is defined as 9 bytes; this one carries 10 more.
+    phys = chunk(b"pHYs", (1).to_bytes(4, "big") * 2 + b"\x00" + b"PHYSNEEDLE")
+    source = data[:33] + phys + data[33:]
+    assert "PNG chunks pHYs" in pi.location_traces(source)
+    stored = pi.clean_copy(source)
+    assert b"PHYSNEEDLE" not in stored
+    assert pi.location_traces(stored) == []
+    assert decoded(stored) == decoded(source)
+
+
+def test_an_orientation_only_in_xmp_is_not_promoted_into_the_stored_exif():
+    xmp = ('<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF '
+           'xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description '
+           'xmlns:tiff="http://ns.adobe.com/tiff/1.0/" tiff:Orientation="6"/></rdf:RDF>'
+           '</x:xmpmeta>')
+    data = plain_jpeg()
+    source = data[:2] + segment(0xE1, b"http://ns.adobe.com/xap/1.0/\x00" + xmp.encode()) + data[2:]
+    with Image.open(io.BytesIO(source)) as im:
+        # Pillow's getexif() reports the XMP orientation, though the file has no EXIF block.
+        assert im.getexif().get(ORIENTATION) == 6
+        assert "exif" not in im.info
+    stored = pi.clean_copy(source)
+    with Image.open(io.BytesIO(stored)) as im:
+        assert dict(im.getexif()) == {}
+
+
+def test_report_with_free_text_in_its_header_does_not_parse():
+    text = pi.render_report(header(), pi.tally([]))
+    assert pi.parse_report(text)[0] == header()
+    leaked = text.replace("d3c/qrep/", "Testshop.Aunt-Testperson/qrep/")
+    with pytest.raises(pi.IntakeError):
+        pi.parse_report(leaked)
+
+
+def test_root_where_git_cannot_answer_is_refused(monkeypatch, tmp_path):
+    def broken(cwd, *args):
+        # git's answer for a repository another account owns, which hides whether the folder
+        # is in a checkout.
+        return subprocess.CompletedProcess(["git", *args], 128, "",
+                                           "fatal: detected dubious ownership in repository\n")
+
+    monkeypatch.setattr(pi, "_git", broken)
+    with pytest.raises(pi.IntakeError, match="cannot tell"):
+        pi.check_root(tmp_path / "corpus" / "private")
+
+
+def test_root_with_no_existing_folder_is_refused(monkeypatch):
+    # A drive that is not there: no folder up to its root exists, so the search for one ends.
+    monkeypatch.setattr(pi.Path, "exists", lambda self: False)
+    with pytest.raises(pi.IntakeError, match="not even its drive"):
+        pi.check_root(Path("Z:/corpus/private"))
+
+
+@needs_git
+def test_a_screenshot_marked_in_xmp_is_never_a_camera_capture(tmp_path):
+    info = PngInfo()
+    info.add_itxt("XML:com.adobe.xmp",
+                  '<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF '
+                  'xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description '
+                  'xmlns:exif="http://ns.adobe.com/exif/1.0/" exif:UserComment="Screenshot"/>'
+                  '</rdf:RDF></x:xmpmeta>')
+    buf = io.BytesIO()
+    picture().save(buf, "PNG", pnginfo=info, exif=exif(exposure=False, gps=False).tobytes())
+    photo = write(tmp_path / "s.png", buf.getvalue())
+    with pytest.raises(pi.IntakeError, match="screenshot"):
+        pi.ingest(photo, intake(capture_confirmed=True), tmp_path / "private")
+    row = pi.ingest(photo, intake(capture="direct_screenshot"), tmp_path / "private")
+    # The XMP marker is the file's own evidence of a screenshot.
+    assert (row["private_tier"], row["capture_evidence"]) == ("screenshot", "exif")
+
+
+@needs_git
+def test_the_same_pixels_received_twice_are_one_photo(tmp_path):
+    root = tmp_path / "private"
+    # The same picture encoded twice at one quality gives the same image data; only the GPS
+    # differs, and the clean drops it, so both stored copies are byte for byte the same.
+    first = write(tmp_path / "a.jpg", jpeg(ex=exif(gps=True), extras=False))
+    second = write(tmp_path / "b.jpg", jpeg(ex=exif(gps=False), extras=False))
+    assert first.read_bytes() != second.read_bytes()
+    pi.ingest(first, intake(), root)
+    with pytest.raises(pi.IntakeError, match="already"):
+        pi.ingest(second, intake(), root)
+    assert len(pi.read_manifest(root)) == 1
+
+
+@needs_git
+def test_ingest_refuses_a_clean_that_keeps_metadata_or_changes_pixels(monkeypatch, tmp_path):
+    photo = write(tmp_path / "p.jpg", jpeg())
+    root = tmp_path / "private"
+    monkeypatch.setattr(pi, "clean_copy", lambda data: data)
+    with pytest.raises(pi.IntakeError, match="metadata survived"):
+        pi.ingest(photo, intake(), root)
+
+    def reencoded(data: bytes) -> bytes:
+        buf = io.BytesIO()
+        with Image.open(io.BytesIO(data)) as im:
+            # From the bare pixels, so no metadata of the source comes along.
+            Image.frombytes(im.mode, im.size, im.tobytes()).save(buf, "JPEG", quality=50)
+        return buf.getvalue()
+
+    monkeypatch.setattr(pi, "clean_copy", reencoded)
+    with pytest.raises(pi.IntakeError, match="other pixels"):
+        pi.ingest(photo, intake(), root)
+    assert not root.exists()
+
+
+@needs_git
+def test_unreadable_photo_and_malformed_claims_are_refused(tmp_path):
+    data = plain_png()
+    start = data.index(b"IDAT") - 4
+    end = start + 12 + int.from_bytes(data[start:start + 4], "big")
+    broken = write(tmp_path / "b.png", data[:start] + chunk(b"IDAT", b"not zlib data") + data[end:])
+    with pytest.raises(pi.IntakeError, match="cannot read"):
+        pi.ingest(broken, intake(capture="direct_screenshot", device_class="phone"),
+                  tmp_path / "private")
+    with pytest.raises(pi.IntakeError, match="JSON object"):
+        pi.ingest(write(tmp_path / "p.jpg", jpeg(extras=False)), intake(), tmp_path / "private",
+                  claims=[{"provenance": "proposed-a"}])
+    assert not (tmp_path / "private").exists()
