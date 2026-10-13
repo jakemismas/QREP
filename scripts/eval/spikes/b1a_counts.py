@@ -316,11 +316,12 @@ def two_part_rejects(wrong: tuple[float, float], truths: Sequence[tuple[float, f
     return wrong[0] < min(t[0] for t in truths) or wrong[1] > max(t[1] for t in truths)
 
 
-def decide_two_part(top3_recall: float, rejected: Sequence[bool]) -> bool:
+def decide_two_part(top3_recall: float | None, rejected: Sequence[bool]) -> bool:
     """Issue #134 criterion 6 as the Go column records it: top-3 recall at least BAR, and the
     two-part fit rule rejects every wrong top-1. rejected holds one flag per wrong top-1, so a
-    method with no wrong top-1 has nothing to reject."""
-    return top3_recall >= BAR and all(rejected)
+    method with no wrong top-1 has nothing to reject; a group with no trials has no recall
+    (summarize gives None) and never ships."""
+    return top3_recall is not None and top3_recall >= BAR and all(rejected)
 
 
 def decide(top3_recall: float, wrong_fits: Sequence[float], truth_fits: Sequence[float]) -> bool:
@@ -680,19 +681,23 @@ def _corners(frame) -> np.ndarray:
     return np.array([[p.x, p.y] for p in (c.top_left, c.top_right, c.bottom_right, c.bottom_left)])
 
 
+def dev_split_rows() -> list[dict]:
+    """Manifest rows of the v0 eval set in tiers A and B, the holdout still in: the dev split is
+    the v0 eval set outside the holdout (corpus/README.md), and load_photos drops the holdout
+    before any read. A tier B row counts only when it is in v0."""
+    with (CORPUS / "manifest.csv").open(encoding="utf-8") as handle:
+        return [row for row in csv.DictReader(handle)
+                if row["tier"] in ("A", "B") and row["eval_set"] == "v0"]
+
+
 def load_photos() -> tuple[list[Photo], list[dict]]:
-    """The dev split: rows of the v0 eval set in tiers A and B, outside the holdout, with every
-    provenance that gives a field and counts; and the rows skipped, with the reason. A tier B
-    row counts only when it is in v0. The holdout is filtered before any read."""
+    """The dev split's photos, with every provenance that gives a field and counts; and the rows
+    skipped, with the reason. The holdout is filtered before any read."""
     sys.path.insert(0, str(REPO / "scripts" / "eval"))
     from qrep_eval import annotation as an
 
     photos, skipped = [], []
-    with (CORPUS / "manifest.csv").open(encoding="utf-8") as handle:
-        # The dev split is the v0 eval set outside the holdout (corpus/README.md).
-        rows = [row for row in csv.DictReader(handle)
-                if row["tier"] in ("A", "B") and row["eval_set"] == "v0"]
-    for row in rows:
+    for row in dev_split_rows():
         stem = Path(row["file"]).stem
         if an.in_holdout(row["sha256"]):
             # Counted, not named: the report never lists holdout photos.
@@ -863,7 +868,7 @@ def build_report(records: list[dict], photos: list[Photo], skipped: list[dict], 
                     summary = summarize(_outcomes(in_scope))
                     row["in_scope"] = summary
                     row["go_product"] = bool(summary["n"]) and decide(summary["top3_rate"], wrong, truths)
-                    row["go"] = bool(summary["n"]) and decide_two_part(summary["top3_rate"], rejected)
+                    row["go"] = decide_two_part(summary["top3_rate"], rejected)
                     groups.append(row)
     zero = [r for r in records if r["radius"] == 0]
     # Every candidate of every trial in quilter units: how often each label was the top-1 and
@@ -982,26 +987,32 @@ def write_markdown(report: dict, path: Path) -> None:
     path.write_text(text, encoding="utf-8", newline="\n")
 
 
-def _header(command: str, photos: list[Photo], skipped: list[dict]) -> dict:
-    import qrep
-
+def _git_state() -> tuple[str, bool]:
+    """HEAD and whether any tracked file differs from it: the SHA names the code that ran only
+    on a clean tree."""
     def git(*args: str) -> str:
         return subprocess.run(["git", *args], cwd=REPO, capture_output=True, text=True,
                               check=True).stdout.strip()
 
+    return git("rev-parse", "HEAD"), bool(git("status", "--porcelain", "--untracked-files=no"))
+
+
+def _header(command: str, photos: list[Photo], skipped: list[dict]) -> dict:
+    import qrep
+
+    sha, dirty = _git_state()
+    rows = dev_split_rows()
     used = ", ".join(f"{p.stem} ({p.tier})" for p in photos)
     holdout = sum(s["reason"] == "holdout" for s in skipped)
-    tier_b = sum(p.tier == "B" for p in photos) + sum(s["tier"] == "B" for s in skipped)
+    tier_b = sum(row["tier"] == "B" for row in rows)
     return {
         "date": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
-        "command": command, "qrep": _qrep_path(qrep.__file__), "git_sha": git("rev-parse", "HEAD"),
-        # The SHA names the code that ran only when no tracked file differs from it.
-        "dirty": bool(git("status", "--porcelain", "--untracked-files=no")),
+        "command": command, "qrep": _qrep_path(qrep.__file__), "git_sha": sha, "dirty": dirty,
         "cv2": cv2.__version__,
         "numpy": np.__version__, "python": sys.version.split()[0],
-        "inputs": (f"corpus/manifest.csv rows of eval_set v0 in tiers A and B ({tier_b} of them "
-                   f"tier B), outside the holdout; {holdout} holdout rows skipped before any "
-                   f"read; read: {used}"),
+        "inputs": (f"corpus/manifest.csv rows of eval_set v0 in tiers A and B: {len(rows)} rows, "
+                   f"{tier_b} of them tier B; {holdout} holdout rows skipped before any read; "
+                   f"read: {used}"),
         "radii_px": list(RADII), "trials_per_radius": TRIALS, "caps": CAPS,
     }
 
@@ -1044,10 +1055,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     command = f"{python} scripts/eval/spikes/b1a_counts.py " + " ".join(
         _public_arg(a, args.cache) for a in (argv if argv is not None else sys.argv[1:]))
     photos, skipped = load_photos()
+    # The header records the checkout as the run starts; a commit, checkout or edit during the
+    # run would make it name code that did not run, so the run then writes nothing.
+    header = _header(command, photos, skipped)
     jobs = [(p, prov, args.cache) for p in photos for prov in sorted(p.truth)]
     with ProcessPoolExecutor(max_workers=args.workers) as pool:
         records = [r for chunk in pool.map(run_photo, jobs) for r in chunk]
-    report = build_report(records, photos, skipped, _header(command, photos, skipped))
+    if _git_state() != (header["git_sha"], header["dirty"]):
+        raise SystemExit("the checkout's HEAD or tracked files changed during the run; nothing "
+                         "written, because the header would not name the code that ran")
+    report = build_report(records, photos, skipped, header)
     Path(args.json).write_text(json.dumps(report, indent=1, default=float) + "\n",
                                encoding="utf-8", newline="\n")
     if args.md:

@@ -7,9 +7,11 @@ designed step in the a channel reaches the methods as the same step (to rounding
 level moves a by well under 1 unit).
 """
 
+import ast
 import importlib.util
 import shutil
 import sys
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -171,6 +173,8 @@ def test_decision_rule_two_part():
     # The bar is inclusive (0.8 >= 0.8), and no wrong top-1 leaves nothing to reject:
     # all([]) is True.
     assert b1a.decide_two_part(0.8, [])
+    # A group with no trials has no recall (summarize gives a rate of None for n = 0): no-go.
+    assert not b1a.decide_two_part(b1a.summarize([])["top3_rate"], [])
 
 
 def test_decision_rule():
@@ -351,8 +355,14 @@ def test_block_periods_on_diagonal_stripes():
 def test_spike_needs_no_module_b6b_deletes(monkeypatch):
     # B6b deletes the qrep.vision package (plan B6b: grid.py, repeats.py, __init__.py and the
     # rest). A None entry in sys.modules makes any import of that name raise ImportError, so
-    # with every qrep.vision module blocked the script must still load, and the code that once
-    # called grid and repeats (autocorr, the tap and block_periods) must still run.
+    # with every qrep.vision module blocked the script must still load, and every method, the
+    # tap, fit_2d and block_periods must still run. No import statement anywhere in the script,
+    # inside a function or not, may name qrep.vision either.
+    tree = ast.parse(Path(b1a.__file__).read_text(encoding="utf-8"))
+    imported = [node.module or "" for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)]
+    imported += [alias.name for node in ast.walk(tree) if isinstance(node, ast.Import)
+                 for alias in node.names]
+    assert [name for name in imported if name.startswith("qrep.vision")] == []
     blocked = ["qrep.vision", "qrep.vision.grid", "qrep.vision.repeats"]
     blocked += [name for name in sys.modules if name.startswith("qrep.vision.")]
     for name in blocked:
@@ -364,14 +374,18 @@ def test_spike_needs_no_module_b6b_deletes(monkeypatch):
     # The expectations of the checkerboard and stripe tests: 240 / 20 = 12 squares each way,
     # and a block period of 3 squares on the stripes.
     board = isolated.FieldImage.from_bgr(_checkerboard(), FULL_FIELD)
-    assert isolated.autocorr_period(board)[0][0] == 12
+    for method in ("autocorr", "fit", "fit_interior"):
+        assert isolated.METHODS[method](board)[0][0] == 12
+    # Seam ranks every candidate, 4 to 240 // 5 = 48: 45 counts.
+    assert len(isolated.seam_energy(board)[0]) == 45
     assert isolated.tap_seed(board, (110.0, 110.0))[1][0] == 12
+    assert isolated.fit_2d(board, 12, 12)["fit"] > isolated.fit_2d(board, 6, 6)["fit"]
     stripes = isolated.FieldImage.from_bgr(_stripes(), FULL_FIELD)
     assert isolated.block_periods(stripes, 12, 12) == (3, 3)
 
 
 def test_load_photos_reads_the_dev_split_only(tmp_path, monkeypatch):
-    # A temporary corpus with five manifest rows, in this order:
+    # A temporary corpus with six manifest rows, in this order:
     # 1. lacma-54871, tier A, eval_set v0, with its committed annotation. Its sha256 starts
     #    89f771d8. 16 = 1 mod 3, so a hex number mod 3 is its digit sum mod 3:
     #    8 + 9 + 15 + 7 + 7 + 1 + 13 + 8 = 68, and 68 mod 3 = 2: outside the holdout
@@ -379,6 +393,7 @@ def test_load_photos_reads_the_dev_split_only(tmp_path, monkeypatch):
     # 2. held, tier A, v0, sha256 starting 00000003: 3 mod 3 = 0, in the holdout.
     # 3. bare, tier A, v0, sha256 starting 00000001: 1 mod 3 = 1, outside, no annotation.
     # 4. tier-b, tier B, eval_set empty, and 5. tier-c, tier C, v0: outside the dev split.
+    # 6. tier-b-v0, tier B, v0, sha256 starting 00000001: in the dev split, no annotation.
     # Rows 2, 4 and 5 get annotation files that are not JSON, so reading one would raise.
     sha = "89f771d81045dcfb801d0f22e1de8855f2a76a73d47967a572b93be469b179db"
     other = "00000001" + "0" * 56
@@ -388,6 +403,7 @@ def test_load_photos_reads_the_dev_split_only(tmp_path, monkeypatch):
         ("images/bare.jpg", "A", other, "v0"),
         ("images/tier-b.jpg", "B", other, ""),
         ("images/tier-c.jpg", "C", other, "v0"),
+        ("images/tier-b-v0.jpg", "B", other, "v0"),
     ]
     (tmp_path / "manifest.csv").write_text(
         "file,tier,sha256,eval_set\n" + "".join(",".join(row) + "\n" for row in rows),
@@ -397,6 +413,9 @@ def test_load_photos_reads_the_dev_split_only(tmp_path, monkeypatch):
     for stem in ("held", "tier-b", "tier-c"):
         (tmp_path / "annotations" / f"{stem}.json").write_text("not json", encoding="utf-8")
     monkeypatch.setattr(b1a, "CORPUS", tmp_path)
+    # The dev split before the holdout: rows 1, 2, 3 and 6, one of them tier B.
+    assert [(Path(r["file"]).stem, r["tier"]) for r in b1a.dev_split_rows()] == [
+        ("lacma-54871", "A"), ("held", "A"), ("bare", "A"), ("tier-b-v0", "B")]
     photos, skipped = b1a.load_photos()
     # Only row 1 is read. corpus/annotations/lacma-54871.json gives both proposal passes 10
     # blocks of 5 squares each way, and proposed-a these field and outer-edge corners
@@ -407,9 +426,10 @@ def test_load_photos_reads_the_dev_split_only(tmp_path, monkeypatch):
     assert truth["counts"] == (10, 5, 10, 5)
     assert truth["field"].tolist() == [[221, 336], [3606, 334], [3659, 3804], [264, 3732]]
     assert truth["outer"].tolist() == [[16, 144], [3795, 138], [3847, 4009], [84, 3905]]
-    # The holdout row is counted without its name; the bare row has no claims to read.
+    # The holdout row is counted without its name; rows 3 and 6 have no claims to read.
     assert skipped == [{"stem": None, "tier": "A", "reason": "holdout"},
-                       {"stem": "bare", "tier": "A", "reason": "no frame and counts claims"}]
+                       {"stem": "bare", "tier": "A", "reason": "no frame and counts claims"},
+                       {"stem": "tier-b-v0", "tier": "B", "reason": "no frame and counts claims"}]
 
 
 def test_qrep_path_names_the_checkout():
