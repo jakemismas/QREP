@@ -52,6 +52,22 @@ describe("composed Pages artifact", () => {
     expect(existsSync(path.join(siteDir, "spike.html"))).toBe(true);
   });
 
+  // C3a (#149; ux-24): the dev annotate page is served to a phone on the home
+  // network for one session and never published. The build makes it, so its
+  // absence here is the compose script's doing, not a missing page.
+  it("leaves the dev annotate page and its entry assets out", () => {
+    expect(existsSync(path.join(webRoot, "dist", "annotate.html"))).toBe(true);
+    // The build names the page's entry chunk annotate-*, the name the compose
+    // filter matches; a renamed chunk would fail here instead of shipping.
+    const built = readFileSync(path.join(webRoot, "dist", "annotate.html"), "utf8");
+    expect(built).toMatch(/assets\/annotate-[\w-]+\.js/);
+    expect(readdirSync(path.join(webRoot, "dist", "assets")).some((name) => name.startsWith("annotate-"))).toBe(true);
+    expect(existsSync(path.join(siteDir, "annotate.html"))).toBe(false);
+    const assets = readdirSync(path.join(siteDir, "assets"));
+    expect(assets.filter((name) => name.startsWith("annotate-"))).toEqual([]);
+    expect(assets.some((name) => name.startsWith("main-"))).toBe(true);
+  });
+
   // #105: Pages publishes the app without internal sprint docs. Only
   // viewer.html and demo/ come from docs/ (the old docs index.html gives way
   // to the app's), so any other docs/ entry in the site is a leak, including

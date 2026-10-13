@@ -23,8 +23,15 @@ if (!outDir) {
 
 mkdirSync(outDir, { recursive: true });
 
-// 1. The app owns the root.
-cpSync(path.join(webRoot, "dist"), outDir, { recursive: true });
+// 1. The app owns the root. The dev annotate page (C3a, #149) and its
+//    annotate-* entry files stay out: it is served to a phone on the home
+//    network for one session, never published (ux-24).
+const distDir = path.join(webRoot, "dist");
+const devOnly = (source) => {
+  const rel = path.relative(distDir, source).split(path.sep).join("/");
+  return rel === "annotate.html" || /^assets\/annotate-[^/]*$/.test(rel);
+};
+cpSync(distDir, outDir, { recursive: true, filter: (source) => !devOnly(source) });
 
 // 2. Legacy product pages keep their URLs. The old docs landing index.html is
 //    superseded by the app and is not in the list.
