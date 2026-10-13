@@ -210,10 +210,16 @@ export function usePatternState({
   );
   const loaderRef = useRef<PatternSummaryLoader | null>(null);
   loaderRef.current ??= new PatternSummaryLoader({ call: engineCall, onChange: setSummaryView });
+  // The controller outlives renders, so its save reads the toast through a ref.
+  const toastRef = useRef(toast);
+  toastRef.current = toast;
   const pdfRef = useRef<PatternPdfController | null>(null);
   pdfRef.current ??= new PatternPdfController({
     call: engineCall,
-    save: savePatternFile,
+    save: (pdfB64, filename) => {
+      savePatternFile(pdfB64, filename);
+      toastRef.current.push("Saved: your pattern file is ready.", "success");
+    },
     onChange: setPdfView,
   });
 

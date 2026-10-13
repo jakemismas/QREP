@@ -208,6 +208,7 @@ test("See a sample pattern shows the method, the census and no photo, and saves 
   // characters outside a-z and 0-9 becomes one hyphen.
   expect(pdf.name).toBe("double-irish-chain-75x90.pdf");
   expect(pdf.bytes.subarray(0, 5).toString("latin1")).toBe("%PDF-");
+  await expect(page.getByTestId("toast")).toHaveAttribute("data-tone", "success");
   await expect(page.getByTestId("download-pattern")).toHaveAttribute("data-state", "idle");
   await expect(page.getByTestId("pattern-error")).toHaveCount(0);
 });
