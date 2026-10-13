@@ -4,22 +4,25 @@ The JS cannot call Python, so the template reimplements these formulas with
 the same half-up integer arithmetic; these are the tested source of truth,
 and build_view_config feeds the JS the same numbers. All lengths are integer
 eighths.
+
+PRESETS and round_div live in qrep/model/sizing.py (A10) and are re-exported
+here, so this module's callers keep working until A7 deletes the viewer.
 """
 
 from pydantic import BaseModel
 
 from qrep.construct.strategies import infer_block_structure
 from qrep.model.schema import Quilt
+from qrep.model.sizing import PRESETS, round_div
 
-# Standard quilt sizes, finished inches converted to eighths (w, h).
-PRESETS = (
-    ("Crib", 36 * 8, 52 * 8),
-    ("Throw", 50 * 8, 65 * 8),
-    ("Twin", 70 * 8, 90 * 8),
-    ("Full", 84 * 8, 90 * 8),
-    ("Queen", 90 * 8, 108 * 8),
-    ("King", 110 * 8, 108 * 8),
-)
+__all__ = [
+    "PRESETS",
+    "SizingResult",
+    "build_view_config",
+    "locked_resize",
+    "round_div",
+    "unlocked_resize",
+]
 
 
 class SizingResult(BaseModel):
@@ -28,13 +31,6 @@ class SizingResult(BaseModel):
     cell_size: int
     achieved_width: int
     achieved_height: int
-
-
-def round_div(a: int, b: int) -> int:
-    """Half-up integer division for a >= 0, b > 0; JS mirrors this exactly as
-    Math.floor((a + Math.floor(b / 2)) / b). Never use round(): Python rounds
-    half to even and JS Math.round differs at negative halves."""
-    return (a + b // 2) // b
 
 
 def locked_resize(
