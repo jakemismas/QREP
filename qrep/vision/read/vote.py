@@ -40,8 +40,9 @@ class Change:
 
 @dataclass(frozen=True)
 class Break:
-    """A confident square that disagrees with its block majority. It keeps
-    its read and its own confidence, so the break stays visible."""
+    """A square that disagrees with its block majority and keeps its read
+    and its own confidence, so the break stays visible: a confident square,
+    or any square of an attached block (vote())."""
 
     row: int
     col: int
@@ -114,23 +115,32 @@ def _best(agreement: np.ndarray) -> np.ndarray:
 
 def _period(layout: np.ndarray, wild: np.ndarray | None = None) -> int:
     """The smallest p, at most half the rows, with layout[i] == layout[i - p]
-    wherever neither block is wild; the row count when none. A repeat needs
-    two whole copies: a p past half compares only the first rows with the
-    last, so rows X, Y, Y, X would read as a period of 3."""
+    wherever neither block is wild, and with at least one such pair in every
+    column; the row count when none.
+
+    A repeat needs two whole copies: a p past half compares only the first
+    rows with the last, so rows X, Y, Y, X would read as a period of 3. So a
+    layout of one and a half copies, such as a 3 x 3 Double Irish Chain,
+    reports the whole field. A column whose every pair at p holds a wild
+    block holds no evidence of p: where unique blocks alternate with plain
+    ones, every pair at p = 1 does, and p = 1 would rest on no comparison."""
     n = layout.shape[0]
     if wild is None:
         wild = np.zeros(layout.shape, dtype=bool)
     for p in range(1, n // 2 + 1):
         known = ~(wild[p:] | wild[:-p])
-        if np.all((layout[p:] == layout[:-p]) | ~known):
+        if known.any(axis=0).all() and np.all((layout[p:] == layout[:-p]) | ~known):
             return p
     return n
 
 
-def _attach(layout, wild, period, codes, weights, n_labels: int, floor: float) -> np.ndarray:
+def _attach(
+    layout, wild, period, codes, weights, n_labels: int, floor: float
+) -> tuple[np.ndarray, np.ndarray]:
     """The layout with each wild block moved to the type its block period
     predicts when it agrees with that type's majority on at least floor of
-    its squares, renumbered by first appearance.
+    its squares, renumbered by first appearance, and the mask of the blocks
+    it moved.
 
     The predicted type is the most common one among the blocks that are not
     wild a whole number of periods away (ties to the lower id). A block with
@@ -141,6 +151,7 @@ def _attach(layout, wild, period, codes, weights, n_labels: int, floor: float) -
     size = codes.shape[1]
     positions = np.arange(size)
     out = layout.copy()
+    moved = np.zeros(layout.shape, dtype=bool)
     for i, j in zip(*(axis.tolist() for axis in np.nonzero(wild))):
         near = layout[i % down :: down, j % across :: across]
         known = near[~wild[i % down :: down, j % across :: across]]
@@ -157,10 +168,11 @@ def _attach(layout, wild, period, codes, weights, n_labels: int, floor: float) -
         agreement = _agreement(codes[b], weights[b], weights[b].sum(axis=1), pattern[None])
         if agreement[0, 0] >= floor - _EPS:
             out[i, j] = t
+            moved[i, j] = True
     kept, seen = np.unique(out, return_index=True)
     rank = np.empty(int(out.max()) + 1, dtype=np.intp)
     rank[kept[np.argsort(seen)]] = np.arange(len(kept))
-    return rank[out]
+    return rank[out], moved
 
 
 def _block_count(name: str, value) -> int:
@@ -264,10 +276,12 @@ def vote(
     of block_cols. A type votes with at least min_copies blocks, and never
     with a 1 x 1 block. Beside a voting type, the block of a type of one
     copy joins the type its block period predicts when it agrees with it on
-    at least attach_agreement of its squares (_attach). A square of a voting
-    type that differs from its type majority takes it below threshold and is
-    a Break otherwise. Raises
-    ValueError on any other input. Inputs are never mutated.
+    at least attach_agreement of its squares (_attach); such an attached
+    block takes its type for the layout, the repeat and the breaks only. A
+    square of a voting type that differs from its type majority takes it
+    below threshold and is a Break otherwise, and every differing square of
+    an attached block is a Break. Raises ValueError on any other input.
+    Inputs are never mutated.
     """
     lab = np.asarray(labels)
     conf = np.asarray(confidence, dtype=float)
@@ -308,28 +322,42 @@ def vote(
     # for the period that predicts its type; once attached it repeats like
     # its type, while a block that stays its own type is part of the layout.
     copies = np.bincount(types)
+    attached = np.zeros(len(types), dtype=bool)
     if size > 1 and (copies >= min_copies).any() and (copies == 1).any():
         wild = copies[layout] == 1
         period = (_period(layout, wild), _period(layout.T, wild.T))
-        layout = _attach(layout, wild, period, codes, weights, len(classes), attach_agreement)
-        types = layout.ravel()
+        layout, moved = _attach(
+            layout, wild, period, codes, weights, len(classes), attach_agreement
+        )
+        types, attached = layout.ravel(), moved.ravel()
     n_types = int(types.max()) + 1
 
+    # Typing found an attached block too different from its type to be a
+    # copy, so its squares are no evidence of what the type holds or of a
+    # misread: they neither move the majority nor count as a copy, and the
+    # vote never changes them. A block different by design that the layout
+    # attaches keeps its design, and its differences show as breaks.
+    own = ~attached
     weight_sum = np.zeros((len(classes), n_types, size))
     count_sum = np.zeros((len(classes), n_types, size), dtype=np.int64)
-    index = (codes, types[:, None], np.arange(size)[None, :])
-    np.add.at(weight_sum, index, weights)
+    index = (codes[own], types[own][:, None], np.arange(size)[None, :])
+    np.add.at(weight_sum, index, weights[own])
     np.add.at(count_sum, index, 1)
     majority, share = _majority(weight_sum, count_sum)
 
     copies = np.bincount(types, minlength=n_types)
-    voting = copies >= min_copies if size > 1 else np.zeros(n_types, dtype=bool)
+    if size > 1:
+        voting = np.bincount(types[own], minlength=n_types) >= min_copies
+    else:
+        voting = np.zeros(n_types, dtype=bool)
     in_vote = to_field(np.repeat(voting[types][:, None], size, axis=1))
     field_majority = to_field(majority[types])
     field_share = to_field(share[types])
     differs = in_vote & (field_codes != field_majority)
     low = conf < threshold
-    changed, held = differs & low, differs & ~low
+    fixed = to_field(np.repeat(attached[:, None], size, axis=1))
+    changed = differs & low & ~fixed
+    held = differs & ~changed
 
     out_labels = lab.copy()
     out_labels[changed] = classes[field_majority[changed]]

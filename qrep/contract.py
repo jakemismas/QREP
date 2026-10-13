@@ -164,8 +164,10 @@ class VoteChange(_Shape):
 
 
 class RepeatBreak(_Shape):
-    """A confidently read square that differs from its block majority. It
-    keeps its read, so a deliberate variation is never voted away."""
+    """A square that differs from its block majority and keeps its read, so a
+    deliberate variation is never voted away: a confidently read square, or
+    any square of a block the block period placed in a type it differs from
+    too much to be a copy of."""
 
     row: int = Field(ge=0)
     col: int = Field(ge=0)

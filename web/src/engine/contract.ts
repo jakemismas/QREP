@@ -115,7 +115,10 @@ export interface VoteChange {
   confidence: number;
 }
 
-/** A confidently read square that differs from its block majority; it keeps its read. */
+/**
+ * A square that differs from its block majority and keeps its read: a confidently read one, or
+ * any square of a block the block period placed in a type it differs from too much to be a copy of.
+ */
 export interface RepeatBreak {
   row: number;
   col: number;
