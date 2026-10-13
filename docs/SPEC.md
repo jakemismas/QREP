@@ -164,8 +164,9 @@ From the confirmed frame and counts, the engine:
   border band's side strips join the clustering, weighted by their area in squares, so a border
   fabric that never appears in the field still gets its own fabric;
 - suggests the fabric count by silhouette over 2 to 12 when you set none, and refuses the quilt as
-  too_many_fabrics when the silhouette is still rising at 12, so its best count is the cap (a
-  scrappy quilt, section 3), never merging fabrics silently. The bridge's request takes a count
+  too_many_fabrics when the silhouette at 12 comes within a margin of the best (0.044, a
+  provisional knob measured on synthetic grids; D5 measures it on real quilts, #248), so a scrappy
+  quilt (section 3) is never merged silently. The bridge's request takes a count
   from 2 to 12 (section 12.1), and the read itself refuses a larger count as too_many_fabrics. With
   no defined silhouette the palette confidence is 0, never 1;
 - assigns each square and strip to its nearest corrected fabric with confidence (d2 - d1) / d2,
