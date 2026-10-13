@@ -63,7 +63,8 @@ from corpus_fetch import CLASSES_BY_TIER
 from qrep_eval import annotation as an
 
 COLUMNS = (
-    "file", "license", "source", "source_name", "sha256", "file_sha256", "px_w", "px_h",
+    "file", "license", "source", "source_name", "sha256", "file_sha256", "pixels_sha256",
+    "px_w", "px_h",
     "orientation", "capture", "capture_evidence", "device_make", "device_model", "device_class",
     "ownership", "private_tier", "tier", "class", "split", "ingested",
 )
@@ -130,9 +131,12 @@ MAIN_ROOT = "<main checkout>/corpus/private"
 OTHER_ROOT = "<root>"
 OTHER_OUT = "<out>"
 # The checkout folder the report names: the main checkout, or a worktree named for its ticket.
-QREP_SHOWN = re.compile(r"(QREP|[a-z][a-z0-9]{0,7})/qrep/__init__\.py")
+QREP_SHOWN = re.compile(r"(QREP|[a-z0-9][a-z0-9-]{0,7})/qrep/__init__\.py")
 # What a photo Pillow cannot decode, or whose metadata does not parse, raises.
 READ_ERRORS = (OSError, SyntaxError, ValueError, EOFError, struct.error, zlib.error)
+# The most pixels the intake decodes: a 200 MP phone capture (16320 x 12240 = 199,756,800)
+# fits under 250 million.
+PIXEL_LIMIT = 250_000_000
 
 
 class IntakeError(Exception):
@@ -304,7 +308,9 @@ def _primary_exif(meta: Metadata) -> Image.Exif:
 
 
 def _orientation(data: bytes) -> int:
-    return _primary_exif(_metadata(data)).get(ORIENTATION, 1)
+    """The orientation a viewer applies: the EXIF tag when it is one of 1 to 8, else 1."""
+    value = _primary_exif(_metadata(data)).get(ORIENTATION, 1)
+    return value if value in range(1, 9) else 1
 
 
 def _picture(data: bytes) -> tuple[str, tuple[int, int], str]:
@@ -422,7 +428,10 @@ def _allowlisted(source: Image.Exif) -> bytes | None:
     kept = Image.Exif()
     for tag in KEPT_TAGS:
         if tag in source:
-            kept[tag] = source[tag] if tag == ORIENTATION else _tag_text(source[tag])
+            if tag != ORIENTATION:
+                kept[tag] = _tag_text(source[tag])
+            elif source[tag] in range(1, 9):  # a viewer shows any other value upright
+                kept[tag] = source[tag]
     return kept.tobytes() if len(kept) else None
 
 
@@ -638,7 +647,13 @@ def read_manifest(root: Path) -> list[dict[str, str]]:
         reader = csv.DictReader(handle)
         if tuple(reader.fieldnames or ()) != COLUMNS:
             raise IntakeError(f"{path} does not have the private manifest's columns")
-        return list(reader)
+        rows = list(reader)
+    # A row with a cell too many or too few (a hand edit's stray comma) would stop the manifest
+    # write after the photo is stored, so it refuses before anything is written.
+    for number, row in enumerate(rows, start=1):
+        if None in row or None in row.values():
+            raise IntakeError(f"manifest row {number} does not have the manifest's columns")
+    return rows
 
 
 def _write_manifest(root: Path, rows: list[dict[str, str]]) -> None:
@@ -780,12 +795,18 @@ def ingest(photo: Path, intake: Intake, root: Path, *, today: str | None = None,
         _check_pins(regression)
     root = check_root(root)
     photo = Path(photo)
-    data = photo.read_bytes()
+    try:
+        data = photo.read_bytes()
+    except OSError as err:
+        raise IntakeError(f"cannot read the photo: {err}") from err
     fmt = detect_format(data)
     received = hashlib.sha256(data).hexdigest()
+    pillow_limit = Image.MAX_IMAGE_PIXELS
     try:
-        # Pillow only warns between its pixel limit and twice it, and would then decode a
-        # photo far larger than any phone takes twice over; the warning refuses it too.
+        # Pillow's own limit (about 89 MP) refuses a 108 or 200 MP phone capture, so the intake
+        # sets its own; past it, Pillow's warning refuses as its error does, rather than
+        # decoding the photo twice over.
+        Image.MAX_IMAGE_PIXELS = PIXEL_LIMIT
         with warnings.catch_warnings():
             warnings.simplefilter("error", Image.DecompressionBombWarning)
             mode, (width, height), pixels = _picture(data)
@@ -796,9 +817,11 @@ def ingest(photo: Path, intake: Intake, root: Path, *, today: str | None = None,
             same_orientation = _orientation(stored) == _orientation(data)
             traces = location_traces(stored)
     except (Image.DecompressionBombError, Image.DecompressionBombWarning) as err:
-        raise IntakeError(f"the photo has more pixels than Pillow decodes safely: {err}") from err
+        raise IntakeError(f"the photo has more pixels than the intake decodes: {err}") from err
     except READ_ERRORS as err:
         raise IntakeError(f"Pillow cannot read this photo whole: {err}") from err
+    finally:
+        Image.MAX_IMAGE_PIXELS = pillow_limit
     if traces:
         raise IntakeError(f"metadata survived the clean ({'; '.join(traces)}); nothing stored")
     if not same_pixels:
@@ -809,7 +832,10 @@ def ingest(photo: Path, intake: Intake, root: Path, *, today: str | None = None,
     file_sha = hashlib.sha256(stored).hexdigest()
     rows = read_manifest(root)
     for row in rows:
-        if {received, file_sha} & {row["sha256"], row["file_sha256"]}:
+        # The same picture exported twice (with and without its make, say) hashes apart, and
+        # its two received hashes could fall on both sides of the holdout; its pixels do not.
+        if ({received, file_sha} & {row["sha256"], row["file_sha256"]}
+                or pixels == row["pixels_sha256"]):
             raise IntakeError(f"this photo is already ingested as {row['file']}")
 
     evidence = _capture_evidence(intake, exifs, meta.xmp)
@@ -845,6 +871,7 @@ def ingest(photo: Path, intake: Intake, root: Path, *, today: str | None = None,
         "source_name": photo.name,
         "sha256": received,
         "file_sha256": file_sha,
+        "pixels_sha256": pixels,
         "px_w": str(width),
         "px_h": str(height),
         "orientation": str(orientation),
@@ -1004,10 +1031,10 @@ def run_header(root: Path, out: Path) -> ReportHeader:
     if head.returncode or status.returncode:
         raise IntakeError("cannot read the checkout's git state")
     qrep_path = Path(qrep.__file__).resolve()
-    try:
-        shown = qrep_path.relative_to(checkout.parent).as_posix()
-    except ValueError:
-        shown = ""
+    # This checkout's own qrep/, shown under the checkout's folder name, which must fit the
+    # pattern so the report can carry no free text there.
+    shown = f"{checkout.name}/qrep/__init__.py" if qrep_path == checkout / "qrep" / "__init__.py" \
+        else ""
     if not QREP_SHOWN.fullmatch(shown):
         raise IntakeError(f"qrep resolves to {qrep_path}, not this checkout's qrep/")
     main = Path(root).resolve() == default_root().resolve()
@@ -1072,6 +1099,10 @@ def main(argv: list[str] | None = None) -> int:
             print(args.out)
     except IntakeError as err:
         print(f"refused: {err}", file=sys.stderr)
+        return 1
+    except OSError as err:
+        # A file another program holds open, or a report folder that does not exist.
+        print(f"failed: {err}", file=sys.stderr)
         return 1
     return 0
 

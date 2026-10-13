@@ -480,6 +480,8 @@ def test_intake_stores_a_copy_without_location_and_a_complete_manifest_row(tmp_p
         # and file_sha256 a copy's own hash.
         "sha256": received,
         "file_sha256": stored_sha,
+        # Pillow's decode of the source, hashed here: the pixels both files show.
+        "pixels_sha256": sha(decoded(photo.read_bytes())[2]),
         # The stored pixels, 64 x 48, which annotations index whatever the orientation tag
         # says (corpus/README.md, Annotations); the tag, 6, is kept beside them.
         "px_w": "64",
@@ -721,8 +723,10 @@ def test_a_screenshot_marker_after_the_png_image_data_is_read(tmp_path):
         with pytest.raises(pi.IntakeError, match="screenshot"):
             pi.ingest(photo, intake(capture_confirmed=True, device_class="phone"), root)
     assert not root.exists()
+    # One root each: both show plain_png()'s pixels, which one root takes once.
     for photo in (by_exif, by_xmp):
-        row = pi.ingest(photo, intake(capture="direct_screenshot", device_class="phone"), root)
+        row = pi.ingest(photo, intake(capture="direct_screenshot", device_class="phone"),
+                        tmp_path / photo.stem / "private")
         assert (row["private_tier"], row["capture_evidence"]) == ("screenshot", "exif")
 
 
@@ -792,16 +796,21 @@ def test_the_same_pixels_received_twice_are_one_photo(tmp_path):
     pi.ingest(first, intake(), root)
     with pytest.raises(pi.IntakeError, match="already"):
         pi.ingest(second, intake(), root)
+    # Exported again without its make: the stored copy differs too, so only the pixels match.
+    third = write(tmp_path / "c.jpg", jpeg(ex=exif(make="", gps=False), extras=False))
+    assert sha(pi.clean_copy(third.read_bytes())) != pi.read_manifest(root)[0]["file_sha256"]
+    with pytest.raises(pi.IntakeError, match="already"):
+        pi.ingest(third, intake(), root)
     assert len(pi.read_manifest(root)) == 1
 
 
 @needs_git
-def test_a_photo_over_the_decompression_bomb_limit_is_refused(monkeypatch, tmp_path):
+def test_a_photo_over_the_intakes_pixel_limit_is_refused(monkeypatch, tmp_path):
     photo = write(tmp_path / "p.jpg", jpeg(extras=False))
-    # 64 x 48 = 3072 pixels. Pillow warns above MAX_IMAGE_PIXELS and raises above twice it:
-    # a limit of 2000 warns (3072 > 2000, 3072 <= 4000), a limit of 1000 raises (3072 > 2000).
+    # 64 x 48 = 3072 pixels. Pillow warns above its limit and raises above twice it: a limit
+    # of 2000 warns (3072 > 2000, 3072 <= 4000), a limit of 1000 raises (3072 > 2000).
     for limit in (2000, 1000):
-        monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", limit)
+        monkeypatch.setattr(pi, "PIXEL_LIMIT", limit)
         with pytest.raises(pi.IntakeError, match="pixels"):
             pi.ingest(photo, intake(), tmp_path / "private")
     assert not (tmp_path / "private").exists()
@@ -1400,3 +1409,66 @@ def test_default_root_is_the_main_checkouts_private_folder():
     # The folder beside the main checkout's .git, from this checkout or any worktree of it.
     assert root.parts[-2:] == ("corpus", "private")
     assert (root.parent.parent / ".git").is_dir()
+
+
+# ---------------------------------------------------------------------------------------------
+# Regression tests from the correctness review of b2fdda5
+# ---------------------------------------------------------------------------------------------
+
+
+def test_the_intake_pixel_limit_admits_a_200_mp_capture():
+    # 16320 x 12240 = 199,756,800 pixels, under the intake's limit; Pillow's own default of
+    # 89,478,485 would refuse it.
+    assert 16320 * 12240 == 199_756_800 < pi.PIXEL_LIMIT
+    assert 16320 * 12240 > 89_478_485
+
+
+@needs_git
+def test_a_manifest_row_with_a_stray_cell_refuses_before_any_write(tmp_path):
+    root = tmp_path / "private"
+    pi.ingest(write(tmp_path / "a.jpg", jpeg(extras=False)), intake(), root)
+    manifest = root / "manifest.csv"
+    # A hand edit's unquoted comma gives the row one cell too many.
+    lines = manifest.read_text(encoding="utf-8").splitlines()
+    manifest.write_text("\n".join([lines[0], lines[1] + ",stray"]) + "\n", encoding="utf-8")
+    before = files_under(root)
+    with pytest.raises(pi.IntakeError, match="manifest row 1"):
+        pi.ingest(write(tmp_path / "b.jpg", jpeg(size=(40, 40), extras=False)), intake(), root)
+    assert files_under(root) == before
+
+
+@needs_git
+def test_cli_failures_print_a_line_not_a_traceback(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(pi, "default_root", lambda: tmp_path / "private")
+    missing = ["ingest", str(tmp_path / "nope.jpg"), "--source", "s", "--capture", "camera",
+               "--ownership", "o", "--tier", "A", "--class", "squares"]
+    assert pi.main(missing) == 1
+    assert "refused: cannot read the photo" in capsys.readouterr().err
+    assert pi.main(["report", "--out", str(tmp_path / "no" / "such" / "folder.md")]) == 1
+    assert capsys.readouterr().err.startswith("failed: ")
+
+
+def test_an_orientation_outside_1_to_8_is_dropped():
+    # EXIF defines orientations 1 to 8; a viewer shows 0 upright, as 1, so the copy keeps none.
+    stored = pi.clean_copy(jpeg(ex=exif(orientation=0, gps=False), extras=False))
+    with Image.open(io.BytesIO(stored)) as im:
+        assert dict(im.getexif()) == {MAKE: "FakePhoneCo", MODEL: "iPhone 99"}
+    assert pi._orientation(stored) == 1
+
+
+def test_more_traces_each_name_their_block():
+    text_png = png_with(before=[chunk(b"tEXt", b"Comment\x00Testhamlet")])
+    assert "PNG text chunks" in pi.location_traces(text_png)
+    data = plain_jpeg()
+    xmp = jpeg_with_segment(data, segment(0xE1, b"http://ns.adobe.com/xap/1.0/\x00<x/>"))
+    assert "an APP1 segment other than one EXIF block" in pi.location_traces(xmp)
+    commented = jpeg_with_segment(data, segment(0xFE, b"Testhamlet"))
+    assert "comment metadata" in pi.location_traces(commented)
+    # 16 MiB and one byte of zeros inflates past the 16 MiB limit for a text chunk.
+    with pytest.raises(pi.IntakeError, match="16 MiB"):
+        pi._inflate(zlib.compress(bytes((1 << 24) + 1)))
+
+
+def test_tally_refuses_a_row_without_a_sha256():
+    with pytest.raises(pi.IntakeError, match="no sha256"):
+        pi.tally([manifest_row(sha256="x")])
