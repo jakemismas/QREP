@@ -62,9 +62,9 @@ class TruthView:
         with the tier; conflict when a verified class contradicts the tier, which
         counts toward no gate; else provisional. A refusal photo is scored on its
         verified out-of-scope call alone (an out_of_scope class or a refusal class).
-        Any other photo needs a verified in-scope class, verified frame and counts,
-        and a fabric count, when there is one, from the square-truth codes, since a
-        proposed count would grade k."""
+        Any other photo needs a verified in-scope class and verified frame and counts.
+        The fabric count plays no part: plan 8.2 verifies frame, bands, counts and
+        class, never the count, and fabrics_for keeps a proposed count off gate rows."""
         p = self.provenance
         verified = self.construction if p.get("construction_class") in an.FRAME_TRUTH else None
         out_of_scope = verified == "out_of_scope" or p.get("refusal_class") in an.FRAME_TRUTH
@@ -76,8 +76,18 @@ class TruthView:
         if out_of_scope:
             return "conflict"
         framed = in_scope and all(p.get(name) in an.FRAME_TRUTH for name in ("frame", "counts"))
-        fabrics_ok = "fabrics" not in p or p["fabrics"] in an.TRUTH
-        return "gate" if framed and fabrics_ok else "provisional"
+        return "gate" if framed else "provisional"
+
+    def fabrics_for(self, label: str) -> int | None:
+        """The fabric count the simulated user gives and k is scored against, for a row
+        labeled label: a square-truth claim (an.TRUTH); a proposal only on a row that is
+        not gate, which rests on proposals anyway; else none, as a user who skips the
+        count, so a gate row is never graded on a proposed k."""
+        if self.fabric_count is None:
+            return None
+        if self.provenance.get("fabrics") in an.TRUTH or label != "gate":
+            return self.fabric_count
+        return None
 
     @property
     def label(self) -> str:

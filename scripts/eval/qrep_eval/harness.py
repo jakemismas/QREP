@@ -107,9 +107,10 @@ def _truth_dims(truth: corpus.TruthView) -> tuple[int, int] | None:
     return c.blocks_down * c.squares_per_block_down, c.blocks_across * c.squares_per_block_across
 
 
-def given_fabrics(truth: corpus.TruthView) -> int | None:
-    """The fabric count a simulated user gives: the truth's, when the read accepts it."""
-    count = truth.fabric_count
+def given_fabrics(truth: corpus.TruthView, label: str) -> int | None:
+    """The fabric count a simulated user gives (TruthView.fabrics_for), when the read
+    accepts it."""
+    count = truth.fabrics_for(label)
     return count if count is not None and FABRICS_MIN <= count <= FABRICS_MAX else None
 
 
@@ -143,12 +144,13 @@ def score(unit: Unit, reading: readers.Reading) -> dict:
         out["harmonic"] = shown and _harmonic((reading.rows, reading.cols), true_dims)
         counts = unit.truth.counts
         out["periodic"] = counts.blocks_across * counts.blocks_down > 1
-    if unit.truth.fabric_count is not None:
-        out["k_truth"] = unit.truth.fabric_count
+    k_truth = unit.truth.fabrics_for(unit.truth_label)
+    if k_truth is not None:
+        out["k_truth"] = k_truth
         # A given count forces k (qrep/vision/palette.py extract_palette), so only a
         # read that chose k on its own is scored on it.
         if _received_fabrics(reading) is None:
-            out["k_exact"] = shown and reading.k == unit.truth.fabric_count
+            out["k_exact"] = shown and reading.k == k_truth
     if reading.cells is not None and _confidence_missing(reading):
         out["confidence_missing"] = True
     if unit.truth_cells is not None:
@@ -207,12 +209,32 @@ def _confirmed_request(unit: Unit, token: str, size: tuple[int, int], corners) -
                 n: Point(x=0.0, y=0.0) for n in ("top_left", "top_right", "bottom_right", "bottom_left")}),
                 bands=[BorderBand(width_squares=w) for w in unit.truth.bands]),
             crop_offset=Point(x=0.0, y=0.0), counts=unit.truth.counts,
-            fabric_count=given_fabrics(unit.truth))
+            fabric_count=given_fabrics(unit.truth, unit.truth_label))
     names = ("top_left", "top_right", "bottom_right", "bottom_left")
     frame = request.frame.model_copy(update={"corners": Corners(**{
         n: Point(x=x, y=y) for n, (x, y) in zip(names, corners)})})
     # The same count auto-corners receives, whichever claim to_read_request preferred.
-    return request.model_copy(update={"frame": frame, "fabric_count": given_fabrics(unit.truth)})
+    return request.model_copy(update={"frame": frame,
+                                      "fabric_count": given_fabrics(unit.truth, unit.truth_label)})
+
+
+def _stage_error_rows(unit: Unit, error: Exception) -> list[dict]:
+    """Each reader's true-corner row (no corners for auto, 0 px for the others), so the
+    tier and jitter tables count the failure where the read would have been, and for the
+    confirmed reader one row per miscount variant, so G3's n keeps them."""
+    rows = []
+    framed = unit.truth.corners is not None and unit.truth.counts is not None
+    for name in unit.readers:
+        base = {**_base_row(unit), "reader": name, "radius_px": None if name == "auto" else 0,
+                "variant": "true"}
+        rows.append({**base, "outcome": "error", "error": repr(error)})
+        if name == "confirmed" and framed:
+            variants, skipped = simulate.miscount_variants(unit.truth.counts)
+            rows.extend({**base, "variant": kind, "outcome": "error", "error": repr(error)}
+                        for kind, _ in variants)
+            rows.extend({**base, "variant": kind, "outcome": "skipped", "reason": reason}
+                        for kind, reason in skipped)
+    return rows
 
 
 def run_unit(unit: Unit) -> list[dict]:
@@ -223,16 +245,12 @@ def run_unit(unit: Unit) -> list[dict]:
         try:
             path, size = stage(unit, Path(tmp))
         except Exception as error:  # noqa: BLE001 - recorded on the row, never swallowed
-            # Each reader's true-corner row (no corners for auto, 0 px for the others), so the
-            # tier and jitter tables count the failure where the read would have been.
-            return json.loads(json.dumps([
-                {**_base_row(unit), "reader": r, "radius_px": None if r == "auto" else 0,
-                 "variant": "true", "outcome": "error", "error": repr(error)} for r in unit.readers]))
+            return json.loads(json.dumps(_stage_error_rows(unit, error)))
         corners = (scale_corners(unit.truth.corners, unit.canvas, size)
                    if unit.truth.corners is not None else None)
         pitch = (simulate.square_pitch(corners, unit.truth.counts, unit.truth.bands)
                  if corners is not None and unit.truth.counts is not None else None)
-        fabrics = given_fabrics(unit.truth)
+        fabrics = given_fabrics(unit.truth, unit.truth_label)
         for name in unit.readers:
             jobs: list[tuple[dict, object]] = []
             if name == "auto":
@@ -249,6 +267,8 @@ def run_unit(unit: Unit) -> list[dict]:
                             "radius_squares": simulate.radius_in_squares(trial.radius_px, pitch)
                             if pitch else None, "variant": "true",
                             "moved_px_mean": sum(trial.moved_px) / len(trial.moved_px)}
+                    # The realized displacement, short of the radius where a clamp stopped it.
+                    meta["moved_squares"] = meta["moved_px_mean"] / pitch if pitch else None
                     if name == "auto-corners":
                         jobs.append((meta, lambda c=trial.corners: readers.read_auto(path, size, c, fabrics)))
                     else:

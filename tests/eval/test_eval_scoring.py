@@ -180,6 +180,24 @@ def test_mismatched_dimensions_score_every_square_wrong_and_confident():
     assert score.dims_match is False
 
 
+def test_a_mismatched_read_that_flags_every_square_is_not_confident():
+    # The same 3 x 2 read against the 3 x 3 truth: 9 truth squares wrong either way.
+    read = [[0, 1], [1, 0], [0, 1]]
+    # Every one of the read's 6 squares at confidence 0.5, below 0.9: all flagged, so
+    # nothing it shows is confident: 0 confident-wrong.
+    low = scoring.score_squares(TRUTH, read, [0, 1], [[0.5, 0.5]] * 3, low_confidence_below=0.9)
+    assert (low.wrong, low.confident_wrong) == (9, 0)
+    # One read square at 0.95, not below 0.9: not every square is flagged, so all 9
+    # truth squares count confident-wrong.
+    one = [[0.5, 0.5], [0.5, 0.95], [0.5, 0.5]]
+    assert scoring.score_squares(TRUTH, read, [0, 1], one, low_confidence_below=0.9).confident_wrong == 9
+    # A flagged region rows 0..3, cols 0..2 (half-open) covers all 6 read squares: 0. One
+    # ending at column 1 leaves column 1 unflagged: 9.
+    ones = [[1.0, 1.0]] * 3
+    assert scoring.score_squares(TRUTH, read, [0, 1], ones, flagged_regions=[(0, 0, 3, 2)]).confident_wrong == 0
+    assert scoring.score_squares(TRUTH, read, [0, 1], ones, flagged_regions=[(0, 0, 3, 1)]).confident_wrong == 9
+
+
 def test_srgb_to_lab_by_hand():
     # CIE 1976 L*a*b* from sRGB (IEC 61966-2-1) with the D65 white of the sRGB matrix.
     # Black: linear 0 -> Y/Yn = 0 -> f = 4/29 (the linear branch) -> L* = 116 * 4/29 - 16
@@ -444,7 +462,8 @@ def _unit(*, counts=None, cells=TRUTH, fabrics=2, bands=()) -> harness.Unit:
                               squares_per_block_down=3)
     truth = corpus.TruthView(corners=[(0.0, 0.0), (30.0, 0.0), (30.0, 30.0), (0.0, 30.0)], bands=list(bands),
                              counts=counts, fabric_count=fabrics, construction="squares",
-                             provenance={"frame": "verified-jake"})
+                             # A hand-authored count is square truth, so a gate row scores k on it.
+                             provenance={"frame": "verified-jake", "fabrics": "hand-authored"})
     return harness.Unit(photo="p", group="corpus", tier="A", split="dev", license="CC0-1.0",
                         device_class="museum scan", resolution="full", cap=None, condition="clean",
                         source="unused.png", canvas=(40, 40), truth=truth, truth_label="gate",
@@ -704,6 +723,51 @@ def test_score_periodic_needs_more_than_one_block():
 def test_given_fabrics_keeps_the_reads_range():
     # The read accepts 2 to 12 fabrics (qrep/contract.py FABRICS_MIN, FABRICS_MAX).
     def view(count):
-        return corpus.TruthView(corners=None, bands=[], counts=None, fabric_count=count, construction=None)
+        return corpus.TruthView(corners=None, bands=[], counts=None, fabric_count=count, construction=None,
+                                provenance={"fabrics": "hand-authored"})
 
-    assert [harness.given_fabrics(view(n)) for n in (None, 1, 2, 12, 13)] == [None, None, 2, 12, None]
+    assert [harness.given_fabrics(view(n), "gate") for n in (None, 1, 2, 12, 13)] == [None, None, 2, 12, None]
+
+
+def test_stress_rows_key_on_reader_condition_device_and_resolution():
+    def stress(photo, outcome, device, resolution):
+        return {**_row(photo, outcome, reader="auto", radius=None, device=device), "group": "stress",
+                "condition": "glare", "resolution": resolution}
+
+    rows = [stress("t1", "read", "museum scan", "full"), stress("t1", "held", "museum scan", "phone-1400"),
+            stress("t2", "refused", "screenshot", "full")]
+    agg = report.aggregate(rows, runner=_no_git)
+    assert set(agg["stress"]) == {"auto | glare | museum scan | full", "auto | glare | museum scan | phone-1400",
+                                  "auto | glare | screenshot | full"}
+    # Each group holds one photo: t1 at full read (0 of 1 blocked), t1 at phone-1400 held
+    # (1 of 1), t2 refused (1 of 1).
+    got = {key: (s["false_warning"]["k"], s["false_warning"]["n"]) for key, s in agg["stress"].items()}
+    assert got == {"auto | glare | museum scan | full": (0, 1), "auto | glare | museum scan | phone-1400": (1, 1),
+                   "auto | glare | screenshot | full": (1, 1)}
+    text = report.markdown({"header": {"title": "t"}, "aggregate": agg})
+    assert "| auto | glare | museum scan | phone-1400 | 1 |" in text
+
+
+def test_the_g4_note_appears_only_beside_skipped_refusal_photos():
+    # Refusal photos all scored (none skipped): the G4 cell is the rate alone.
+    agg = report.aggregate([_row("r1", "refused", tier="R")], runner=_no_git)
+    text = report.markdown({"header": {"title": "t"}, "aggregate": agg}).splitlines()
+    line = next(r for r in text if r.startswith("| auto-corners | museum scan | full | gate |"))
+    assert "#243" not in line.split("|")[7]
+    # One more refusal photo skipped: the note joins the cell.
+    agg = report.aggregate([_row("r1", "refused", tier="R"), _row("r2", "skipped", tier="R")], runner=_no_git)
+    text = report.markdown({"header": {"title": "t"}, "aggregate": agg}).splitlines()
+    line = next(r for r in text if r.startswith("| auto-corners | museum scan | full | gate |"))
+    assert line.split("|")[7].strip().endswith(", 1 skipped; no frame or counts on the v0 refusal photos (#243)")
+
+
+def test_jitter_reports_the_realized_move_beside_the_radius():
+    # Two 4 px trials at pitch 20 px: nominal 4 / 20 = 0.2 squares each. One moved the full
+    # 4 px (0.2 squares), one was clamped to 2 px (2 / 20 = 0.1): mean (0.2 + 0.1) / 2 = 0.15.
+    rows = [_row("j1", "read", radius=4, trial=0, radius_squares=0.2, moved_squares=0.2),
+            _row("j1", "read", radius=4, trial=1, radius_squares=0.2, moved_squares=0.1)]
+    four = report.aggregate(rows, runner=_no_git)["jitter"]["auto-corners | full | 4"]
+    assert four["mean_radius_squares"] == pytest.approx(0.2)
+    assert four["mean_moved_squares"] == pytest.approx(0.15)
+    text = report.markdown({"header": {"title": "t"}, "aggregate": report.aggregate(rows, runner=_no_git)})
+    assert "| auto-corners | full | 4 | 0.200 | 0.150 | 2 |" in text

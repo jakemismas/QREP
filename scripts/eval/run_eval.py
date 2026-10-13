@@ -31,7 +31,6 @@ from qrep_eval import corpus, degrade, harness, readers, report, simulate  # noq
 READERS = ("auto", "auto-corners", "confirmed")
 PHOTOREAL = ("busy_print_squares", "low_contrast_hst")
 PHOTOREAL_CAPS = (1400, 2000)
-STRESS_RESOLUTION = "desktop-2000"
 DEFAULT_SEED = "d4a"
 # What the header says when git cannot answer, as under Pyodide.
 GIT_UNAVAILABLE = "unknown (git unavailable)"
@@ -143,16 +142,15 @@ def _corpus_units(args, photos, readers_, radii, workdir_root=None) -> list[harn
             readers=readers_, trials=args.trials, seed=args.seed, annotation=photo.annotation,
             extra={"proposals_agree": _proposals_agree(photo.annotation)}, workdir_root=workdir_root,
         )
+        stressed = (not args.no_degradations and photo.tier == "A" and photo.row["license"] == "CC0-1.0"
+                    and truth.corners is not None)
         for resolution in args.resolutions.split(","):
-            units.append(harness.Unit(group="corpus", resolution=resolution,
-                                      cap=corpus.RESOLUTIONS[resolution], condition="clean",
+            cap = corpus.RESOLUTIONS[resolution]
+            units.append(harness.Unit(group="corpus", resolution=resolution, cap=cap, condition="clean",
                                       radii=radii, **common))
-        if (not args.no_degradations and photo.tier == "A" and photo.row["license"] == "CC0-1.0"
-                and truth.corners is not None):
-            for d in degrade.DEGRADATIONS:
-                units.append(harness.Unit(group="stress", resolution=STRESS_RESOLUTION,
-                                          cap=corpus.RESOLUTIONS[STRESS_RESOLUTION], condition=d.name,
-                                          radii=(0,), **common))
+            if stressed:
+                units += [harness.Unit(group="stress", resolution=resolution, cap=cap, condition=d.name,
+                                       radii=(0,), **common) for d in degrade.DEGRADATIONS]
     return units
 
 
@@ -264,14 +262,16 @@ def main(argv=None, *, runner=subprocess.run) -> int:
         "readers": ", ".join(readers_),
         "simulation": (f"corners from the annotation's outer edge (gate truth, else proposed-a, else "
                        f"proposed-b), jitter radii {list(radii)} px, {args.trials} draws per nonzero "
-                       f"radius, seed {args.seed!r}; auto-corners receives those corners and the fabric "
-                       f"count when 2 to 12; the automatic read takes no counts, so the true counts reach "
+                       f"radius, seed {args.seed!r}; auto-corners receives those corners and a fabric count "
+                       f"when 2 to 12 (a square-truth claim, or the proposal on a row that is not gate; a "
+                       f"gate row with only a proposed count gives none); the automatic read takes no counts, so the true counts reach "
                        f"only the confirmed reader, with the same corners and fabric count; picker answer "
                        f"{simulate.PICKER_ANSWER!r} for every photo"),
         "resolutions": args.resolutions,
         "degradations": "none" if args.no_degradations else "; ".join(
             f"{d.name} {d.params}" for d in degrade.DEGRADATIONS) + (
-            f", applied at {STRESS_RESOLUTION} to museum tier A photos licensed CC0-1.0"),
+            ", applied at every requested resolution, at true corners, to museum tier A photos "
+            "licensed CC0-1.0"),
         "truth": (f"{sum(r['truth'] == 'gate' for r in rows)} gate rows, "
                   f"{sum(r['truth'] == 'provisional' for r in rows)} provisional rows, "
                   f"{sum(r['truth'] == 'conflict' for r in rows)} conflict rows, "

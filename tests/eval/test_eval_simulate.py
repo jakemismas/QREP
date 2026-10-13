@@ -6,6 +6,7 @@ stated parameters, never copied from a run.
 """
 
 import csv
+import dataclasses
 import hashlib
 import json
 import math
@@ -225,16 +226,38 @@ def test_only_gate_truth_makes_a_gate_row():
     assert bare.corners is None and bare.counts is None
 
 
-def test_a_proposed_fabric_count_keeps_a_photo_provisional():
-    # Plan 5.D: verified frame, counts and class, but the fabric count only proposed-a:
-    # a proposal would grade k, so the row is provisional.
+def test_a_proposed_fabric_count_never_grades_a_gate_row():
+    # Plan 8.2 verifies frame, bands, counts and class, never the fabric count, so the count
+    # plays no part in the label. Verified frame, counts and class with only a proposed-a
+    # count: gate, and the count is withheld (a user who skips it), so no k is graded.
     view = corpus.truth_view(_annotation("verified-jake", fabrics=[("proposed-a", 3)]))
     assert view.provenance["fabrics"] == "proposed-a"
-    assert view.label_for("A") == "provisional" and view.label == "provisional"
-    # A hand-authored count is square truth (an.TRUTH), and it wins over the proposal.
+    assert view.label_for("A") == "gate" and view.label == "gate"
+    assert view.fabrics_for("gate") is None and harness.given_fabrics(view, "gate") is None
+    # The same truth on a provisional row gives the proposal to the reader: 3.
+    assert harness.given_fabrics(view, "provisional") == 3
+    # A hand-authored count is square truth (an.TRUTH): it wins over the proposal, and the
+    # gate row gives and scores it: 4.
     view = corpus.truth_view(_annotation("verified-jake", fabrics=[("proposed-a", 3), ("hand-authored", 4)]))
     assert (view.fabric_count, view.provenance["fabrics"]) == (4, "hand-authored")
-    assert view.label_for("A") == "gate"
+    assert view.label_for("A") == "gate" and view.fabrics_for("gate") == 4
+    # A provisional row rests on proposals anyway, so it gives the proposed 3.
+    view = corpus.truth_view(_annotation("proposed-a", fabrics=[("proposed-a", 3)]))
+    assert view.label_for("A") == "provisional" and view.fabrics_for("provisional") == 3
+
+
+def test_a_gate_row_without_a_true_count_records_no_k(tmp_path):
+    # Score side of the same rule: a gate unit whose only count is proposed records
+    # neither k_truth nor k_exact; a provisional one records both.
+    view = corpus.truth_view(_annotation("verified-jake", fabrics=[("proposed-a", 2)]))
+    reading = _fake_reading(received={"fabrics": None})
+    unit = _plain_unit(tmp_path / "unused.png", canvas=(400, 300), corners=view.corners, counts=view.counts,
+                       readers_=("auto",))
+    gate = harness.score(dataclasses.replace(unit, truth=view, truth_label="gate"), reading)
+    assert "k_truth" not in gate and "k_exact" not in gate
+    prov = harness.score(dataclasses.replace(unit, truth=view, truth_label="provisional"), reading)
+    # The fake read has 2 colors and the proposal says 2: exact.
+    assert (prov["k_truth"], prov["k_exact"]) == (2, True)
 
 
 def test_a_refusal_photo_is_gated_on_its_class():
@@ -568,12 +591,12 @@ def test_the_confirmed_request_gets_the_count_auto_corners_gets():
                             readers=("confirmed",), radii=(0,), trials=1, seed="t", annotation=annotation)
 
     request = harness._confirmed_request(unit(truth, annotation), "x.png", (400, 300), truth.corners)
-    assert request.fabric_count == 4 == harness.given_fabrics(truth)
+    assert request.fabric_count == 4 == harness.given_fabrics(truth, "gate")
     # 13 is outside the read's 2 to 12, so neither reader receives a count.
     annotation = _annotation("verified-jake", fabrics=[("hand-authored", 13)])
     truth = corpus.truth_view(annotation)
     request = harness._confirmed_request(unit(truth, annotation), "x.png", (400, 300), truth.corners)
-    assert request.fabric_count is None and harness.given_fabrics(truth) is None
+    assert request.fabric_count is None and harness.given_fabrics(truth, "gate") is None
 
 
 def test_the_start_sha_check_stops_the_run_before_any_read(monkeypatch, tmp_path):
@@ -928,7 +951,8 @@ def _fake_reading(*, rows=6, cols=6, received=None):
 
 
 def _plain_unit(source, *, canvas, corners, counts, readers_, cap=None, radii=(0,), condition="clean"):
-    truth = corpus.TruthView(corners=corners, bands=[], counts=counts, fabric_count=2, construction="squares")
+    truth = corpus.TruthView(corners=corners, bands=[], counts=counts, fabric_count=2, construction="squares",
+                             provenance={"fabrics": "hand-authored"})
     return harness.Unit(photo="q", group="corpus", tier="A", split="dev", license="CC0-1.0",
                         device_class="museum scan", resolution="full" if cap is None else f"cap-{cap}",
                         cap=cap, condition=condition, source=str(source), canvas=canvas, truth=truth,
@@ -962,16 +986,26 @@ def test_miscounts_no_count_can_express_are_skipped_rows(monkeypatch, tmp_path):
 
 def test_a_stage_error_is_each_readers_true_corner_row(tmp_path):
     # No such source: cv2 cannot decode it, so every reader gets an error row where its
-    # true-corner read would be (no corners for auto, 0 px for the others).
+    # true-corner read would be (no corners for auto, 0 px for the others), and the
+    # confirmed reader one per miscount variant. Counts 1 block of 4 x 4: square +1 and
+    # -1 on each axis (4), block +1 on each axis (2), half (4 / 2 = 2 each way) and
+    # double: 8 variants, error rows; block -1 on each axis leaves 0 blocks: 2 skipped.
     unit = _plain_unit(tmp_path / "missing.png", canvas=(100, 100),
                        corners=[(10.0, 10.0), (90.0, 10.0), (90.0, 90.0), (10.0, 90.0)],
                        counts=Counts(blocks_across=1, blocks_down=1, squares_per_block_across=4,
                                      squares_per_block_down=4),
                        readers_=("auto", "auto-corners", "confirmed"))
     rows = harness.run_unit(unit)
-    assert [(r["reader"], r["radius_px"], r["variant"], r["outcome"]) for r in rows] == [
+    assert [(r["reader"], r["radius_px"], r["variant"], r["outcome"]) for r in rows[:3]] == [
         ("auto", None, "true", "error"), ("auto-corners", 0, "true", "error"), ("confirmed", 0, "true", "error")]
+    variants = {r["variant"]: r["outcome"] for r in rows[3:]}
+    assert all(r["reader"] == "confirmed" and r["radius_px"] == 0 for r in rows[3:])
+    assert variants == {**{f"square {s} {axis}": "error" for s in ("+1", "-1") for axis in ("across", "down")},
+                        "block +1 across": "error", "block +1 down": "error", "half": "error", "double": "error",
+                        "block -1 across": "skipped", "block -1 down": "skipped"}
     agg = report.aggregate(rows, runner=_no_git)
+    # 8 error and 2 skipped miscount rows: 10 miscount trials.
+    assert agg["miscount_trials"] == 10
     assert agg["by_tier"]["auto | A | full"]["errors"] == 1
     assert agg["jitter"]["auto-corners | full | 0"]["false_warning"]["errors"] == 1
 
@@ -1022,6 +1056,9 @@ def test_corner_reads_get_the_staged_corners_and_pitch(monkeypatch, tmp_path):
     rows = harness.run_unit(unit)
     assert calls[0] == ((160, 160), [(20.0, 20.0), (140.0, 20.0), (140.0, 140.0), (20.0, 140.0)], 2)
     assert {r["radius_px"]: r["radius_squares"] for r in rows} == {0: 0.0, 4: pytest.approx(0.2)}
+    # The staged corners lie 20 px from every edge, more than 4, so each moves the full
+    # 4 px: realized 4 / 20 = 0.2 squares, and 0 at radius 0.
+    assert {r["radius_px"]: r["moved_squares"] for r in rows} == {0: 0.0, 4: pytest.approx(0.2)}
 
 
 def _capture_units(monkeypatch, argv, runner=_outside_git):
@@ -1049,15 +1086,18 @@ def test_private_staging_goes_beside_the_cache(monkeypatch, tmp_path):
     assert {u.workdir_root for u in units} == {None}
 
 
-def test_stress_units_need_a_cc0_tier_a_photo_and_run_at_desktop_2000(monkeypatch, tmp_path):
+def test_stress_units_need_a_cc0_tier_a_photo_and_run_at_each_resolution(monkeypatch, tmp_path):
     root, cache = _write_corpus(tmp_path / "cc0")
     units = _capture_units(monkeypatch, _corpus_argv(root, cache, tmp_path, "--no-photoreal",
-                                                     "--resolutions", "full"))
+                                                     "--resolutions", "full,phone-1400"))
     stress = [u for u in units if u.group == "stress"]
-    # a-dev is CC0-1.0 tier A with corners: one unit per degradation (6), at desktop-2000
-    # (cap 2000), true corners only. r-dev is tier R: none.
-    assert [u.condition for u in stress] == [d.name for d in degrade.DEGRADATIONS]
-    assert {(u.photo, u.resolution, u.cap, u.radii) for u in stress} == {("a-dev", "desktop-2000", 2000, (0,))}
+    # a-dev is CC0-1.0 tier A with corners: one unit per degradation (6) at each of the 2
+    # requested resolutions (caps None and 1400), true corners only: 12. r-dev is tier R:
+    # none.
+    names = [d.name for d in degrade.DEGRADATIONS]
+    assert [(u.resolution, u.condition) for u in stress] == [("full", n) for n in names] + [
+        ("phone-1400", n) for n in names]
+    assert {(u.photo, u.cap, u.radii) for u in stress} == {("a-dev", None, (0,)), ("a-dev", 1400, (0,))}
     # The same photo licensed PDM-1.0 gets no stress unit, nor as a tier B photo (still
     # CC0-1.0, still framed), nor with --no-degradations.
     root, cache = _write_corpus(tmp_path / "pdm", overrides={"a-dev": {"license": "PDM-1.0"}})
@@ -1135,3 +1175,48 @@ def test_proposals_agree_compares_the_two_proposals_field_by_field():
         "counts": False, "construction_class": False}
     # One proposal alone has nothing to agree with.
     assert run_eval._proposals_agree(_proposals(4, 4, both=False)) == {}
+
+
+def test_run_unit_stages_under_its_workdir_root(monkeypatch, tmp_path):
+    # A capped image must be written: the PNG lands in a qrep-eval-* folder under
+    # workdir_root, never in the shared temp.
+    source = tmp_path / "q.png"
+    assert cv2.imwrite(str(source), np.full((320, 320, 3), 200, dtype=np.uint8))
+    root = tmp_path / "staging-root"
+    root.mkdir()
+    written = []
+    imwrite = cv2.imwrite
+
+    def spy(path, image, *args):
+        written.append(Path(path))
+        return imwrite(path, image, *args)
+
+    monkeypatch.setattr(harness.cv2, "imwrite", spy)
+    monkeypatch.setattr(readers, "read_auto", lambda path, size, corners=None, fabrics=None: _fake_reading())
+    unit = dataclasses.replace(_plain_unit(source, canvas=(320, 320), cap=160, counts=None, corners=None,
+                                           readers_=("auto",)), workdir_root=str(root))
+    harness.run_unit(unit)
+    assert len(written) == 1
+    assert written[0].parent.parent == root and written[0].parent.name.startswith("qrep-eval-")
+    assert written[0].name == "q-cap-160-clean.png"
+
+
+def test_the_realized_move_is_the_clamped_displacement_over_the_pitch(monkeypatch, tmp_path):
+    # Corners on the edges of a 160 x 160 photo: (0, 0), (120, 0), (120, 120), (0, 120).
+    # Edges 120 px over 6 squares: pitch 120 / 6 = 20 px. Each corner touches at least one
+    # edge, so a 4 px move pointing off the photo is clamped short; over 10 seeded trials
+    # at least one is (each draw stays whole for corner (0, 0) with chance 1/4 only).
+    # Every row's realized move in squares is its mean moved px over 20.
+    source = tmp_path / "q.png"
+    assert cv2.imwrite(str(source), np.full((160, 160, 3), 200, dtype=np.uint8))
+    monkeypatch.setattr(readers, "read_auto", lambda path, size, corners=None, fabrics=None: _fake_reading())
+    counts = Counts(blocks_across=1, blocks_down=1, squares_per_block_across=6, squares_per_block_down=6)
+    unit = dataclasses.replace(
+        _plain_unit(source, canvas=(160, 160), radii=(4,), counts=counts,
+                    corners=[(0.0, 0.0), (120.0, 0.0), (120.0, 120.0), (0.0, 120.0)], readers_=("auto-corners",)),
+        trials=10)
+    rows = harness.run_unit(unit)
+    assert len(rows) == 10
+    assert all(r["moved_squares"] == pytest.approx(r["moved_px_mean"] / 20.0) for r in rows)
+    assert all(r["radius_squares"] == pytest.approx(4 / 20) for r in rows)
+    assert any(r["moved_px_mean"] < 4.0 - 1e-9 for r in rows)

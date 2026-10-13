@@ -127,22 +127,27 @@ def score_squares(
     (G2) unless its confidence is below low_confidence_below (None: no square is
     flagged by confidence) or it lies in a flagged region, given as (row0, col0,
     row1, col1), half-open. A read whose grid differs from the truth's locates no
-    truth square, so every square counts wrong and confident-wrong.
+    truth square, so every square counts wrong; they count confident-wrong unless the
+    read flagged every one of its own squares, since then nothing it shows is
+    confident.
     """
+    def flagged(r: int, c: int) -> bool:
+        low = low_confidence_below is not None and confidence[r][c] < low_confidence_below
+        return low or any(r0 <= r < r1 and c0 <= c < c1 for r0, c0, r1, c1 in flagged_regions)
+
     squares = sum(len(row) for row in truth)
     dims_match = len(read) == len(truth) and all(len(a) == len(b) for a, b in zip(read, truth))
     if not dims_match:
-        return SquareScore(squares, 0, squares, squares, False)
+        cells = [(r, c) for r, row in enumerate(read) for c in range(len(row))]
+        all_flagged = bool(cells) and all(flagged(r, c) for r, c in cells)
+        return SquareScore(squares, 0, squares, 0 if all_flagged else squares, False)
     correct = confident_wrong = 0
     for r, (truth_row, read_row) in enumerate(zip(truth, read)):
         for c, (role, fabric) in enumerate(zip(truth_row, read_row)):
             mapped = mapping[fabric] if 0 <= fabric < len(mapping) else None
             if mapped == role:
                 correct += 1
-                continue
-            low = low_confidence_below is not None and confidence[r][c] < low_confidence_below
-            in_region = any(r0 <= r < r1 and c0 <= c < c1 for r0, c0, r1, c1 in flagged_regions)
-            if not (low or in_region):
+            elif not flagged(r, c):
                 confident_wrong += 1
     return SquareScore(squares, correct, squares - correct, confident_wrong, True)
 

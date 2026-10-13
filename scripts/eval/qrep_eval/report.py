@@ -95,11 +95,17 @@ def _summary(rows) -> dict:
     return out
 
 
+def _mean(rows, key):
+    values = [r[key] for r in _scored(rows) if r.get(key) is not None]
+    return sum(values) / len(values) if values else None
+
+
 def _jitter(rows) -> dict:
-    radii = [r["radius_squares"] for r in _scored(rows) if r.get("radius_squares") is not None]
     return {
         "n_rows": len(rows),
-        "mean_radius_squares": sum(radii) / len(radii) if radii else None,
+        "mean_radius_squares": _mean(rows, "radius_squares"),
+        # Clamping at the photo's edge leaves the realized move short of the radius.
+        "mean_moved_squares": _mean(rows, "moved_squares"),
         "false_warning": _trial_count(rows),
         "count_top1": _trial_count(rows, "dims_exact"),
     }
@@ -180,7 +186,8 @@ def aggregate(rows: list[dict], *, runner=subprocess.run) -> dict:
     jitter = {" | ".join(map(str, k)): _jitter(g) for k, g in _group(
         [r for r in tier_a if r.get("radius_px") is not None], "reader", "resolution", "radius_px").items()}
     stress = {" | ".join(map(str, k)): _summary(g) for k, g in _group(
-        _at_true_corners([r for r in true_rows if r["group"] == "stress"]), "reader", "condition").items()}
+        _at_true_corners([r for r in true_rows if r["group"] == "stress"]),
+        "reader", "condition", "device_class", "resolution").items()}
     auto_a = [r for r in photo_rows if r["tier"] == "A" and r["reader"] == "auto"]
     seconds = [r["seconds"] for r in _scored(true_rows) if "seconds" in r]
     r1 = {}
@@ -274,7 +281,7 @@ def markdown(report: dict) -> str:
         g2 = e["G2"]
         truth = e["truth"] + (f" ({e['conflict_rows']} conflict rows)" if e.get("conflict_rows") else "")
         g4 = "n/a" if e["G4"] is None else _fmt(e["G4"]) + (
-            f"; {G4_CORNERS}" if e["reader"] != "auto" else "")
+            f"; {G4_CORNERS}" if e["G4"].get("skipped") else "")
         g1 = "n/a" if e["G1"] is None else _fmt(e["G1"])
         g2_text = "n/a" if g2 is None else f"{g2['photos']} photos: {_fmt(g2, 'squares', 4)}"
         lines.append(f"| {e['reader']} | {e['device_class']} | {e['resolution']} | {truth} "
@@ -282,8 +289,9 @@ def markdown(report: dict) -> str:
     lines += ["", "- G5 for auto counts its read with no corners, since the automatic read takes none; "
               "auto-corners and confirmed count their 0 px trials. The " + POOLED + " rows pool G5 over "
               "every device class.",
-              "- G4 for auto-corners and confirmed: these readers take a frame and counts, and the v0 "
-              "annotations give the refusal photos neither, so those photos are skipped, not scored (#243).",
+              "- A G4 cell with skipped refusal photos: auto-corners and confirmed take a frame and counts, "
+              "and the v0 annotations give the refusal photos neither, so those photos are skipped, not "
+              "scored (#243).",
               "- G2 counts squares, which cluster by photo; its interval treats them as independent, so "
               "it is too narrow. The photo count says how many gold photos stand behind it."]
     lines += [f"- {k}: {v}" for k, v in a["pending"].items()]
@@ -316,19 +324,20 @@ def markdown(report: dict) -> str:
     lines += ["", "## Corner jitter (museum tier A)", "",
               "Trials of one photo are not independent, so these rows give k/n trials and the photo "
               "count, with no interval and no 3/n bound.", "",
-              "| Reader | Resolution | Radius px | Mean radius in squares | Rows | False warning "
-              "| Count top-1 |", "|---|---|---|---|---|---|---|"]
+              "| Reader | Resolution | Radius px | Mean radius in squares | Mean moved in squares | Rows "
+              "| False warning | Count top-1 |", "|---|---|---|---|---|---|---|---|"]
     for key, s in a["jitter"].items():
         reader, resolution, radius = key.split(" | ")
-        mean = s.get("mean_radius_squares")
+        mean, moved = s.get("mean_radius_squares"), s.get("mean_moved_squares")
         lines.append(f"| {reader} | {resolution} | {radius} | {'n/a' if mean is None else f'{mean:.3f}'} "
-                     f"| {s['n_rows']} | {_fmt_trials(s['false_warning'])} | {_fmt_trials(s['count_top1'])} |")
+                     f"| {'n/a' if moved is None else f'{moved:.3f}'} | {s['n_rows']} "
+                     f"| {_fmt_trials(s['false_warning'])} | {_fmt_trials(s['count_top1'])} |")
     lines += ["", "## Stress: degradations", "", "Parameters: " + h.get("degradations", "none") + ".", "",
-              "| Reader | Degradation | Photos | Outcomes | False warning | Count top-1 | Verdicts |",
-              "|---|---|---|---|---|---|---|"]
+              "| Reader | Degradation | Device class | Resolution | Photos | Outcomes | False warning "
+              "| Count top-1 | Verdicts |", "|---|---|---|---|---|---|---|---|---|"]
     for key, s in a["stress"].items():
-        reader, condition = key.split(" | ")
-        lines.append(f"| {reader} | {condition} | {s['n_photos']} | {_outcomes(s)} "
+        reader, condition, device, resolution = key.split(" | ")
+        lines.append(f"| {reader} | {condition} | {device} | {resolution} | {s['n_photos']} | {_outcomes(s)} "
                      f"| {_fmt(s['false_warning'])} | {_fmt(s['count_top1'])} | {_verdicts(s)} |")
     lines += ["", "## Named rows: photoreal fixtures (#82)", "",
               "auto-corners reads each fixture with its sidecar corners and fabric count, auto with "
