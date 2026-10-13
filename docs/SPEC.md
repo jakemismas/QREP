@@ -88,12 +88,29 @@ Your pattern. Plan section 2.1 holds the screen-level rules and copy.
   camera. Try an example opens a committed CC0 or public-domain museum quilt on Confirm, with its
   verified corners, counts and bands pre-filled; the examples replace the synthetic sample photo
   (C9). See a sample pattern opens the hand-authored demo quilt on Your pattern without a read
-  (plan section 5.C, decision 2).
+  (plan section 5.C, decision 2). The file is decoded when it is picked or dropped, with its EXIF
+  orientation applied. A file the browser cannot decode (a text file, a truncated JPEG or PNG) shows
+  a plain error on this screen and never opens Confirm. The picker accepts JPG and PNG, the formats
+  its copy names; Jake's phone pass checks a HEIC photo from the iPhone picker (plan section 9,
+  item 8). Capture tips sit beside the picker: the whole quilt flat and square-on with a margin, even light without glare,
+  and for a screenshot, the quilt zoomed to fill the screen first.
 - **Scope picker.** Right after the photo, QREP-drawn diagrams show quilts QREP works with and
   quilts it does not work with yet (section 3). A Not yet pick ends at the refusal screen, so an
   out-of-scope quilt is turned away before the user confirms anything. The pick travels with the
   read as its scope.
-- **Confirm.** One screen with a live grid overlay for the frame and the counts (section 4).
+- **Confirm.** One screen with a live grid overlay for the frame and the counts (section 4). The
+  pins start at a neutral inset, 15 percent in from each side, never on a detected quad, and the
+  counts start at one block of one square per axis; every new photo starts there. The photo takes
+  the available height, and Continue sits in a bar that stays visible without scrolling at
+  1440 x 900 and 390 x 844. Continue stays disabled until the photo is decoded and the pins make a
+  box. On Continue, QREP cuts one crop from the decoded photo at full resolution: the frame's
+  bounding box plus at least one square of margin, clamped to the photo, then capped at 2000 px on
+  its longest side at every window width. The read gets the crop, the corners in the crop's pixels
+  and the crop's offset in the photo, so the same photo and pins give the same crop on a phone and
+  a desktop (#101). A new photo, Back or Cancel clears the staged photo first, and each read is
+  bound to its photo, so a result for an earlier photo is dropped. Until C3c switches to the
+  confirmed read, Continue sends the corners to the existing read, the counts ride along unused,
+  and the size block stays on this screen.
 - **Reading.** One progress line while the engine reads fabrics and units and checks the grid fit
   (sections 4 and 5). A failed fit returns to Confirm with the pins and counts kept, and too few
   pixels per square returns there with advice for a closer photo (sections 3 and 5).
