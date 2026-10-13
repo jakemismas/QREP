@@ -833,7 +833,11 @@ def _read_model(geometry, squares, fabrics, voted, knobs) -> tuple[Quilt, ReadDe
         )
     ]
     borders = []
-    for band in geometry.bands:
+    # The request and the geometry list the bands from the outside in (band 0
+    # the outermost, as the details' strips keep them), but the model lists
+    # them from the center out: the renderer paints the last one outermost
+    # and the cutting and assembly attach the first one to the center.
+    for band in reversed(geometry.bands):
         # A band takes the fabric its sides read as, weighted by each side's
         # label confidence; a tie goes to the lower fabric.
         votes: dict[int, float] = {}
@@ -885,8 +889,9 @@ def _read_model(geometry, squares, fabrics, voted, knobs) -> tuple[Quilt, ReadDe
         ),
         borders=borders,
         # The read cannot see the binding, so it binds in the outermost border
-        # fabric, or the first fabric when there is no border.
-        binding=Binding(fabric_id=borders[0].fabric_id if borders else ids[0]),
+        # fabric, the model's last band, or the first fabric when there is no
+        # border.
+        binding=Binding(fabric_id=borders[-1].fabric_id if borders else ids[0]),
         provenance=Provenance(
             source="cv",
             # Your corners, counts and border bands are user facts at 1.0

@@ -1206,6 +1206,68 @@ def test_read_confirmed_keeps_a_band_in_whole_eighths(tmp_path):
     assert basis["rounding_step"] == 2
 
 
+def test_read_confirmed_lists_the_model_bands_from_the_center_out(tmp_path):
+    # Source: review of 48d2505 (round 3 addendum): the request and the
+    #   geometry list the bands from the outside in (SPEC.md section 12.1,
+    #   qrep/vision/read/geometry.py Band), but the model lists them from the
+    #   center out: qrep/render/renderer.py and qrep/export/svg.py paint
+    #   reversed(borders), and qrep/construct/strategies.py border_pieces and
+    #   qrep/construct/cutting.py border_bands attach borders[0] to the
+    #   center. The read binds in the outermost band. One band cannot show
+    #   the order, so two bands of unequal widths and fabrics do.
+    # Inputs: a 120 x 120 px image, the outer edge at the image edge; a field
+    #   of 2 x 2 squares of 15 px inside an outer band of 1 square (15 px, red,
+    #   BGR (0, 0, 255)) and an inner band of 2 squares (30 px, blue, BGR
+    #   (255, 0, 0)), (2 + 2 x (1 + 2)) x 15 = 120 px; the field a
+    #   checkerboard of gray 64 (r + c even) and gray 192, as in the wide band
+    #   test above; bands sent outside in as [1, 2]; four fabrics requested.
+    # Formula: L* = 116 Y^(1/3) - 16, Y = 0.212671 R + 0.715160 G + 0.072169 B
+    #   over linear channels; fabrics sort darkest first.
+    # Arithmetic: gray 64 is linear 0.0513, L* = 116 x 0.3715 - 16 = 27.1.
+    #   Blue: Y = 0.0722, L* = 116 x 0.4163 - 16 = 32.3. Red: Y = 0.2127,
+    #   L* = 116 x 0.5969 - 16 = 53.2. Gray 192 is linear 0.5271, L* = 116 x
+    #   0.8078 - 16 = 77.7. So f0 gray 64, f1 blue, f2 red, f3 gray 192.
+    #   Square size 15 px x 8 / 10 px per inch = 12 eighths, a whole 2-eighth
+    #   step. Outer band 1 x 12 = 12 eighths, inner band 2 x 12 = 24. Size:
+    #   2 x 12 + 2 x (24 + 12) = 96 each way.
+    # Expected: the model's bands inner first, blue 24 then red 12; binding
+    #   red f2; achieved 96 by 96; the details' strips keep the request's
+    #   index, band 0 (outer) red f2 and band 1 (inner) blue f1.
+    import cv2
+    import numpy as np
+
+    image = np.full((120, 120, 3), (0, 0, 255), dtype=np.uint8)
+    image[15:105, 15:105] = (255, 0, 0)
+    for r in range(2):
+        for c in range(2):
+            level = 64 if (r + c) % 2 == 0 else 192
+            image[45 + 15 * r : 60 + 15 * r, 45 + 15 * c : 60 + 15 * c] = level
+    path = tmp_path / "two_bands.png"
+    cv2.imwrite(str(path), image)
+    counts = {
+        "blocks_across": 1,
+        "blocks_down": 1,
+        "squares_per_block_across": 2,
+        "squares_per_block_down": 2,
+    }
+    request = _image_request(
+        path, (120, 120), counts, frame_kind="outer_edge", bands=[1, 2], fabric_count=4
+    )
+    result = ok_result(bridge.read_confirmed(request))
+    assert result["outcome"] == "read"
+    model = result["model"]
+    assert model["center"]["cell_size"] == 12
+    assert model["borders"] == [
+        {"fabric_id": "f1", "width": 24},
+        {"fabric_id": "f2", "width": 12},
+    ]
+    assert model["binding"]["fabric_id"] == "f2"
+    basis = model["size_basis"]
+    assert (basis["achieved_width"], basis["achieved_height"]) == (96, 96)
+    strips = {(s["band"], s["fabric_id"]) for s in result["details"]["strips"]}
+    assert strips == {(0, "f2"), (1, "f1")}
+
+
 def test_read_confirmed_reads_a_non_ascii_path(l0_render, tmp_path):
     # Windows: cv2.imread cannot open a path outside the ANSI code page, so a
     # photo staged under a name with an e-acute must still read. The bytes are
