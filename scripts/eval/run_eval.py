@@ -3,7 +3,8 @@
     python scripts/eval/run_eval.py --cache <main checkout>/corpus/private/cache --out <stem>
 
 Runs the v0 dev split with the auto and auto-corners readers by default and
-writes <stem>.json and <stem>.md; --holdout runs the holdout instead and writes
+writes <stem>.json and <stem>.md; --decode chromium or webkit reads the browser's
+decoded PNGs from <cache>/decoded/ (scripts/eval/decode/run_decode.py writes them); --holdout runs the holdout instead and writes
 <stem>-holdout.json and .md. Only rows under a license corpus-guard admits run
 unless --private, which writes its reports and staged copies only where git
 ignores them. Report only: it freezes nothing.
@@ -26,7 +27,7 @@ if str(EVAL) not in sys.path:
 
 from qrep.contract import Counts  # noqa: E402
 from qrep_eval import annotation as an  # noqa: E402
-from qrep_eval import corpus, degrade, harness, readers, report, simulate  # noqa: E402
+from qrep_eval import corpus, decode, degrade, harness, readers, report, simulate  # noqa: E402
 
 READERS = ("auto", "auto-corners", "confirmed")
 PHOTOREAL = ("busy_print_squares", "low_contrast_hst")
@@ -65,6 +66,8 @@ def _parse(argv):
     p.add_argument("--no-photoreal", action="store_true")
     p.add_argument("--start-sha", help="refuse to run unless qrep/vision/ outside read/ equals this SHA's")
     p.add_argument("--workers", type=int, default=1, help="processes for the reads")
+    p.add_argument("--decode", choices=("native", *decode.BROWSERS), default="native",
+                   help="read the browser's decoded PNGs instead of decoding natively (plan D4b)")
     p.add_argument("--private", action="store_true",
                    help="admit rows under other licenses; reports and staged copies must be git-ignored")
     return p.parse_args(argv)
@@ -261,8 +264,15 @@ def main(argv=None, *, runner=subprocess.run) -> int:
     units = _corpus_units(args, photos, readers_, radii, str(workdir_root) if workdir_root else None)
     if not args.no_photoreal and split == "dev":
         units += _photoreal_units(args, readers_)
+    decode_path, decode_errors = harness.DECODE_PATH, []
+    if args.decode != "native":
+        try:
+            units, decode_errors, versions = decode.browser_units(units, cache / "decoded", args.decode)
+        except (decode.DecodeMissing, ValueError) as error:
+            raise SystemExit(f"run_eval: {error}") from error
+        decode_path = decode.describe(args.decode, versions)
     try:
-        rows = _run(units, args.workers)
+        rows = _run(units, args.workers) + decode_errors
     except readers.ReaderUnavailable as error:
         print(f"run_eval: {error}", file=sys.stderr)
         raise SystemExit(2) from error
@@ -287,7 +297,7 @@ def main(argv=None, *, runner=subprocess.run) -> int:
             GIT_UNAVAILABLE if status is None
             else "; ".join(line.strip() for line in status.splitlines()) or "clean"),
         "cv2_version": cv2.__version__,
-        "decode_path": harness.DECODE_PATH,
+        "decode_path": decode_path,
         "split": split,
         "inputs": (f"{_repo_relative(manifest, 'a manifest outside the repo')}, eval_set v0 (sha256 "
                    f"{corpus.sha256_of(manifest)}), {len(photos)} photos in the {split} split by tier "
