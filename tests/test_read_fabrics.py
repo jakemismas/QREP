@@ -604,8 +604,8 @@ def test_a_value_ramp_reads_no_worse_at_the_cap_than_at_6(seed, monkeypatch):
     #   2.0 within the rounds, the two reads are the same.
     # Arithmetic: no hand bound on either read exists, since the light's
     #   path is the fit's; the expected relation is the one the rulings
-    #   measured. Disclosed (#248 comment 6149362474 and #137 comment
-    #   6149611481), squares right of 2464 at 2.0 / 6 / uncorrected:
+    #   measured. Disclosed (#248 comments 6149362474 and 6149712445),
+    #   squares right of 2464 at 2.0 / 6 / uncorrected:
     #   seeds 0 to 7: 2345 / 2345 / 2345, 2364 / 1833 / 2364, 2370 / 2016 /
     #   2370, 2384 / 1975 / 2384, 2357 / 1897 / 2357, 2371 / 1871 / 2371,
     #   2360 / 2138 / 2360, 2371 / 1541 / 2371. Seeds whose light passes

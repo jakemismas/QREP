@@ -135,13 +135,13 @@ KNOBS: dict[str, Knob] = {
     ),
     "SHADING_ROUNDS": Knob(
         SHADING_ROUNDS,
-        "synthetic grids only (PR #251 round 3, #248 comment 6149362474), kept by the "
-        "ruling in #137 comment 6149649689: the cap catches a runaway light only once it "
-        "passes it, which on 6 gray bands (L* 25 + 12i, noise 3) comes in rounds 4 to 10 on "
-        "seeds 0 to 7 (9 rounds leave seed 6 at 0.888 of squares right and 8 rounds seeds "
-        "1, 2, 4 and 6 at 0.874 to 0.900, against 0.952 to 0.968 at 10), but only in rounds "
-        "11 to 31 on seeds 10, 11, 12, 34, 42 and 45, which read 0.875 to 0.938 at 10 "
-        "rounds; a count fitted to those seeds is not ruled (#261)",
+        "synthetic grids only (PR #251 round 3, #248 comments 6149362474 and 6149712445), "
+        "kept by the ruling in #137 comment 6149649689: the cap catches a runaway light "
+        "only once it passes it, which on 6 gray bands (L* 25 + 12i, noise 3) comes in "
+        "rounds 4 to 10 on seeds 0 to 7 (9 rounds leave seed 6 at 0.888 of squares right "
+        "and 8 rounds seeds 1, 2, 4 and 6 at 0.874 to 0.900, against 0.952 to 0.968 at 10), "
+        "but only in rounds 11 to 31 on seeds 10, 11, 12, 34, 42 and 45, which read 0.875 "
+        "to 0.938 at 10 rounds; a count fitted to those seeds is not ruled (#261)",
     ),
     "LIGHT_CONFIDENCE_POWER": Knob(
         LIGHT_CONFIDENCE_POWER,
