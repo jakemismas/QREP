@@ -95,8 +95,10 @@ test.describe("photo-flow components in the editor at 1440 x 900", { tag: "@phon
     await expect(panel).toHaveCSS("display", "flex");
 
     // The strategy cards and the yardage table above the panel fill in from
-    // bridge calls (each card shows "…" per amount until its plan arrives)
-    // and move the panel as they do, so measure only once they all have.
+    // bridge calls and move the panel as they do, so measure only once they
+    // all have. Source: PatternPanel.tsx, each card's Metric values read "…"
+    // while plans[k] is unset, and the yardage rows render only once the
+    // selected plan's yardage and the summary arrive.
     for (const strategy of ["historical", "strip", "modern"]) {
       const card = page.getByTestId(`strategy-card-${strategy}`);
       await expect(card).toBeVisible();
@@ -115,33 +117,38 @@ test.describe("photo-flow components in the editor at 1440 x 900", { tag: "@phon
     // right edge. Every descendant stays inside the panel, the panel's
     // content is no wider than the panel, and the panel ends inside 1440 px.
     // One evaluate finds and measures the panel in a single task, so no
-    // re-render can swap it out mid-measure, and a missing panel fails at
-    // once instead of leaving a locator waiting out the test timeout (#232).
-    const fit = await page.evaluate(() => {
-      const root = document.querySelector('[data-testid="roundtrip-panel"]');
-      if (!root) throw new Error("the round-trip panel was gone when measured");
-      const box = root.getBoundingClientRect();
-      // Sub-pixel spill from layout rounding is not overflow (as in
-      // helpers/layout.ts).
-      const tolerance = 0.5;
-      const spill = Array.from(root.querySelectorAll("*"))
-        .map((el) => ({ el, r: el.getBoundingClientRect() }))
-        .filter(({ r }) => r.width > 0 && (r.left < box.left - tolerance || r.right > box.right + tolerance))
-        .map(({ el, r }) => `${el.tagName.toLowerCase()}.${el.getAttribute("class") ?? ""} spans ${r.left.toFixed(1)} to ${r.right.toFixed(1)}`);
-      return { spill, scrollWidth: root.scrollWidth, clientWidth: root.clientWidth, right: box.right };
-    });
-    expect(fit.spill, "round-trip panel content past its edges").toEqual([]);
-    expect(fit.scrollWidth).toBeLessThanOrEqual(fit.clientWidth);
-    expect(fit.right).toBeLessThanOrEqual(1440);
-
-    // The record comes last. A full-page capture can report a 1 x 1 window
-    // for a moment, which swaps in the phone editor and back and reopens the
-    // desktop editor on its Fabrics tab (#232), so nothing reads the page
-    // after it.
-    await page.screenshot({
-      path: path.join(layoutDir, "editor-pattern-roundtrip-1440.png"),
-      fullPage: true,
-      animations: "disabled",
-    });
+    // re-render can swap it out mid-measure, and a missing or doubled panel
+    // fails at once (as the locator's strict mode did) instead of leaving a
+    // locator waiting out the test timeout (#232).
+    try {
+      const fit = await page.evaluate(() => {
+        const found = document.querySelectorAll('[data-testid="roundtrip-panel"]');
+        if (found.length !== 1) throw new Error(`expected one round-trip panel to measure, found ${found.length}`);
+        const root = found[0];
+        const box = root.getBoundingClientRect();
+        // Sub-pixel spill from layout rounding is not overflow (as in
+        // helpers/layout.ts).
+        const tolerance = 0.5;
+        const spill = Array.from(root.querySelectorAll("*"))
+          .map((el) => ({ el, r: el.getBoundingClientRect() }))
+          .filter(({ r }) => r.width > 0 && (r.left < box.left - tolerance || r.right > box.right + tolerance))
+          .map(({ el, r }) => `${el.tagName.toLowerCase()}.${el.getAttribute("class") ?? ""} spans ${r.left.toFixed(1)} to ${r.right.toFixed(1)}`);
+        return { spill, scrollWidth: root.scrollWidth, clientWidth: root.clientWidth, right: box.right };
+      });
+      expect(fit.spill, "round-trip panel content past its edges").toEqual([]);
+      expect(fit.scrollWidth).toBeLessThanOrEqual(fit.clientWidth);
+      expect(fit.right).toBeLessThanOrEqual(1440);
+    } finally {
+      // The record comes after the measurement, and on a failure too, when a
+      // reviewer needs it most. A full-page capture can report a 1 x 1 window
+      // for a moment, which swaps in the phone editor and back and reopens
+      // the desktop editor on its Fabrics tab (#232), so nothing reads the
+      // page after it.
+      await page.screenshot({
+        path: path.join(layoutDir, "editor-pattern-roundtrip-1440.png"),
+        fullPage: true,
+        animations: "disabled",
+      });
+    }
   });
 });
