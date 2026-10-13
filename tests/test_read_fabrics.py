@@ -403,15 +403,15 @@ def test_an_empty_fabric_leaves_the_silhouette_undefined_and_the_margins_clean()
     assert np.all(result.confidence == 1.0)
 
 
-def falloff_grid(stripes=False):
+def falloff_grid(stripes=False, drop=0.3):
     """Two grays, a* = b* = 0, on a 16 x 16 checkerboard (dark where r + c is
     even), or in column stripes (dark where c is even), lit by a falloff that
-    scales luminance by 1 - 0.02c: 1.0 at column 0 down to 0.7 at column
-    15."""
+    scales luminance by 1 - drop x c / 15: 1.0 at column 0 down to 1 - drop
+    at column 15 (1 - 0.02c for the default 30 percent)."""
     rows = cols = 16
     r, c = np.divmod(np.arange(rows * cols), cols)
     truth = c % 2 if stripes else (r + c) % 2
-    luminance = np.where(truth == 0, 0.24, 0.30) * (1 - 0.02 * c)
+    luminance = np.where(truth == 0, 0.24, 0.30) * (1 - drop * c / 15)
     lab = np.zeros((rows * cols, 3))
     lab[:, 0] = 116 * np.cbrt(luminance) - 16
     return lab.reshape(rows, cols, 3), truth.reshape(rows, cols)
@@ -472,6 +472,34 @@ def test_the_shading_correction_reads_stripes_along_the_falloff():
     assert np.array_equal(corrected.labels, truth)
 
 
+@pytest.mark.parametrize("stripes", [False, True], ids=["checkerboard", "stripes"])
+def test_the_shading_correction_reads_a_65_percent_falloff(stripes):
+    # Source: PR #251 round 2: a cap of 2.0 on the light dropped the whole
+    #   correction from about a one-stop falloff on, and these grids read
+    #   0.56 to 0.65 of squares right.
+    # Inputs: falloff_grid(stripes, drop 0.65): the same two grays, the
+    #   luminance scaled by f = 1 - 0.65c / 15, down to 0.35 at column 15.
+    # Formula: L* = 116 Y^(1/3) - 16, Y > 0.008856 throughout (Y >= 0.084).
+    # Arithmetic: 0.084^(1/3) = 0.437952, 0.105^(1/3) = 0.471769.
+    #   dark  column 0: 56.088 (as above); column 15 (Y 0.084): 116 x
+    #     0.437952 - 16 = 34.802
+    #   light column 0: 61.654; column 15 (Y 0.105): 116 x 0.471769 - 16 =
+    #     38.725
+    #   The ranges [34.802, 56.088] and [38.725, 61.654] overlap, so one L*
+    #   threshold misreads a square. Under the light the fabrics stay 116
+    #   (0.669433 - 0.621447) f^(1/3) >= 5.566 x 0.35^(1/3) = 5.566 x 0.704730
+    #   = 3.92 apart in L* in every column. The light varies 1 / 0.35 =
+    #   2.857 in luminance across the field, under knobs.LIGHT_MAX_RATIO
+    #   6.0, so the read keeps the correction.
+    # Expected: with shading_rounds = 0 at least one square is misread; with
+    #   the default correction every square reads its fabric.
+    lab, truth = falloff_grid(stripes=stripes, drop=0.65)
+    plain = read_fabrics(squares_of(lab), 2, shading_rounds=0)
+    assert np.any(plain.labels != truth)
+    corrected = read_fabrics(squares_of(lab), 2)
+    assert np.array_equal(corrected.labels, truth)
+
+
 def bands_of_rising_lightness(sigma, seed):
     """Four grays, L* 25, 45, 65 and 85 with a* = b* = 0, in 14-row bands of a
     56 x 44 grid under flat light, plus Gaussian noise of sd sigma on every
@@ -493,7 +521,7 @@ def share_right(labels, truth):
     return float(np.mean(np.array([named[v] for v in labels]) == truth))
 
 
-@pytest.mark.parametrize(("sigma", "least"), [(3, 0.99), (4, 0.98)])
+@pytest.mark.parametrize(("sigma", "least"), [(3, 0.9967), (4, 0.98)])
 @pytest.mark.parametrize("seed", [0, 1, 2])
 def test_the_shading_correction_keeps_bands_of_rising_lightness(sigma, least, seed):
     # Source: PR #251 round 1 (critical): a surface per fabric, fitted only
@@ -510,11 +538,31 @@ def test_the_shading_correction_keeps_bands_of_rising_lightness(sigma, least, se
     #   0.00932, so an exact flat read gets 1 - 0.00932 = 0.9907 right, with
     #   sd sqrt(2464 x 0.00932) = 4.8 squares; 0.98 leaves 49 misreads, 5
     #   sd past the 23 expected. sigma 3: P(N > 3.333) = 0.000429, on average
-    #   0.000644, so 0.99936 right; 0.99 leaves 24 misreads against 1.6.
-    # Expected: at least 0.98 (sigma 4) and 0.99 (sigma 3) of squares right.
+    #   0.000644, so 0.99936 right, 1.59 misreads expected with sd
+    #   sqrt(2464 x 0.000644) = 1.26; 5 sd past it is 1.59 + 6.30 = 7.9
+    #   misreads, 1 - 7.9 / 2464 = 0.99679, so 0.9967 (8.1 misreads).
+    # Expected: at least 0.98 (sigma 4) and 0.9967 (sigma 3) of squares
+    #   right.
     lab, positions, truth = bands_of_rising_lightness(sigma, seed)
     result = cluster(lab, np.ones(len(lab)), positions, 4)
     assert share_right(result.labels, truth) >= least
+
+
+def test_a_light_that_runs_away_keeps_the_flat_read():
+    # Source: knobs.LIGHT_MAX_RATIO, the band grid it still catches at 6.0
+    #   (PR #251 round 2; #137 comment 6148562029): with no cap this grid's
+    #   light runs past 8 in 10 rounds and the read keeps 0.56 of squares.
+    # Inputs: bands_of_rising_lightness(5, 0), k = 4, shading_rounds 10, the
+    #   rounds over which the light passes the cap.
+    # Formula: as the band test above; past the cap the read is k-means'.
+    # Arithmetic: sigma 5: P(N > 10 / 5 = 2) = 0.02275; on average (2 x 2 x
+    #   0.02275 + 2 x 0.02275) / 4 = 0.03413 misread, so a flat read gets
+    #   0.9659 right, 84.1 misreads expected with sd sqrt(2464 x 0.03413 x
+    #   0.9659) = 9.0; 0.95 leaves 123 misreads, 4.3 sd past them.
+    # Expected: at least 0.95 of squares right.
+    lab, positions, truth = bands_of_rising_lightness(5, 0)
+    result = cluster(lab, np.ones(len(lab)), positions, 4, shading_rounds=10)
+    assert share_right(result.labels, truth) >= 0.95
 
 
 def test_a_light_past_the_cap_keeps_the_plain_read(monkeypatch):

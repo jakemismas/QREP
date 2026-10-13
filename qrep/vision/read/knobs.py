@@ -49,7 +49,7 @@ SHADING_ROUNDS = 10
 LIGHT_CONFIDENCE_POWER = 2
 # The most the fitted light may vary across the field, brightest over dimmest
 # luminance; past it the read keeps no shading correction.
-LIGHT_MAX_RATIO = 2.0
+LIGHT_MAX_RATIO = 6.0
 # Lloyd iterations per k-means run, and deterministic seedings per count.
 KMEANS_ITERATIONS = 100
 KMEANS_SEEDINGS = 4
@@ -132,9 +132,13 @@ KNOBS: dict[str, Knob] = {
     ),
     "LIGHT_MAX_RATIO": Knob(
         LIGHT_MAX_RATIO,
-        "synthetic grids only (PR #251 round 1): a 40 percent falloff fits at 1.66, 4 bands at "
-        "noise 3 and 4 settle under 1.3, and bands at noise 5 drift past 2 within 4 rounds "
-        "and on to 8 and 18",
+        "synthetic grids only (PR #251 round 2, #137 comment 6148562029): value-only falloffs "
+        "of 50 to 85 percent fit at 1.97 to 5.34 and read 0.95 to 1.00 of squares right at "
+        "noise 0.5 and 1.0, where 2.0 dropped them to 0.55 to 0.65; on 4 bands of rising "
+        "lightness the light runs away past 6 at noise 6 and at noise 5 seed 0 (only in round "
+        "10, on to 8.35), and the cap keeps the flat read; it misses noise 5 seed 3, which "
+        "settles between 2 and 3 and reads 0.827 against 0.970 at 2.0. Past the cap, a fitted "
+        "light of about 2.6 stops, the correction still drops whole",
     ),
     "KMEANS_ITERATIONS": Knob(KMEANS_ITERATIONS, "not measured: a compute bound"),
     "KMEANS_SEEDINGS": Knob(KMEANS_SEEDINGS, "not measured: a compute bound"),
