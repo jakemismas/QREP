@@ -2,8 +2,8 @@
 
 Measures five ways to suggest the square counts of a confirmed field on the v0 dev split:
 
-- autocorr: the existing detector's autocorrelation period (qrep/vision/grid.py _find_pitch on
-  the gray Sobel projection, as estimate_grid builds it), count = extent / pitch.
+- autocorr: the existing detector's autocorrelation period (a copy of qrep/vision/grid.py
+  _find_pitch on the gray Sobel projection, as estimate_grid builds it), count = extent / pitch.
 - seam: a seam-energy scorer, the mean edge energy on the N - 1 seams a count N implies. It is
   reconstructed from the public description of exp9 (plan section 1.2); the prototype's own
   code is not in the repo.
@@ -40,15 +40,13 @@ from typing import NamedTuple
 import cv2
 import numpy as np
 
-from qrep.vision import grid as qgrid
-from qrep.vision import repeats as qrepeats
-
 REPO = Path(__file__).resolve().parents[3]
 CORPUS = REPO / "corpus"
 
 # --- Knobs, each with its source ----------------------------------------------------------
-# The detector envelope: a pitch under 5 px is unresolvable (qrep/vision/grid.py MIN_PITCH_PX).
-MIN_PITCH_PX = qgrid.MIN_PITCH_PX
+# The detector envelope: a pitch under 5 px is unresolvable (qrep/vision/grid.py MIN_PITCH_PX
+# at 8480443, copied because B6b deletes grid.py).
+MIN_PITCH_PX = 5
 # estimate_grid searches pitches up to extent // 4, so at least 4 squares per axis; one or two
 # seam samples make the scores of 2 and 3 noise, and no tier A quilt has fewer than 11.
 MIN_COUNT = 4
@@ -91,6 +89,132 @@ KMEANS_K = 3
 BAR = 0.8
 TOP_K = 3
 PROVENANCES = ("verified-jake", "proposed-a", "proposed-b")
+
+
+# --- Copies from modules B6b deletes ------------------------------------------------------
+# B6b deletes qrep/vision/grid.py and qrep/vision/repeats.py (plan B6b), so the spike and its
+# tests carry the few helpers its methods call, copied from commit 8480443 with their logic
+# unchanged. The check that the copies are faithful is a rerun: the trials are seeded, so the
+# rerun must reproduce the recorded run's JSON group for group.
+
+
+def _autocorrelate(profile: np.ndarray) -> np.ndarray:
+    """qrep/vision/grid.py _autocorrelate at 8480443."""
+    centered = profile - profile.mean()
+    corr = np.correlate(centered, centered, mode="full")[len(centered) - 1 :]
+    if corr[0] <= 0:
+        return np.zeros_like(corr)
+    return corr / corr[0]
+
+
+def _binarize(profile: np.ndarray) -> np.ndarray:
+    """qrep/vision/grid.py _binarize at 8480443: an equal-weight spike train of edge locations,
+    so the fundamental pitch peaks as strongly as its multiples."""
+    threshold = profile.mean() + profile.std()
+    spikes = np.zeros_like(profile)
+    for i in range(1, len(profile) - 1):
+        if profile[i] > threshold and profile[i] >= profile[i - 1] and profile[i] >= profile[i + 1]:
+            spikes[i] = 1.0
+    # Dilate by one pixel to absorb random half-pixel edge jitter.
+    return np.minimum(spikes + np.roll(spikes, 1) + np.roll(spikes, -1), 1.0)
+
+
+def _find_pitch(profile: np.ndarray, max_pitch: int) -> tuple[float, float]:
+    """qrep/vision/grid.py _find_pitch at 8480443: the fundamental repeat distance and its
+    normalized peak prominence."""
+    corr = _autocorrelate(_binarize(profile))
+    lo, hi = MIN_PITCH_PX, min(max_pitch, len(corr) - 1)
+    window = corr[lo:hi]
+    if window.size == 0:
+        raise ValueError("profile too short for grid detection")
+    # Local maxima only, so a slow downward ramp does not win.
+    peaks = [
+        i
+        for i in range(1, window.size - 1)
+        if window[i] >= window[i - 1] and window[i] >= window[i + 1] and window[i] > 0
+    ]
+    if not peaks:
+        raise ValueError("no periodicity found in edge profile")
+    strongest = max(window[i] for i in peaks)
+    # The smallest comparably strong lag is the fundamental, not a harmonic.
+    fundamental = next(i for i in peaks if window[i] >= 0.5 * strongest)
+    pitch = float(lo + fundamental)
+    i = lo + fundamental
+    if 1 <= i < len(corr) - 1:
+        denom = corr[i - 1] - 2 * corr[i] + corr[i + 1]
+        if abs(denom) > 1e-9:
+            shift = 0.5 * (corr[i - 1] - corr[i + 1]) / denom
+            pitch += float(np.clip(shift, -0.5, 0.5))
+    # A systematic pitch alternation plateaus the fundamental peak; the harmonic average
+    # replaces the parabolic estimate only when the two disagree by more than 1 percent.
+    base = lo + fundamental
+    harmonic_estimates: list[float] = []
+    for k in range(2, 7):
+        center = k * base
+        if center + 2 >= len(corr):
+            break
+        lo_k, hi_k = center - 2, center + 3
+        segment = corr[lo_k:hi_k]
+        peak_at = lo_k + int(np.argmax(segment))
+        if corr[peak_at] > 0:
+            harmonic_estimates.append(peak_at / k)
+    if harmonic_estimates:
+        harmonic = float(np.mean(harmonic_estimates))
+        if abs(harmonic - pitch) / max(harmonic, 1e-9) > 0.01:
+            pitch = harmonic
+    prominence = float(max(0.0, min(1.0, corr[i])))
+    return pitch, prominence
+
+
+# qrep/vision/repeats.py MATCH_THRESHOLD and SOFT_FACTOR at 8480443: an exact repeat tolerates
+# a stray cell, and the soft vote takes the smallest period within 5 percent of the best.
+MATCH_THRESHOLD = 0.999
+SOFT_FACTOR = 0.95
+
+
+class RepeatResult(NamedTuple):
+    """qrep/vision/repeats.py RepeatResult at 8480443, a NamedTuple here instead of a pydantic
+    model; the fields and their values are the same."""
+
+    period_rows: int  # 0 when no repeat found
+    period_cols: int
+    confidence: float
+
+
+def _axis_period(grid: np.ndarray, axis: int) -> tuple[int, float]:
+    """qrep/vision/repeats.py _axis_period at 8480443."""
+    n = grid.shape[axis]
+    scores: list[tuple[int, float]] = []
+    for shift in range(1, n // 2 + 1):
+        if axis == 0:
+            a, b = grid[:-shift, :], grid[shift:, :]
+        else:
+            a, b = grid[:, :-shift], grid[:, shift:]
+        score = float(np.mean(a == b))
+        if score >= MATCH_THRESHOLD:
+            return shift, score
+        scores.append((shift, score))
+    if not scores:
+        return 0, 0.0
+    best_score = max(score for _shift, score in scores)
+    if best_score <= 0:
+        return 0, 0.0
+    for shift, score in scores:
+        if score >= SOFT_FACTOR * best_score:
+            return shift, score
+    return 0, 0.0
+
+
+def detect_repeat(assignments: list[list[int]]) -> RepeatResult:
+    """qrep/vision/repeats.py detect_repeat at 8480443."""
+    grid = np.array(assignments)
+    period_rows, score_rows = _axis_period(grid, 0)
+    period_cols, score_cols = _axis_period(grid, 1)
+    return RepeatResult(
+        period_rows=period_rows,
+        period_cols=period_cols,
+        confidence=float(min(score_rows, score_cols)),
+    )
 
 
 # --- Scoring helpers ----------------------------------------------------------------------
@@ -192,9 +316,17 @@ def two_part_rejects(wrong: tuple[float, float], truths: Sequence[tuple[float, f
     return wrong[0] < min(t[0] for t in truths) or wrong[1] > max(t[1] for t in truths)
 
 
+def decide_two_part(top3_recall: float, rejected: Sequence[bool]) -> bool:
+    """Issue #134 criterion 6 as the Go column records it: top-3 recall at least BAR, and the
+    two-part fit rule rejects every wrong top-1. rejected holds one flag per wrong top-1, so a
+    method with no wrong top-1 has nothing to reject."""
+    return top3_recall >= BAR and all(rejected)
+
+
 def decide(top3_recall: float, wrong_fits: Sequence[float], truth_fits: Sequence[float]) -> bool:
-    """Issue #134 criterion 6, with the fit rule read globally: one threshold passes every true
-    count and rejects every wrong top-1 (each wrong top-1 fits worse than the worst truth)."""
+    """The product reading of criterion 6 (go_product in the JSON): one threshold on the
+    product fit passes every true count and rejects every wrong top-1 (each wrong top-1 fits
+    worse than the worst truth)."""
     if top3_recall < BAR:
         return False
     return not wrong_fits or max(wrong_fits) < min(truth_fits)
@@ -326,10 +458,10 @@ def _autocorr_axis(field: FieldImage, axis: int) -> list[int]:
     extent = field.width if axis == 0 else field.height
     profile = field.sobel_x.sum(axis=0) if axis == 0 else field.sobel_y.sum(axis=1)
     try:
-        pitch, _prominence = qgrid._find_pitch(profile, max_pitch=extent // 4)
+        pitch, _prominence = _find_pitch(profile, max_pitch=extent // 4)
     except ValueError:
         return []
-    corr = qgrid._autocorrelate(qgrid._binarize(profile))
+    corr = _autocorrelate(_binarize(profile))
     counts = candidate_counts(extent)
     first = min(max(int(round(extent / pitch)), counts.start), counts.stop - 1)
     scores = {n: float(_sample(corr, np.array([extent / n]))[0]) for n in counts if n != first}
@@ -460,7 +592,7 @@ def tap_region(field: FieldImage, tap: Sequence[float]) -> tuple[float | None, f
 
 
 def _tap_axis(profile: np.ndarray, bracket: float | None, extent: int) -> list[int]:
-    corr = qgrid._autocorrelate(qgrid._binarize(profile))
+    corr = _autocorrelate(_binarize(profile))
     lo, hi = (TAP_RANGE[0] * bracket, TAP_RANGE[1] * bracket) if bracket else (0, len(corr))
     lags = [i for i in range(max(MIN_PITCH_PX, int(math.ceil(lo))), len(corr) - 1)
             if i <= hi and corr[i] > 0 and corr[i] >= corr[i - 1] and corr[i] >= corr[i + 1]]
@@ -499,7 +631,9 @@ METHODS: dict[str, Callable[[FieldImage], tuple[list[int], list[int]]]] = {
     "fit": fit_score,
     "fit_interior": fit_interior,
 }
-# Functions in modules B6b deletes (plan B6b; REBASELINE.md "detector (B6b)") each method calls.
+# Functions of modules B6b deletes (plan B6b; REBASELINE.md "detector (B6b)") that each method
+# uses, through the copies above: the list a shipping method would hand B7 (issue #134,
+# criterion 7).
 B6B_FUNCTIONS = {
     "autocorr": ["qrep.vision.grid._find_pitch", "qrep.vision.grid._autocorrelate",
                  "qrep.vision.grid._binarize", "qrep.vision.grid.MIN_PITCH_PX"],
@@ -513,8 +647,8 @@ B6B_FUNCTIONS = {
 
 
 def block_periods(field: FieldImage, nx: int, ny: int) -> tuple[int, int]:
-    """(columns, rows) block period in squares: detect_repeat on k-means labels of the squares'
-    centre colors."""
+    """(columns, rows) block period in squares: detect_repeat (the copy above) on k-means
+    labels of the squares' inner colors."""
     px, py = field.width / nx, field.height / ny
     offsets = _offsets()
     xi = np.clip(np.floor(px * (np.arange(nx)[:, None] + offsets)).astype(int), 0, field.width - 1)
@@ -525,7 +659,7 @@ def block_periods(field: FieldImage, nx: int, ny: int) -> tuple[int, int]:
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 50, 0.1)
     _c, labels, _centres = cv2.kmeans(colors.reshape(-1, 3).astype(np.float32), k, None, criteria,
                                       3, cv2.KMEANS_PP_CENTERS)
-    result = qrepeats.detect_repeat(labels.reshape(ny, nx).tolist())
+    result = detect_repeat(labels.reshape(ny, nx).tolist())
     return result.period_cols, result.period_rows
 
 
@@ -547,8 +681,9 @@ def _corners(frame) -> np.ndarray:
 
 
 def load_photos() -> tuple[list[Photo], list[dict]]:
-    """Tier A and B rows outside the holdout, with every provenance that gives a field and
-    counts; and the rows skipped, with the reason. The holdout is filtered before any read."""
+    """The dev split: rows of the v0 eval set in tiers A and B, outside the holdout, with every
+    provenance that gives a field and counts; and the rows skipped, with the reason. A tier B
+    row counts only when it is in v0. The holdout is filtered before any read."""
     sys.path.insert(0, str(REPO / "scripts" / "eval"))
     from qrep_eval import annotation as an
 
@@ -728,7 +863,7 @@ def build_report(records: list[dict], photos: list[Photo], skipped: list[dict], 
                     summary = summarize(_outcomes(in_scope))
                     row["in_scope"] = summary
                     row["go_product"] = bool(summary["n"]) and decide(summary["top3_rate"], wrong, truths)
-                    row["go"] = bool(summary["n"]) and summary["top3_rate"] >= BAR and all(rejected)
+                    row["go"] = bool(summary["n"]) and decide_two_part(summary["top3_rate"], rejected)
                     groups.append(row)
     zero = [r for r in records if r["radius"] == 0]
     # Every candidate of every trial in quilter units: how often each label was the top-1 and
@@ -778,7 +913,8 @@ def write_markdown(report: dict, path: Path) -> None:
         f"- Date: {h['date']}",
         f"- Command: `{h['command']}`",
         f"- qrep: `{h['qrep']}`",
-        f"- Git SHA: `{h['git_sha']}`",
+        f"- Git SHA: `{h['git_sha']}`"
+        + (" with uncommitted changes to tracked files" if h["dirty"] else ", clean tree"),
         f"- cv2 {h['cv2']}, numpy {h['numpy']}, Python {h['python']}",
         f"- Inputs: {h['inputs']}",
         "",
@@ -849,27 +985,33 @@ def write_markdown(report: dict, path: Path) -> None:
 def _header(command: str, photos: list[Photo], skipped: list[dict]) -> dict:
     import qrep
 
-    sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=REPO, capture_output=True, text=True,
-                         check=True).stdout.strip()
+    def git(*args: str) -> str:
+        return subprocess.run(["git", *args], cwd=REPO, capture_output=True, text=True,
+                              check=True).stdout.strip()
+
     used = ", ".join(f"{p.stem} ({p.tier})" for p in photos)
     holdout = sum(s["reason"] == "holdout" for s in skipped)
+    tier_b = sum(p.tier == "B" for p in photos) + sum(s["tier"] == "B" for s in skipped)
     return {
         "date": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
-        "command": command, "qrep": _qrep_path(qrep.__file__), "git_sha": sha,
+        "command": command, "qrep": _qrep_path(qrep.__file__), "git_sha": git("rev-parse", "HEAD"),
+        # The SHA names the code that ran only when no tracked file differs from it.
+        "dirty": bool(git("status", "--porcelain", "--untracked-files=no")),
         "cv2": cv2.__version__,
         "numpy": np.__version__, "python": sys.version.split()[0],
-        "inputs": (f"corpus/manifest.csv tiers A and B outside the holdout; {holdout} holdout rows "
-                   f"skipped before any read; read: {used}"),
+        "inputs": (f"corpus/manifest.csv rows of eval_set v0 in tiers A and B ({tier_b} of them "
+                   f"tier B), outside the holdout; {holdout} holdout rows skipped before any "
+                   f"read; read: {used}"),
         "radii_px": list(RADII), "trials_per_radius": TRIALS, "caps": CAPS,
     }
 
 
 def _qrep_path(module_file: str) -> str:
-    """The resolved qrep module relative to the checkout that ran the script (the proof that
-    this checkout's code ran), without the local folders above it."""
+    """The resolved qrep module as <checkout folder>/<path inside it>: the folder's name shows
+    which checkout's code ran, and no local folder above it is printed."""
     resolved = Path(module_file).resolve()
     if resolved.is_relative_to(REPO):
-        return f"{resolved.relative_to(REPO).as_posix()} in the checkout that ran this script"
+        return f"{REPO.name}/{resolved.relative_to(REPO).as_posix()}"
     return f"<outside this checkout>/{resolved.name}"
 
 

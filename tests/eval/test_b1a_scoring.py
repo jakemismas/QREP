@@ -7,6 +7,10 @@ designed step in the a channel reaches the methods as the same step (to rounding
 level moves a by well under 1 unit).
 """
 
+import importlib.util
+import shutil
+import sys
+
 import cv2
 import numpy as np
 import pytest
@@ -155,9 +159,24 @@ def test_two_part_fit_rule():
     assert not b1a.two_part_rejects((1.7, 1.4), truths)
 
 
+def test_decision_rule_two_part():
+    # Issue #134 criterion 6 as the Go column records it: ship when top-3 recall >= BAR (0.8)
+    # and exp2's two-part rule rejects every wrong top-1 (one flag per wrong top-1).
+    # 0.82 >= 0.8 and both wrong top-1s rejected: go.
+    assert b1a.decide_two_part(0.82, [True, True])
+    # One wrong top-1 passes both thresholds unnoticed: no-go, however high the recall.
+    assert not b1a.decide_two_part(0.95, [True, False])
+    # 0.79 < 0.8: no-go, even with every wrong top-1 rejected.
+    assert not b1a.decide_two_part(0.79, [True])
+    # The bar is inclusive (0.8 >= 0.8), and no wrong top-1 leaves nothing to reject:
+    # all([]) is True.
+    assert b1a.decide_two_part(0.8, [])
+
+
 def test_decision_rule():
-    # Issue #134 criterion 6: ship when top-3 recall >= 0.8 and the fit score rejects every
-    # wrong top-1: every wrong top-1's fit sits below the lowest true-count fit.
+    # The product reading of criterion 6 (go_product in the JSON; the recorded Go uses
+    # decide_two_part): ship when top-3 recall >= 0.8 and every wrong top-1's product fit
+    # sits below the lowest true-count fit.
     # 0.82 >= 0.8, and max wrong 1.3 < min truth 1.5: go.
     assert b1a.decide(0.82, wrong_fits=[1.1, 1.3], truth_fits=[1.5, 2.0])
     # A wrong top-1 at 1.6 is not below the truth's 1.5: the fit would pass it unnoticed.
@@ -303,3 +322,101 @@ def test_fit_2d_prefers_the_true_pair_on_checkerboard():
     true_fit = b1a.fit_2d(field, 12, 12)["fit"]
     for wrong in ((24, 24), (6, 6), (4, 4)):
         assert b1a.fit_2d(field, *wrong)["fit"] < true_fit
+
+
+# --- Quilter-unit periods, the dev split and the run header ------------------------------
+
+
+def _stripes(n: int = 12, pitch: int = 20) -> np.ndarray:
+    # Three fabrics on diagonal stripes: square (row, col) takes fabric (row + col) mod 3. The
+    # fabrics sit at least 40 units apart on a or b, so k-means with k = 3 gives each fabric
+    # its own label.
+    fabrics = np.array([(40.0, 40.0, 0.0), (60.0, -40.0, 20.0), (80.0, 0.0, -40.0)], np.float32)
+    rows, cols = np.mgrid[0:n * pitch, 0:n * pitch] // pitch
+    return _lab_to_bgr(fabrics[(rows + cols) % 3])
+
+
+def test_block_periods_on_diagonal_stripes():
+    # The k-means labels relabel the fabrics, so two squares share a label exactly when they
+    # share a fabric. Shifting the 12 x 12 label grid by s rows (or columns) compares fabric
+    # (r + c) mod 3 with (r + c + s) mod 3: a match on every square when s mod 3 == 0, on none
+    # for s = 1 or 2. _axis_period tries s = 1, 2, 3 and stops at 3, a full match (1.0 >=
+    # 0.999). So the block period is 3 squares each way, and quilter_units(12, 3) gives
+    # gcd(3, 12) = 3 squares per block and 12 / 3 = 4 blocks.
+    field = b1a.FieldImage.from_bgr(_stripes(), FULL_FIELD)
+    assert b1a.block_periods(field, 12, 12) == (3, 3)
+    assert b1a.quilter_units(12, 3) == (4, 3)
+
+
+def test_spike_needs_no_module_b6b_deletes(monkeypatch):
+    # B6b deletes the qrep.vision package (plan B6b: grid.py, repeats.py, __init__.py and the
+    # rest). A None entry in sys.modules makes any import of that name raise ImportError, so
+    # with every qrep.vision module blocked the script must still load, and the code that once
+    # called grid and repeats (autocorr, the tap and block_periods) must still run.
+    blocked = ["qrep.vision", "qrep.vision.grid", "qrep.vision.repeats"]
+    blocked += [name for name in sys.modules if name.startswith("qrep.vision.")]
+    for name in blocked:
+        monkeypatch.setitem(sys.modules, name, None)
+    spec = importlib.util.spec_from_file_location("b1a_isolated", b1a.__file__)
+    isolated = importlib.util.module_from_spec(spec)
+    monkeypatch.setitem(sys.modules, "b1a_isolated", isolated)
+    spec.loader.exec_module(isolated)
+    # The expectations of the checkerboard and stripe tests: 240 / 20 = 12 squares each way,
+    # and a block period of 3 squares on the stripes.
+    board = isolated.FieldImage.from_bgr(_checkerboard(), FULL_FIELD)
+    assert isolated.autocorr_period(board)[0][0] == 12
+    assert isolated.tap_seed(board, (110.0, 110.0))[1][0] == 12
+    stripes = isolated.FieldImage.from_bgr(_stripes(), FULL_FIELD)
+    assert isolated.block_periods(stripes, 12, 12) == (3, 3)
+
+
+def test_load_photos_reads_the_dev_split_only(tmp_path, monkeypatch):
+    # A temporary corpus with five manifest rows, in this order:
+    # 1. lacma-54871, tier A, eval_set v0, with its committed annotation. Its sha256 starts
+    #    89f771d8. 16 = 1 mod 3, so a hex number mod 3 is its digit sum mod 3:
+    #    8 + 9 + 15 + 7 + 7 + 1 + 13 + 8 = 68, and 68 mod 3 = 2: outside the holdout
+    #    (corpus/README.md: the first 8 hex digits, read as an integer, divisible by 3).
+    # 2. held, tier A, v0, sha256 starting 00000003: 3 mod 3 = 0, in the holdout.
+    # 3. bare, tier A, v0, sha256 starting 00000001: 1 mod 3 = 1, outside, no annotation.
+    # 4. tier-b, tier B, eval_set empty, and 5. tier-c, tier C, v0: outside the dev split.
+    # Rows 2, 4 and 5 get annotation files that are not JSON, so reading one would raise.
+    sha = "89f771d81045dcfb801d0f22e1de8855f2a76a73d47967a572b93be469b179db"
+    other = "00000001" + "0" * 56
+    rows = [
+        ("images/lacma-54871.jpg", "A", sha, "v0"),
+        ("images/held.jpg", "A", "00000003" + "0" * 56, "v0"),
+        ("images/bare.jpg", "A", other, "v0"),
+        ("images/tier-b.jpg", "B", other, ""),
+        ("images/tier-c.jpg", "C", other, "v0"),
+    ]
+    (tmp_path / "manifest.csv").write_text(
+        "file,tier,sha256,eval_set\n" + "".join(",".join(row) + "\n" for row in rows),
+        encoding="utf-8")
+    (tmp_path / "annotations").mkdir()
+    shutil.copy(b1a.REPO / "corpus" / "annotations" / "lacma-54871.json", tmp_path / "annotations")
+    for stem in ("held", "tier-b", "tier-c"):
+        (tmp_path / "annotations" / f"{stem}.json").write_text("not json", encoding="utf-8")
+    monkeypatch.setattr(b1a, "CORPUS", tmp_path)
+    photos, skipped = b1a.load_photos()
+    # Only row 1 is read. corpus/annotations/lacma-54871.json gives both proposal passes 10
+    # blocks of 5 squares each way, and proposed-a these field and outer-edge corners
+    # (top left, top right, bottom right, bottom left).
+    assert [(p.stem, p.tier, sorted(p.truth)) for p in photos] == [
+        ("lacma-54871", "A", ["proposed-a", "proposed-b"])]
+    truth = photos[0].truth["proposed-a"]
+    assert truth["counts"] == (10, 5, 10, 5)
+    assert truth["field"].tolist() == [[221, 336], [3606, 334], [3659, 3804], [264, 3732]]
+    assert truth["outer"].tolist() == [[16, 144], [3795, 138], [3847, 4009], [84, 3905]]
+    # The holdout row is counted without its name; the bare row has no claims to read.
+    assert skipped == [{"stem": None, "tier": "A", "reason": "holdout"},
+                       {"stem": "bare", "tier": "A", "reason": "no frame and counts claims"}]
+
+
+def test_qrep_path_names_the_checkout():
+    # A qrep inside the checkout prints as <checkout folder>/qrep/__init__.py: the folder's
+    # name tells which tree ran, and no folder above it is printed.
+    inside = b1a.REPO / "qrep" / "__init__.py"
+    assert b1a._qrep_path(str(inside)) == f"{b1a.REPO.name}/qrep/__init__.py"
+    # A qrep outside the checkout prints its file name only.
+    outside = b1a.REPO.parent / "elsewhere" / "qrep" / "__init__.py"
+    assert b1a._qrep_path(str(outside)) == "<outside this checkout>/__init__.py"
