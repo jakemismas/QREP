@@ -17,7 +17,7 @@ from __future__ import annotations
 import math
 import re
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 
 from qrep.model.units import format_inches
@@ -53,6 +53,7 @@ FIGURE_KINDS = {
     "snowball_unit": "snowball unit figure",
     "flying_geese_unit": "flying geese unit figure",
     "strip_set": "strip set figure",
+    "sub_unit": "plain sub-unit figure",
     "block": "block figure",
     "assembly": "quilt assembly figure",
     "borders": "border figure",
@@ -61,6 +62,8 @@ FIGURE_KINDS = {
     "layout_chart": "layout chart",
     "coloring_page": "coloring page",
 }
+# G-05 has a step cite every figure; only these stand alone, without a number.
+UNCITED_KINDS = frozenset({"cover_render", "layout_chart", "coloring_page"})
 
 _HEX = re.compile(r"#[0-9a-fA-F]{6}")
 
@@ -77,7 +80,8 @@ class FigureRequest:
     width: float
     height: float
     label: str
-    subject: object = None
+    # Out of the hash, so a request with a dict or list subject can key a dict.
+    subject: object = field(default=None, hash=False)
 
     def __post_init__(self) -> None:
         if self.kind not in FIGURE_KINDS:
@@ -124,7 +128,7 @@ class Step:
     figure: FigureRequest | None = None
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "details", tuple(self.details))
+        object.__setattr__(self, "details", _items(self.details, "details"))
 
 
 @dataclass(frozen=True)
@@ -136,7 +140,7 @@ class Steps:
     start: int = 1
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "items", tuple(self.items))
+        object.__setattr__(self, "items", _items(self.items, "items"))
         if not self.items:
             raise ValueError("a step list needs at least one step")
         if not isinstance(self.start, int) or isinstance(self.start, bool) or self.start < 1:
@@ -166,8 +170,10 @@ class Table:
     widths: tuple[float, ...] | None = None
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "header", tuple(self.header))
-        object.__setattr__(self, "rows", tuple(tuple(row) for row in self.rows))
+        object.__setattr__(self, "header", _items(self.header, "header"))
+        object.__setattr__(
+            self, "rows", tuple(_items(row, "row") for row in _items(self.rows, "rows"))
+        )
         if not self.header and not self.rows:
             raise ValueError("a table needs a header or a row")
         columns = self.columns
@@ -190,6 +196,13 @@ class Figure:
 
     request: FigureRequest
 
+    def __post_init__(self) -> None:
+        if self.request.kind not in UNCITED_KINDS:
+            raise ValueError(
+                f"a {self.request.kind} figure is cited from its step or paragraph (G-05); "
+                f"only {', '.join(sorted(UNCITED_KINDS))} stand alone"
+            )
+
 
 @dataclass(frozen=True)
 class PrintScaleSquare:
@@ -208,7 +221,11 @@ class Section:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "kind", SectionKind(self.kind))
-        object.__setattr__(self, "blocks", tuple(self.blocks))
+        object.__setattr__(self, "blocks", _items(self.blocks, "blocks"))
+        # An empty section prints a bare heading, such as "Borders" for a quilt
+        # without borders, which PS-02 fails; the builder leaves it out instead.
+        if not self.blocks and self.kind is not SectionKind.COVER:
+            raise ValueError(f"the {self.kind.value} section has no blocks")
 
 
 @dataclass(frozen=True)
@@ -219,13 +236,9 @@ class PatternDocument:
     sections: tuple[Section, ...]
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "sections", tuple(self.sections))
-        if not self.name.strip() or "\n" in self.name:
-            raise ValueError("a pattern needs a one-line name")
-        check_printable(self.name)
+        object.__setattr__(self, "sections", _items(self.sections, "sections"))
         # The name prints in every footer, where no date may appear (G-02, PS-03).
-        if _DATE.search(self.name):
-            raise PatternTextError(f"the pattern name {self.name!r} holds a date")
+        check_name(self.name)
         kinds = [section.kind for section in self.sections]
         if not kinds or kinds[0] is not SectionKind.COVER:
             raise ValueError("the cover must be the first section")
@@ -272,6 +285,14 @@ def _block_texts(block: Block) -> Iterator[str]:
         yield block.request.label
 
 
+def _items(value, what: str) -> tuple:
+    """value as a tuple; a lone string is refused, since tuple() would split it
+    into one-character items that each print on their own line or cell."""
+    if isinstance(value, str):
+        raise TypeError(f"{what} is a sequence, not the string {value!r}")
+    return tuple(value)
+
+
 def _check_color(color: str) -> None:
     if not _HEX.fullmatch(color):
         raise ValueError(f"a swatch color is #rrggbb, got {color!r}")
@@ -316,8 +337,10 @@ _MONTH = (
     r"December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sept?|Oct|Nov|Dec)\.?"
 )
 _DATE = re.compile(
-    r"\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2}/\d{1,2}/\d{2,4}\b|"
-    rf"\b{_MONTH} \d{{1,2}}\b|\b\d{{1,2}} {_MONTH}(?![a-z])"
+    r"\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2}-\d{1,2}-\d{4}\b|\b\d{1,2}/\d{1,2}/\d{2,4}\b|"
+    r"\b\d{4}/\d{1,2}/\d{1,2}\b|"
+    rf"\b{_MONTH} (?:\d{{1,2}}(?:st|nd|rd|th)?|\d{{4}})\b|"
+    rf"\b\d{{1,2}}(?:st|nd|rd|th)? {_MONTH}(?![a-z])"
 )
 _BANNED = [
     (re.compile(r"\b(?:historical|modern|strip strategy|difficulty|minutes|heuristic)\b",
@@ -329,7 +352,8 @@ _BANNED = [
                 re.IGNORECASE), "a piece total"),
     (re.compile(r"\bf\d+\b"), "an internal fabric id"),
     (_HEX, "a hex color"),
-    (re.compile(r"\.\d"), "a decimal number"),
+    # C-07 lets the pattern echo a centimeter size the user typed, such as 152.4 cm.
+    (re.compile(r"\.\d+(?!\d)(?! ?cm\b)"), "a decimal number"),
     # A hyphen or any Unicode dash between the whole number and the fraction.
     (re.compile(r"\b\d+[-\u2010-\u2015]\d+/\d+\b"), "a hyphenated fraction"),
     (re.compile("[¼-¾⅐-⅞⁄\u2215]"), "a fraction glyph"),
@@ -340,6 +364,13 @@ _FRACTION = re.compile(r"\b(\d+)/(\d+)\b")
 _BARE_FRACTION = re.compile(r'\b\d+/\d+\b(?!"| yd\b)')
 _SEPARATOR = re.compile(r"\d( ?)([xX×])( ?)(?=\d|WOF)")
 _BY = re.compile(r"\d by \d")
+# Lengths in the places a cut size takes. These read the text with its quotes,
+# since an inch mark is a straight double quote (C-07).
+_NUMBER = r'(\d+(?: \d+/\d+)?)("?)'
+# Not after a letter, so a piece label such as "each A2 square" is no length.
+_STRIP_OR_SQUARE = re.compile(rf'(?<![\w/.]){_NUMBER} (?:x WOF|squares?)\b')
+_RECTANGLE = re.compile(rf'(?<![\w/.]){_NUMBER} x {_NUMBER} rectangles?\b')
+_CURLY_MARK = re.compile(r"\d[\N{RIGHT DOUBLE QUOTATION MARK}\N{DOUBLE PRIME}]")
 
 
 def check_printable(text: str) -> None:
@@ -356,17 +387,16 @@ def check_printable(text: str) -> None:
         ) from None
 
 
-def check_text(text: str, name: str = "") -> None:
+def check_text(text: str) -> None:
     """Raise PatternTextError when text holds a PS-05 item or breaks PS-06.
 
     The text is read as section 6 reads it: whitespace collapsed and straight
-    double quotes dropped, so '2"x8"' is caught as "2x8". The pattern name is
-    left out, as the PS-05 check leaves it out.
+    double quotes dropped, so '2"x8"' is caught as "2x8". Nothing is exempt,
+    the pattern name included: PS-05 bans its items anywhere, and the name
+    prints on every page (G-02).
     """
-    check_printable(text)
-    plain = re.sub(r"\s+", " ", text.replace('"', ""))
-    if name:
-        plain = plain.replace(re.sub(r"\s+", " ", name.replace('"', "")), " ")
+    raw = re.sub(r"\s+", " ", text)
+    plain = raw.replace('"', "")
     for pattern, what in _BANNED:
         found = pattern.search(plain)
         if found:
@@ -384,3 +414,37 @@ def check_text(text: str, name: str = "") -> None:
     found = _BY.search(plain)
     if found:
         raise PatternTextError(f"dimension {found.group(0)!r} needs ' x ' in {text!r}")
+    found = _CURLY_MARK.search(raw)
+    if found:
+        raise PatternTextError(f"the inch mark in {found.group(0)!r} is not a straight quote in {text!r}")
+    for found in _STRIP_OR_SQUARE.finditer(raw):
+        if not found.group(2):
+            raise PatternTextError(f"length {found.group(0)!r} has no inch mark in {text!r}")
+    for found in _RECTANGLE.finditer(raw):
+        if not (found.group(2) and found.group(4)):
+            raise PatternTextError(f"rectangle {found.group(0)!r} needs inch marks in {text!r}")
+        if _value(found.group(1)) > _value(found.group(3)):
+            raise PatternTextError(f"rectangle {found.group(0)!r} needs its short side first in {text!r}")
+    # Last, so a fraction glyph outside cp1252 is reported as a fraction glyph.
+    check_printable(text)
+
+
+def _value(number: str) -> float:
+    """A printed length such as "2 1/2" in inches, to compare two sides."""
+    whole, _, fraction = number.partition(" ")
+    if "/" in whole:
+        whole, fraction = "0", whole
+    num, _, den = fraction.partition("/")
+    return int(whole) + (int(num) / int(den) if den else 0)
+
+
+def check_name(name: str) -> None:
+    """Raise when the pattern name cannot print whole on one footer line.
+
+    The name prints in the title and every footer, so it obeys every text rule
+    and is one clean line: control characters or doubled or edge spaces would
+    print in the footer as they are while the title collapses them.
+    """
+    if not name or name != " ".join(name.split()) or any(ord(c) < 32 or ord(c) == 127 for c in name):
+        raise ValueError(f"a pattern needs a one-line name without extra spaces, got {name!r}")
+    check_text(name)
