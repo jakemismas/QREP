@@ -111,6 +111,13 @@ function saveText(name: string, text: string) {
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
+/** Hands over the chosen file and clears the input, so choosing the same file again still fires a change. */
+function takeFile(input: HTMLInputElement, open: (file: File) => void) {
+  const file = input.files?.[0];
+  input.value = "";
+  if (file) open(file);
+}
+
 export function AnnotatePage() {
   const [photo, setPhoto] = useState<Photo | null>(null);
   const [annotation, setAnnotation] = useState<Annotation | null>(null);
@@ -400,7 +407,7 @@ export function AnnotatePage() {
       <section className="an-files" aria-label="Files">
         <label className="an-file">
           <span>Photo</span>
-          <input type="file" accept="image/*" data-testid="photo-input" onChange={(e) => e.target.files?.[0] && onPhoto(e.target.files[0])} />
+          <input type="file" accept="image/*" data-testid="photo-input" onChange={(e) => takeFile(e.target, onPhoto)} />
         </label>
         <label className="an-file">
           <span>Annotation (optional)</span>
@@ -408,7 +415,7 @@ export function AnnotatePage() {
             type="file"
             accept="application/json,.json"
             data-testid="annotation-input"
-            onChange={(e) => e.target.files?.[0] && onAnnotationFile(e.target.files[0])}
+            onChange={(e) => takeFile(e.target, onAnnotationFile)}
           />
         </label>
         <label className="an-file">
