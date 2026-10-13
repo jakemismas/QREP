@@ -239,6 +239,55 @@ From the size the user sets, QREP picks a rotary-friendly finished square size a
 achieved size beside the asked-for size; with no size set, it prints an estimate labeled "estimated
 from your photo". The pattern never prints a guess as a measured fact (PATTERN-SPEC.md, cover).
 
+The model's sizing math lives in one module, in integer eighths (qrep/model/sizing.py); the
+bridge's own resize copies leave with A7:
+
+- Finished squares come in 1/4 in steps from 3/4 in to 4 in, 14 sizes. The step is a setting
+  (`SQUARE_STEP`, 2 e); the pattern path refuses a step that is not a whole quarter inch. A corner
+  unit narrows the list to the squares that keep its leg a whole eighth, because a corner's cut
+  size cannot be rounded: a 1/3 leg leaves 3/4, 1 1/2, 2 1/4, 3 and 3 3/4 in. `offered_squares`
+  lists them, and the size basis records the step they move in as the rounding applied
+  (section 8). A leg that no offered square keeps whole (a 1/17 leg needs a multiple of 4 1/4 in)
+  is refused.
+- Squares, borders and plain pieces therefore cut at whole quarter inches (the finished size plus
+  1/2 in), as do the oversize-and-trim triangles, the exact quarter-square triangle (F + 1 1/4 in),
+  the eight-at-a-time half-square triangle and the one-at-a-time flying geese. Not every cut size
+  is a whole quarter inch: the exact half-square triangle cuts at F + 7/8 in and the four-at-a-time
+  geese's sky squares at H + 7/8 in (MATH.md F14), which no square step can make whole quarters,
+  and a snowball corner square cuts at its leg plus 1/2 in, a whole quarter only when the leg is.
+- Border widths snap to the nearest 1/4 in, half-up, from 1/4 in to 14 in on the pattern path. The
+  one-eighth step rounds them to the eighth and caps them at 14 in as well.
+- Sizing never changes the counts, so the quilt size moves in whole squares and whole blocks: the
+  width is the columns times the square size plus twice the border widths, and the height likewise.
+  Changing the block count to reach a size is editing, which is out of scope.
+- A typed size or a preset (applied as listed, width first) picks the offered square whose
+  achieved size (the squares plus the borders scaled to that square and snapped) has the smallest
+  combined miss: the sum of the misses on the sides you set, in eighths. With one side set, that
+  is the side's own miss. When two squares miss by the same amount, the larger square wins. A
+  request that needs squares below 3/4 in or above 4 in stops at that clamp, and the achieved size
+  shows the miss. The double Irish chain asked for 75 x 90 in gets exactly 75 x 90 in with
+  1 1/2 in squares; asked for 86 x 67.5 in, it gets 62 3/4 x 75 1/4 in with 1 1/4 in squares
+  (misses of 23 1/4 and 7 3/4 in, 31 in combined, against 33 1/2 in with 1 1/2 in squares).
+- With no size set, QREP fits the model's own estimate the same way and records the size as a
+  default, never as typed. The basis keeps the estimate's confidence; a hand-authored model's
+  (authored provenance, every recorded confidence at 1.0) is 1.0, and a read that recorded none
+  gets 0.0, because an assumed resolution measures nothing. A model whose basis says you typed its
+  size or picked a preset holds no estimate, so it takes no default size.
+- The sizing call writes the basis from the sized model, so the two match. It refuses, as kind
+  value, an unknown preset, a default on a size you set and a corner leg no offered square keeps
+  whole.
+- `apply_finished_size` serves the crop-screen size and the editor's size edit. Both pass a size
+  you entered, so it records a typed basis with the step it applied; a preset chip there arrives
+  as a width and height and is recorded as typed until #244. Its default one-eighth step is the
+  sprint 3 reconcile: the exact square rounded half-up on each side you set, the smaller of the
+  two. It differs from sprint 3 in three ways: it caps borders at 14 in, it refuses a size below
+  1/8 in, and it refuses a reconciled square that would break a corner leg instead of rounding the
+  leg.
+- A square size and borders you choose (`size_at`) record no basis yet, because the basis has no
+  source for a chosen square, so a later default request on that model records a default, at 0.0
+  on a read. The editor's resize calls keep a basis they make stale. #240 tracks both. Size the
+  read's model each time, because sizing a sized model again rounds its borders again.
+
 ## 7. Math defaults and conventions
 
 MATH.md holds the formulas and vectors. This contract fixes:
