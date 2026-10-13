@@ -212,6 +212,31 @@ From the size the user sets, QREP picks a rotary-friendly finished square size a
 achieved size beside the asked-for size; with no size set, it prints an estimate labeled "estimated
 from your photo". The pattern never prints a guess as a measured fact (PATTERN-SPEC.md, cover).
 
+One module holds the sizing math, in integer eighths (qrep/model/sizing.py):
+
+- Finished squares come in 1/4 in steps from 3/4 in to 4 in, 14 sizes, so every cut size (the
+  finished size plus 1/2 in) is a whole quarter inch. The step is a setting (`SQUARE_STEP`, 2 e),
+  and the size basis records it as the rounding applied (section 8).
+- Border widths snap to the nearest 1/4 in, half-up, from 1/4 in to 14 in, whatever the square
+  step.
+- Sizing never changes the counts, so the quilt size moves in whole squares and whole blocks: the
+  width is the columns times the square size plus twice the border widths, and the height likewise.
+  Changing the block count to reach a size is editing, which is out of scope.
+- A typed size or a preset snaps to the nearest achievable size. On each axis you set, QREP picks
+  the offered square whose achieved extent (the squares plus the borders scaled to that square and
+  snapped) is nearest the request; when two squares miss by the same amount, the larger square
+  wins. With both a width and a height set, it takes the smaller of the two squares, so the quilt
+  never overshoots one axis to meet the other. A request that needs squares below 3/4 in or above
+  4 in stops at that clamp, and the achieved size shows the miss. The double Irish chain asked for
+  75 x 90 in gets exactly 75 x 90 in with 1 1/2 in squares.
+- With no size set, QREP fits the model's own estimate the same way and records the size as a
+  default, never as typed. The basis keeps the estimate's confidence; a hand-authored model's is
+  1.0, and a read that recorded none gets 0.0, because an assumed resolution measures nothing. A
+  model whose size you set holds no estimate, so it takes no default size.
+- A sized model's size basis matches its finished size: the sizing call writes the basis from the
+  sized model, and the sprint 3 resize drops a basis it would make stale. Size the read's model
+  each time, because sizing a sized model again rounds its borders again.
+
 ## 7. Math defaults and conventions
 
 MATH.md holds the formulas and vectors. This contract fixes:
