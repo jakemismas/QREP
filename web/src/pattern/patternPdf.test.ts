@@ -52,7 +52,8 @@ class FakeWorker implements WorkerLike {
 }
 
 /** A client whose first boot failed, as when the engine's files do not load;
- * client.restart() is what the screen's Retry runs (engine.retry()). */
+ * client.restart() is what every Retry runs (engine.retry()): Your pattern's
+ * and the header engine chip's alike. */
 function failedBootClient(): { client: EngineClient; workers: FakeWorker[] } {
   const workers: FakeWorker[] = [];
   const client = new EngineClient(() => {
@@ -65,7 +66,7 @@ function failedBootClient(): { client: EngineClient; workers: FakeWorker[] } {
   return { client, workers };
 }
 
-function bootedClient(): { client: EngineClient; worker: FakeWorker } {
+function bootedClient(): { client: EngineClient; worker: FakeWorker; workers: FakeWorker[] } {
   const workers: FakeWorker[] = [];
   const client = new EngineClient(() => {
     const worker = new FakeWorker();
@@ -74,7 +75,7 @@ function bootedClient(): { client: EngineClient; worker: FakeWorker } {
   });
   client.start();
   workers[0].bootDone();
-  return { client, worker: workers[0] };
+  return { client, worker: workers[0], workers };
 }
 
 // Promise callbacks from the client and the controller run as microtasks; a
@@ -173,7 +174,7 @@ describe("PatternPdfController", () => {
     expect(saved).toEqual([]);
   });
 
-  it("sends a waiting pattern again after a restart, so one Retry saves it", async () => {
+  it("sends a waiting pattern again after any restart, so one Retry saves it", async () => {
     const { client, workers } = failedBootClient();
     const { controller, saved, views } = makeController(client);
 
@@ -183,11 +184,12 @@ describe("PatternPdfController", () => {
     // The boot failed, so nothing reached the worker.
     expect(workers[0].calls()).toHaveLength(0);
 
+    // The restart alone, as the header's Retry runs it: nothing else asks
+    // the controller to send again.
     client.restart();
-    void controller.resend();
     await settle();
-    // The restart rejected the first call; its outcome is dropped, so the
-    // pattern still reads as being made, never as failed.
+    // The restart rejected the first call and the controller sent it again,
+    // so the pattern still reads as being made, never as failed.
     expect(controller.view.status).toBe("busy");
     expect(views.map((view) => view.status)).not.toContain("failed");
 
@@ -202,19 +204,54 @@ describe("PatternPdfController", () => {
     expect(controller.view).toEqual({ status: "idle", message: null });
   });
 
-  it("resends nothing unless a pattern is being made", async () => {
-    const { client, worker } = bootedClient();
+  it("sends a call a restart cut off in flight again, to the new engine", async () => {
+    const { client, worker, workers } = bootedClient();
+    const { controller, saved, views } = makeController(client);
+
+    void controller.start(MODEL_JSON, FILE);
+    await settle();
+    expect(worker.calls()).toHaveLength(1);
+    client.restart();
+    await settle();
+    workers[1].bootDone();
+    await settle();
+    // Hand count: one call was in flight, the restart rejected it once, and
+    // the controller sent it once more: one call on the new worker.
+    expect(workers[1].calls()).toHaveLength(1);
+    // The old worker's late answer belongs to a call the restart ended.
+    worker.respond(worker.calls()[0].id!, ready());
+    await settle();
+    expect(saved).toEqual([]);
+    workers[1].respond(workers[1].calls()[0].id!, ready());
+    await settle();
+    expect(saved).toEqual([[PDF_B64, FILE]]);
+    expect(views.map((view) => view.status)).toEqual(["busy", "idle"]);
+  });
+
+  it("sends nothing again after a restart once the pattern is saved or reset", async () => {
+    const { client, worker, workers } = bootedClient();
     const { controller, saved } = makeController(client);
 
-    void controller.resend();
     void controller.start(MODEL_JSON, FILE);
     await settle();
     worker.respond(worker.calls()[0].id!, ready());
     await settle();
-    void controller.resend();
+    client.restart();
+    workers[1].bootDone();
     await settle();
-    expect(worker.calls()).toHaveLength(1);
+    // Saved: no call waited, so the restart rejected none.
+    expect(workers[1].calls()).toHaveLength(0);
+
+    void controller.start(MODEL_JSON, FILE);
+    await settle();
+    controller.reset();
+    client.restart();
+    workers[2].bootDone();
+    await settle();
+    // Reset: the rejected call belongs to a request nobody wants now.
+    expect(workers[2].calls()).toHaveLength(0);
     expect(saved).toEqual([[PDF_B64, FILE]]);
+    expect(controller.view).toEqual({ status: "idle", message: null });
   });
 
   it("fails plainly on a result that states no outcome, never reading it as success", async () => {
@@ -341,14 +378,13 @@ describe("PatternSummaryLoader", () => {
     expect(loader.view).toEqual({ status: "refused", message });
   });
 
-  it("loads a summary a restart rejected on retry, never showing a failure", async () => {
+  it("loads a summary a restart rejected, with the restart alone, never showing a failure", async () => {
     const { client, workers } = failedBootClient();
     const { loader, views } = makeLoader(client);
 
     loader.load(MODEL_JSON);
     await settle();
     client.restart();
-    loader.retry();
     await settle();
     expect(loader.view).toEqual({ status: "loading" });
     expect(views.map((view) => view.status)).not.toContain("failed");
@@ -356,9 +392,25 @@ describe("PatternSummaryLoader", () => {
     workers[1].bootDone();
     await settle();
     expect(workers[1].calls()).toHaveLength(1);
+    expect(workers[1].calls()[0].args).toEqual([MODEL_JSON]);
     workers[1].respond(workers[1].calls()[0].id!, ready());
     await settle();
     expect(loader.view).toEqual({ status: "ready", summary: SUMMARY });
+    expect(views.map((view) => view.status)).toEqual(["loading", "ready"]);
+  });
+
+  it("sends a cleared summary nowhere after a restart", async () => {
+    const { client, workers } = failedBootClient();
+    const { loader } = makeLoader(client);
+
+    loader.load(MODEL_JSON);
+    await settle();
+    loader.clear();
+    client.restart();
+    workers[1].bootDone();
+    await settle();
+    expect(workers[1].calls()).toHaveLength(0);
+    expect(loader.view).toEqual({ status: "idle" });
   });
 
   it("clears to idle and ignores a result that lands after", async () => {
@@ -371,6 +423,75 @@ describe("PatternSummaryLoader", () => {
     worker.respond(worker.calls()[0].id!, ready());
     await settle();
     expect(loader.view).toEqual({ status: "idle" });
+  });
+});
+
+describe("Your pattern's waiting calls after an engine restart", () => {
+  it("sends a waiting summary and a waiting PDF again once each, and both land", async () => {
+    const { client, workers } = failedBootClient();
+    const { loader } = makeLoader(client);
+    const { controller, saved, views } = makeController(client);
+
+    loader.load(MODEL_JSON);
+    void controller.start(MODEL_JSON, FILE);
+    await settle();
+    expect(workers[0].calls()).toHaveLength(0);
+
+    client.restart();
+    await settle();
+    workers[1].bootDone();
+    await settle();
+    // The client runs one call at a time, so the new worker holds the first
+    // resend now and the second once the first is answered.
+    expect(workers[1].calls()).toHaveLength(1);
+    workers[1].respond(workers[1].calls()[0].id!, ready());
+    await settle();
+    expect(workers[1].calls()).toHaveLength(2);
+    workers[1].respond(workers[1].calls()[1].id!, ready());
+    await settle();
+
+    // Hand count: two requests waited (the summary, then the PDF), the one
+    // restart rejected each once, and each sent once more: two calls on the
+    // new worker, both export_pattern with the model JSON alone.
+    expect(workers[1].calls()).toHaveLength(2);
+    for (const call of workers[1].calls()) {
+      expect(call.method).toBe("export_pattern");
+      expect(call.args).toEqual([MODEL_JSON]);
+    }
+    expect(loader.view).toEqual({ status: "ready", summary: SUMMARY });
+    expect(saved).toEqual([[PDF_B64, FILE]]);
+    expect(views.map((view) => view.status)).toEqual(["busy", "idle"]);
+  });
+
+  it("sends each again once per restart, so a second restart adds no extra call", async () => {
+    const { client, workers } = failedBootClient();
+    const { loader } = makeLoader(client);
+    const { controller, saved } = makeController(client);
+
+    loader.load(MODEL_JSON);
+    void controller.start(MODEL_JSON, FILE);
+    await settle();
+    // The first restart's boot fails too, and a second Retry restarts again.
+    client.restart();
+    await settle();
+    workers[1].emit({ type: "boot-failed", message: "the engine files did not load" });
+    client.restart();
+    await settle();
+    workers[2].bootDone();
+    await settle();
+    workers[2].respond(workers[2].calls()[0].id!, ready());
+    await settle();
+    workers[2].respond(workers[2].calls()[1].id!, ready());
+    await settle();
+
+    // Hand count: after each restart the summary and the PDF each have one
+    // call waiting, since a rejection sends one call and nothing else does;
+    // the failed boots posted nothing, so the third worker holds exactly two.
+    expect(workers[0].calls()).toHaveLength(0);
+    expect(workers[1].calls()).toHaveLength(0);
+    expect(workers[2].calls()).toHaveLength(2);
+    expect(loader.view).toEqual({ status: "ready", summary: SUMMARY });
+    expect(saved).toEqual([[PDF_B64, FILE]]);
   });
 });
 

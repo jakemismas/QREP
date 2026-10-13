@@ -14,7 +14,8 @@
  * sidecar JSON whose "corners" are the quilt's outer corners in image
  * pixels (top left, top right, bottom right, bottom left), the order of
  * corner-pin-0 to corner-pin-3. Level 0 is the clean render; level 1 adds
- * fabric texture (qrep/render/renderer.py), so its read flags squares.
+ * fabric texture (qrep/render/renderer.py), so its read flags squares. Each
+ * pinned test pins a render to its own sidecar.
  *
  * No screenshot or snapshot assertions; layout checks read element boxes.
  */
@@ -22,7 +23,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import { devices, expect, test, type Download, type Page } from "@playwright/test";
+import { devices, expect, test, type Download, type Page, type Route } from "@playwright/test";
 import { expectNoHorizontalOverflow } from "./helpers/layout";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -30,6 +31,7 @@ const generatedDir = path.join(repoRoot, "tests", "fixtures", "_generated");
 const photoPath = path.join(generatedDir, "pattern_e2e_l0.png");
 const sidecarPath = path.join(generatedDir, "pattern_e2e_l0.json");
 const texturedPath = path.join(generatedDir, "pattern_e2e_l1.png");
+const texturedSidecarPath = path.join(generatedDir, "pattern_e2e_l1.json");
 const fixturePath = path.join(repoRoot, "tests", "fixtures", "double_irish_chain.json");
 const READY_TIMEOUT = 300_000;
 const REVERSE_TIMEOUT = 300_000;
@@ -60,7 +62,8 @@ function renderFixture(level: number, file: string): void {
 test.beforeAll(() => {
   if (!existsSync(photoPath) || !existsSync(sidecarPath)) renderFixture(0, photoPath);
   if (!existsSync(sidecarPath)) throw new Error("fixture render produced no sidecar");
-  if (!existsSync(texturedPath)) renderFixture(1, texturedPath);
+  if (!existsSync(texturedPath) || !existsSync(texturedSidecarPath)) renderFixture(1, texturedPath);
+  if (!existsSync(texturedSidecarPath)) throw new Error("level 1 render produced no sidecar");
 });
 
 /** Width and height from the PNG's IHDR chunk (bytes 16 to 23, big endian). */
@@ -69,10 +72,17 @@ function pngSize(file: string): { width: number; height: number } {
   return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
 }
 
-/** The sidecar's quilt corners as fractions of the photo, in pin order. */
-function cornerFractions(): [number, number][] {
-  const { width, height } = pngSize(photoPath);
-  const sidecar = JSON.parse(readFileSync(sidecarPath, "utf8")) as { corners: [number, number][] };
+/** A render's own sidecar: save_render writes it beside the PNG, same stem. */
+function sidecarOf(photo: string): string {
+  return photo.replace(/\.png$/, ".json");
+}
+
+/** The render's sidecar quilt corners as fractions of the photo, in pin order. */
+function cornerFractions(photo: string): [number, number][] {
+  const { width, height } = pngSize(photo);
+  const sidecar = JSON.parse(readFileSync(sidecarOf(photo), "utf8")) as {
+    corners: [number, number][];
+  };
   return sidecar.corners.map(([x, y]) => [x / width, y / height]);
 }
 
@@ -99,8 +109,8 @@ async function openFixtureFile(page: Page): Promise<void> {
 }
 
 /** Upload a render and reach the results screen. With pins, set the four pins
- * on the sidecar's corners first; without, analyze where the corner search
- * put them, as photo.spec.ts does. */
+ * on that render's own sidecar corners first; without, analyze where the
+ * corner search put them, as photo.spec.ts does. */
 async function photoToResults(page: Page, { photo = photoPath, pins = true } = {}): Promise<void> {
   await page.goto("./");
   await page.getByTestId("start-photo").click();
@@ -115,17 +125,17 @@ async function photoToResults(page: Page, { photo = photoPath, pins = true } = {
     .poll(() => crop.locator("img.pf-corner-img").evaluate((img: HTMLImageElement) => img.naturalWidth))
     .toBeGreaterThan(0);
   await expect(page.getByTestId("crop-detecting")).toHaveCount(0, { timeout: REVERSE_TIMEOUT });
-  if (pins) await pinCorners(page);
+  if (pins) await pinCorners(page, photo);
   await page.getByTestId("crop-analyze").click();
   await expect(page.getByTestId("photo-results")).toBeVisible({ timeout: REVERSE_TIMEOUT });
 }
 
-/** Drag the four pins onto the sidecar's corners. */
-async function pinCorners(page: Page): Promise<void> {
+/** Drag the four pins onto the render's own sidecar corners. */
+async function pinCorners(page: Page, photo: string): Promise<void> {
   const crop = page.getByTestId("crop-screen");
   // PinOverlay places each pin at left/top percent of .pf-corner-box, and a
   // drag stores the pointer's fraction of that same box.
-  const targets = cornerFractions();
+  const targets = cornerFractions(photo);
   for (const [index, [fx, fy]] of targets.entries()) {
     const box = (await crop.locator(".pf-corner-box").boundingBox())!;
     const pin = page.getByTestId(`corner-pin-${index}`);
@@ -168,6 +178,63 @@ async function expectNoConfidence(page: Page): Promise<void> {
   await expect(page.getByTestId("overall-pill")).toHaveCount(0);
   await expect(page.locator("[data-testid^='confidence-']")).toHaveCount(0);
   await expect(page.getByTestId("your-pattern")).not.toContainText(/confidence/i);
+}
+
+/** Record every engine call the page posts to its worker, from the first
+ * page load on; read it back with `engineCalls`. */
+async function recordEngineCalls(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const calls: string[] = [];
+    (window as unknown as { engineCalls: string[] }).engineCalls = calls;
+    const post = Worker.prototype.postMessage;
+    Worker.prototype.postMessage = function (this: Worker, ...args: unknown[]) {
+      const message = args[0] as { type?: string; method?: string } | null;
+      if (message?.type === "call" && message.method) calls.push(message.method);
+      return (post as (...rest: unknown[]) => void).apply(this, args);
+    } as typeof Worker.prototype.postMessage;
+  });
+}
+
+/** How many calls of `method` the page has posted to its worker so far. */
+function engineCalls(page: Page, method: string): Promise<number> {
+  return page.evaluate(
+    (wanted) =>
+      (window as unknown as { engineCalls: string[] }).engineCalls.filter(
+        (name) => name === wanted,
+      ).length,
+    method,
+  );
+}
+
+interface SeenToast {
+  tone: string;
+  text: string;
+}
+
+/** Record every toast the page shows from now on. A new toast replaces the
+ * one before it in the DOM, so a check on the toast showing at the end
+ * cannot see an earlier one; a MutationObserver keeps them all. */
+async function recordToasts(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const seen: { tone: string; text: string }[] = [];
+    (window as unknown as { toastRecord: typeof seen }).toastRecord = seen;
+    const take = (node: Node) => {
+      if (!(node instanceof HTMLElement)) return;
+      const toasts = node.matches("[data-testid='toast']")
+        ? [node]
+        : [...node.querySelectorAll<HTMLElement>("[data-testid='toast']")];
+      for (const toast of toasts) {
+        seen.push({ tone: toast.dataset.tone ?? "", text: toast.textContent ?? "" });
+      }
+    };
+    new MutationObserver((mutations) => {
+      for (const mutation of mutations) mutation.addedNodes.forEach(take);
+    }).observe(document.body, { childList: true, subtree: true });
+  });
+}
+
+function seenToasts(page: Page): Promise<SeenToast[]> {
+  return page.evaluate(() => (window as unknown as { toastRecord: SeenToast[] }).toastRecord);
 }
 
 async function savePattern(page: Page): Promise<{ bytes: Buffer; name: string }> {
@@ -293,50 +360,75 @@ test("the sample shows at once and says it is working until the engine is ready"
   await expect(page.getByTestId("download-pattern")).toBeVisible();
 });
 
-test("one Retry after a failed engine boot brings the method, the census and a waiting PDF", async ({
-  page,
-}) => {
-  // Abort every engine file, as app.spec.ts does: the boot fails, and the
-  // calls queued meanwhile (the census, the summary, then the PDF) wait.
-  await page.route(ENGINE_FILES, (route) => route.abort());
-  await openSample(page);
-  const error = page.getByTestId("pattern-error");
-  await expect(error).toBeVisible({ timeout: FAILED_TIMEOUT });
-  await expect(error.locator(".yp-error-text")).toHaveText(
-    "The pattern engine did not start, so your pattern is not ready yet.",
-  );
-  await expect(error).not.toContainText(/traceback|exception|pyodide/i);
-  await expect(page.getByTestId("pattern-retry")).toBeVisible();
-  // A working line or spinner beside the error would say the wait goes on.
-  await expect(page.getByTestId("pattern-working")).toHaveCount(0);
+// Both Retry buttons show while the engine is down and both restart it: Your
+// pattern's (pattern-retry) and the header engine chip's (engine-retry), which
+// calls engine.retry directly. Either one must bring Your pattern back.
+for (const [retryName, retryId] of [
+  ["Your pattern's Retry", "pattern-retry"],
+  ["the header's engine Retry", "engine-retry"],
+] as const) {
+  test(`one click on ${retryName} after a failed engine boot brings the method, the census and a waiting PDF`, async ({
+    page,
+  }) => {
+    await recordEngineCalls(page);
+    // Abort every engine file, as app.spec.ts does: the boot fails, and the
+    // calls queued meanwhile (the census, the summary, then the PDF) wait.
+    await page.route(ENGINE_FILES, (route) => route.abort());
+    await openSample(page);
+    await recordToasts(page);
+    const error = page.getByTestId("pattern-error");
+    await expect(error).toBeVisible({ timeout: FAILED_TIMEOUT });
+    await expect(error.locator(".yp-error-text")).toHaveText(
+      "The pattern engine did not start, so your pattern is not ready yet.",
+    );
+    await expect(error).not.toContainText(/traceback|exception|pyodide/i);
+    await expect(page.getByTestId("pattern-retry")).toBeVisible();
+    await expect(page.getByTestId("engine-retry")).toBeVisible();
+    // A working line or spinner beside the error would say the wait goes on.
+    await expect(page.getByTestId("pattern-working")).toHaveCount(0);
 
-  // Download while the engine is down: the PDF waits, without a spinner.
-  const button = page.getByTestId("download-pattern");
-  await button.click();
-  await expect(button).toHaveAttribute("data-state", "busy");
-  await expect(button).toHaveAttribute("aria-busy", "false");
+    // Download while the engine is down: the PDF waits, without a spinner.
+    const button = page.getByTestId("download-pattern");
+    await button.click();
+    await expect(button).toHaveAttribute("data-state", "busy");
+    await expect(button).toHaveAttribute("aria-busy", "false");
 
-  await page.unroute(ENGINE_FILES);
-  const download = page.waitForEvent("download", { timeout: READY_TIMEOUT });
-  await page.getByTestId("pattern-retry").click();
+    await page.unroute(ENGINE_FILES);
+    const download = page.waitForEvent("download", { timeout: READY_TIMEOUT });
+    await page.getByTestId(retryId).click();
 
-  await expect(page.getByTestId("method-line")).toHaveText(
-    "Blocks of 5 x 5 squares repeat across the quilt, so it is strip pieced.",
-    { timeout: READY_TIMEOUT },
-  );
-  const saved = await download;
-  // slugify("Double Irish Chain 75x90"), as in the sample test above.
-  expect(saved.suggestedFilename()).toBe("double-irish-chain-75x90.pdf");
-  // The design doc's census literal, the element's whole text: the census
-  // the restart rejected was asked for again.
-  await expect(page.getByTestId("fabric-count-b")).toHaveText(/^1,?246 squares$/, {
-    timeout: READY_TIMEOUT,
+    await expect(page.getByTestId("method-line")).toHaveText(
+      "Blocks of 5 x 5 squares repeat across the quilt, so it is strip pieced.",
+      { timeout: READY_TIMEOUT },
+    );
+    const saved = await download;
+    // slugify("Double Irish Chain 75x90"), as in the sample test above.
+    expect(saved.suggestedFilename()).toBe("double-irish-chain-75x90.pdf");
+    // The design doc's census literal, the element's whole text: the census
+    // the restart rejected was asked for again.
+    await expect(page.getByTestId("fabric-count-b")).toHaveText(/^1,?246 squares$/, {
+      timeout: READY_TIMEOUT,
+    });
+    await expect(button).toHaveAttribute("data-state", "idle");
+    await expect(page.getByTestId("pattern-error")).toHaveCount(0);
+    await expect(page.getByTestId("engine-chip")).toHaveAttribute("data-engine-phase", "ready");
+
+    // Hand count: the failed worker never booted, so the client posted it
+    // nothing; the restart rejected the waiting summary and the waiting PDF
+    // once each, and each was sent once more: two pattern calls in all.
+    expect(await engineCalls(page, "export_pattern")).toBe(2);
+
+    // The restart is not news. Every toast from Your pattern's opening on
+    // was recorded, and the only one is the saved file's success toast; no
+    // raw engine message reached any toast.
+    await expect.poll(() => seenToasts(page)).toEqual([
+      { tone: "success", text: expect.stringContaining("Saved: your pattern file is ready.") },
+    ]);
+    for (const toast of await seenToasts(page)) {
+      expect(toast.text).not.toMatch(/restarted|traceback|worker/i);
+    }
   });
-  await expect(button).toHaveAttribute("data-state", "idle");
-  await expect(page.getByTestId("pattern-error")).toHaveCount(0);
-  // The restart is not news: no raw engine message reached a toast.
-  await expect(page.getByTestId("toast").filter({ hasText: /restarted|traceback/i })).toHaveCount(0);
-});
+}
 
 test("Download pattern (PDF) reports busy while it works and saves once for a double tap", async ({
   page,
@@ -410,14 +502,22 @@ test("Download pattern (PDF) reports busy while it works and saves once for a do
 test("a textured photo's flagged squares are counted, outlined, and can be hidden", async ({
   page,
 }) => {
-  // The level 1 render adds fabric texture, so the read scores some squares
-  // below 0.9 (PARITY item 6). The property is a count above 0; the number
-  // itself is the reader's and is not pinned here.
-  await photoToResults(page, { photo: texturedPath, pins: false });
+  // Pinned to the level 1 render's own sidecar corners, so the read's grid
+  // is the quilt's and the flags come from the squares alone, not from where
+  // a corner search happened to land.
+  await photoToResults(page, { photo: texturedPath, pins: true });
   await seePattern(page);
   await expectNoConfidence(page);
   const flagged = page.getByTestId("flagged-count");
   await expect(flagged).toHaveAttribute("data-count", /^\d+$/);
+  // Why above 0: the level 1 render adds texture to every square.
+  // _apply_texture in qrep/render/renderer.py redraws each center square
+  // with its own seeded tint of -6 to +6 per channel (rng.integers(-6, 7))
+  // and then adds pixel noise of sigma 2.5 (rng.normal(0, 2.5)) over the
+  // whole quilt, so some squares read below the 0.9 confidence mark
+  // (UNCERTAIN_THRESHOLD in src/state/photo.tsx, PARITY item 6). The
+  // property is a count above 0; the number itself is the reader's and is
+  // not pinned here.
   expect(Number(await flagged.getAttribute("data-count"))).toBeGreaterThan(0);
   await expect(page.getByTestId("flagged-hint")).toBeVisible();
   await expect(flagged).not.toContainText(/download|install/i);
@@ -429,33 +529,71 @@ test("a textured photo's flagged squares are counted, outlined, and can be hidde
   await expect(toggle).toHaveAttribute("aria-pressed", "true");
 });
 
-test("See a sample pattern ignores taps while it loads, and a quilt opened meanwhile goes to the editor", async ({
+// Every start-screen entry that opens or starts something, the resume
+// banner's Continue among them, besides See a sample pattern itself.
+const START_ENTRIES = ["start-photo", "resume-accept", "open-demo", "start-blank", "open-project"];
+
+/** Leave an autosave behind, so the start screen shows the resume banner. */
+async function seedAutosave(page: Page): Promise<void> {
+  await page.goto("./");
+  const model = JSON.parse(readFileSync(fixturePath, "utf8")) as unknown;
+  await page.evaluate((saved) => {
+    localStorage.setItem(
+      "qrep-autosave",
+      JSON.stringify({
+        app: "QREP",
+        version: 1,
+        name: "Saved quilt",
+        savedAt: Date.now(),
+        model: saved,
+        ui: {},
+      }),
+    );
+  }, model);
+  await page.reload();
+  await expect(page.getByTestId("resume-banner")).toBeVisible();
+}
+
+test("See a sample pattern holds every start entry while it loads, then shows the sample", async ({
   page,
 }) => {
-  // Hold the sample's file unanswered: its load stays pending for the test.
-  await page.route(SAMPLE_FILE, () => {});
-  await page.goto("./");
+  await seedAutosave(page);
+  // Hold the sample's file until the entries are checked, then let it load.
+  const held: Route[] = [];
+  await page.route(SAMPLE_FILE, (route) => {
+    held.push(route);
+  });
   const see = page.getByTestId("see-sample");
   await see.click();
   await expect(see).toBeDisabled();
   await expect(see).toHaveAttribute("aria-busy", "true");
+  // No other quilt can open while the sample loads, so none can be replaced
+  // by the sample when its file lands.
+  for (const id of START_ENTRIES) await expect(page.getByTestId(id), id).toBeDisabled();
+  await expect.poll(() => held.length).toBe(1);
 
-  // Another quilt opens while the sample loads: nothing binds it to Your
-  // pattern, so it goes to the editor.
-  await openFixtureFile(page);
-  await expect(page.getByTestId("editor")).toBeVisible();
-  await expect(page.getByTestId("your-pattern")).toHaveCount(0);
+  await held[0].continue();
+  const screen = page.getByTestId("your-pattern");
+  await expect(screen).toHaveAttribute("data-source", "sample");
+  await expect(page.getByTestId("start-screen")).toHaveCount(0);
+  // The fixture's method line, as in the sample test above.
+  await expect(page.getByTestId("method-line")).toHaveText(
+    "Blocks of 5 x 5 squares repeat across the quilt, so it is strip pieced.",
+    { timeout: READY_TIMEOUT },
+  );
 });
 
 test("after a failed sample load the button works again and the next open goes to the editor", async ({
   page,
 }) => {
+  await seedAutosave(page);
   await page.route(SAMPLE_FILE, (route) => route.abort(), { times: 1 });
-  await page.goto("./");
   const see = page.getByTestId("see-sample");
   await see.click();
   await expect(page.getByTestId("toast")).toHaveAttribute("data-tone", "error");
   await expect(see).toBeEnabled();
+  await expect(see).toHaveAttribute("aria-busy", "false");
+  for (const id of START_ENTRIES) await expect(page.getByTestId(id), id).toBeEnabled();
   await expect(page.getByTestId("start-screen")).toBeVisible();
 
   await page.getByTestId("open-demo").click();
@@ -466,24 +604,8 @@ test("after a failed sample load the button works again and the next open goes t
 test("leaving Your pattern through Open sends no pattern call for the quilt that goes to the editor", async ({
   page,
 }) => {
-  // Record every engine call the page posts to its worker.
-  await page.addInitScript(() => {
-    const calls: string[] = [];
-    (window as unknown as { engineCalls: string[] }).engineCalls = calls;
-    const post = Worker.prototype.postMessage;
-    Worker.prototype.postMessage = function (this: Worker, ...args: unknown[]) {
-      const message = args[0] as { type?: string; method?: string } | null;
-      if (message?.type === "call" && message.method) calls.push(message.method);
-      return (post as (...rest: unknown[]) => void).apply(this, args);
-    } as typeof Worker.prototype.postMessage;
-  });
-  const patternCalls = () =>
-    page.evaluate(
-      () =>
-        (window as unknown as { engineCalls: string[] }).engineCalls.filter(
-          (method) => method === "export_pattern",
-        ).length,
-    );
+  await recordEngineCalls(page);
+  const patternCalls = () => engineCalls(page, "export_pattern");
 
   await openSample(page);
   await waitForEngine(page);

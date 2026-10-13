@@ -3,8 +3,9 @@
  * so "Start from a photo" is a visibly disabled teaser here. S3 adds the
  * blank-grid card, the autosave resume banner (with the save age), and the
  * loud autosave-error surface for a foreign schema_version. C2a (issue #96)
- * adds See a sample pattern, which opens the demo quilt on Your pattern; the
- * demo entry into the editor stays until C6a removes the editor.
+ * adds See a sample pattern, which opens the demo quilt on Your pattern and
+ * holds every other entry here until it has loaded; the demo entry into the
+ * editor stays until C6a removes the editor.
  */
 import { useRef, useState } from "react";
 import { useProject } from "../state/project";
@@ -67,17 +68,23 @@ export function StartScreen({
   const { openDemo, startBlank, resume, autosaveError, resumeAutosave, yourPattern } =
     useProject();
 
-  // One sample load at a time: the button is disabled while it runs, and the
-  // ref ignores a second tap that lands before the disabled state renders.
+  // While the sample loads, every entry here that opens or starts something
+  // is disabled: openDemo installs the sample whenever its fetch lands and
+  // cannot tell it was overtaken, so a quilt opened meanwhile would be
+  // replaced by it. The ref also ignores a tap that lands before the disabled
+  // state renders. A failed load enables them all again.
   const [loadingSample, setLoadingSample] = useState(false);
   const loadingSampleRef = useRef(false);
+  const unlessLoading =
+    (action: (() => void) | undefined) =>
+    (): void => {
+      if (!loadingSampleRef.current) action?.();
+    };
   const seeSample = () => {
     if (loadingSampleRef.current) return;
     loadingSampleRef.current = true;
     setLoadingSample(true);
     void openDemo().then((opened) => {
-      // Bound only once the sample has opened, so a quilt opened while it
-      // loads (the resume banner, the header's Open) goes to the editor.
       if (opened) {
         yourPattern.showPattern("sample");
         return;
@@ -115,7 +122,8 @@ export function StartScreen({
             type="button"
             data-testid="resume-accept"
             className="btn btn--secondary start-resume-btn"
-            onClick={resumeAutosave}
+            disabled={loadingSample}
+            onClick={unlessLoading(resumeAutosave)}
           >
             Continue
           </button>
@@ -131,7 +139,8 @@ export function StartScreen({
           className="start-resume-idle"
           aria-hidden="true"
           tabIndex={-1}
-          onClick={resumeAutosave}
+          disabled={loadingSample}
+          onClick={unlessLoading(resumeAutosave)}
         />
       )}
 
@@ -155,7 +164,8 @@ export function StartScreen({
             type="button"
             data-testid="start-photo"
             className="btn start-cta"
-            onClick={onStartPhoto}
+            disabled={loadingSample}
+            onClick={unlessLoading(onStartPhoto)}
           >
             Start from a photo
           </button>
@@ -175,9 +185,10 @@ export function StartScreen({
             type="button"
             data-testid="open-demo"
             className="btn btn--secondary"
-            onClick={() => {
+            disabled={loadingSample}
+            onClick={unlessLoading(() => {
               void openDemo();
-            }}
+            })}
           >
             Open the demo quilt instead
           </button>
@@ -186,7 +197,8 @@ export function StartScreen({
             type="button"
             data-testid="start-blank"
             className="btn btn--link"
-            onClick={startBlank}
+            disabled={loadingSample}
+            onClick={unlessLoading(startBlank)}
           >
             No photo handy? Start from a blank grid
           </button>
@@ -195,7 +207,8 @@ export function StartScreen({
             type="button"
             data-testid="open-project"
             className="btn btn--link"
-            onClick={onOpenProject}
+            disabled={loadingSample}
+            onClick={unlessLoading(onOpenProject)}
           >
             Open a saved project
           </button>

@@ -10,15 +10,11 @@ import { useEngine } from "../engine/useEngine";
 import type { Engine } from "../engine/useEngine";
 import { EngineError } from "../engine/rpc";
 import type { QuiltModel, ModelSummary } from "../model/types";
+import { isEngineRestart } from "../pattern/patternPdf";
 import { useToast } from "../ui";
 
 export const DEFAULT_NAME = "My quilt project";
 export const DEMO_URL = "fixtures/double_irish_chain.json";
-
-// rpc.ts restart() rejects every queued and in-flight call with exactly this
-// kind and message; the engine itself never answers with it.
-const RESTART_KIND = "worker";
-const RESTART_MESSAGE = "the engine was restarted";
 
 export interface ModelApi {
   model: QuiltModel | null;
@@ -93,11 +89,7 @@ export class CensusQueue {
         },
         (err: unknown) => {
           if (want.version !== this.version) return;
-          if (
-            err instanceof EngineError &&
-            err.kind === RESTART_KIND &&
-            err.message === RESTART_MESSAGE
-          ) {
+          if (isEngineRestart(err)) {
             // A restart (Retry after a failed boot) drops the queue, but the
             // census is still wanted: it goes again, to the new worker,
             // unless a newer model's request already waits.

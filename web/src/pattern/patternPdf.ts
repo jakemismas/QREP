@@ -12,9 +12,16 @@
  * engine error, a result without a valid outcome) shows PATTERN_FAILED,
  * never the engine's raw message. A refusal gets its own status, because
  * the same quilt is refused again: the screen offers no Retry for it.
+ *
+ * An engine restart is never a failure. Any Retry restarts the engine (Your
+ * pattern's, or the header's engine chip, which calls engine.retry
+ * directly), and the restart rejects every waiting call; both classes send a
+ * still-current request again on their own, once per rejection, so either
+ * Retry recovers Your pattern.
  */
 import { parsePatternResult } from "../engine/contract";
 import type { PatternSummary } from "../engine/contract";
+import { EngineError } from "../engine/rpc";
 
 /** Engine.call, narrowed to what these calls need. */
 export type EngineCall = (method: string, ...args: unknown[]) => Promise<unknown>;
@@ -26,12 +33,32 @@ type Made =
   | { ok: true; pdfB64: string; summary: PatternSummary }
   | { ok: false; message: string; refused: boolean };
 
-async function makePattern(call: EngineCall, modelJson: string): Promise<Made> {
+// rpc.ts restart() rejects every queued and in-flight call with exactly this
+// kind and message; the engine itself never answers with it.
+const RESTART_KIND = "worker";
+const RESTART_MESSAGE = "the engine was restarted";
+
+/** True for the rejection an engine restart gives a call that was waiting. */
+export function isEngineRestart(err: unknown): boolean {
+  return err instanceof EngineError && err.kind === RESTART_KIND && err.message === RESTART_MESSAGE;
+}
+
+/** `current` says whether the caller still wants this request: a restart
+ * sends a current request again, and a replaced one stops at its rejection. */
+async function makePattern(
+  call: EngineCall,
+  modelJson: string,
+  current: () => boolean,
+): Promise<Made> {
   let raw: unknown;
-  try {
-    raw = await call("export_pattern", modelJson);
-  } catch {
-    return { ok: false, message: PATTERN_FAILED, refused: false };
+  for (;;) {
+    try {
+      raw = await call("export_pattern", modelJson);
+      break;
+    } catch (err) {
+      if (isEngineRestart(err) && current()) continue;
+      return { ok: false, message: PATTERN_FAILED, refused: false };
+    }
   }
   try {
     const result = parsePatternResult(raw);
@@ -89,19 +116,11 @@ export class PatternPdfController {
     return this.start(this.last.modelJson, this.last.filename);
   }
 
-  /** Send the waiting request again after an engine restart rejected it, so
-   * the restart reads as a wait, not a failure; the rejected call's outcome
-   * is dropped. A no-op unless a pattern is being made. */
-  resend(): Promise<void> {
-    if (this.last === null || this.current.status !== "busy") return Promise.resolve();
-    return this.make(this.last.modelJson, this.last.filename);
-  }
-
   private async make(modelJson: string, filename: string): Promise<void> {
     this.last = { modelJson, filename };
     const run = ++this.run;
     this.set({ status: "busy", message: null });
-    const made = await makePattern(this.options.call, modelJson);
+    const made = await makePattern(this.options.call, modelJson, () => run === this.run);
     if (run !== this.run) return;
     if (!made.ok) {
       this.set({ status: made.refused ? "refused" : "failed", message: made.message });
@@ -177,7 +196,7 @@ export class PatternSummaryLoader {
   private async fetch(modelJson: string): Promise<void> {
     const run = ++this.run;
     this.set({ status: "loading" });
-    const made = await makePattern(this.options.call, modelJson);
+    const made = await makePattern(this.options.call, modelJson, () => run === this.run);
     if (run !== this.run) return;
     this.set(
       made.ok

@@ -61,7 +61,7 @@ export interface YourPatternApi {
   pdf: PdfView;
   savePdf: () => void;
   retryPdf: () => void;
-  /** Reboot a failed engine and send Your pattern's waiting calls again. */
+  /** Reboot a failed engine; Your pattern's waiting calls go again on their own. */
   retryEngine: () => void;
 }
 
@@ -299,15 +299,13 @@ export function usePatternState({
   }, []);
 
   const retryEngine = useCallback(() => {
+    // The restart rejects every waiting call, and the loader and the PDF
+    // controller send theirs again on their own, as after the header's
+    // Retry; sending them here too would post each one twice. Only a summary
+    // that had already failed is asked for again.
     engineRef.current.retry();
-    // The restart rejects every queued call. Sending Your pattern's again
-    // lets one Retry recover the summary and a waiting PDF alike; the
-    // rejected calls' outcomes are dropped.
     const loader = loaderRef.current;
-    if (loader && (loader.view.status === "loading" || loader.view.status === "failed")) {
-      loader.retry();
-    }
-    void pdfRef.current?.resend();
+    if (loader && loader.view.status === "failed") loader.retry();
   }, []);
 
   const yourPattern = useMemo<YourPatternApi>(
