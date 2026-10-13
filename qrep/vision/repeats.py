@@ -423,7 +423,7 @@ def vote_cells(
     margins: list[list[float]],
     period_rows: int,
     period_cols: int,
-) -> tuple[list[list[int]], int]:
+) -> tuple[list[list[int]], int, bool]:
     """Confidence-weighted plurality over periodic copies.
 
     Labels are categorical, so this is a WEIGHTED PLURALITY, never a median.

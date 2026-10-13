@@ -72,10 +72,19 @@ from qrep.contract import (
     CONTRACT_VERSION,
     FABRICS_MAX,
     FABRICS_MIN,
+    FabricCount,
+    FabricRead,
     PatternResult,
+    ReadDetails,
     ReadRequest,
+    ReadResult,
+    Reason,
+    Repeat,
+    RepeatBreak,
     SizeRequest,
     SizeResult,
+    StripRead,
+    VoteChange,
 )
 from qrep.export.cutlist import render_cutlist_csv, render_cutlist_md
 from qrep.export.pdf import render_booklet
@@ -83,7 +92,18 @@ from qrep.export.svg import render_top_svg
 from qrep.export.yardage_report import render_yardage_md
 from qrep.model import QrepSchemaError
 from qrep.model.io import loads
-from qrep.model.schema import Quilt
+from qrep.model.schema import (
+    Binding,
+    BorderBand,
+    ConfirmedBlocks,
+    Fabric,
+    FinishedSizeBasis,
+    GridRegion,
+    Palette,
+    Provenance,
+    Quilt,
+    QuiltMetadata,
+)
 from qrep.viewer.sizing import locked_resize, round_div, unlocked_resize
 
 # qrep.vision AND qrep.render import cv2 at module load (the renderer for
@@ -779,17 +799,225 @@ def _result(model: type[BaseModel], produce):
     return result.model_dump(mode="json")
 
 
+def _snap(value: float, step: int, low: int, high: int) -> int:
+    """value rounded half up to a whole step, within [low, high]."""
+    # A product that is a half step in exact arithmetic can land a hair under
+    # it in float: 4.1 x 30 is 123 exactly but 122.99999999999999 in float,
+    # which would round down to 122 instead of up to 124.
+    return min(high, max(low, step * math.floor(value / step + 0.5 + 1e-9)))
+
+
+def _read_model(geometry, squares, fabrics, voted, knobs) -> tuple[Quilt, ReadDetails]:
+    """The quilt model and the details of one confirmed read."""
+    import numpy as np
+
+    from qrep.vision.read.fabrics import to_hex
+    from qrep.vision.read.geometry import square_sides
+
+    ids = [f"f{i}" for i in range(fabrics.k)]
+    # A photo's real resolution is unknown, so the square size is an estimate
+    # at an assumed resolution (knobs.ASSUMED_PPI), recorded as a default size
+    # basis below its confidence (#207), never as a measurement.
+    side_px = float(np.median(np.linalg.norm(square_sides(geometry.grid_vertices()), axis=-1)))
+    cell = _snap(side_px * 8 / knobs.ASSUMED_PPI, knobs.SIZE_STEP, knobs.SQUARE_MIN, knobs.SQUARE_MAX)
+
+    strips = [
+        StripRead(
+            band=strip.band,
+            side=strip.side,
+            fabric_id=ids[label],
+            confidence=round(float(confidence), 6),
+        )
+        for strip, label, confidence in zip(
+            squares.strips, fabrics.strip_labels, fabrics.strip_confidence, strict=True
+        )
+    ]
+    borders = []
+    # The request and the geometry list the bands from the outside in (band 0
+    # the outermost, as the details' strips keep them), but the model lists
+    # them from the center out: the renderer paints the last one outermost
+    # and the cutting and assembly attach the first one to the center.
+    for band in reversed(geometry.bands):
+        # A band takes the fabric its sides read as, weighted by each side's
+        # label confidence; a tie goes to the lower fabric.
+        votes: dict[int, float] = {}
+        for strip in strips:
+            if strip.band == band.index:
+                index = ids.index(strip.fabric_id)
+                votes[index] = votes.get(index, 0.0) + strip.confidence
+        fabric = min(votes, key=lambda index: (-votes[index], index))
+        # A band is its width in squares times the square size (the S7-5c
+        # replacement), in whole eighths; the pattern rounds it to 1/4 in when
+        # you size it. It caps at 14 in (BAND_MAX, REBASELINE.md literal C3),
+        # as sizing caps it, so a wide band at an estimated square size cannot
+        # exceed it.
+        width = _snap(band.width_squares * cell, 1, BAND_MIN, BAND_MAX)
+        borders.append(BorderBand(fabric_id=ids[fabric], width=width))
+
+    # The cells stage weighs every labeled area alike: each square counts
+    # once and each band strip by its area in squares, as in the clustering.
+    weights = [1.0] * (geometry.rows * geometry.cols)
+    values = [float(v) for v in voted.confidence.ravel()]
+    for strip, confidence in zip(squares.strips, fabrics.strip_confidence, strict=True):
+        side = geometry.bands[strip.band].side(strip.side)
+        weights.append(side.length_squares * side.width_squares)
+        values.append(float(confidence))
+    cells_stage = sum(w * v for w, v in zip(weights, values, strict=True)) / sum(weights)
+
+    width = geometry.cols * cell + 2 * sum(band.width for band in borders)
+    height = geometry.rows * cell + 2 * sum(band.width for band in borders)
+    quilt = Quilt(
+        metadata=QuiltMetadata(
+            name="Recovered quilt",
+            notes=(
+                "Read by QREP from your corners, border bands and counts. The square size is "
+                "an estimate from the photo; set the finished size to replace it."
+            ),
+        ),
+        palette=Palette(
+            fabrics=[
+                Fabric(id=ids[i], name=f"Fabric {i + 1}", color=to_hex(fabrics.centers[i]))
+                for i in range(fabrics.k)
+            ]
+        ),
+        center=GridRegion(
+            rows=geometry.rows,
+            cols=geometry.cols,
+            cell_size=cell,
+            cells=[[ids[label] for label in row] for row in voted.labels.tolist()],
+            cell_confidence=[[round(float(v), 4) for v in row] for row in voted.confidence],
+        ),
+        borders=borders,
+        # The read cannot see the binding, so it binds in the outermost border
+        # fabric, the model's last band, or the first fabric when there is no
+        # border.
+        binding=Binding(fabric_id=borders[-1].fabric_id if borders else ids[0]),
+        provenance=Provenance(
+            source="cv",
+            # Your corners, counts and border bands are user facts at 1.0
+            # (criterion S7-6 replacement); the other three stages are CV.
+            stage_confidence={
+                "rectify": geometry.confidence,
+                "palette": round(float(fabrics.palette_confidence), 6),
+                "grid": geometry.confidence,
+                "cells": round(cells_stage, 6),
+                "repeat": round(float(voted.agreement), 6),
+                "border": geometry.confidence,
+            },
+        ),
+        confirmed_blocks=ConfirmedBlocks(
+            blocks_across=geometry.blocks_across,
+            blocks_down=geometry.blocks_down,
+            squares_across=geometry.block_cols,
+            squares_down=geometry.block_rows,
+        ),
+        size_basis=FinishedSizeBasis(
+            source="default",
+            achieved_width=width,
+            achieved_height=height,
+            rounding_step=knobs.SIZE_STEP,
+            confidence=knobs.SIZE_ESTIMATE_CONFIDENCE,
+        ),
+    )
+    details = ReadDetails(
+        corners_source=geometry.corners_source,
+        fabric_count=FabricCount(
+            value=fabrics.k,
+            source=fabrics.k_source,
+            confidence=round(float(fabrics.k_confidence), 6),
+        ),
+        fabrics=[
+            FabricRead(fabric_id=ids[i], confidence=round(float(c), 6))
+            for i, c in enumerate(fabrics.center_confidence)
+        ],
+        strips=strips,
+        repeat=Repeat(down=voted.repeat[0], across=voted.repeat[1]),
+        vote_changes=[
+            VoteChange(
+                row=c.row,
+                col=c.col,
+                read=ids[c.read],
+                voted=ids[c.voted],
+                confidence=round(float(c.confidence), 6),
+            )
+            for c in voted.changes
+        ],
+        repeat_breaks=[
+            RepeatBreak(
+                row=b.row,
+                col=b.col,
+                read=ids[b.read],
+                majority=ids[b.majority],
+                confidence=round(float(b.confidence), 6),
+            )
+            for b in voted.breaks
+        ],
+    )
+    return quilt, details
+
+
+def _stopped(outcome: str, stop) -> dict:
+    """A held or refused read, with the stop's code and message as its reason."""
+    reason = Reason(code=stop.code, message=stop.message)
+    return _result(ReadResult, lambda: ReadResult(outcome=outcome, reason=reason))
+
+
 @_envelope
 def read_confirmed(request_json: str) -> dict:
     """The confirmed read (SPEC.md sections 4, 5 and 12.1): reads the staged
     photo the request's token names, with your frame, counts and optional
     fabric count, and returns a ReadResult.
 
-    A stub until B2b switches it to the real read in qrep/vision/read/: it
-    validates the request, then returns kind not_implemented.
+    A frame, count or pixel problem is held with its diagnosis, so the web
+    returns to Confirm; more fabrics than the cap is refused. A missing or
+    unreadable staged image is kind value.
     """
-    _request(ReadRequest, "request_json", request_json)
-    raise NotImplementedError("read_confirmed is not implemented yet")
+    request = _request(ReadRequest, "request_json", request_json)
+    path = Path(request.token)
+    if not path.is_file():
+        raise ValueError(f"image file not found: {request.token}")
+    # The read imports cv2 through qrep.vision, so it loads here, when a read
+    # runs, and never when the worker imports the bridge.
+    import cv2
+    import numpy as np
+
+    from qrep.vision.read import knobs
+    from qrep.vision.read.diagnosis import Diagnosis
+    from qrep.vision.read.fabrics import Refusal, read_fabrics
+    from qrep.vision.read.geometry import confirm
+    from qrep.vision.read.sample import read_squares
+    from qrep.vision.read.vote import vote
+
+    # cv2.imread cannot open a non-ASCII path on Windows, so the bytes come
+    # through numpy and cv2 only decodes them. imdecode raises on an empty
+    # buffer instead of returning None, so an empty file is checked first.
+    data = np.fromfile(path, dtype=np.uint8)
+    image = cv2.imdecode(data, cv2.IMREAD_COLOR) if data.size else None
+    if image is None:
+        raise ValueError(f"image file is not a readable image: {request.token}")
+    height, width = image.shape[:2]
+    # #231 adds the corner source to the request; until then every corner the
+    # bridge receives is one you set.
+    geometry = confirm(
+        request.frame, request.counts, (width, height), request.crop_offset, corners_source="user"
+    )
+    if isinstance(geometry, Diagnosis):
+        return _stopped("held", geometry)
+    squares = read_squares(image, geometry)
+    if isinstance(squares, Diagnosis):
+        return _stopped("held", squares)
+    fabrics = read_fabrics(squares, request.fabric_count)
+    if isinstance(fabrics, Refusal):
+        return _stopped("refused", fabrics)
+    voted = vote(fabrics.labels, fabrics.confidence, geometry.block_rows, geometry.block_cols)
+
+    def produce() -> ReadResult:
+        # Built inside _result, so a model the engine cannot validate is an
+        # engine bug (kind internal), never your input.
+        quilt, details = _read_model(geometry, squares, fabrics, voted, knobs)
+        return ReadResult(outcome="read", model=quilt, details=details)
+
+    return _result(ReadResult, produce)
 
 
 @_envelope
