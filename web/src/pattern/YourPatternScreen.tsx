@@ -218,23 +218,28 @@ export function YourPatternScreen() {
           message={pattern.sizer.message}
           onSize={pattern.setSize}
         />
+        {/* A select with a width in force stays usable, so a width the engine
+            refuses can be changed back. */}
+        <PatternSettings
+          stripWidth={pattern.widths.strip ?? shown?.strip_width ?? null}
+          backingWidth={pattern.widths.backing ?? shown?.backing_width ?? null}
+          disabled={false}
+          onChange={pattern.setWidths}
+        />
+        {/* The census comes last: below 1100 px the details scroll under the
+            sticky photo and quilt, and the census stays reachable at the
+            page's end (pattern.spec.ts, the narrow desktop). */}
         {shown !== null ? (
           <div className="yp-amounts" aria-busy={updating}>
+            <ShoppingLines summary={shown} />
             <FabricCensus
               lines={shown.fabrics}
               palette={model.palette.fabrics}
               census={census}
               countFailed={censusFailed}
             />
-            <ShoppingLines summary={shown} />
           </div>
         ) : null}
-        <PatternSettings
-          stripWidth={pattern.widths.strip ?? shown?.strip_width ?? null}
-          backingWidth={pattern.widths.backing ?? shown?.backing_width ?? null}
-          disabled={shown === null}
-          onChange={pattern.setWidths}
-        />
       </section>
 
       {lightbox !== null ? (

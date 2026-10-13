@@ -87,12 +87,22 @@ export interface Widths {
 
 export const NO_WIDTHS: Widths = { strip: null, backing: null };
 
+// Settings refuses a wide-back width at or below the backing width
+// (qrep/model/schema.py, _wide_back_is_wider), and the wide back defaults to
+// 108 in. A 108 in backing therefore moves the wide back to MATH.md section
+// 1.3's other common width, 118 in, so the model stays valid.
+const WIDE_BACK_108 = 864;
+const WIDE_BACK_118 = 944;
+
 /** The model with your widths in its settings (Settings.wof and backing_width). */
 export function withWidths(model: QuiltModel, widths: Widths): QuiltModel {
   if (widths.strip === null && widths.backing === null) return model;
   const settings: Record<string, unknown> = { ...(model.settings ?? {}) };
   if (widths.strip !== null) settings.wof = widths.strip;
-  if (widths.backing !== null) settings.backing_width = widths.backing;
+  if (widths.backing !== null) {
+    settings.backing_width = widths.backing;
+    if (widths.backing >= WIDE_BACK_108) settings.wide_back_width = WIDE_BACK_118;
+  }
   return { ...model, settings };
 }
 

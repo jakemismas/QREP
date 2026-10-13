@@ -132,13 +132,21 @@ describe("withWidths", () => {
     const model = quilt();
     // 40 in x 8 = 320 e for cutting; 108 in x 8 = 864 e for the backing.
     const next = withWidths(model, { strip: 320, backing: 864 });
-    expect(next.settings).toEqual({ wof: 320, backing_width: 864 });
+    expect(next.settings).toEqual({ wof: 320, backing_width: 864, wide_back_width: 944 });
     // The input is not changed, and an unset width keeps the model's own.
     expect(model.settings).toEqual({ wof: 336, backing_width: 336 });
-    expect(withWidths(model, { strip: null, backing: 864 }).settings).toEqual({
+    expect(withWidths(model, { strip: null, backing: 352 }).settings).toEqual({
       wof: 336,
-      backing_width: 864,
+      backing_width: 352,
     });
+  });
+
+  it("widens the wide back past a 108 in backing, as the schema requires", () => {
+    // Settings refuses wide_back_width <= backing_width (qrep/model/schema.py,
+    // _wide_back_is_wider), and both default to 108 in = 864 e here. The wide
+    // back moves to MATH.md section 1.3's other common width: 118 in x 8 = 944 e.
+    const next = withWidths(quilt(), { strip: null, backing: 864 });
+    expect(next.settings).toEqual({ wof: 336, backing_width: 864, wide_back_width: 944 });
   });
 
   it("returns the same model when no width is set", () => {
