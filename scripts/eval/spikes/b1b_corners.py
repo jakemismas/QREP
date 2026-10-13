@@ -601,13 +601,14 @@ def ring_models(lab: np.ndarray) -> list[tuple[np.ndarray, float]]:
     return models
 
 
-def segment(image_bgr: np.ndarray) -> tuple[np.ndarray, np.ndarray] | None:
-    """The quilt's filled mask (uint8, 255 inside) and its outline points, or None."""
+def _segment(image_bgr: np.ndarray) -> tuple[tuple[np.ndarray, np.ndarray] | None, str]:
+    """The quilt's filled mask (uint8, 255 inside) and its outline points, or None and the
+    reason there is no suggestion."""
     lab = _lab(image_bgr)
     h, w = lab.shape[:2]
     models = ring_models(lab)
     if len(models) < MIN_UNIFORM_SIDES:
-        return None
+        return None, "no backdrop: under 2 uniform ring sides"
     near = np.zeros((h, w), bool)
     for median, tolerance in models:
         near |= np.linalg.norm(lab - median, axis=2) <= tolerance
@@ -620,55 +621,60 @@ def segment(image_bgr: np.ndarray) -> tuple[np.ndarray, np.ndarray] | None:
     quilt = cv2.morphologyEx(quilt, cv2.MORPH_OPEN, np.ones((size, size), np.uint8))
     count, labels, stats, _c = cv2.connectedComponentsWithStats(quilt, connectivity=4)
     if count < 2:
-        return None
+        return None, "no component off the backdrop"
     largest = 1 + int(np.argmax(stats[1:, cv2.CC_STAT_AREA]))
     component = labels == largest
     if not AREA_RANGE[0] <= float(component.mean()) <= AREA_RANGE[1]:
-        return None
+        return None, "component area outside 5 to 98 percent"
     for edge in (component[0], component[-1], component[:, 0], component[:, -1]):
         if float(edge.mean()) > TOUCH_MAX:
-            return None
+            return None, "component touches the photo's border"
     contours, _ = cv2.findContours(component.astype(np.uint8) * 255, cv2.RETR_EXTERNAL,
                                    cv2.CHAIN_APPROX_NONE)
     outline = max(contours, key=cv2.contourArea)
     mask = np.zeros((h, w), np.uint8)
     cv2.drawContours(mask, [outline], -1, 255, thickness=cv2.FILLED)
-    return mask, outline
+    return (mask, outline), "segmented"
 
 
-def _accept(mask: np.ndarray, quad: np.ndarray | None) -> Suggestion | None:
+def segment(image_bgr: np.ndarray) -> tuple[np.ndarray, np.ndarray] | None:
+    return _segment(image_bgr)[0]
+
+
+def _accept(mask: np.ndarray, quad: np.ndarray | None) -> tuple[Suggestion | None, str]:
     """A convex quad whose overlap with the mask (intersection over union) is at least FIT_MIN;
     the overlap is its confidence."""
     if quad is None or not np.all(np.isfinite(quad)):
-        return None
+        return None, "no quad from the outline"
     if not cv2.isContourConvex(np.round(quad).astype(np.int32).reshape(-1, 1, 2)):
-        return None
+        return None, "quad not convex"
     filled = np.zeros_like(mask)
     cv2.fillConvexPoly(filled, np.round(quad).astype(np.int32), 255)
     union = int(np.count_nonzero(filled | mask))
     overlap = int(np.count_nonzero(filled & mask)) / union if union else 0.0
     if overlap < FIT_MIN:
-        return None
-    return Suggestion(np.asarray(quad, float), float(overlap), None)
+        return None, "quad overlap under 0.9"
+    return Suggestion(np.asarray(quad, float), float(overlap), None), "suggested"
 
 
-def backdrop_hull(image_bgr: np.ndarray) -> Suggestion | None:
-    found = segment(image_bgr)
+def _backdrop(image_bgr: np.ndarray, lines: bool) -> tuple[Suggestion | None, str]:
+    found, reason = _segment(image_bgr)
     if found is None:
-        return None
+        return None, reason
     mask, outline = found
     quad, _residual = _quad_from_contour(outline)
+    if lines:
+        fitted = side_lines(outline.reshape(-1, 2).astype(np.float64), quad)
+        quad = quad_from_lines(fitted) if fitted else None
     return _accept(mask, quad)
 
 
+def backdrop_hull(image_bgr: np.ndarray) -> Suggestion | None:
+    return _backdrop(image_bgr, lines=False)[0]
+
+
 def backdrop_lines(image_bgr: np.ndarray) -> Suggestion | None:
-    found = segment(image_bgr)
-    if found is None:
-        return None
-    mask, outline = found
-    quad, _residual = _quad_from_contour(outline)
-    lines = side_lines(outline.reshape(-1, 2).astype(np.float64), quad)
-    return _accept(mask, quad_from_lines(lines) if lines else None)
+    return _backdrop(image_bgr, lines=True)[0]
 
 
 def tiered(image_bgr: np.ndarray) -> Suggestion | None:
@@ -686,6 +692,14 @@ METHODS: dict[str, Callable[[np.ndarray], Suggestion | None]] = {
     "backdrop_lines": backdrop_lines,
     "tiered": tiered,
 }
+
+
+def explain(method: str, image_bgr: np.ndarray) -> tuple[Suggestion | None, str]:
+    """A method's suggestion and, when there is none, why."""
+    if method == "tiered":
+        found = tiered(image_bgr)
+        return found, "suggested" if found is not None else "tier 3, the full frame"
+    return _backdrop(image_bgr, lines=method == "backdrop_lines")
 
 
 # --- Band proposals -----------------------------------------------------------------------
@@ -863,8 +877,8 @@ def run_photo(job: tuple[Photo, str]) -> tuple[list[dict], list[dict]]:
     corners, bands = [], []
     for cap_name, cap in CAPS.items():
         staged, (sx, sy) = stage(image, cap)
-        for method, suggest in METHODS.items():
-            found = suggest(staged)
+        for method in METHODS:
+            found, reason = explain(method, staged)
             source = found.corners / [sx, sy] if found is not None else None
             for prov, truth in sorted(photo.truth.items()):
                 square = square_size(truth["outer"], truth["field"], truth["counts"], truth["bands"])
@@ -876,6 +890,7 @@ def run_photo(job: tuple[Photo, str]) -> tuple[list[dict], list[dict]]:
                     "suggested": source.round(1).tolist() if source is not None else None,
                     "confidence": round(found.confidence, 4) if found is not None else None,
                     "detector_tier": found.tier if found is not None else None,
+                    "reason": reason,
                     "errors": _round(errors) if errors is not None else None,
                 })
         for prov, truth in sorted(photo.truth.items()):
@@ -1002,7 +1017,8 @@ def write_markdown(report: dict, path: Path) -> None:
         "",
         "## Each photo's largest corner error in squares",
         "",
-        "none means no suggestion; the tiered column names the old detector's tier.",
+        "none means no suggestion, with its reason; the tiered column names the old "
+        "detector's tier.",
         "",
         "| Provenance | Cap | Photo | Square px | backdrop_hull | backdrop_lines | tiered |",
         "|---|---|---|---|---|---|---|",
@@ -1015,7 +1031,7 @@ def write_markdown(report: dict, path: Path) -> None:
         for method in METHODS:
             r = methods.get(method)
             if r is None or r["errors"] is None:
-                cells.append("none")
+                cells.append(f"none ({r['reason']})" if r else "none")
                 continue
             cell = _fmt(max(r["errors"]))
             cells.append(cell + (f" (tier {r['detector_tier']})" if method == "tiered" else ""))

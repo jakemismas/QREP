@@ -202,8 +202,14 @@ def test_backdrop_gives_no_suggestion_when_the_quilt_runs_off_the_frame(method):
     # The quilt spans x = 100 to 400 in a 400 px wide photo, so it covers the whole right
     # border column (rows 60 to 239, 180 of 300 rows): its right edge is not in the photo.
     # The method gives no suggestion and never the full frame.
+    # The right ring strip (6 px, 2 percent of 300) is quilt on 180 of its 300 rows, so it is
+    # not uniform; the other three are pure backdrop, and three uniform sides are enough to
+    # segment. The quilt then covers 180 / 300 = 0.6 of the right border column, over the 0.02
+    # it may touch, and that is the reason given.
     corners = np.array([[100.0, 60.0], [400.0, 60.0], [400.0, 240.0], [100.0, 240.0]])
-    assert b1b.METHODS[method](_scene((300, 400), corners)) is None
+    image = _scene((300, 400), corners)
+    assert b1b.METHODS[method](image) is None
+    assert b1b.explain(method, image) == (None, "component touches the photo's border")
 
 
 def test_backdrop_gives_no_suggestion_without_a_backdrop():
@@ -217,6 +223,7 @@ def test_backdrop_gives_no_suggestion_without_a_backdrop():
     image = _lab_to_bgr(_checker_lab(300, 400, 10))
     assert b1b.backdrop_hull(image) is None
     assert b1b.backdrop_lines(image) is None
+    assert b1b.explain("backdrop_hull", image) == (None, "no backdrop: under 2 uniform ring sides")
 
 
 def test_tiered_maps_the_full_frame_to_no_suggestion(monkeypatch):
@@ -226,6 +233,8 @@ def test_tiered_maps_the_full_frame_to_no_suggestion(monkeypatch):
     full = np.array([[0.0, 0.0], [400.0, 0.0], [400.0, 300.0], [0.0, 300.0]])
     monkeypatch.setattr(b1b, "_detect_tiered", lambda image: (full, 0.0, 3, None))
     assert b1b.tiered(np.zeros((300, 400, 3), np.uint8)) is None
+    assert b1b.explain("tiered", np.zeros((300, 400, 3), np.uint8)) == (
+        None, "tier 3, the full frame")
     # Tier 1's quad passes through with its tier.
     quad = RECT.copy()
     monkeypatch.setattr(b1b, "_detect_tiered", lambda image: (quad, 0.01, 1, None))
