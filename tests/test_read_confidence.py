@@ -2,7 +2,8 @@
 
 Every value the read derives from the photo carries a confidence in [0, 1],
 every input you confirmed is recorded at 1.0, and every knob the read turns
-is provisional, with its source, until D5 measures it (plan section 5.B).
+is provisional, with its source, until D5 measures it (plan section 5.B),
+except the three literals REBASELINE.md keeps frozen.
 """
 
 import json
@@ -19,13 +20,22 @@ from qrep.vision.read import knobs
 
 def test_every_knob_is_provisional_with_a_source():
     # Plan B2b: the L weight, P, the inset, the k range and the vote threshold
-    # sit in knobs.py with their sources, and this ticket freezes none.
+    # sit in knobs.py with their sources, and this ticket freezes none of
+    # them. The three literals REBASELINE.md keeps stay frozen: B5
+    # (VOTE_MIN_COPIES), B8 (SQUARE_MIN) and B9 (SQUARE_MAX); every other
+    # knob is provisional.
     named = {"L_WEIGHT", "P", "INSET", "K_MIN", "K_MAX", "VOTE_THRESHOLD"}
+    kept = {"VOTE_MIN_COPIES", "SQUARE_MIN", "SQUARE_MAX"}
     assert named <= set(knobs.KNOBS)
+    frozen = {name for name, knob in knobs.KNOBS.items() if knob.status == "frozen"}
+    assert frozen == kept
     for name, knob in knobs.KNOBS.items():
-        assert knob.status == "provisional", name
+        if name not in kept:
+            assert knob.status == "provisional", name
         assert knob.source.strip(), name
-        assert knob.value == getattr(knobs, name, knob.value), name
+        assert getattr(knobs, name) == knob.value, name
+    for name, literal in (("VOTE_MIN_COPIES", "B5"), ("SQUARE_MIN", "B8"), ("SQUARE_MAX", "B9")):
+        assert f"literal {literal}" in knobs.KNOBS[name].source, name
 
 
 def test_knob_values_match_their_sources():
@@ -171,9 +181,10 @@ def test_vote_changes_and_repeat_breaks_carry_confidences(renders, tmp_path):
     # blocks) has 50 copies (tests/test_read_vote.py), are painted with the
     # wrong fabric. (0, 0) gets a 70/30 sRGB blend of the wrong and the right
     # fabric, about 0.3 of the way from the wrong one, so it reads the wrong
-    # fabric at about (0.7 - 0.3) / 0.7 = 0.57, under the 0.8 vote threshold:
-    # the vote changes it to the type majority. (1, 1) gets the wrong fabric
-    # exactly, read at 1.0, so it keeps its read as a repeat break.
+    # fabric at a margin (d2 - d1) / d2 of about 0.6, well under the 0.8 vote
+    # threshold: the vote changes it to the type majority. (1, 1) gets the
+    # wrong fabric exactly, read at 1.0, so it keeps its read as a repeat
+    # break.
     quilt = load(FIXTURE)
     colors = {f.id: f.color for f in quilt.palette.fabrics}
 

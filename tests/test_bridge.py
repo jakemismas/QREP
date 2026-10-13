@@ -1030,8 +1030,14 @@ def test_read_confirmed_reads_the_l0_render(l0_render, quilt):
     assert result["outcome"] == "read" and result["reason"] is None
     model = result["model"]
     assert (model["center"]["rows"], model["center"]["cols"]) == (55, 45)
-    # Fabrics sort darkest first: chain blue #9db8d9 is darker than background
-    # cream #f2e8d5 (each channel lower), so f0 is the fixture's b and f1 its c.
+    # Fabrics sort darkest first, by CIELAB L*, not channel by channel (blue's
+    # 0xd9 = 217 tops cream's 0xd5 = 213). Y = 0.212671 R + 0.715160 G +
+    # 0.072169 B over linear channels weighs green most, and blue's green
+    # 0xb8 = 184 sits well under cream's 0xe8 = 232. Chain blue #9db8d9:
+    # linear (0.3372, 0.4793, 0.6939), Y = 0.0717 + 0.3428 + 0.0501 = 0.4646,
+    # L* = 116 x 0.4646^(1/3) - 16 = 116 x 0.7745 - 16 = 73.8. Cream #f2e8d5:
+    # linear (0.8879, 0.8070, 0.6654), Y = 0.1888 + 0.5771 + 0.0480 = 0.8140,
+    # L* = 116 x 0.9337 - 16 = 92.3. So f0 is the fixture's b and f1 its c.
     to_fixture = {"f0": "b", "f1": "c"}
     assert [f["id"] for f in model["palette"]["fabrics"]] == ["f0", "f1"]
     read = [[to_fixture[f] for f in row] for row in model["center"]["cells"]]
@@ -1087,6 +1093,143 @@ def test_read_confirmed_holds_too_few_pixels(l0_render):
     result = ok_result(bridge.read_confirmed(l0_request(png, corners, counts=counts)))
     assert result["outcome"] == "held"
     assert result["reason"]["code"] == "too_few_pixels"
+
+
+def test_snap_rounds_half_up_through_float_noise():
+    # Source: _snap rounds half up to a whole step (plan A10, 1/4 in steps).
+    # Formula: step x floor(value / step + 1/2), within [low, high].
+    # Inputs: a 4.1-square band at 30 eighths a square, step 2, within
+    #   [2, 200], then within [2, 112].
+    # Arithmetic: 4.1 x 30 = 123 exactly; 123 / 2 = 61.5 rounds up to 62, so
+    #   2 x 62 = 124. In float 4.1 x 30 is 122.99999999999999, a hair under
+    #   61.5 steps, which would round down to 122 without a guard. Under a
+    #   high bound of 112 (BAND_MAX), 124 caps at 112.
+    # Expected: 124, then 112.
+    assert bridge._snap(4.1 * 30, 2, 2, 200) == 124
+    assert bridge._snap(4.1 * 30, 2, 2, bridge.BAND_MAX) == 112
+
+
+def _image_request(path, size, counts, frame_kind="field", bands=None, **extra) -> str:
+    names = ("top_left", "top_right", "bottom_right", "bottom_left")
+    width, height = size
+    corners = ((0, 0), (width, 0), (width, height), (0, height))
+    frame = {
+        "kind": frame_kind,
+        "corners": {name: {"x": x, "y": y} for name, (x, y) in zip(names, corners)},
+    }
+    if bands is not None:
+        frame["bands"] = [{"width_squares": w} for w in bands]
+    request = {"token": str(path), "frame": frame, "crop_offset": {"x": 0, "y": 0}}
+    return json.dumps({**request, "counts": counts, **extra})
+
+
+def test_read_confirmed_caps_a_wide_band_at_14_inches(tmp_path):
+    # Source: BAND_MAX = 112 eighths, 14 in (REBASELINE.md literal C3), the
+    #   cap sizing puts on a border band.
+    # Inputs: a 330 x 330 px image, the outer edge at the image edge; a field
+    #   of 2 x 2 squares of 15 px inside one band of 10 squares (150 px) on
+    #   each side, (2 + 2 x 10) x 15 = 330 px; the band red, BGR (0, 0, 255),
+    #   the field a checkerboard of gray 64 (r + c even) and gray 192; three
+    #   fabrics requested. Darkest first, as in test_read_fabrics.py's border
+    #   fabric test: gray 64 (L* 27.1) f0, red (L* 53.2) f1, gray 192 f2.
+    # Arithmetic: square size 15 px x 8 / 10 px per inch = 12 eighths, a whole
+    #   quarter step inside [6, 32]. The band: 10 x 12 = 120 eighths, a whole
+    #   step but over 112, so 112. Size: 2 x 12 + 2 x 112 = 248 each way.
+    # Expected: one red band of 112, achieved 248 by 248.
+    import cv2
+    import numpy as np
+
+    image = np.full((330, 330, 3), (0, 0, 255), dtype=np.uint8)
+    for r in range(2):
+        for c in range(2):
+            level = 64 if (r + c) % 2 == 0 else 192
+            image[150 + 15 * r : 165 + 15 * r, 150 + 15 * c : 165 + 15 * c] = level
+    path = tmp_path / "wide_band.png"
+    cv2.imwrite(str(path), image)
+    counts = {
+        "blocks_across": 1,
+        "blocks_down": 1,
+        "squares_per_block_across": 2,
+        "squares_per_block_down": 2,
+    }
+    request = _image_request(
+        path, (330, 330), counts, frame_kind="outer_edge", bands=[10], fabric_count=3
+    )
+    result = ok_result(bridge.read_confirmed(request))
+    assert result["outcome"] == "read"
+    model = result["model"]
+    assert model["center"]["cell_size"] == 12
+    assert model["borders"] == [{"fabric_id": "f1", "width": 112}]
+    basis = model["size_basis"]
+    assert (basis["achieved_width"], basis["achieved_height"]) == (248, 248)
+
+
+def test_read_confirmed_reads_a_non_ascii_path(l0_render, tmp_path):
+    # Windows: cv2.imread cannot open a path outside the ANSI code page, so a
+    # photo staged under a name with an e-acute must still read. The bytes are
+    # the L0 render's, so the read is the one of
+    # test_read_confirmed_reads_the_l0_render: outcome read, 55 x 45 squares.
+    png, corners = l0_render
+    copy = tmp_path / "photo_\u00e9.png"
+    copy.write_bytes(Path(png).read_bytes())
+    result = ok_result(bridge.read_confirmed(l0_request(copy, corners)))
+    assert result["outcome"] == "read"
+    assert (result["model"]["center"]["rows"], result["model"]["center"]["cols"]) == (55, 45)
+
+
+def test_read_confirmed_reports_an_empty_image_file_as_value(tmp_path):
+    # SPEC.md section 12.1: an unreadable staged image is kind value, an
+    # empty file included, never an engine error.
+    empty = tmp_path / "empty.png"
+    empty.write_bytes(b"")
+    error = error_of(bridge.read_confirmed(_image_request(empty, (100, 100), L0_COUNTS)))
+    assert error["kind"] == "value"
+    assert "empty.png" in error["message"]
+
+
+def test_read_confirmed_refuses_more_fabrics_than_the_cap(tmp_path):
+    # Source: plan B2b criterion 2 at the bridge: a quilt whose silhouette
+    #   peaks at 12 fabrics is refused, never merged silently.
+    # Inputs: the 13-color construction of
+    #   tests/test_read_fabrics.py::test_more_fabrics_than_the_cap_refuse_as_too_many_fabrics,
+    #   an 8 x 13 grid at (r + c) mod 13, each color 8 times, with its lattice
+    #   halved and shifted by +5 in a* and b* so every color lies inside sRGB
+    #   at L* 50: a* in {-25, -5, 15, 35} by b* in {-15, 5, 25}, 20 apart, and
+    #   a 13th at (37, 25), 2 from (35, 25). Each color is drawn as its 8-bit
+    #   sRGB code (fabrics.to_hex) in 10 px squares under a field frame at the
+    #   image edge, counts 1 block of 13 x 8 squares.
+    # Arithmetic: s = (b - a) / max(a, b) does not change when every distance
+    #   scales by one factor or shifts with the lattice, so that test's hand
+    #   values hold: 0.991815 at k = 12 (only the close pair shares a fabric)
+    #   and at most 0.918 at k = 11, lower still below. Rounding to 8-bit
+    #   codes moves each color by half a code step, a fraction of a Lab unit,
+    #   small against the gaps of 2 and 20, so the peak stays at 12, the cap.
+    # Expected: outcome refused, reason too_many_fabrics, no model or details.
+    import cv2
+    import numpy as np
+
+    from qrep.vision.read.fabrics import to_hex
+
+    lattice = [(50.0, a, b) for b in (-15, 5, 25) for a in (-25, -5, 15, 35)]
+    codes = [to_hex(np.array(lab)) for lab in lattice + [(50.0, 37.0, 25.0)]]
+    bgr = [[int(code[i : i + 2], 16) for i in (5, 3, 1)] for code in codes]
+    rows, cols, px = 8, 13, 10
+    image = np.zeros((rows * px, cols * px, 3), dtype=np.uint8)
+    for r in range(rows):
+        for c in range(cols):
+            image[r * px : (r + 1) * px, c * px : (c + 1) * px] = bgr[(r + c) % 13]
+    path = tmp_path / "thirteen.png"
+    cv2.imwrite(str(path), image)
+    counts = {
+        "blocks_across": 1,
+        "blocks_down": 1,
+        "squares_per_block_across": cols,
+        "squares_per_block_down": rows,
+    }
+    result = ok_result(bridge.read_confirmed(_image_request(path, (cols * px, rows * px), counts)))
+    assert result["outcome"] == "refused"
+    assert result["reason"]["code"] == "too_many_fabrics"
+    assert result["model"] is None and result["details"] is None
 
 
 @pytest.mark.skipif(

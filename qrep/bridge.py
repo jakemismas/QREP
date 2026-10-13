@@ -801,7 +801,10 @@ def _result(model: type[BaseModel], produce):
 
 def _snap(value: float, step: int, low: int, high: int) -> int:
     """value rounded half up to a whole step, within [low, high]."""
-    return min(high, max(low, step * math.floor(value / step + 0.5)))
+    # A product that is a half step in exact arithmetic can land a hair under
+    # it in float: 4.1 x 30 is 123 exactly but 122.99999999999999 in float,
+    # which would round down to 122 instead of up to 124.
+    return min(high, max(low, step * math.floor(value / step + 0.5 + 1e-9)))
 
 
 def _read_model(geometry, squares, fabrics, voted, knobs) -> tuple[Quilt, ReadDetails]:
@@ -839,7 +842,9 @@ def _read_model(geometry, squares, fabrics, voted, knobs) -> tuple[Quilt, ReadDe
                 index = ids.index(strip.fabric_id)
                 votes[index] = votes.get(index, 0.0) + strip.confidence
         fabric = min(votes, key=lambda index: (-votes[index], index))
-        width = _snap(band.width_squares * cell, knobs.SIZE_STEP, knobs.SIZE_STEP, 10**9)
+        # A band caps at 14 in (BAND_MAX, REBASELINE.md literal C3), as sizing
+        # caps it, so a wide band at an estimated square size cannot exceed it.
+        width = _snap(band.width_squares * cell, knobs.SIZE_STEP, knobs.SIZE_STEP, BAND_MAX)
         borders.append(BorderBand(fabric_id=ids[fabric], width=width))
 
     # The cells stage weighs every labeled area alike: each square counts
@@ -966,6 +971,7 @@ def read_confirmed(request_json: str) -> dict:
     # The read imports cv2 through qrep.vision, so it loads here, when a read
     # runs, and never when the worker imports the bridge.
     import cv2
+    import numpy as np
 
     from qrep.vision.read import knobs
     from qrep.vision.read.diagnosis import Diagnosis
@@ -974,7 +980,11 @@ def read_confirmed(request_json: str) -> dict:
     from qrep.vision.read.sample import read_squares
     from qrep.vision.read.vote import vote
 
-    image = cv2.imread(str(path), cv2.IMREAD_COLOR)
+    # cv2.imread cannot open a non-ASCII path on Windows, so the bytes come
+    # through numpy and cv2 only decodes them. imdecode raises on an empty
+    # buffer instead of returning None, so an empty file is checked first.
+    data = np.fromfile(path, dtype=np.uint8)
+    image = cv2.imdecode(data, cv2.IMREAD_COLOR) if data.size else None
     if image is None:
         raise ValueError(f"image file is not a readable image: {request.token}")
     height, width = image.shape[:2]

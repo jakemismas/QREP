@@ -59,9 +59,12 @@ class Vote:
     breaks are sorted by (row, col). types has shape (blocks down, blocks
     across), numbered by first appearance in raster order. repeat is (down,
     across) in squares, derived only from the confirmed block period and the
-    types. agreement, in [0, 1], is the share of the voting types' squares
-    whose read equals their type majority, 1.0 when no type voted; voted says
-    whether any type did.
+    types, and the whole field for a 1 x 1 block, which confirms no repeat.
+    agreement, in [0, 1], is the share of the squares of every type with at
+    least two copies whose read before the vote equals their type majority,
+    0.0 when no such type exists or the block is 1 x 1: as an undefined
+    silhouette gives 0, a read with no repeated block has no evidence of a
+    repeat. voted says whether any type voted.
     """
 
     labels: np.ndarray
@@ -282,18 +285,30 @@ def vote(
         Break(r, c, int(lab[r, c]), int(classes[field_majority[r, c]]), float(conf[r, c]))
         for r, c in zip(*(axis.tolist() for axis in np.nonzero(held)))
     )
+    # A type of one copy is its own majority, so it agrees by construction
+    # and is no evidence of a repeat; a type of two copies is, voting or not.
+    repeated = copies >= 2 if size > 1 else np.zeros(n_types, dtype=bool)
+    in_repeat = to_field(np.repeat(repeated[types][:, None], size, axis=1))
     agreement = (
-        float(np.mean(field_codes[in_vote] == field_majority[in_vote])) if voting.any() else 1.0
+        float(np.mean(field_codes[in_repeat] == field_majority[in_repeat]))
+        if repeated.any()
+        else 0.0
     )
 
     layout = types.reshape(down, across)
+    if size == 1:
+        # A 1 x 1 block is the square itself, so its types are the labels,
+        # and their period is the pattern's, not a block repeat you confirmed.
+        repeat = (rows, cols)
+    else:
+        repeat = (_period(layout) * br, _period(layout.T) * bc)
     return Vote(
         labels=out_labels,
         confidence=out_confidence,
         changes=changes,
         breaks=breaks,
         types=layout,
-        repeat=(_period(layout) * br, _period(layout.T) * bc),
+        repeat=repeat,
         agreement=agreement,
         voted=bool(voting.any()),
     )

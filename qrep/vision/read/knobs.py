@@ -2,7 +2,9 @@
 
 Every knob is provisional (plan section 5.B): D5 measures the new read on the
 corpus, and only Jake freezes a value or changes the L weight (plan section
-7.2). B2a's sampling knobs live beside the code that uses them, and the
+7.2). The exceptions are the literals REBASELINE.md keeps, which stay frozen:
+VOTE_MIN_COPIES (literal B5), SQUARE_MIN (B8) and SQUARE_MAX (B9). B2a's
+sampling knobs live beside the code that uses them, and the
 fabric-count range beside the request that carries it (qrep/contract.py must
 not import qrep.vision, which loads cv2), so this table records those by
 reference and holds each value once.
@@ -16,6 +18,7 @@ from qrep.vision.read.geometry import MIN_PX_PER_SQUARE
 from qrep.vision.read.sample import INSET, P
 
 PROVISIONAL = "provisional"
+FROZEN = "frozen"
 
 # Weight on L* in the color distance, so lightness, which shading moves most,
 # counts half: Jake's default (plan section 2.1, screen 3).
@@ -84,6 +87,7 @@ KNOBS: dict[str, Knob] = {
     "VOTE_MIN_COPIES": Knob(
         VOTE_MIN_COPIES,
         "REBASELINE.md literal B5, kept for the block-consistent vote (#70 body and comment 0)",
+        FROZEN,
     ),
     "TYPE_AGREEMENT": Knob(
         TYPE_AGREEMENT,
@@ -107,10 +111,14 @@ KNOBS: dict[str, Knob] = {
     ),
     "SIZE_STEP": Knob(SIZE_STEP, "1/4 in square sizes (plan A10 and section 2.1, screen 4)"),
     "SQUARE_MIN": Knob(
-        SQUARE_MIN, "qrep/model/finished_size.py CELL_MIN, 3/4 in (REBASELINE.md literal B8)"
+        SQUARE_MIN,
+        "qrep/model/finished_size.py CELL_MIN, 3/4 in (REBASELINE.md literal B8)",
+        FROZEN,
     ),
     "SQUARE_MAX": Knob(
-        SQUARE_MAX, "qrep/model/finished_size.py CELL_MAX, 4 in (REBASELINE.md literal B9)"
+        SQUARE_MAX,
+        "qrep/model/finished_size.py CELL_MAX, 4 in (REBASELINE.md literal B9)",
+        FROZEN,
     ),
     "SIZE_ESTIMATE_CONFIDENCE": Knob(
         SIZE_ESTIMATE_CONFIDENCE,

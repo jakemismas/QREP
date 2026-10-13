@@ -54,9 +54,11 @@ class Clusters:
 
     centers has shape (k, 3): each fabric's fitted float CIELAB at the field
     center, position (0.5, 0.5). labels and confidence have shape (n,); a
-    sample's confidence is (d2 - d1) / d2 over its distances to the fabrics'
-    shading-corrected colors at its own position. silhouette is the weighted
-    mean silhouette at k, None when undefined.
+    sample's confidence is (d2 - d1) / d2 over its distances to the
+    shading-corrected colors, at its own position, of the fabrics that hold
+    samples, and 0.0 when fewer than two do. silhouette is the weighted mean
+    silhouette at k, None when undefined, which includes a fabric that holds
+    no sample.
     """
 
     k: int
@@ -230,18 +232,38 @@ def _expected(basis: np.ndarray, coef: np.ndarray) -> np.ndarray:
     return np.einsum("nb,kbc->nkc", basis, coef)
 
 
+def _spread(n: int, m: int) -> np.ndarray:
+    """m distinct indices of range(n), m < n, sorted: the distinct values of
+    floor(frac((j + 1) x 0.618...) x n) for j = 0, 1, .., the first m to
+    appear. The sequence runs past j = m only when picks repeat, and it
+    reaches every index in the end, so the loop stops."""
+    count = m
+    while True:
+        u = np.arange(1, count + 1) * _GOLDEN % 1.0
+        # u x n rounds up to n only for u within an ulp of 1.
+        picks = np.minimum(np.floor(u * n), n - 1).astype(np.intp)
+        values, first = np.unique(picks, return_index=True)
+        if len(values) >= m:
+            return np.sort(picks[np.sort(first)[:m]])
+        count *= 2
+
+
 def _subset(positions: np.ndarray, weights: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """The silhouette's points and weights: every sample outside the field
-    (the band strips, few and heavy) and a stride subsample of the squares,
-    at most SILHOUETTE_SAMPLES in all. Each kept square stands for stride
-    squares, so its weight scales up and the squares keep their share of the
-    weight against the strips."""
+    (the band strips, few and heavy) and a golden-ratio pick of the squares
+    (_spread), at most SILHOUETTE_SAMPLES in all. A stride would line up with
+    the grid whenever it shares a factor with the column count: stride 2 on
+    48 columns keeps the even columns alone, and a fabric on odd columns
+    drops out of the silhouette. The golden-ratio sequence has no period, so
+    it cannot line up. Each kept square stands for n / kept squares, so its
+    weight scales up and the squares keep their share of the weight against
+    the strips."""
     inside = np.all((positions >= 0) & (positions <= 1), axis=1)
     squares, strips = np.flatnonzero(inside), np.flatnonzero(~inside)
     budget = max(SILHOUETTE_SAMPLES - len(strips), 0)
     kept = squares
     if len(squares) > budget:
-        kept = squares[:: -(-len(squares) // budget)] if budget else squares[:0]
+        kept = squares[_spread(len(squares), budget)]
     index = np.concatenate([kept, strips])
     w = weights[index].copy()
     if len(kept):
@@ -316,10 +338,15 @@ def cluster(
 
     expected = _expected(basis, coef)
     distances = np.sqrt(_squared(lab, expected, l_weight))
-    if k == 1:
-        confidence = np.ones(len(lab))
+    # An empty fabric (k above the distinct colors) repeats a held center, so
+    # counting it would put d2 at 0 for every square of its twin. With fewer
+    # than two held fabrics there is no other fabric to tell a square from,
+    # so no margin, never certainty.
+    held = np.bincount(labels, minlength=k) > 0
+    if held.sum() < 2:
+        confidence = np.zeros(len(lab))
     else:
-        nearest = np.sort(distances, axis=1)
+        nearest = np.sort(distances[:, held], axis=1)
         d1, d2 = nearest[:, 0], nearest[:, 1]
         confidence = np.where(d2 > 0, (d2 - d1) / np.where(d2 > 0, d2, 1.0), 0.0)
 
@@ -327,6 +354,10 @@ def cluster(
     corrected = _scale(lab - (expected[rows, labels] - coef[labels, 0]), l_weight)
     index, w = _subset(positions, weights)
     silhouette, per_label = _silhouette(corrected[index], w, labels[index], k)
+    if not held.all():
+        # A fabric with no sample has no evidence of separation, so the
+        # palette has none at this k; the held fabrics keep their own scores.
+        silhouette = None
     if per_label is None:
         center_confidence = np.zeros(k)
     else:

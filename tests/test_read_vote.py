@@ -11,9 +11,10 @@ qrep/vision/read/vote.py (the ticket's algorithm, steps 1 to 8):
   a square of a voting type that differs from its majority takes it below
     the threshold (a Change, with the share) and is a Break otherwise
   repeat: the smallest row and column periods of the type layout, times the
-    block size
-  agreement: over the squares of the types that voted, the share whose read
-    equals their type majority; 1.0 when no type voted
+    block size; the whole field for a 1 x 1 block, which confirms no repeat
+  agreement: over the squares of every type with at least two copies, the
+    share whose read before the vote equals their type majority; 0.0 when no
+    such type exists or the block is 1 x 1
 
 The tests pass the knob values their arithmetic uses (below) explicitly, so
 a provisional knob that D5 moves does not change a hand computation; one
@@ -91,31 +92,35 @@ def test_period_of_one_never_votes_even_with_many_copies():
     # Arithmetic: block size 1 x 1 = 1, not > 1, so no type votes. Had it
     #   voted, label 0 weighs 5 x 0.5 = 2.5 against label 1's 4 x 0.5 = 2.0,
     #   and the four 1s would have changed; none does.
+    #   A 1 x 1 block confirms no repeat (vision-22), so the repeat is the
+    #   whole 3 x 3 field and no type counts toward the agreement: 0.0.
     # Expected: voted False, labels and confidence unchanged, no changes or
-    #   breaks, agreement 1.0 (no type voted), types all 0, repeat 1 x 1.
+    #   breaks, agreement 0.0, types all 0, repeat (3, 3).
     assert merged.voted is False
     np.testing.assert_array_equal(merged.labels, labels)
     np.testing.assert_array_equal(merged.confidence, confidence)
     assert merged.changes == ()
     assert merged.breaks == ()
-    assert merged.agreement == 1.0
+    assert merged.agreement == 0.0
     np.testing.assert_array_equal(merged.types, np.zeros((3, 3), dtype=int))
-    assert merged.repeat == (1, 1)
+    assert merged.repeat == (3, 3)
 
     split = _vote(labels, confidence, 1, 1)
-    # Source: ticket steps 4, 5 and 7.
+    # Source: ticket steps 4 and 5; vision-22 for the repeat.
     # Formula: a 1 x 1 block agrees with a pattern 1.0 when equal, else 0.0,
     #   so at type_agreement 0.75 each label is its own type, numbered by
-    #   first appearance; the repeat is the smallest period of that layout.
+    #   first appearance; a 1 x 1 block confirms no repeat, so the repeat is
+    #   the whole field whatever the layout's period.
     # Inputs: (0, 0) reads 0, (0, 1) reads 1.
-    # Arithmetic: label 0 -> type 0, label 1 -> type 1. Rows: row 1 differs
-    #   from row 0, row 2 equals row 0, so py = 2; columns likewise px = 2;
-    #   repeat (2 x 1, 2 x 1).
-    # Expected: types equal the labels, repeat (2, 2), no vote.
+    # Arithmetic: label 0 -> type 0, label 1 -> type 1. The layout repeats
+    #   every 2 squares each way, but the block is 1 x 1, so the repeat is
+    #   the whole field, (3, 3).
+    # Expected: types equal the labels, repeat (3, 3), no vote, agreement 0.0.
     assert split.voted is False
     np.testing.assert_array_equal(split.types, labels)
-    assert split.repeat == (2, 2)
+    assert split.repeat == (3, 3)
     assert split.changes == ()
+    assert split.agreement == 0.0
 
 
 def test_fewer_copies_than_min_copies_do_not_vote():
@@ -129,13 +134,15 @@ def test_fewer_copies_than_min_copies_do_not_vote():
     #   confidence 0.1.
     # Arithmetic: the second block agrees with the first on 3 squares of
     #   weight 1.0: 3.0 / 3.1 = 0.968 >= 0.75, so one type of 2 copies;
-    #   2 < 3, so it does not vote.
-    # Expected: voted False, labels unchanged, no changes, agreement 1.0,
+    #   2 < 3, so it does not vote. Its two copies still count toward the
+    #   agreement: at (1, 1) label 1 at 1.0 beats label 0 at 0.1, so 7 of the
+    #   8 squares read their majority before the vote, 7/8.
+    # Expected: voted False, labels unchanged, no changes, agreement 0.875,
     #   types [[0, 0]], repeat (2, 2).
     assert held.voted is False
     np.testing.assert_array_equal(held.labels, labels)
     assert held.changes == ()
-    assert held.agreement == 1.0
+    assert held.agreement == _approx(7 / 8)
     np.testing.assert_array_equal(held.types, [[0, 0]])
     assert held.repeat == (2, 2)
 
@@ -355,12 +362,17 @@ def test_double_irish_chain_misread_takes_its_own_types_majority():
             [[0, 1], [1, 0]],
             (4, 4),
         ),
-        # Rows alternate in 1 x 1 blocks: labels 5 and 7 number as types 0
-        # and 1 by first appearance; row 1 differs from row 0, rows 2 and 3
-        # repeat rows 0 and 1, py = 2; columns equal, px = 1; repeat (2, 1).
-        ([[5, 5], [7, 7], [5, 5], [7, 7]], (1, 1), [[0, 0], [1, 1], [0, 0], [1, 1]], (2, 1)),
+        # Rows alternate in 1 x 2 blocks: [5, 5] and [7, 7] agree on 0 of 2
+        # squares, so they number as types 0 and 1 by first appearance; row 1
+        # differs from row 0, rows 2 and 3 repeat rows 0 and 1, py = 2; one
+        # block across, px = 1; repeat (2 x 1, 1 x 2) = (2, 2).
+        ([[5, 5], [7, 7], [5, 5], [7, 7]], (1, 2), [[0], [1], [0], [1]], (2, 2)),
+        # The same rows in 1 x 1 blocks: the types are the labels, 5 -> 0 and
+        # 7 -> 1, with period 2 down, but a 1 x 1 block confirms no repeat
+        # (vision-22), so the repeat is the whole 4 x 2 field.
+        ([[5, 5], [7, 7], [5, 5], [7, 7]], (1, 1), [[0, 0], [1, 1], [0, 0], [1, 1]], (4, 2)),
     ],
-    ids=["one-type", "all-distinct", "checkerboard", "row-period"],
+    ids=["one-type", "all-distinct", "checkerboard", "row-period", "one-by-one"],
 )
 def test_repeat_comes_from_the_type_layout(labels, block, types, repeat):
     # Source: ticket step 7.
@@ -374,7 +386,7 @@ def test_repeat_comes_from_the_type_layout(labels, block, types, repeat):
     assert result.repeat == repeat
 
 
-def test_agreement_counts_only_the_types_that_voted():
+def test_agreement_counts_only_types_with_two_or_more_copies():
     a = np.array([[0, 0, 0], [0, 1, 0], [0, 0, 0]])
     labels = np.hstack([a, a, a, np.full((3, 3), 2)])
     confidence = np.ones((3, 12))
@@ -384,7 +396,7 @@ def test_agreement_counts_only_the_types_that_voted():
     result = _vote(labels, confidence, 3, 3)
     # Source: ticket steps 6 and 8.
     # Formula: agreement = squares equal to their type majority / squares,
-    #   over the voting types only.
+    #   over the types with at least two copies only.
     # Inputs: blocks A, A with (2, 0) read 1 at 0.2, A with (0, 0) read 1 at
     #   0.4 and (2, 2) read 1 at 0.9, then an all-2 block; all else 1.0.
     # Arithmetic: copy 1 agrees 8.0 / 8.2 = 0.976, copy 2 7.0 / 8.3 = 0.843,
@@ -508,10 +520,13 @@ def test_refinement_pass_reassigns_and_renumbers_types():
     #   renumber by first appearance to [0, 1, 1, 0, 0, 0].
     # Majorities: type 0 = b0, b3, b4, b5: position 4 reads 0, 1, 0, 0 -> 0;
     #   position 5 reads 0, 1, 1, 0, a full tie -> 0; so 00000011. Type 1 =
-    #   b1, b2 has 2 copies and does not vote.
+    #   b1, b2 has 2 copies and does not vote; its positions 0 and 1 read 0
+    #   and 1, a full tie -> 0, so its majority is 00000000.
     # Vote, all confidence 1.0, so differences are Breaks: b3 at positions 4
     #   and 5 (columns 3 x 8 + 4 = 28 and 29), b4 at position 5 (column 37).
-    #   Agreement: 29 of type 0's 32 squares, 29/32.
+    #   Agreement: 29 of type 0's 32 squares, and, since type 1 has two
+    #   copies, 8 + 6 = 14 of its 16 (b2 differs at positions 0 and 1):
+    #   (29 + 14) / (32 + 16) = 43/48.
     # Repeat: [0, 1, 1, 0, 0, 0] first equals itself shifted at p = 5 ([0] vs
     #   [0]); px = 5, repeat (1, 5 x 8).
     # Expected: as listed. Without pass 2 the types would be [0, 0, 0, 1, 1, 1].
@@ -522,8 +537,64 @@ def test_refinement_pass_reassigns_and_renumbers_types():
         Break(0, 37, 1, 0, _approx(1.0)),
     )
     assert result.changes == ()
-    assert result.agreement == _approx(29 / 32)
+    assert result.agreement == _approx(43 / 48)
     assert result.repeat == (1, 40)
+
+
+def test_a_one_by_one_block_confirms_no_repeat():
+    labels = [[0, 1, 0, 1], [0, 1, 0, 1]]
+    result = _vote(labels, np.ones((2, 4)), 1, 1)
+    # Source: vision-22, a 1 x 1 block confirms no repeat.
+    # Formula: block_rows x block_cols = 1, so repeat = (rows, cols), whatever
+    #   the labels.
+    # Inputs: two rows of [0, 1, 0, 1] in 1 x 1 blocks, confidence 1.0.
+    # Arithmetic: the types are the labels, with period 1 down and 2 across,
+    #   which would give (1, 2); the block is 1 x 1, so the repeat is the
+    #   whole 2 x 4 field.
+    # Expected: repeat (2, 4).
+    np.testing.assert_array_equal(result.types, labels)
+    assert result.repeat == (2, 4)
+
+
+def test_agreement_is_zero_without_a_repeated_block():
+    distinct = np.kron([[0, 1, 2], [3, 4, 5]], np.ones((2, 2), dtype=int))
+    result = _vote(distinct, np.ones((4, 6)), 2, 2)
+    # Source: vision-22 and the rule that an undefined silhouette gives 0,
+    #   never 1: no repeated block is no evidence of a repeat.
+    # Formula: agreement over the squares of the types with at least two
+    #   copies, 0.0 when there are none.
+    # Inputs: the all-distinct case of test_repeat_comes_from_the_type_layout,
+    #   six 2 x 2 blocks of one label each.
+    # Arithmetic: any two blocks agree on 0 of 4 squares, so six types of one
+    #   copy each, none with two.
+    # Expected: no vote, agreement 0.0.
+    assert result.voted is False
+    assert result.agreement == 0.0
+
+    uniform = _vote(np.zeros((3, 3), dtype=int), np.ones((3, 3)), 1, 1)
+    # Inputs: a 3 x 3 field of label 0 in 1 x 1 blocks, one type of 9 copies.
+    # Arithmetic: a 1 x 1 block never counts toward the agreement, however
+    #   many copies its type has, and its repeat is the whole field.
+    # Expected: agreement 0.0, repeat (3, 3).
+    assert uniform.agreement == 0.0
+    assert uniform.repeat == (3, 3)
+
+
+def test_a_type_of_two_copies_counts_toward_agreement_without_voting():
+    result = _vote([[0, 1, 0, 0]], [[1.0, 1.0, 1.0, 0.2]], 1, 2)
+    # Source: vision-22, agreement over every type with at least two copies.
+    # Formula: block agreement = matching weight / block weight; majority by
+    #   summed weight.
+    # Inputs: 1 x 2 blocks [0, 1] and [0, 0], the second's last square at 0.2.
+    # Arithmetic: the second block agrees 1.0 / 1.2 = 0.833 >= 0.75, so one
+    #   type of 2 copies, under min_copies 3, so no vote. Position 1: label 1
+    #   at 1.0 beats label 0 at 0.2, majority 1. Squares equal to their
+    #   majority: (0, 0), (0, 1) and (0, 2), not (0, 3): 3 of 4.
+    # Expected: no vote, no changes, types [[0, 0]], agreement 3/4.
+    assert result.voted is False
+    assert result.changes == ()
+    np.testing.assert_array_equal(result.types, [[0, 0]])
+    assert result.agreement == _approx(3 / 4)
 
 
 def test_inputs_are_not_mutated():

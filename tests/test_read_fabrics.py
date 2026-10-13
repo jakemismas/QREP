@@ -8,8 +8,10 @@ Formulas used throughout, from the ticket:
              to the other members of its fabric, b the smallest weighted
              mean distance to another fabric; s = 0 for a point alone in its
              fabric; the read's silhouette is the weighted mean of s
-  confidence (d2 - d1) / d2 over a sample's two nearest fabric colors
+  confidence (d2 - d1) / d2 over a sample's two nearest fabric colors among
+             the fabrics that hold samples; 0 when fewer than two do
   lightness  L* = 116 Y^(1/3) - 16 for luminance Y > 0.008856
+A fabric that holds no sample leaves the silhouette undefined.
 A fabric with fewer than 18 members fits a constant shading surface, its
 weighted mean, so below that count the corrected points are the samples.
 """
@@ -278,13 +280,14 @@ def test_an_undefined_silhouette_gives_palette_confidence_zero():
     # confidence to 0, never 1.
     # Inputs: a 4 x 4 grid of one color, (50, 10, 10).
     # Arithmetic: one distinct color, under K_MIN = 2, so no count is tried
-    #   and the read takes k = 1: one fabric, so the silhouette is undefined.
-    #   A request for k = 2 keeps 2 fabrics, the second repeating the first
-    #   and empty: one fabric present, still undefined. Its squares sit at
-    #   distance 0 from both centers, d2 = 0, so confidence 0.0.
+    #   and the read takes k = 1: one fabric, so the silhouette is undefined,
+    #   and with no second fabric to tell a square from, each square's
+    #   confidence is 0.0. A request for k = 2 keeps 2 fabrics, the second
+    #   repeating the first and empty: one fabric holds samples, so the
+    #   silhouette is still undefined and the confidence again 0.0.
     # Expected: suggested: k 1, palette and k confidence 0.0, every label 0,
-    #   confidence 1.0 (k = 1). Requested: k 2 at confidence 1.0, palette
-    #   confidence 0.0, every label 0, confidence 0.0.
+    #   confidence 0.0. Requested: k 2 at confidence 1.0, palette confidence
+    #   0.0, every label 0, confidence 0.0.
     lab = np.tile(np.array([50.0, 10.0, 10.0]), (4, 4, 1))
     suggested = read_fabrics(squares_of(lab))
     assert suggested.k == 1
@@ -293,7 +296,7 @@ def test_an_undefined_silhouette_gives_palette_confidence_zero():
     assert suggested.center_confidence.tolist() == [0.0]
     assert suggested.centers.tolist() == [[50.0, 10.0, 10.0]]
     assert np.all(suggested.labels == 0)
-    assert np.all(suggested.confidence == 1.0)
+    assert np.all(suggested.confidence == 0.0)
 
     requested = read_fabrics(squares_of(lab), 2)
     assert requested.k == 2
@@ -334,7 +337,7 @@ def test_assignment_confidence_is_the_margin_over_the_second_center():
     assert full.confidence == pytest.approx([1.0, 0.542940, 0.707299, 1.0], abs=1e-6)
 
 
-def test_a_single_fabric_is_certain_and_a_repeated_center_is_not():
+def test_one_fabric_has_no_margin_and_an_empty_fabric_takes_no_part():
     # Source: the ticket's seeding, k-means and confidence rules.
     # Inputs: L* 20 three times, then L* 60 three times, a* = b* = 0,
     #   weights 1.
@@ -346,24 +349,57 @@ def test_a_single_fabric_is_certain_and_a_repeated_center_is_not():
     #   Every D^2 is now 0, so the third center repeats L* 20. Lloyd: L* 60
     #   goes to center 0, L* 20 ties centers 1 and 2 and takes the lower, 1;
     #   the means do not move. Inertia 0, which no later seeding beats.
-    #   Confidence: an L* 20 sample has d1 = d2 = 0, so 0.0; an L* 60 sample
-    #   has d1 = 0 and d2 = 20, so 1.0. Two fabrics present over six points:
-    #   a = 0 and b = 20 everywhere, s = 1.
-    #   k = 1: one fabric, confidence 1.0, center the mean (40, 0, 0), and the
-    #   silhouette undefined.
+    #   Confidence among the fabrics that hold samples, 0 and 1 (center 2 is
+    #   empty): an L* 20 sample has d1 = 0 and d2 = 0.5 x 40 = 20, so 1.0, and
+    #   an L* 60 sample likewise. Fabric 2 holds no sample, so the silhouette
+    #   is undefined; fabrics 0 and 1 each have a = 0 and b = 20 at every
+    #   point, s = 1, so their center confidence is 1.0, and fabric 2's is 0.
+    #   k = 1: one fabric, no second to tell a square from, confidence 0.0,
+    #   center the mean (40, 0, 0), and the silhouette undefined.
     # Expected: as above.
     lab = np.array([(20, 0, 0)] * 3 + [(60, 0, 0)] * 3, dtype=float)
     three = cluster(lab, np.ones(6), in_a_row(6), 3)
     assert three.labels.tolist() == [1, 1, 1, 0, 0, 0]
     assert three.centers.tolist() == [[60.0, 0.0, 0.0], [20.0, 0.0, 0.0], [20.0, 0.0, 0.0]]
-    assert three.confidence.tolist() == [0.0, 0.0, 0.0, 1.0, 1.0, 1.0]
-    assert three.silhouette == 1.0
+    assert three.confidence.tolist() == [1.0] * 6
+    assert three.silhouette is None
     assert three.center_confidence.tolist() == [1.0, 1.0, 0.0]
     one = cluster(lab, np.ones(6), in_a_row(6), 1)
     assert one.labels.tolist() == [0] * 6
-    assert one.confidence.tolist() == [1.0] * 6
+    assert one.confidence.tolist() == [0.0] * 6
     assert one.centers.tolist() == [[40.0, 0.0, 0.0]]
     assert one.silhouette is None
+
+
+def test_an_empty_fabric_leaves_the_silhouette_undefined_and_the_margins_clean():
+    # Source: the ticket: an undefined silhouette gives the palette confidence
+    #   0, never 1; each margin counts only the fabrics that hold samples.
+    # Inputs: a 4 x 4 checkerboard of two flat colors, F0 (30, 0, 0) where
+    #   r + c is even and F1 (70, 0, 0) where it is odd; a requested k = 3.
+    # Arithmetic: two distinct colors for three fabrics, so seeding repeats a
+    #   chosen center and one fabric stays empty (distance ties go to the
+    #   lower index); with it the silhouette is undefined, palette confidence
+    #   0.0, and the empty fabric's center confidence 0.0. Each square sits on
+    #   its own fabric, d1 = 0, and the other held fabric is 0.5 x 40 = 20
+    #   away, so (20 - 0) / 20 = 1.0; the empty twin, also at 0, is not
+    #   counted. The held fabrics have a = 0, b = 20, s = 1: 1.0 each.
+    # Expected: k 3, palette confidence 0.0, one empty fabric at center
+    #   confidence 0.0, the others at 1.0, labels by the checkerboard, every
+    #   square's confidence 1.0.
+    r, c = np.divmod(np.arange(16), 4)
+    truth = (r + c) % 2
+    colors = np.array([(30.0, 0.0, 0.0), (70.0, 0.0, 0.0)])
+    result = read_fabrics(squares_of(colors[truth].reshape(4, 4, 3)), 3)
+    assert isinstance(result, Fabrics)
+    assert result.k == 3
+    assert result.palette_confidence == 0.0
+    empty = sorted(set(range(3)) - set(result.labels.ravel().tolist()))
+    assert len(empty) == 1
+    held = [i for i in range(3) if i not in empty]
+    assert result.center_confidence[empty[0]] == 0.0
+    assert result.center_confidence[held] == pytest.approx([1.0, 1.0], abs=1e-12)
+    assert same_partition(result.labels.ravel(), [np.flatnonzero(truth == i) for i in (0, 1)])
+    assert np.all(result.confidence == 1.0)
 
 
 def falloff_grid():
@@ -518,20 +554,61 @@ def test_fabrics_order_darkest_first_then_by_a_then_b():
     assert result.centers.tolist() == colors[[2, 1, 0]].tolist()
 
 
-def test_the_silhouette_keeps_every_strip_and_a_stride_of_squares():
+def test_the_silhouette_keeps_every_strip_and_a_golden_ratio_pick_of_squares():
     # Source: the ticket's silhouette subsample, SILHOUETTE_SAMPLES = 2000.
     # Inputs: 2116 squares inside the field (weight 1), then 4 strips outside
     #   it (weights 3, 3, 5, 5).
-    # Arithmetic: 2000 - 4 = 1996 places for squares; stride
-    #   ceil(2116 / 1996) = 2 keeps squares 0, 2, .., 2114: 1058 of them, each
-    #   standing for 2116 / 1058 = 2 squares, so weight 2.0.
-    # Expected: indices 0, 2, .., 2114 then 2116..2119; weights 2.0 for the
-    #   squares and 3, 3, 5, 5 for the strips; 1062 points, under 2000.
+    # Formula: square j of the pick is floor(frac((j + 1) x 0.618034) x n),
+    #   the first m distinct values, sorted.
+    # Arithmetic: 2000 - 4 = 1996 places for squares, so m = 1996 of n = 2116,
+    #   each standing for 2116 / 1996 = 529/499 squares. The first picks:
+    #   j = 0: 0.618034 x 2116 = 1307.76 -> 1307; j = 1: frac(1.236068) =
+    #   0.236068 x 2116 = 499.52 -> 499; j = 2: frac(1.854102) = 0.854102 x
+    #   2116 = 1807.28 -> 1807.
+    # Expected: 1996 distinct sorted square indices under 2116, among them
+    #   499, 1307 and 1807, then 2116..2119; weights 529/499 for the squares
+    #   and 3, 3, 5, 5 for the strips; 2000 points.
     positions = np.concatenate([np.full((2116, 2), 0.5), [(0.5, -0.1), (1.1, 0.5)] * 2])
     weights = np.concatenate([np.ones(2116), [3.0, 3.0, 5.0, 5.0]])
     index, w = _subset(positions, weights)
-    assert index.tolist() == list(range(0, 2116, 2)) + [2116, 2117, 2118, 2119]
-    assert w.tolist() == [2.0] * 1058 + [3.0, 3.0, 5.0, 5.0]
+    kept = index[:1996].tolist()
+    assert len(index) == 2000
+    assert kept == sorted(set(kept)) and kept[-1] < 2116
+    assert {499, 1307, 1807} <= set(kept)
+    assert index[1996:].tolist() == [2116, 2117, 2118, 2119]
+    assert w[:1996] == pytest.approx([529 / 499] * 1996, abs=1e-12)
+    assert w[1996:].tolist() == [3.0, 3.0, 5.0, 5.0]
+
+
+def test_the_silhouette_sees_a_fabric_on_odd_columns():
+    # Source: the ticket's silhouette subsample; a stride of 2 on a field of
+    #   48 columns kept only the even columns, so a fabric there was unscored.
+    # Inputs: a 48 x 48 field, 2304 squares; F1 (50, 60, 0) on the odd columns
+    #   of rows 0 to 5 (6 x 24 = 144 squares); elsewhere F0 (30, 0, 0) where
+    #   r + c is even and F2 (70, 0, 0) where it is odd; a requested k = 3.
+    # Arithmetic: 2304 > 2000, so the pick keeps m = 2000. Square r x 48 + c
+    #   is odd exactly when c is, so the old stride ceil(2304 / 2000) = 2 kept
+    #   no F1 square. The golden-ratio pick keeps j = 4: frac(5 x 0.618034) =
+    #   0.090170 x 2304 = 207.75 -> 207 = 4 x 48 + 15, and j = 12:
+    #   frac(13 x 0.618034) = 0.034442 x 2304 = 79.35 -> 79 = 1 x 48 + 31,
+    #   both F1 (odd column, row under 6). Each fabric is one flat color with
+    #   at least 18 members, so its fitted surface is flat at that color and
+    #   the corrected points are the samples: a = 0 and b > 0 at every kept
+    #   point, s = 1, so the silhouette and every center confidence are 1.0.
+    # Expected: labels as built (darkest first F0, F1, F2), palette and every
+    #   center confidence 1.0, F1's above 0 in particular.
+    rows = cols = 48
+    r, c = np.divmod(np.arange(rows * cols), cols)
+    truth = np.where((r < 6) & (c % 2 == 1), 1, np.where((r + c) % 2 == 0, 0, 2))
+    colors = np.array([(30.0, 0.0, 0.0), (50.0, 60.0, 0.0), (70.0, 0.0, 0.0)])
+    index, _ = _subset(np.stack([(c + 0.5) / cols, (r + 0.5) / rows], axis=1), np.ones(r.size))
+    assert {79, 207} <= set(index.tolist())
+
+    result = read_fabrics(squares_of(colors[truth].reshape(rows, cols, 3)), 3)
+    assert np.array_equal(result.labels.ravel(), truth)
+    assert result.palette_confidence == pytest.approx(1.0, abs=1e-12)
+    assert result.center_confidence[1] > 0
+    assert result.center_confidence == pytest.approx([1.0, 1.0, 1.0], abs=1e-12)
 
 
 def test_the_read_is_deterministic():
@@ -568,8 +645,8 @@ def test_a_center_shows_as_the_srgb_color_it_was_sampled_from(lab, expected):
     # Arithmetic for gray 16, which takes the linear branches: L 4.6805 is at
     #   most 903.3 x 0.008856 = 8.0, so Y = 4.6805 / 903.3 = 0.0051816; a
     #   gray has X/Xn = Y = Z/Zn, so linear R = G = B = 0.0051816, over
-    #   0.0031308, so 1.055 x 0.0051816^(1/2.4) - 0.055 = 1.055 x 0.111628 -
-    #   0.055 = 0.062767, and 0.062767 x 255 = 16.006, code 16: #101010.
+    #   0.0031308, so 1.055 x 0.0051816^(1/2.4) - 0.055 = 1.055 x 0.111607 -
+    #   0.055 = 0.062745, and 0.062745 x 255 = 16.000, code 16: #101010.
     # Expected: the codes each value was computed from, as lowercase hex.
     assert fabrics_module.to_hex(np.array(lab)) == expected
 
