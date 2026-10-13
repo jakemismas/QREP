@@ -970,12 +970,146 @@ READ_REQUEST = {
 }
 
 
-def test_read_confirmed_validates_then_reports_not_implemented():
-    # A stub until B2b switches it to the real read in qrep/vision/read/,
-    # under the contract lease: a valid request reaches not_implemented, and
-    # an invalid one is refused first, naming the field.
+def test_read_confirmed_validates_then_reads_the_staged_photo():
+    # Re-expressed from test_read_confirmed_validates_then_reports_not_implemented
+    # (#137 comment 6143414369): E1b's stub returned not_implemented "until B2b
+    # switches it to the real read", and B2b's criterion switches it. The real
+    # read opens the staged photo the token names; READ_REQUEST's token,
+    # /staging/photo-1.png, names no file here, so the read stops at the image
+    # check with kind value (SPEC.md section 12.1: a missing image is value).
     error = error_of(bridge.read_confirmed(json.dumps(READ_REQUEST)))
-    assert error["kind"] == "not_implemented"
+    assert error["kind"] == "value"
+    assert "/staging/photo-1.png" in error["message"]
     error = error_of(bridge.read_confirmed(json.dumps({**READ_REQUEST, "fabric_count": 1})))
     assert error["kind"] == "validation"
     assert "fabric_count" in error["message"]
+
+
+# The L0 render of the fixture (scale 10 px per inch, seed 42): squares of
+# 1 1/2 in are 15 px, and the sidecar's corners are the outer quilt edge,
+# 72 px in from each image edge (qrep/render/renderer.py). The field is
+# 45 x 55 squares inside one cream band of 30 / 12 = 2.5 squares, so the
+# outer edge spans (45 + 2 x 2.5) x 15 = 750 by (55 + 2 x 2.5) x 15 = 900 px.
+L0_COUNTS = {
+    "blocks_across": 9,
+    "blocks_down": 11,
+    "squares_per_block_across": 5,
+    "squares_per_block_down": 5,
+}
+
+
+@pytest.fixture(scope="module")
+def l0_render(tmp_path_factory):
+    png, sidecar = save_render(
+        load(FIXTURE_PATH), tmp_path_factory.mktemp("l0") / "l0.png", level=0, seed=42
+    )
+    corners = json.loads(Path(sidecar).read_text(encoding="utf-8"))["corners"]
+    return png, corners
+
+
+def l0_request(png, corners, **overrides) -> str:
+    names = ("top_left", "top_right", "bottom_right", "bottom_left")
+    request = {
+        "token": str(png),
+        "frame": {
+            "kind": "outer_edge",
+            "corners": {name: {"x": x, "y": y} for name, (x, y) in zip(names, corners)},
+            "bands": [{"width_squares": 2.5}],
+        },
+        "crop_offset": {"x": 0, "y": 0},
+        "counts": L0_COUNTS,
+    }
+    return json.dumps({**request, **overrides})
+
+
+def test_read_confirmed_reads_the_l0_render(l0_render, quilt):
+    # Plan B2b: the bridge reads the L0 render with its sidecar corners, the
+    # band and the fixture counts. Counts: 11 x 5 = 55 rows, 9 x 5 = 45 cols.
+    result = ok_result(bridge.read_confirmed(l0_request(*l0_render)))
+    ReadResult.model_validate(result)
+    assert result["outcome"] == "read" and result["reason"] is None
+    model = result["model"]
+    assert (model["center"]["rows"], model["center"]["cols"]) == (55, 45)
+    # Fabrics sort darkest first: chain blue #9db8d9 is darker than background
+    # cream #f2e8d5 (each channel lower), so f0 is the fixture's b and f1 its c.
+    to_fixture = {"f0": "b", "f1": "c"}
+    assert [f["id"] for f in model["palette"]["fabrics"]] == ["f0", "f1"]
+    read = [[to_fixture[f] for f in row] for row in model["center"]["cells"]]
+    assert read == quilt.center.cells
+    # Square size: 15 px x 8 / 10 px per inch = 12 eighths. The band: 2.5 x 12
+    # = 30 eighths of cream. Size: 45 x 12 + 2 x 30 = 600 by 55 x 12 + 60 = 720.
+    assert model["center"]["cell_size"] == 12
+    assert model["borders"] == [{"fabric_id": "f1", "width": 30}]
+    basis = model["size_basis"]
+    assert (basis["source"], basis["achieved_width"], basis["achieved_height"]) == (
+        "default",
+        600,
+        720,
+    )
+    assert basis["confidence"] < 1.0
+    assert model["confirmed_blocks"] == {
+        "blocks_across": 9,
+        "blocks_down": 11,
+        "squares_across": 5,
+        "squares_down": 5,
+        "confidence": 1.0,
+    }
+    details = result["details"]
+    assert details["corners_source"] == "user"
+    assert details["fabric_count"]["value"] == 2
+    assert details["fabric_count"]["source"] == "suggestion"
+    assert {strip["fabric_id"] for strip in details["strips"]} == {"f1"}
+    assert len(details["strips"]) == 4
+    # The fixture alternates two 5 x 5 block types, so its labels repeat every
+    # 2 x 5 = 10 squares each way.
+    assert details["repeat"] == {"across": 10, "down": 10}
+    assert details["vote_changes"] == [] and details["repeat_breaks"] == []
+
+
+def test_read_confirmed_holds_a_corner_outside_the_image(l0_render):
+    # The render is 72 + 750 + 72 = 894 px wide, so x = 900 lies outside it.
+    png, corners = l0_render
+    moved = [list(corner) for corner in corners]
+    moved[1][0] = 900
+    result = ok_result(bridge.read_confirmed(l0_request(png, moved)))
+    assert result["outcome"] == "held"
+    assert result["reason"]["code"] == "corner_outside_image"
+    assert result["model"] is None and result["details"] is None
+
+
+def test_read_confirmed_holds_too_few_pixels(l0_render):
+    # Counts of 9 x 15 by 11 x 15 give 135 columns and 165 rows. With the
+    # 2.5-square band on each side the outer edge holds 135 + 5 = 140 squares
+    # across 750 px (750 / 140 = 5.36 px) and 165 + 5 = 170 down 900 px
+    # (900 / 170 = 5.29 px), both under the 7 px floor.
+    png, corners = l0_render
+    counts = {**L0_COUNTS, "squares_per_block_across": 15, "squares_per_block_down": 15}
+    result = ok_result(bridge.read_confirmed(l0_request(png, corners, counts=counts)))
+    assert result["outcome"] == "held"
+    assert result["reason"]["code"] == "too_few_pixels"
+
+
+@pytest.mark.skipif(
+    __import__("sys").platform == "emscripten",
+    reason="subprocess is unavailable under wasm; the import graph is "
+    "platform-independent and verified on native CPython",
+)
+def test_read_confirmed_loads_the_read_only_when_it_runs(l0_render):
+    # #137 comment 6113555911: importing the bridge loads neither the read
+    # package nor cv2; a read loads both.
+    import subprocess
+    import sys
+
+    script = (
+        "import json, sys\n"
+        "import qrep.bridge\n"
+        "before = {'qrep.vision.read', 'cv2'} & set(sys.modules)\n"
+        "raw = qrep.bridge.read_confirmed(sys.argv[1])\n"
+        "after = {'qrep.vision.read.fabrics', 'qrep.vision.read.vote', 'cv2'} - set(sys.modules)\n"
+        "ok = json.loads(raw)['ok']\n"
+        "raise SystemExit(0 if ok and not before and not after else 1)\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", script, l0_request(*l0_render)], capture_output=True
+    )
+    assert result.returncode == 0, result.stderr.decode(errors="replace")[-2000:]
