@@ -5,14 +5,17 @@
  * DOM: the controller hands the PDF to a save callback, which the screen
  * wires to a file save.
  */
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { EngineClient, type WorkerLike } from "../engine/rpc";
+import { EngineClient, EngineError, type WorkerLike } from "../engine/rpc";
 import type { ModelSummary } from "../model/types";
 import { CensusQueue } from "../state/model";
 import { base64ToArrayBuffer, patternFileName, patternPdfName } from "../state/pattern";
 import {
+  isWorkerFailure,
   PatternPdfController,
   PatternSummaryLoader,
+  retryPattern,
   type PdfView,
   type SummaryView,
 } from "./patternPdf";
@@ -492,6 +495,177 @@ describe("Your pattern's waiting calls after an engine restart", () => {
     expect(workers[2].calls()).toHaveLength(2);
     expect(loader.view).toEqual({ status: "ready", summary: SUMMARY });
     expect(saved).toEqual([[PDF_B64, FILE]]);
+  });
+});
+
+// The worker's own failures, as worker.ts posts them: its catch in serve()
+// (kind internal) and its not-booted guard (kind worker). The bridge's one
+// internal error carries its own fixed sentence instead (qrep/bridge.py).
+const WORKER_FAILED_SENTENCE = "engine call failed in the worker";
+const NOT_BOOTED_SENTENCE = "engine is not booted";
+const BRIDGE_INTERNAL_SENTENCE = "internal engine error; see the browser console log";
+
+function failure(kind: string, message: string) {
+  return { ok: false, error: { kind, message } };
+}
+
+function targets(client: EngineClient, loader: PatternSummaryLoader, pdf: PatternPdfController) {
+  return { loader, pdf, restart: () => client.restart() };
+}
+
+describe("Retry after a failed call", () => {
+  it("restarts the engine after the worker itself failed the PDF, and the PDF lands on the new worker", async () => {
+    const { client, worker, workers } = bootedClient();
+    const { loader } = makeLoader(client);
+    const { controller, saved } = makeController(client);
+
+    void controller.start(MODEL_JSON, FILE);
+    await settle();
+    worker.respond(worker.calls()[0].id!, failure("internal", WORKER_FAILED_SENTENCE));
+    await settle();
+    expect(controller.view).toEqual({ status: "failed", message: FAILED_SENTENCE });
+    expect(controller.workerDown).toBe(true);
+
+    retryPattern(targets(client, loader, controller), "pdf");
+    await settle();
+    // The Retry restarted the engine once: a second worker exists, and the
+    // broken one was sent nothing more.
+    expect(workers).toHaveLength(2);
+    expect(worker.calls()).toHaveLength(1);
+    expect(controller.view.status).toBe("busy");
+    // The new worker has not booted yet, so the call waits in the queue.
+    expect(workers[1].calls()).toHaveLength(0);
+
+    workers[1].bootDone();
+    await settle();
+    // Hand count: one call failed on the first worker and the Retry sent it
+    // once more, after the restart: one call on the second worker.
+    expect(workers[1].calls()).toHaveLength(1);
+    expect(workers[1].calls()[0].method).toBe("export_pattern");
+    expect(workers[1].calls()[0].args).toEqual([MODEL_JSON]);
+    workers[1].respond(workers[1].calls()[0].id!, ready());
+    await settle();
+    expect(saved).toEqual([[PDF_B64, FILE]]);
+    expect(controller.view).toEqual({ status: "idle", message: null });
+    expect(controller.workerDown).toBe(false);
+    expect(workers).toHaveLength(2);
+  });
+
+  it("sends a failed summary with the PDF on the one restart, so both land", async () => {
+    const { client, worker, workers } = bootedClient();
+    const { loader } = makeLoader(client);
+    const { controller, saved } = makeController(client);
+
+    loader.load(MODEL_JSON);
+    void controller.start(MODEL_JSON, FILE);
+    await settle();
+    // One call at a time: the summary first, then the PDF; the worker fails both.
+    worker.respond(worker.calls()[0].id!, failure("internal", WORKER_FAILED_SENTENCE));
+    await settle();
+    worker.respond(worker.calls()[1].id!, failure("internal", WORKER_FAILED_SENTENCE));
+    await settle();
+    expect(loader.view).toEqual({ status: "failed", message: FAILED_SENTENCE });
+    expect(controller.view).toEqual({ status: "failed", message: FAILED_SENTENCE });
+
+    // The error line shows the PDF's failure first, so its Retry is the one.
+    retryPattern(targets(client, loader, controller), "pdf");
+    await settle();
+    workers[1].bootDone();
+    await settle();
+    workers[1].respond(workers[1].calls()[0].id!, ready());
+    await settle();
+    workers[1].respond(workers[1].calls()[1].id!, ready());
+    await settle();
+
+    // Hand count: two calls failed on the first worker, and the one Retry
+    // restarted the engine once and sent each once more: two workers, the
+    // first holding its two failed calls and the second the two resends.
+    expect(workers).toHaveLength(2);
+    expect(worker.calls()).toHaveLength(2);
+    expect(workers[1].calls()).toHaveLength(2);
+    for (const call of workers[1].calls()) {
+      expect(call.method).toBe("export_pattern");
+      expect(call.args).toEqual([MODEL_JSON]);
+    }
+    expect(loader.view).toEqual({ status: "ready", summary: SUMMARY });
+    expect(saved).toEqual([[PDF_B64, FILE]]);
+  });
+
+  for (const [what, kind, message] of [
+    ["a failure in the worker's call plumbing", "internal", WORKER_FAILED_SENTENCE],
+    ["a worker that never booted", "worker", NOT_BOOTED_SENTENCE],
+  ] as const) {
+    it(`restarts the engine for the summary's Retry after ${what}`, async () => {
+      const { client, worker, workers } = bootedClient();
+      const { loader } = makeLoader(client);
+      const { controller } = makeController(client);
+
+      loader.load(MODEL_JSON);
+      await settle();
+      worker.respond(worker.calls()[0].id!, failure(kind, message));
+      await settle();
+      expect(loader.view).toEqual({ status: "failed", message: FAILED_SENTENCE });
+      expect(loader.workerDown).toBe(true);
+
+      retryPattern(targets(client, loader, controller), "summary");
+      await settle();
+      workers[1].bootDone();
+      await settle();
+      // Hand count: one restart, nothing more to the broken worker, and the
+      // one failed summary sent once to the new worker.
+      expect(workers).toHaveLength(2);
+      expect(worker.calls()).toHaveLength(1);
+      expect(workers[1].calls()).toHaveLength(1);
+      expect(workers[1].calls()[0].args).toEqual([MODEL_JSON]);
+      workers[1].respond(workers[1].calls()[0].id!, ready());
+      await settle();
+      expect(loader.view).toEqual({ status: "ready", summary: SUMMARY });
+      // No PDF was asked for, so the Retry made none.
+      expect(controller.view).toEqual({ status: "idle", message: null });
+    });
+  }
+
+  it("sends the call again to the same worker after a bridge error, with no restart", async () => {
+    const { client, worker, workers } = bootedClient();
+    const { loader } = makeLoader(client);
+    const { controller, saved } = makeController(client);
+
+    void controller.start(MODEL_JSON, FILE);
+    await settle();
+    worker.respond(worker.calls()[0].id!, failure("internal", BRIDGE_INTERNAL_SENTENCE));
+    await settle();
+    expect(controller.view).toEqual({ status: "failed", message: FAILED_SENTENCE });
+    expect(controller.workerDown).toBe(false);
+
+    retryPattern(targets(client, loader, controller), "pdf");
+    await settle();
+    // Hand count: no restart, so one worker, holding the failed call and the
+    // Retry's call.
+    expect(workers).toHaveLength(1);
+    expect(worker.calls()).toHaveLength(2);
+    worker.respond(worker.calls()[1].id!, ready());
+    await settle();
+    expect(saved).toEqual([[PDF_B64, FILE]]);
+  });
+
+  it("tells the worker's failures from the bridge's by the sentences their sources send", () => {
+    // The sources still send the sentences isWorkerFailure reads, so a
+    // reworded one fails here instead of quietly turning a broken worker's
+    // Retry back into a resend to it.
+    const bridge = readFileSync(new URL("../../../qrep/bridge.py", import.meta.url), "utf8");
+    expect(bridge).toContain(`_error("internal", "${BRIDGE_INTERNAL_SENTENCE}")`);
+    const workerSource = readFileSync(new URL("../engine/worker.ts", import.meta.url), "utf8");
+    expect(workerSource).toContain(`: "${WORKER_FAILED_SENTENCE}"`);
+    expect(workerSource).toContain(`fail("worker", "${NOT_BOOTED_SENTENCE}")`);
+
+    expect(isWorkerFailure(new EngineError("internal", WORKER_FAILED_SENTENCE))).toBe(true);
+    expect(isWorkerFailure(new EngineError("internal", "no envelope"))).toBe(true);
+    expect(isWorkerFailure(new EngineError("worker", NOT_BOOTED_SENTENCE))).toBe(true);
+    expect(isWorkerFailure(new EngineError("internal", BRIDGE_INTERNAL_SENTENCE))).toBe(false);
+    expect(isWorkerFailure(new EngineError("value", "unknown strategy: zigzag"))).toBe(false);
+    // A restart's rejection is no failure at all: the call goes again on its own.
+    expect(isWorkerFailure(new EngineError("worker", "the engine was restarted"))).toBe(false);
+    expect(isWorkerFailure(new Error(WORKER_FAILED_SENTENCE))).toBe(false);
   });
 });
 

@@ -3,8 +3,9 @@
  * vitest covers the choice without a DOM. A failed engine boot leaves the
  * queued calls waiting forever, so a wait on it gets ENGINE_DOWN and a Retry
  * that reboots the engine; a failed call gets its sentence and a Retry of that
- * call; a refusal shows its reason with no Retry, because the same quilt is
- * refused again.
+ * call, which restarts the engine first when the worker itself failed
+ * (retryPattern in patternPdf.ts); a refusal shows its reason with no Retry,
+ * because the same quilt is refused again.
  */
 import type { PdfView, SummaryView } from "./patternPdf";
 

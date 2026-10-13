@@ -13,11 +13,16 @@
  * never the engine's raw message. A refusal gets its own status, because
  * the same quilt is refused again: the screen offers no Retry for it.
  *
- * An engine restart is never a failure. Any Retry restarts the engine (Your
- * pattern's, or the header's engine chip, which calls engine.retry
+ * An engine restart is never a failure. An engine Retry restarts the engine
+ * (Your pattern's, or the header's engine chip, which calls engine.retry
  * directly), and the restart rejects every waiting call; both classes send a
  * still-current request again on their own, once per rejection, so either
  * Retry recovers Your pattern.
+ *
+ * A failed call's Retry (retryPattern) sends the call again, to the same
+ * worker after a bridge error. A failure of the worker itself would meet the
+ * same broken worker, so after one the Retry restarts the engine first and
+ * the request goes to the fresh worker.
  */
 import { parsePatternResult } from "../engine/contract";
 import type { PatternSummary } from "../engine/contract";
@@ -31,7 +36,7 @@ export const SAVE_FAILED = "Your browser did not save the pattern file. Try agai
 
 type Made =
   | { ok: true; pdfB64: string; summary: PatternSummary }
-  | { ok: false; message: string; refused: boolean };
+  | { ok: false; message: string; refused: boolean; workerDown: boolean };
 
 // rpc.ts restart() rejects every queued and in-flight call with exactly this
 // kind and message; the engine itself never answers with it.
@@ -41,6 +46,25 @@ const RESTART_MESSAGE = "the engine was restarted";
 /** True for the rejection an engine restart gives a call that was waiting. */
 export function isEngineRestart(err: unknown): boolean {
   return err instanceof EngineError && err.kind === RESTART_KIND && err.message === RESTART_MESSAGE;
+}
+
+// The bridge wraps every engine exception in its own envelope, and its one
+// kind "internal" error always carries this sentence (qrep/bridge.py, the
+// _envelope catch-all). Kind "internal" with any other message comes from
+// the plumbing around the bridge: worker.ts's catch in serve() ("engine call
+// failed in the worker", or the vision load's message) and rpc.ts's result
+// without an envelope ("no envelope").
+const BRIDGE_INTERNAL_MESSAGE = "internal engine error; see the browser console log";
+
+/** True when the worker itself failed the call, not the engine inside it:
+ * kind "internal" from the worker or the client rather than the bridge, or
+ * kind "worker" (worker.ts: "engine is not booted") other than a restart's
+ * rejection. Read as a worker failure, an unknown internal message costs
+ * only a restart, while the reverse would resend to a broken worker. */
+export function isWorkerFailure(err: unknown): boolean {
+  if (!(err instanceof EngineError) || isEngineRestart(err)) return false;
+  if (err.kind === "worker") return true;
+  return err.kind === "internal" && err.message !== BRIDGE_INTERNAL_MESSAGE;
 }
 
 /** `current` says whether the caller still wants this request: a restart
@@ -57,7 +81,7 @@ async function makePattern(
       break;
     } catch (err) {
       if (isEngineRestart(err) && current()) continue;
-      return { ok: false, message: PATTERN_FAILED, refused: false };
+      return { ok: false, message: PATTERN_FAILED, refused: false, workerDown: isWorkerFailure(err) };
     }
   }
   try {
@@ -66,9 +90,14 @@ async function makePattern(
       // parsePatternResult already required both on a ready pattern.
       return { ok: true, pdfB64: result.pdf_b64 as string, summary: result.summary as PatternSummary };
     }
-    return { ok: false, message: (result.reason as { message: string }).message, refused: true };
+    return {
+      ok: false,
+      message: (result.reason as { message: string }).message,
+      refused: true,
+      workerDown: false,
+    };
   } catch {
-    return { ok: false, message: PATTERN_FAILED, refused: false };
+    return { ok: false, message: PATTERN_FAILED, refused: false, workerDown: false };
   }
 }
 
@@ -95,6 +124,7 @@ export class PatternPdfController {
   // Bumped by every start and reset, so a result that lands after a reset
   // (Home, another quilt) is dropped instead of saved.
   private run = 0;
+  private down = false;
 
   constructor(options: PdfOptions) {
     this.options = options;
@@ -102,6 +132,11 @@ export class PatternPdfController {
 
   get view(): PdfView {
     return this.current;
+  }
+
+  /** True while the shown failure is the worker's own (isWorkerFailure). */
+  get workerDown(): boolean {
+    return this.down;
   }
 
   /** Make the pattern and save it; a no-op while one is being made. */
@@ -119,10 +154,12 @@ export class PatternPdfController {
   private async make(modelJson: string, filename: string): Promise<void> {
     this.last = { modelJson, filename };
     const run = ++this.run;
+    this.down = false;
     this.set({ status: "busy", message: null });
     const made = await makePattern(this.options.call, modelJson, () => run === this.run);
     if (run !== this.run) return;
     if (!made.ok) {
+      this.down = made.workerDown;
       this.set({ status: made.refused ? "refused" : "failed", message: made.message });
       return;
     }
@@ -139,6 +176,7 @@ export class PatternPdfController {
   reset(): void {
     this.run += 1;
     this.last = null;
+    this.down = false;
     this.set(PDF_IDLE);
   }
 
@@ -167,6 +205,7 @@ export class PatternSummaryLoader {
   private modelJson: string | null = null;
   // Bumped by every request and clear: only the newest model's summary lands.
   private run = 0;
+  private down = false;
 
   constructor(options: SummaryOptions) {
     this.options = options;
@@ -174,6 +213,11 @@ export class PatternSummaryLoader {
 
   get view(): SummaryView {
     return this.current;
+  }
+
+  /** True while the shown failure is the worker's own (isWorkerFailure). */
+  get workerDown(): boolean {
+    return this.down;
   }
 
   /** Fetch the summary for a model, once: the same model again is a no-op. */
@@ -190,14 +234,17 @@ export class PatternSummaryLoader {
   clear(): void {
     this.run += 1;
     this.modelJson = null;
+    this.down = false;
     this.set(SUMMARY_IDLE);
   }
 
   private async fetch(modelJson: string): Promise<void> {
     const run = ++this.run;
+    this.down = false;
     this.set({ status: "loading" });
     const made = await makePattern(this.options.call, modelJson, () => run === this.run);
     if (run !== this.run) return;
+    this.down = !made.ok && made.workerDown;
     this.set(
       made.ok
         ? { status: "ready", summary: made.summary }
@@ -209,4 +256,30 @@ export class PatternSummaryLoader {
     this.current = view;
     this.options.onChange?.(view);
   }
+}
+
+export interface RetryTargets {
+  loader: PatternSummaryLoader;
+  pdf: PatternPdfController;
+  /** engine.retry: terminate the worker and boot a fresh one. */
+  restart: () => void;
+}
+
+/**
+ * Retry for a failed call on Your pattern: `which` names the failure the
+ * error line shows. After a bridge error the call goes again to the same
+ * worker. After a failure of the worker itself, the engine restarts first,
+ * so the call queues for the fresh worker instead of meeting the broken one;
+ * a summary that failed too goes again with it, as an engine Retry sends it,
+ * because nothing else would ask for it once the engine is back.
+ */
+export function retryPattern({ loader, pdf, restart }: RetryTargets, which: "pdf" | "summary"): void {
+  if (!pdf.workerDown && !loader.workerDown) {
+    if (which === "pdf") void pdf.retry();
+    else loader.retry();
+    return;
+  }
+  restart();
+  if (which === "pdf") void pdf.retry();
+  if (loader.view.status === "failed") loader.retry();
 }

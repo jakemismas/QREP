@@ -15,7 +15,7 @@ import { EngineError } from "../engine/rpc";
 import type { ModelSummary, QuiltModel } from "../model/types";
 import type { SeamStrategy } from "../model/seams";
 import { useToast } from "../ui";
-import { PatternPdfController, PatternSummaryLoader } from "../pattern/patternPdf";
+import { PatternPdfController, PatternSummaryLoader, retryPattern } from "../pattern/patternPdf";
 import type { PdfView, SummaryView } from "../pattern/patternPdf";
 import type { ModelApi } from "./model";
 import { buildSettingsSummary } from "./patternText";
@@ -287,16 +287,23 @@ export function usePatternState({
     loaderRef.current?.load(JSON.stringify(model));
   }, [screen, model, latestModel, latestOpened]);
 
-  const retrySummary = useCallback(() => loaderRef.current?.retry(), []);
+  // A failed call goes again; after a failure of the worker itself,
+  // retryPattern restarts the engine first so the call reaches a fresh one.
+  const retryFailed = useCallback((which: "pdf" | "summary") => {
+    const loader = loaderRef.current;
+    const pdf = pdfRef.current;
+    if (!loader || !pdf) return;
+    retryPattern({ loader, pdf, restart: () => engineRef.current.retry() }, which);
+  }, []);
+
+  const retrySummary = useCallback(() => retryFailed("summary"), [retryFailed]);
 
   const savePdf = useCallback(() => {
     if (!model) return;
     void pdfRef.current?.start(JSON.stringify(model), patternPdfName(summary, model));
   }, [model, summary]);
 
-  const retryPdf = useCallback(() => {
-    void pdfRef.current?.retry();
-  }, []);
+  const retryPdf = useCallback(() => retryFailed("pdf"), [retryFailed]);
 
   const retryEngine = useCallback(() => {
     // The restart rejects every waiting call, and the loader and the PDF
