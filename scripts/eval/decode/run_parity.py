@@ -201,11 +201,30 @@ def run_reads(units, args, decoded_dir: Path, jobs: dict, sidecars: dict) -> dic
     return results
 
 
-def run_pixels(units, decoded_dir: Path, args) -> dict:
-    """{(photo, resolution): {browser: diff or error}} for every staged image."""
+def run_pixels(units, decoded_dir: Path, args, jobs: dict, sidecars: dict) -> dict:
+    """{(photo, resolution): {browser: diff or error}} for every staged image, cached
+    under the images' ids and the cv2 version that staged the native one, so a run
+    stopped on free memory resumes where it stopped."""
+    import cv2 as cv
+
+    cache_file = decoded_dir / "parity-work" / "pixels.jsonl"
+    cache_file.parent.mkdir(parents=True, exist_ok=True)
+    done = {}
+    if cache_file.exists():
+        for line in cache_file.read_text(encoding="utf-8").splitlines():
+            try:
+                entry = json.loads(line)
+            except ValueError:
+                continue  # a line cut short by a killed run; it runs again
+            done[tuple(entry["key"])] = entry["row"]
     out = {}
     with tempfile.TemporaryDirectory(prefix="qrep-eval-", dir=decoded_dir) as tmp:
         for unit in units:
+            key = (unit.photo, unit.resolution, cv.__version__,
+                   *(_image_id(unit, name, jobs, sidecars) for name in DECODES))
+            if key in done:
+                out[(unit.photo, unit.resolution)] = done[key]
+                continue
             free = decode.available_memory_gb()
             if free < args.min_free_gb:
                 raise MemoryStop(f"free memory {free:.2f} GB is under {args.min_free_gb} GB")
@@ -219,6 +238,8 @@ def run_pixels(units, decoded_dir: Path, args) -> dict:
                 except Exception as error:  # noqa: BLE001 - recorded, never swallowed
                     row[browser] = {"error": repr(error)}
             out[(unit.photo, unit.resolution)] = row
+            with cache_file.open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps({"key": list(key), "row": row}) + "\n")
             del native
     return out
 
@@ -368,7 +389,7 @@ def main(argv=None) -> int:
     wanted = set(args.read_resolutions.split(","))
     read_units = [u for u in units if u.resolution in wanted or u.group == "named"]
     try:
-        pixels = run_pixels(units, decoded_dir, args)
+        pixels = run_pixels(units, decoded_dir, args, jobs, sidecars)
         rows = compare(read_units, run_reads(read_units, args, decoded_dir, jobs, sidecars))
     except MemoryStop as stop:
         print(f"run_parity: {stop}", file=sys.stderr)
