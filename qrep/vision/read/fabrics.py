@@ -3,9 +3,9 @@ label-aware shading correction, and label every square and band strip.
 
 Distances are taken in float CIELAB with L* scaled by the L weight, d =
 sqrt((w dL)^2 + da^2 + db^2), because shading moves lightness most (plan
-B2b, vision-06). The correction is one light surface, quadratic in
-position, that every fabric's color is scaled by, so each fabric's color is
-a quadratic in position. The read fits the palette and assigns the squares
+B2b, vision-06). The correction is one light surface, whose logarithm is
+quadratic in position, that scales every fabric's color, so each fabric
+gets a surface of the same shape. The read fits the palette and assigns the squares
 with the same correction, which the old detrend did not (vision-07).
 
 numpy only and no random draws: the same code runs under Pyodide (numpy
