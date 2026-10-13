@@ -222,7 +222,9 @@ def aggregate(rows: list[dict], *, runner=subprocess.run) -> dict:
             "triangle_counts": "n/a until B4 classifies triangle units",
         },
         "miscount_trials": len(miscounts),
-        "errors": [{k: r.get(k) for k in ("photo", "reader", "resolution", "condition", "error")}
+        # A stage error stands in for every trial of the unit, so each line names its trial.
+        "errors": [{k: r.get(k) for k in ("photo", "reader", "resolution", "condition", "radius_px", "trial",
+                                          "variant", "error")}
                    for r in rows if r["outcome"] == "error"],
     }
 

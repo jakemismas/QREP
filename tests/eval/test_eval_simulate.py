@@ -1397,7 +1397,7 @@ def test_a_run_states_the_budget_and_skips_only_as_fetched_units_over_it(monkeyp
     # At 1400 px: a-dev clean read by auto and by auto-corners at 0 and 4 px (3 rows), its
     # 6 degradations by both readers (12), r-dev by auto (1) and skipped by auto-corners,
     # which has no frame to confirm (1): 17 rows, 16 of them reads.
-    assert len(capped) == 17 and sum(r["outcome"] != "skipped" for r in capped) == 16
+    assert len(capped) == 17 and sum(r["outcome"] in report.OUTCOMES for r in capped) == 16
     assert "- Full resolution budget: 0.02 MP per as-fetched unit" in (out.parent / "r.md").read_text(
         encoding="utf-8")
     # Back at 50 MP nothing here is over it, and the header names the largest image read
@@ -1408,3 +1408,114 @@ def test_a_run_states_the_budget_and_skips_only_as_fetched_units_over_it(monkeyp
     budget = json.loads((tmp_path / "out" / "r2.json").read_text(encoding="utf-8"))["header"]["full_resolution_budget"]
     assert ("In this run: clean units 2 as fetched, 0 skipped; photos skipped: none; the largest image read "
             "as fetched: 160 x 160 px (r-dev).") in budget
+
+
+def test_banded_glare_and_gradient_never_hold_a_whole_image_float_copy(monkeypatch):
+    # Banding exists to bound memory, so the test measures it. A 300 x 2000 x 3 uint8
+    # photo is 1,800,000 bytes; with BAND_ROWS = 7 one band's float64 copy is
+    # 7 x 2000 x 3 x 8 = 336,000 bytes, and a whole-image float64 copy 300 x 2000 x 3 x 8
+    # = 14,400,000. The traced peak may hold the uint8 output (1,800,000) and ten
+    # band-sized float64 arrays (3,360,000): 5,160,000 bytes, about a third of one
+    # whole-image copy, so any whole-image float array fails.
+    import tracemalloc
+
+    image = np.zeros((300, 2000, 3), dtype=np.uint8)
+    monkeypatch.setattr(degrade, "BAND_ROWS", 7)
+    for name, call in (("glare", lambda: degrade.glare(image, (10.0, 5.0, 1990.0, 295.0))),
+                       ("lighting_gradient", lambda: degrade.lighting_gradient(image))):
+        tracemalloc.start()
+        try:
+            call()
+            peak = tracemalloc.get_traced_memory()[1]
+        finally:
+            tracemalloc.stop()
+        assert peak <= 1_800_000 + 10 * 336_000, (name, peak)
+
+
+def test_banded_glare_and_gradient_match_their_formulas_on_a_large_photo():
+    # The equality test above on a photo the size the eval reads: a seeded random
+    # 1000 x 900 photo, a field box with fractional edges, and the default 256-row bands
+    # (3 full bands and one of 1000 - 768 = 232 rows). The reference is again each
+    # docstring's whole-image formula, the form 78e92e3 computed. Its centre:
+    # (37.25 + 0.35 x 834.5, 18.5 + 0.35 x 944.9) = (329.325, 349.215); sigma = 0.15 x
+    # min(834.5, 944.9) = 125.175. Three million random values put many blends near a
+    # half level, where any change of float precision moves a rounded value.
+    image = np.random.default_rng(166).integers(0, 256, size=(1000, 900, 3), dtype=np.uint8)
+    box = (37.25, 18.5, 871.75, 963.4)
+    cx, cy, sigma = 37.25 + 0.35 * 834.5, 18.5 + 0.35 * (963.4 - 18.5), 0.15 * 834.5
+    ys, xs = np.mgrid[0:1000, 0:900]
+    alpha = (0.85 * np.exp(-((xs - cx) ** 2 + (ys - cy) ** 2) / (2 * sigma * sigma)))[..., None]
+    glare = np.clip(np.rint(image.astype(np.float64) * (1 - alpha) + 255.0 * alpha), 0, 255).astype(np.uint8)
+    ramp = 1.0 - (1.0 - 0.55) * np.arange(900) / 899
+    gradient = np.clip(np.rint(image.astype(np.float64) * ramp[None, :, None]), 0, 255).astype(np.uint8)
+    assert np.array_equal(degrade.glare(image, box), glare)
+    assert np.array_equal(degrade.lighting_gradient(image), gradient)
+
+
+def test_the_budget_line_counts_skips_from_rows_and_names_the_largest_read():
+    # Two clean units as fetched: big, 10292 x 11415 (117,483,180 px, over the budget),
+    # and small, 5038 x 7721 (38,898,398 px, within), plus big at the 2000 px cap. The
+    # rows: big's auto row skipped over the budget and its auto-corners row skipped for
+    # want of a frame; small's auto row read at 5038 x 7721 and its auto-corners row an
+    # error; big at 2000 px read at 1803 x 2000 (2000 / 11415 x 10292 = 1803.25 -> 1803),
+    # which is capped and never "as fetched". So 2 clean units as fetched, 1 skipped
+    # (big), and the largest image read as fetched is small's.
+    def unit(photo, canvas, cap=None):
+        return dataclasses.replace(_plain_unit("never-opened.png", canvas=canvas, corners=None, counts=None,
+                                               readers_=("auto",), cap=cap), photo=photo)
+
+    units = [unit("big", (10292, 11415)), unit("small", (5038, 7721)), unit("big", (10292, 11415), cap=2000)]
+    base = {"group": "corpus", "condition": "clean"}
+    rows = [{**base, "photo": "big", "resolution": "full", "reader": "auto", "outcome": "skipped",
+             "skip_kind": corpus.OVER_BUDGET},
+            {**base, "photo": "big", "resolution": "full", "reader": "auto-corners", "outcome": "skipped",
+             "reason": harness.SKIP_REASON},
+            {**base, "photo": "small", "resolution": "full", "reader": "auto", "outcome": "read",
+             "received": {"staged_size": [5038, 7721]}},
+            {**base, "photo": "small", "resolution": "full", "reader": "auto-corners", "outcome": "error"},
+            {**base, "photo": "big", "resolution": "cap-2000", "reader": "auto", "outcome": "read",
+             "received": {"staged_size": [1803, 2000]}}]
+    line = run_eval._budget_line(units, rows)
+    assert ("In this run: clean units 2 as fetched, 1 skipped; photos skipped: big; the largest image read "
+            "as fetched: 5038 x 7721 px (small).") in line
+    # A run of auto-corners alone: big's only row is its no-frame skip, so no unit is
+    # counted over the budget.
+    line = run_eval._budget_line(units, [r for r in rows if r["reader"] == "auto-corners"])
+    assert "In this run: clean units 2 as fetched, 0 skipped; photos skipped: none; " in line
+
+
+def test_a_reader_error_keeps_its_photo_in_the_periodic_split(monkeypatch, tmp_path):
+    # The read raises, as a scan too large for memory would. 2 x 2 blocks of 2 x 2
+    # squares: 4 blocks, so periodic, and truth dims 2 x 2 = 4 by 4. The error row
+    # carries both, so R1's periodic count lists the error instead of losing the photo.
+    source = tmp_path / "q.png"
+    assert cv2.imwrite(str(source), np.full((100, 100, 3), 128, dtype=np.uint8))
+
+    def out_of_memory(*args, **kwargs):
+        raise MemoryError("synthetic")
+
+    monkeypatch.setattr(readers, "read_auto", out_of_memory)
+    unit = _plain_unit(source, canvas=(100, 100), corners=[(10.0, 10.0), (90.0, 10.0), (90.0, 90.0), (10.0, 90.0)],
+                       counts=Counts(blocks_across=2, blocks_down=2, squares_per_block_across=2,
+                                     squares_per_block_down=2), readers_=("auto",))
+    rows = harness.run_unit(unit)
+    assert [(r["outcome"], r["periodic"], r["truth_dims"]) for r in rows] == [("error", True, [4, 4])]
+    periodic = report.aggregate(rows, runner=_no_git)["r1"]["by_resolution"]["full"]["count_top1_periodic"]
+    assert (periodic["n"], periodic["errors"]) == (0, 1)
+
+
+def test_a_stage_error_on_an_unframed_photo_stays_an_error(tmp_path):
+    # No such source and no frame: auto-corners has no trial to stand in for, yet the
+    # failed decode is an error, so the Errors section lists it, at 0 px with no trial.
+    truth = corpus.TruthView(corners=None, bands=[], counts=None, fabric_count=None,
+                             construction="out_of_scope", provenance={"refusal_class": "verified-jake"})
+    unit = harness.Unit(photo="r1", group="corpus", tier="R", split="dev", license="CC0-1.0",
+                        device_class="museum scan", resolution="full", cap=None, condition="clean",
+                        source=str(tmp_path / "missing.png"), canvas=(40, 30), truth=truth,
+                        truth_label=truth.label_for("R"), readers=("auto-corners",), radii=(0, 4), trials=1,
+                        seed="t")
+    rows = harness.run_unit(unit)
+    assert [(r["reader"], r["radius_px"], r["outcome"]) for r in rows] == [("auto-corners", 0, "error")]
+    errors = report.aggregate(rows, runner=_no_git)["errors"]
+    assert [(e["photo"], e["reader"], e["radius_px"], e["trial"], e["variant"]) for e in errors] == [
+        ("r1", "auto-corners", 0, None, "true")]

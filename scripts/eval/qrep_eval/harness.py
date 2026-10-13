@@ -190,11 +190,18 @@ def _score_cells(unit: Unit, reading: readers.Reading) -> dict:
 
 
 def _base_row(unit: Unit) -> dict:
+    # Every row of a unit with true counts carries its truth dims and periodicity, an
+    # error or skip row included, so R1's periodic split lists it instead of losing n.
+    truth = {}
+    if unit.truth.counts is not None:
+        counts = unit.truth.counts
+        truth = {"truth_dims": list(_truth_dims(unit.truth)),
+                 "periodic": counts.blocks_across * counts.blocks_down > 1}
     return {
         "photo": unit.photo, "group": unit.group, "tier": unit.tier, "split": unit.split,
         "license": unit.license, "device_class": unit.device_class, "resolution": unit.resolution,
         "condition": unit.condition, "truth": unit.truth_label, "provenance": unit.truth.provenance,
-        "picker": simulate.PICKER_ANSWER, "cell_truth": unit.truth_cells is not None, **unit.extra,
+        "picker": simulate.PICKER_ANSWER, "cell_truth": unit.truth_cells is not None, **truth, **unit.extra,
     }
 
 
@@ -227,22 +234,20 @@ def over_budget(unit: Unit) -> bool:
 def _unread_rows(unit: Unit, result: dict) -> list[dict]:
     """Rows for a unit never read, carrying result (a stage error or a skip), wherever
     run_unit would have put a read: auto's one read, each corner reader's trial at every
-    requested radius, and at 0 px the confirmed reader's miscount variants. Every table,
-    jitter radii and R1's periodic split included, then lists the unit as unscored
-    instead of shrinking its n. A corner reader with no frame keeps its no-frame row."""
+    requested radius, and at 0 px the confirmed reader's miscount variants. The tables
+    then list the unit as unscored where its reads would have counted, instead of
+    shrinking n. A corner reader with no frame has no trials to stand in for: over the
+    budget it keeps its no-frame row, while a stage error stays an error there, so the
+    Errors section still lists it."""
     rows = []
     framed = unit.truth.corners is not None and unit.truth.counts is not None
-    truth = {}
-    if unit.truth.counts is not None:
-        counts = unit.truth.counts
-        truth = {"truth_dims": list(_truth_dims(unit.truth)),
-                 "periodic": counts.blocks_across * counts.blocks_down > 1}
     for name in unit.readers:
-        base = {**_base_row(unit), "reader": name, **truth}
+        base = {**_base_row(unit), "reader": name}
         if name == "auto":
             rows.append({**base, "radius_px": None, "variant": "true", **result})
         elif not framed:
-            rows.append({**base, "radius_px": 0, "variant": "true", "outcome": "skipped", "reason": SKIP_REASON})
+            unframed = result if result["outcome"] == "error" else {"outcome": "skipped", "reason": SKIP_REASON}
+            rows.append({**base, "radius_px": 0, "variant": "true", **unframed})
         else:
             for radius, trial in simulate.trial_ids(unit.radii, unit.trials):
                 meta = {"radius_px": radius, "trial": trial}

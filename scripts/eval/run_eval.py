@@ -200,14 +200,15 @@ def _photoreal_units(args, readers_) -> list[harness.Unit]:
 
 def _budget_line(units, rows) -> str:
     """The as-fetched budget as the report states it, with what it skipped in this run and
-    the largest image a reader was handed uncapped."""
-    fetched = [u for u in units if u.cap is None]
-    over = [u for u in fetched if harness.over_budget(u)]
-    groups = (("clean", "corpus"), ("stress", "stress"), ("named", "named"))
-    tally = "; ".join(f"{label} units {sum(u.group == g for u in fetched)} as fetched, "
-                      f"{sum(u.group == g for u in over)} skipped"
-                      for label, g in groups if any(u.group == g for u in fetched))
+    the largest image a reader was handed as fetched. Skips are counted from the rows, so
+    a unit only a no-frame row stands for is not counted as over the budget."""
     uncapped = {name for name, cap in corpus.RESOLUTIONS.items() if cap is None}
+    fetched = [u for u in units if u.group != "named" and u.resolution in uncapped]
+    over = {(r["group"], r["photo"], r["resolution"], r["condition"]) for r in rows
+            if r.get("skip_kind") == corpus.OVER_BUDGET}
+    tally = "; ".join(f"{label} units {sum(u.group == g for u in fetched)} as fetched, "
+                      f"{sum(key[0] == g for key in over)} skipped"
+                      for label, g in (("clean", "corpus"), ("stress", "stress")) if any(u.group == g for u in fetched))
     read = [(*r["received"]["staged_size"], r["photo"]) for r in rows
             if r["resolution"] in uncapped and r["outcome"] not in report.UNSCORED and "received" in r]
     largest = max(read, key=lambda t: (t[0] * t[1], t[2]), default=None)
@@ -215,10 +216,11 @@ def _budget_line(units, rows) -> str:
             "6145839899 and 6146139041), on every split: a unit whose reader would be handed an uncapped "
             "image above it, judged after any degradation that shrinks the image, is never read; its rows "
             "stand where its reads would be (auto's read, each corner trial, the confirmed reader's "
-            "miscounts), carry skip_kind over_budget, and are listed beside every rate, never counted as "
-            "a read, refusal, success or failure; a capped unit is never over it. In this run: "
-            f"{tally or 'no units as fetched'}; photos skipped: "
-            f"{', '.join(sorted({u.photo for u in over})) or 'none'}; the largest image read as fetched: "
+            "miscounts) and carry skip_kind over_budget, except a corner reader with no frame to confirm, "
+            "which keeps its no-frame row; they are listed beside every rate, never counted as a read, "
+            "refusal, success or failure; a capped unit is never over it, and the named fixture rows are "
+            f"outside this tally. In this run: {tally or 'no units as fetched'}; photos skipped: "
+            f"{', '.join(sorted({key[1] for key in over})) or 'none'}; the largest image read as fetched: "
             f"{f'{largest[0]} x {largest[1]} px ({largest[2]})' if largest else 'none'}. Why: {BUDGET_EVIDENCE}")
 
 
