@@ -21,6 +21,8 @@ interface Props {
   pinnedField?: Quad | null;
 }
 
+const SQUARE_LINES_MAX = 300;
+
 const points = (quad: Quad) => quad.map((p) => `${p.x},${p.y}`).join(" ");
 
 function Lines({ segments, className }: { segments: Segment[]; className: string }) {
@@ -32,7 +34,11 @@ export function GridOverlay({ homography, across, down, bands, activeBand = null
   const cols = across.blocks * across.squaresPerBlock;
   const rows = down.blocks * down.squaresPerBlock;
   const field = fieldRange(cols, rows, bands);
-  const squares = gridLines(homography, cols, rows, field);
+  // Past this many squares on an axis the square lines fill the photo and cost
+  // a frame on every pointer move, so only the block lines are drawn.
+  const squares = cols <= SQUARE_LINES_MAX && rows <= SQUARE_LINES_MAX
+    ? gridLines(homography, cols, rows, field)
+    : { vertical: [], horizontal: [] };
   const blocks = gridLines(homography, across.blocks, down.blocks, field);
   return (
     <g className="cf-grid" data-testid="grid-overlay" data-cols={cols} data-rows={rows}>

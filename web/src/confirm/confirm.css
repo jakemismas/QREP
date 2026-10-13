@@ -77,7 +77,8 @@
   margin: 0;
   padding: 0;
   border: 0;
-  border-radius: 50%;
+  /* Square corners: a rounded button would hit-test as a 44 px circle,
+     smaller than the 44 x 44 px target. */
   background: transparent;
   cursor: grab;
   touch-action: none;

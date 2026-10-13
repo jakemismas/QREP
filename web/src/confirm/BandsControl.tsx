@@ -35,15 +35,18 @@ function formatInches(inches: number): string {
 }
 
 function InchField({ index, width, squareEighths, onSet }: { index: number; width: number; squareEighths: number | null; onSet: (w: number) => void }) {
-  const shown = squareEighths ? String(squaresToInches(width, squareEighths)) : "";
+  // Three decimals: a dragged width is not a whole quarter inch.
+  const shown = squareEighths ? String(Number(squaresToInches(width, squareEighths).toFixed(3))) : "";
   const [text, setText] = useState(shown);
   useEffect(() => setText(shown), [shown]);
   const apply = () => {
     const inches = Number(text);
     if (!squareEighths || !(inches > 0)) return setText(shown);
     const squares = inchesToSquares(inches, squareEighths);
-    if (squares > 0) onSet(squares);
-    else setText(shown);
+    if (!(squares > 0)) return setText(shown);
+    onSet(squares);
+    // The rounded width can equal the current one, which leaves shown unchanged.
+    setText(String(Number(squaresToInches(squares, squareEighths).toFixed(3))));
   };
   return (
     <label className="cf-bands__inches">

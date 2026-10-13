@@ -32,9 +32,11 @@ import {
   CLASS_LABELS,
   CONSTRUCTION_CLASSES,
   frameProvenances,
+  isNoBorderFrame,
   newAnnotation,
   parseAnnotation,
   photoStem,
+  sameStem,
   saveProblems,
   serializeAnnotation,
   startingValues,
@@ -68,7 +70,7 @@ function inchLabel(eighths: number): string {
 
 function draftFrom(annotation: Annotation | null, canvas: [number, number], provenance?: string) {
   const empty = drillStart(canvas);
-  if (!annotation) return { draft: empty, fieldVisible: false, from: null as string | null };
+  if (!annotation) return { draft: empty, fieldVisible: false, from: null as string | null, frameMode: "outer_edge" as FrameMode };
   const start = startingValues(annotation, provenance);
   const counts = start.counts ? fromCounts(start.counts) : { across: empty.across, down: empty.down };
   const draft: Draft = {
@@ -79,7 +81,12 @@ function draftFrom(annotation: Annotation | null, canvas: [number, number], prov
     down: counts.down,
     constructionClass: start.constructionClass,
   };
-  return { draft, fieldVisible: draft.field !== null, from: start.provenance };
+  // A no-border frame reopens as field corners, or its field pins would sit
+  // on top of the outer pins and an edit would reach only one of the two.
+  if (start.frame && isNoBorderFrame(start.frame)) {
+    return { draft, fieldVisible: false, from: start.provenance, frameMode: "field" as FrameMode };
+  }
+  return { draft, fieldVisible: draft.field !== null, from: start.provenance, frameMode: "outer_edge" as FrameMode };
 }
 
 function deviceInfo(): DeviceInfo {
@@ -100,7 +107,8 @@ function saveText(name: string, text: string) {
   document.body.append(link);
   link.click();
   link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  // WebKit fails a save whose blob URL is revoked too soon (bugs.webkit.org 211234).
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 export function AnnotatePage() {
@@ -141,7 +149,7 @@ export function AnnotatePage() {
     setDraft(start.draft);
     setFieldVisible(start.fieldVisible);
     setSeededFrom(start.from);
-    setFrameMode("outer_edge");
+    setFrameMode(start.frameMode);
     setActiveBand(null);
     setSquare(null);
   }, [annotation, natural, startFrom, mode]);
@@ -190,9 +198,21 @@ export function AnnotatePage() {
     setDraft(null);
     const url = URL.createObjectURL(file);
     setPhoto({ url, name: file.name, natural: null, sha256: null });
-    if (!annotation) setPhotoPath(file.name);
-    const sha = sha256Hex(new Uint8Array(await file.arrayBuffer()));
-    setPhoto((p) => (p && p.url === url ? { ...p, sha256: sha } : p));
+    // An annotation names its photo; keeping it for another photo would save
+    // that photo's pins under the first one's identity.
+    const keep = annotation !== null && sameStem(annotation.photo, file.name);
+    if (annotation && !keep) {
+      setAnnotation(null);
+      setStatus(`Closed the annotation for ${annotation.photo}: it names another photo.`);
+    }
+    if (!keep) setPhotoPath(file.name);
+    if (keep) return;
+    try {
+      const sha = sha256Hex(new Uint8Array(await file.arrayBuffer()));
+      setPhoto((p) => (p && p.url === url ? { ...p, sha256: sha } : p));
+    } catch {
+      setError("This photo could not be read to compute its sha256.");
+    }
   };
 
   const onAnnotationFile = async (file: File) => {
@@ -201,6 +221,10 @@ export function AnnotatePage() {
     setProblems([]);
     try {
       const parsed = parseAnnotation(await file.text());
+      if (photo && !sameStem(parsed.photo, photo.name)) {
+        setError(`This annotation names ${parsed.photo}, but the open photo is ${photo.name}. Open the photo it names first.`);
+        return;
+      }
       if (mode === "drill") setMode("verify");
       setDrill(null);
       setStartFrom(undefined);
@@ -211,8 +235,11 @@ export function AnnotatePage() {
   };
 
   const setCounts = (across: AxisCount, down: AxisCount) => {
+    const before = draft && toCounts(draft.across, draft.down);
+    const after = toCounts(across, down);
     setDraft((d) => d && { ...d, across, down });
-    if (drill) setDrill((log) => log && recordCounts(log, toCounts(across, down), elapsed()));
+    const changed = !before || (Object.keys(after) as (keyof typeof after)[]).some((k) => after[k] !== before[k]);
+    if (drill && changed) setDrill((log) => log && recordCounts(log, after, elapsed()));
   };
 
   const onMove = (id: string, point: Point) => {
@@ -278,8 +305,9 @@ export function AnnotatePage() {
     const size = { width: canvas[0], height: canvas[1] };
     const range = frameMode === "outer_edge" ? bandTotal(bands) : 0;
     // Start the two pins one square apart at the current counts, near the middle.
-    const du = 1 / (cols + 2 * range);
-    const dv = 1 / (rows + 2 * range);
+    // At most a tenth of the frame, so at 1 x 1 the pins do not start on the corners.
+    const du = Math.min(0.1, 1 / (cols + 2 * range));
+    const dv = Math.min(0.1, 1 / (rows + 2 * range));
     setSquare([
       snapToPixel(applyHomography(homography, 0.5 - du / 2, 0.5 - dv / 2), size),
       snapToPixel(applyHomography(homography, 0.5 + du / 2, 0.5 + dv / 2), size),

@@ -66,6 +66,12 @@ interface Pinch {
   view: View;
 }
 
+interface Pan {
+  pointerId: number;
+  start: Point;
+  view: View;
+}
+
 const ZOOM_MAX = 8;
 const ZOOM_STEP = 1.5;
 const FIT: View = { scale: 1, x: 0, y: 0 };
@@ -109,6 +115,8 @@ export function PinLayer({
   const pointers = useRef(new Map<number, Point>());
   const drag = useRef<Drag | null>(null);
   const pinch = useRef<Pinch | null>(null);
+  // A mouse has no second finger, so a drag off the pins pans a zoomed photo.
+  const pan = useRef<Pan | null>(null);
   const [view, setView] = useState<View>(FIT);
   const [dragging, setDragging] = useState<string | null>(null);
   const viewRef = useRef(view);
@@ -152,6 +160,8 @@ export function PinLayer({
   };
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    // Only the primary mouse button drags: a right-click opens its menu and may never send pointerup.
+    if (event.pointerType === "mouse" && event.button !== 0) return;
     pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
     if (pointers.current.size === 2) {
       // A second finger turns a drag into a pinch; the pin keeps where it got to.
@@ -165,6 +175,11 @@ export function PinLayer({
     const id = pinEl?.dataset.pinId;
     const point = id ? pinPoint(id) : null;
     const img = imgRef.current;
+    if (!id && event.pointerType === "mouse" && viewRef.current.scale > 1) {
+      pan.current = { pointerId: event.pointerId, start: { x: event.clientX, y: event.clientY }, view: viewRef.current };
+      stageRef.current?.setPointerCapture(event.pointerId);
+      return;
+    }
     if (!id || !point || !img) return;
     event.preventDefault();
     const center = sourceToDisplay(point, img.getBoundingClientRect(), canvas);
@@ -194,6 +209,17 @@ export function PinLayer({
       }
       return;
     }
+    const panning = pan.current;
+    if (panning && panning.pointerId === event.pointerId) {
+      const stage = stageSize();
+      const moved = {
+        scale: panning.view.scale,
+        x: panning.view.x + event.clientX - panning.start.x,
+        y: panning.view.y + event.clientY - panning.start.y,
+      };
+      setView(clampView(moved, stage.width, stage.height));
+      return;
+    }
     const start = pinch.current;
     if (start && pointers.current.size >= 2) {
       const [a, b] = [...pointers.current.values()];
@@ -209,7 +235,9 @@ export function PinLayer({
 
   const handlePointerEnd = (event: PointerEvent<HTMLDivElement>) => {
     pointers.current.delete(event.pointerId);
-    if (drag.current?.pointerId === event.pointerId) endDrag(event.type === "pointerup");
+    // A cancelled drag still moved the pin on screen, so it still counts as a placement.
+    if (drag.current?.pointerId === event.pointerId) endDrag(true);
+    if (pan.current?.pointerId === event.pointerId) pan.current = null;
     if (pointers.current.size < 2) pinch.current = null;
   };
 
@@ -231,7 +259,16 @@ export function PinLayer({
   };
 
   const dragPoint = dragging ? pinPoint(dragging) : null;
-  const loupeSide = dragPoint && dragPoint.x < canvas.width / 2 && dragPoint.y < canvas.height / 2 ? "right" : "left";
+  // The loupe moves aside when the pin is under it on screen, which at a
+  // zoom is not the same as the pin's quarter of the photo.
+  let loupeSide: "left" | "right" = "left";
+  const stageRect = stageRef.current?.getBoundingClientRect();
+  const imgRect = imgRef.current?.getBoundingClientRect();
+  if (dragPoint && stageRect && imgRect) {
+    const shown = sourceToDisplay(dragPoint, imgRect, canvas);
+    const inTopLeft = shown.x - stageRect.left < stageRect.width / 2 && shown.y - stageRect.top < stageRect.height / 2;
+    loupeSide = inTopLeft ? "right" : "left";
+  }
 
   return (
     <div className="cf-pins">

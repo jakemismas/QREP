@@ -11,7 +11,7 @@
  * image (canvas), whichever file the page shows.
  */
 import type { BorderBand, Corners, Counts, FieldFrame, OuterEdgeFrame } from "../../engine/contract";
-import type { AxisCount } from "../../confirm/counts";
+import { COUNT_MAX, type AxisCount } from "../../confirm/counts";
 import { cornersToQuad, fieldInsideProblem, quadProblem, type FrameMode } from "../../confirm/frame";
 import type { Size } from "../../confirm/geometry";
 
@@ -69,6 +69,34 @@ export class AnnotationError extends Error {
 }
 
 const IDENTITY_FIELDS = new Set(["schema_version", "photo", "sha256", "canvas"]);
+// The model's claim fields and provenance codes (scripts/eval/qrep_eval/annotation.py).
+// Refusing anything else up front keeps a file the model would reject, or a
+// __proto__ key, from being carried into a saved file.
+const CLAIM_FIELDS = new Set([
+  "frame",
+  "counts",
+  "construction_class",
+  "refusal_class",
+  "fabrics",
+  "finished_size",
+  "capture",
+  "device_class",
+  "masks",
+  "gold_layout",
+  "quad",
+  "grid",
+  "repeat_cells",
+  "character",
+]);
+const PROVENANCES = new Set([
+  "proposed-a",
+  "proposed-b",
+  "adjudicated",
+  VERIFIED,
+  "hand-authored",
+  "source-record",
+  "screened",
+]);
 const SHA256 = /^[0-9a-f]{64}$/;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -91,7 +119,10 @@ function isFrameValue(value: unknown): boolean {
   const edge = value.outer_edge;
   const bandsOk =
     Array.isArray(edge.bands) &&
-    edge.bands.every((band: unknown) => isRecord(band) && Number(band.width_squares) > 0);
+    edge.bands.every(
+      (band: unknown) =>
+        isRecord(band) && typeof band.width_squares === "number" && band.width_squares > 0 && Number.isFinite(band.width_squares),
+    );
   const fieldOk = value.field == null || (isRecord(value.field) && isCorners(value.field.corners));
   return edge.kind === "outer_edge" && isCorners(edge.corners) && bandsOk && fieldOk;
 }
@@ -99,8 +130,10 @@ function isFrameValue(value: unknown): boolean {
 function isCountsValue(value: unknown): boolean {
   return (
     isRecord(value) &&
-    ["blocks_across", "blocks_down", "squares_per_block_across", "squares_per_block_down"].every((k) =>
-      isWhole(value[k], 1),
+    // The typed maximum bounds a file's counts too: a huge count would make
+    // the overlay draw lines without end.
+    ["blocks_across", "blocks_down", "squares_per_block_across", "squares_per_block_down"].every(
+      (k) => isWhole(value[k], 1) && (value[k] as number) <= COUNT_MAX,
     )
   );
 }
@@ -129,10 +162,15 @@ export function parseAnnotation(text: string): Annotation {
   }
   for (const [name, claims] of Object.entries(data)) {
     if (IDENTITY_FIELDS.has(name)) continue;
+    if (!CLAIM_FIELDS.has(name)) throw new AnnotationError(`This annotation has a field the format does not define: ${name}.`);
     const listOk =
       Array.isArray(claims) &&
-      claims.every((claim) => isRecord(claim) && typeof claim.provenance === "string" && "value" in claim);
+      claims.every((claim) => isRecord(claim) && PROVENANCES.has(claim.provenance as string) && "value" in claim);
     if (!listOk) throw new AnnotationError(`This annotation's ${name} field is not a list of claims.`);
+    const codes = claims.map((claim: Record<string, unknown>) => claim.provenance);
+    if (new Set(codes).size !== codes.length) {
+      throw new AnnotationError(`This annotation's ${name} field has two claims with one provenance code.`);
+    }
   }
   const check = (name: string, valid: (value: unknown) => boolean) => {
     const claims = (data as Record<string, unknown>)[name] as Claim<unknown>[] | undefined;
@@ -142,7 +180,7 @@ export function parseAnnotation(text: string): Annotation {
   };
   check("frame", isFrameValue);
   check("counts", isCountsValue);
-  check("construction_class", (value) => typeof value === "string");
+  check("construction_class", (value) => (CONSTRUCTION_CLASSES as readonly unknown[]).includes(value));
   return data as unknown as Annotation;
 }
 
@@ -276,5 +314,26 @@ export function aspectMatches(canvas: [number, number], image: Size): boolean {
 export function photoStem(photo: string): string {
   const name = photo.split(/[\\/]/).pop() ?? photo;
   const dot = name.lastIndexOf(".");
-  return dot > 0 ? name.slice(0, dot) : name;
+  return (dot > 0 ? name.slice(0, dot) : name) || "annotation";
+}
+
+/** Whether a photo file is the one an annotation names, by file stem, ignoring case. */
+export function sameStem(a: string, b: string): boolean {
+  return photoStem(a).toLowerCase() === photoStem(b).toLowerCase();
+}
+
+/**
+ * A frame with no bands whose field equals its outer edge was saved as
+ * field corners with no border, so it reopens that way.
+ */
+export function isNoBorderFrame(frame: AnnotatedFrame): boolean {
+  const field = frame.field?.corners;
+  const edge = frame.outer_edge.corners;
+  return (
+    frame.outer_edge.bands.length === 0 &&
+    field !== undefined &&
+    (["top_left", "top_right", "bottom_right", "bottom_left"] as const).every(
+      (k) => field[k].x === edge[k].x && field[k].y === edge[k].y,
+    )
+  );
 }

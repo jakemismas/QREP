@@ -9,7 +9,9 @@ import {
   aspectMatches,
   annotatedFrame,
   AnnotationError,
+  isNoBorderFrame,
   newAnnotation,
+  sameStem,
   parseAnnotation,
   photoStem,
   saveProblems,
@@ -74,6 +76,37 @@ describe("reading an annotation", () => {
     expect(() => parseAnnotation(JSON.stringify({ ...proposed(), sha256: "abc" }))).toThrow(/sha256/);
     expect(() => parseAnnotation(JSON.stringify({ ...proposed(), canvas: [800] }))).toThrow(/canvas/);
     expect(() => parseAnnotation(JSON.stringify({ ...proposed(), frame: {} }))).toThrow(/frame/);
+  });
+
+  it("refuses what the annotation model refuses, before it reaches a saved file", () => {
+    // Self-review findings on #149: a string band width concatenated in
+    // bandTotal; a count of 1e300 made the overlay loop without end; a
+    // __proto__ key or an unknown code was carried into the saved file.
+    const frame = proposed().frame!;
+    const stringBand = [{ ...frame[0], value: { outer_edge: { ...frame[0].value.outer_edge, bands: [{ width_squares: "2" }] } } }];
+    expect(() => parseAnnotation(JSON.stringify({ ...proposed(), frame: stringBand }))).toThrow(/frame claim/);
+    const huge = [{ value: { ...COUNTS, blocks_across: 1e300 }, provenance: "proposed-a" }];
+    expect(() => parseAnnotation(JSON.stringify({ ...proposed(), counts: huge }))).toThrow(/counts claim/);
+    expect(() => parseAnnotation('{"schema_version":1,"photo":"a.jpg","sha256":"' + SHA + '","canvas":[1,1],"__proto__":[]}')).toThrow(
+      /does not define: __proto__/,
+    );
+    const unknownCode = [{ value: "hst", provenance: "proposed-c" }];
+    expect(() => parseAnnotation(JSON.stringify({ ...proposed(), construction_class: unknownCode }))).toThrow(/list of claims/);
+    const twice = [...proposed().counts!, ...proposed().counts!];
+    expect(() => parseAnnotation(JSON.stringify({ ...proposed(), counts: twice }))).toThrow(/one provenance code/);
+    const badClass = [{ value: "diamond", provenance: "proposed-a" }];
+    expect(() => parseAnnotation(JSON.stringify({ ...proposed(), construction_class: badClass }))).toThrow(/class claim/);
+  });
+
+  it("matches a photo file to its annotation by stem, ignoring case and folders", () => {
+    expect(sameStem("images/lacma-54871.jpg", "lacma-54871.JPG")).toBe(true);
+    expect(sameStem("private/cache/met-13596.jpg", "met-13597.jpg")).toBe(false);
+  });
+
+  it("knows a no-border frame saved from field corners", () => {
+    expect(isNoBorderFrame(annotatedFrame("field", FIELD, [], null))).toBe(true);
+    expect(isNoBorderFrame(annotatedFrame("outer_edge", OUTER, [], FIELD))).toBe(false);
+    expect(isNoBorderFrame(annotatedFrame("outer_edge", OUTER, [], null))).toBe(false);
   });
 
   it("starts from the verified claim, else proposer A, else proposer B", () => {
