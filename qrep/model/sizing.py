@@ -21,9 +21,9 @@ The one-eighth step is the sprint 3 reconcile for its callers (the crop-screen
 size and the editor's size edit): the exact cell rounded half-up per axis,
 the smaller of the two, borders to the eighth. Both rules use the frozen
 clamps and cap borders at BAND_MAX (PARITY item 4; REBASELINE.md literals B8
-to B10, and C3 for the band cap): an entry outside them returns the size at
-the clamp with its miss reported, never an error. Callers receive {requested,
-achieved}, and the model records both in its size basis.
+to B10, and C3 for the band cap): a size of at least 1 e outside them returns
+the size at the clamp with its miss reported, not an error. Callers receive
+{requested, achieved}, and the model records both in its size basis.
 """
 
 from math import lcm
@@ -120,8 +120,10 @@ def _check_pattern_step(step: int) -> None:
 def offered_squares(quilt: Quilt, step: int | None = None) -> tuple[int, ...]:
     """The finished square sizes the pattern offers this quilt: square_sizes(step)
     narrowed to the sizes that keep every corner leg a whole eighth. Raises
-    when a leg leaves none, because the pattern cannot size that quilt."""
+    for a step that is not a whole quarter inch, and when a leg leaves no
+    size, because the pattern cannot size that quilt."""
     step = SQUARE_STEP if step is None else step
+    _check_pattern_step(step)
     whole = _square_step(quilt, step)
     sizes = tuple(square for square in square_sizes(step) if square % whole == 0)
     if not sizes:
@@ -196,7 +198,6 @@ def _reconcile(
         new_bands = [max(BAND_FLOOR, min(BAND_MAX, round_div(w * cell, cell0))) for w in bands0]
         applied = 1
     else:
-        _check_pattern_step(step)
         sizes = offered_squares(quilt, step)
         cell = _nearest_square(width, height, cols, rows, bands0, cell0, sizes)
         new_bands = [_pattern_band(w, cell0, cell) for w in bands0]
@@ -237,7 +238,8 @@ def apply_finished_size(
     Every caller passes a size you entered (the crop-screen size and the
     editor's size edit), so the updated quilt records a typed size basis at
     1.0 with the step applied; a basis the old size had cannot describe the
-    new one."""
+    new one. A preset chip on those screens arrives as a width and height, so
+    it is recorded as typed too, until #244."""
     updated, requested, achieved, applied = _reconcile(quilt, width, height, step)
     updated.size_basis = FinishedSizeBasis(
         source="typed",
@@ -263,7 +265,6 @@ def size_at(
     The returned quilt carries no size basis: the basis has no source for a
     chosen square yet (#240)."""
     step = SQUARE_STEP if step is None else step
-    _check_pattern_step(step)
     offered = offered_squares(quilt, step)
     if square not in offered:
         reason = (
@@ -337,6 +338,9 @@ def size_pattern(quilt: Quilt, request: SizeRequest) -> SizeResult:
         width, height = quilt.finished_width, quilt.finished_height
         confidence = _estimate_confidence(quilt)
 
+    # Step 1 would select the sprint 3 reconcile, whose borders round to the
+    # eighth, so the pattern step is checked before _reconcile sees it.
+    _check_pattern_step(SQUARE_STEP)
     sized, _requested, _achieved, applied = _reconcile(quilt, width, height, SQUARE_STEP)
     if request.source == "default":
         width = height = None

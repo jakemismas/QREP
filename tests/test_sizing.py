@@ -10,6 +10,7 @@ On the pattern path a border scales with the square and snaps to 1/4 in
 2 x round_div(30 x s, 2 x 12) = 2 x round_div(30 s, 24) = 2 x ((30 s + 12) // 24).
 """
 
+import ast
 import inspect
 import json
 import re
@@ -89,6 +90,24 @@ def _snowball_grid(
     )
 
 
+def _top_level_bindings(module) -> set[str]:
+    """Names a module's top level binds other than by import."""
+    names = set()
+    for node in ast.parse(inspect.getsource(module)).body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            names.add(node.name)
+            continue
+        if isinstance(node, ast.Assign):
+            targets = node.targets
+        elif isinstance(node, (ast.AnnAssign, ast.AugAssign)):
+            targets = [node.target]
+        else:
+            continue
+        for target in targets:
+            names |= {n.id for n in ast.walk(target) if isinstance(n, ast.Name)}
+    return names
+
+
 def _envelope_error(envelope_json: str) -> dict:
     envelope = json.loads(envelope_json)
     assert envelope["ok"] is False
@@ -122,12 +141,13 @@ def test_moved_names_have_one_home():
     assert viewer_sizing.round_div is sizing.round_div
     assert finished_size.apply_finished_size is sizing.apply_finished_size
     # Small ints carry no identity, so an equal value cannot tell an import
-    # from a redefined literal; the shims' source must assign none of them.
+    # from a redefined literal; the shims' top level must bind none of the
+    # moved names except by import (plain, annotated, augmented or tuple
+    # assignment, or a def).
+    moved = {"PRESETS", "CELL_MIN", "CELL_MAX", "BAND_FLOOR", "BAND_MAX", "round_div"}
+    moved |= {"apply_finished_size"}
     for module in (finished_size, viewer_sizing):
-        source = inspect.getsource(module)
-        for name in ("PRESETS", "CELL_MIN", "CELL_MAX", "BAND_FLOOR", "BAND_MAX"):
-            assert not re.search(rf"^{name}\s*=", source, re.MULTILINE), (module, name)
-        assert "def round_div" not in source, module
+        assert not moved & _top_level_bindings(module), module
     for name in ("CELL_MIN", "CELL_MAX", "BAND_FLOOR"):
         assert getattr(finished_size, name) == getattr(sizing, name)
 
@@ -149,10 +169,9 @@ def test_offered_square_sizes_are_quarter_inch_steps():
     # every 1/4 in (2 e) from 3/4 in (6 e) to 4 in (32 e):
     # (32 - 6) / 2 + 1 = 14 sizes
     assert sizing.square_sizes() == (6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32)
-    # cut size = finished + 2 x 1/4 in seam allowance = finished + 4 e. The
-    # reference cut sizes are on the list: 6 + 4 = 10 e (1 1/4 in),
-    # 16 + 4 = 20 e (2 1/2 in) and 32 + 4 = 36 e (4 1/2 in).
-    assert {10, 20, 36} <= {square + 4 for square in sizing.square_sizes()}
+    # cut size = finished + 2 x 1/4 in seam allowance = finished + 4 e, so
+    # the references' cut sizes are on the list above: 6 + 4 = 10 e
+    # (1 1/4 in), 16 + 4 = 20 e (2 1/2 in) and 32 + 4 = 36 e (4 1/2 in).
 
 
 def test_square_step_is_a_setting():
@@ -193,9 +212,20 @@ def test_a_pattern_step_off_whole_quarter_inches_is_refused(monkeypatch):
     # pattern step.
     with pytest.raises(ValueError, match="quarter inch"):
         apply_finished_size(load(FIXTURE), 600, None, step=3)
-    monkeypatch.setattr(sizing, "SQUARE_STEP", 3)
+    # the public list and a chosen square refuse it too, so a picker built
+    # from offered_squares never offers a square size_at refuses
     with pytest.raises(ValueError, match="quarter inch"):
-        size_pattern(load(FIXTURE), _typed(600, 720))
+        sizing.offered_squares(load(FIXTURE), 3)
+    with pytest.raises(ValueError, match="quarter inch"):
+        sizing.size_at(load(FIXTURE), 12, step=3)
+    # The setting at 3 e, or at 1 e (which would select the sprint 3 rule,
+    # borders to the eighth), is refused on the pattern path.
+    for step in (3, 1):
+        monkeypatch.setattr(sizing, "SQUARE_STEP", step)
+        with pytest.raises(ValueError, match="quarter inch"):
+            size_pattern(load(FIXTURE), _typed(600, 720))
+        with pytest.raises(ValueError, match="quarter inch"):
+            sizing.offered_squares(load(FIXTURE))
 
 
 def test_border_snaps_to_quarter_inch_within_floor_and_cap():
@@ -372,6 +402,22 @@ def test_the_sample_at_86_by_67_5():
     assert (result.basis.achieved_width, result.basis.achieved_height) == (502, 602)
 
 
+def test_the_combined_miss_is_the_plain_sum():
+    # The DIC asked for 400 x 720 e (50 x 90 in). Misses per square, as
+    # (width miss, height miss):
+    #   1 in (8 e): 400 x 480, (0, 240)
+    #   1 1/4 in (10 e): 502 x 602, (102, 118)
+    #   1 1/2 in (12 e): 600 x 720, (200, 0)
+    #   1 3/4 in (14 e): 702 x 842, (302, 122)
+    # The plain sum: 240, 220, 200, 424 -> 12 e. Other measures pick 10 e,
+    # so this vector tells them apart: the largest miss (240, 118, 200, 302)
+    # and the sum of squares (57600, 10404 + 13924 = 24328, 40000, ...).
+    # Source: docs/SPEC.md section 6.3, the combined miss.
+    result = size_pattern(load(FIXTURE), _typed(400, 720))
+    assert result.model.center.cell_size == 12
+    assert (result.basis.achieved_width, result.basis.achieved_height) == (600, 720)
+
+
 def test_a_preset_records_its_size_as_requested():
     # Twin is 70 x 90 in = 560 x 720 e (PRESETS). Combined misses:
     #   1 1/4 in: 502 x 602, 58 + 118 = 176
@@ -438,14 +484,16 @@ def test_a_default_size_from_a_read_carries_no_measured_confidence():
     #   3/4 in (6 e): border 2 x round_div(138, 18) = 2 x (147 // 18) = 16,
     #     302 x 362, combined miss 149 + 179 = 328
     #   1 in (8 e): border 2 x round_div(184, 18) = 2 x (193 // 18) = 20,
-    #     45 x 8 + 40 = 400 x 55 x 8 + 40 = 480, 51 + 61 = 112
+    #     45 x 8 + 40 = 400 by 55 x 8 + 40 = 480, 51 + 61 = 112
     #   1 1/4 in (10 e): border 2 x round_div(230, 18) = 2 x (239 // 18) = 26,
-    #     45 x 10 + 52 = 502 x 55 x 10 + 52 = 602, 51 + 61 = 112
+    #     45 x 10 + 52 = 502 by 55 x 10 + 52 = 602, 51 + 61 = 112
     #   1 1/2 in (12 e): border 2 x round_div(276, 18) = 2 x (285 // 18) = 30,
     #     600 x 720, 149 + 179 = 328
     # A two-axis tie at 112: the larger square wins -> 502 x 602 e. The read
     # recorded no confidence for its assumed resolution, which measures
-    # nothing, so the estimate carries 0.0.
+    # nothing, so the estimate carries 0.0 (Source: docs/SPEC.md section 6.3,
+    # "a read that recorded none gets 0.0"; section 8, a size estimated from
+    # the photo is low confidence).
     result = size_pattern(_read_shaped(9, 23), SizeRequest(source="default"))
     assert result.model.center.cell_size == 10
     assert [band.width for band in result.model.borders] == [26]
@@ -470,7 +518,9 @@ def test_a_default_keeps_the_estimate_confidence_a_read_recorded():
 
 def test_a_default_from_a_read_without_provenance_is_not_hand_authored():
     # A model that drops its provenance defaults to "authored", but its
-    # squares were read at confidence 0.3, so the estimate is a read's: 0.0.
+    # squares were read at confidence 0.3, so the estimate is a read's: 0.0
+    # (Source: docs/SPEC.md section 6.3, only authored provenance with every
+    # recorded confidence at 1.0 is hand-authored).
     data = json.loads(dumps(_read_shaped(9, 23)))
     data["center"]["cell_confidence"] = [[0.3] * 45 for _ in range(55)]
     del data["provenance"]
@@ -608,6 +658,7 @@ def test_the_one_eighth_step_caps_borders():
     # = (12000 + 69) // 138 = 87, clamped to 32. The border scales to
     # round_div(30 x 32, 6) = (960 + 3) // 6 = 160 e and stops at the
     # 112 e cap: 13 x 32 + 2 x 112 = 640 by 10 x 32 + 224 = 544.
+    # Source: #132 criterion 3 and REBASELINE.md literal C3 (BAND_MAX 112 e).
     quilt = _grid_model(10, 13, 6, 30)
     updated, _requested, achieved = apply_finished_size(quilt, 2000, None)
     assert updated.center.cell_size == 32
@@ -649,6 +700,15 @@ def test_apply_finished_size_refuses_a_size_below_one_eighth(width):
         apply_finished_size(load(FIXTURE), width, None)
     error = _envelope_error(bridge.apply_finished_size(dumps(load(FIXTURE)), width, None))
     assert error["kind"] == "value"
+
+
+def test_one_eighth_is_the_smallest_size_you_can_enter():
+    # 1 e wide on the DIC: round_div(1 x 12, 45 x 12 + 60) = (12 + 300) // 600
+    # = 0, clamped to 6 e; border round_div(30 x 6, 12) = (180 + 6) // 12 = 15:
+    # 45 x 6 + 30 = 300 by 55 x 6 + 30 = 360, recorded as asked for 1 e.
+    updated, _requested, achieved = apply_finished_size(load(FIXTURE), 1, None)
+    assert (achieved["width"], achieved["height"]) == (300, 360)
+    assert updated.size_basis.requested_width == 1
 
 
 def test_a_size_typed_on_the_v1_paths_reaches_the_pattern_as_typed(tmp_path):
