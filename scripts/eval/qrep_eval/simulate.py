@@ -50,12 +50,17 @@ def corner_trials(
     """One trial at radius 0 and trials draws at each other radius, each seeded from
     key, radius and trial, so a rerun or a single row reproduces on its own."""
     out = []
-    for radius in radii:
-        for trial in range(1 if radius == 0 else trials):
-            rng = random.Random(f"{key}|{radius}|{trial}")
-            moved = jitter(corners, radius, rng, bounds=bounds)
-            out.append(CornerTrial(radius, trial, moved, tuple(_side(a, b) for a, b in zip(corners, moved))))
+    for radius, trial in trial_ids(radii, trials):
+        rng = random.Random(f"{key}|{radius}|{trial}")
+        moved = jitter(corners, radius, rng, bounds=bounds)
+        out.append(CornerTrial(radius, trial, moved, tuple(_side(a, b) for a, b in zip(corners, moved))))
     return out
+
+
+def trial_ids(radii: tuple[float, ...], trials: int) -> list[tuple[float, int]]:
+    """The (radius, trial) pairs corner_trials draws, for rows that stand in for reads
+    never made."""
+    return [(radius, trial) for radius in radii for trial in range(1 if radius == 0 else trials)]
 
 
 def _side(a: Point, b: Point) -> float:

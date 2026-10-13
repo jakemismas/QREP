@@ -776,10 +776,10 @@ def test_jitter_reports_the_realized_move_beside_the_radius():
 def test_the_g4_cell_names_each_skip_reason():
     # r1 refused (scored: 1/1); r2 skipped for want of a frame; r3 skipped because it was
     # read as fetched above the 50 MP budget (#166 comment 6145839899). Neither skip enters
-    # n, so G4 stays k 1 of n 1, with 2 skipped, 1 of them over the budget.
-    over = corpus.OVER_BUDGET_REASON
+    # n, so G4 stays k 1 of n 1, with 2 skipped, 1 of them over the budget. The report
+    # knows a budget skip by its skip_kind, not by its reason text.
     rows = [_row("r1", "refused", tier="R"), _row("r2", "skipped", tier="R", reason=harness.SKIP_REASON),
-            _row("r3", "skipped", tier="R", reason=over)]
+            _row("r3", "skipped", tier="R", skip_kind=corpus.OVER_BUDGET, reason="any text")]
     agg = report.aggregate(rows, runner=_no_git)
     g4 = next(e for e in agg["gate_metrics"] if e["truth"] == "gate" and e["device_class"] == "museum scan")["G4"]
     assert (g4["k"], g4["n"], g4["skipped"], g4["over_budget"]) == (1, 1, 2, 1)

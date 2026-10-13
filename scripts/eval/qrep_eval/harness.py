@@ -218,22 +218,40 @@ def _confirmed_request(unit: Unit, token: str, size: tuple[int, int], corners) -
                                       "fabric_count": given_fabrics(unit.truth, unit.truth_label)})
 
 
-def _true_corner_rows(unit: Unit, result: dict) -> list[dict]:
-    """Each reader's true-corner row (no corners for auto, 0 px for the others) carrying
-    result, a stage error or a skip, so the tier and jitter tables count the unit where
-    the read would have been, and for the confirmed reader one row per miscount variant,
-    so G3's n keeps them."""
+def over_budget(unit: Unit) -> bool:
+    """Whether the reader would be handed an image above the as-fetched budget, judged
+    at the size the unit's degradation hands it."""
+    return corpus.over_budget(degrade.read_size(unit.condition, tuple(unit.canvas)), unit.cap)
+
+
+def _unread_rows(unit: Unit, result: dict) -> list[dict]:
+    """Rows for a unit never read, carrying result (a stage error or a skip), wherever
+    run_unit would have put a read: auto's one read, each corner reader's trial at every
+    requested radius, and at 0 px the confirmed reader's miscount variants. Every table,
+    jitter radii and R1's periodic split included, then lists the unit as unscored
+    instead of shrinking its n. A corner reader with no frame keeps its no-frame row."""
     rows = []
     framed = unit.truth.corners is not None and unit.truth.counts is not None
+    truth = {}
+    if unit.truth.counts is not None:
+        counts = unit.truth.counts
+        truth = {"truth_dims": list(_truth_dims(unit.truth)),
+                 "periodic": counts.blocks_across * counts.blocks_down > 1}
     for name in unit.readers:
-        base = {**_base_row(unit), "reader": name, "radius_px": None if name == "auto" else 0,
-                "variant": "true"}
-        rows.append({**base, **result})
-        if name == "confirmed" and framed:
-            variants, skipped = simulate.miscount_variants(unit.truth.counts)
-            rows.extend({**base, "variant": kind, **result} for kind, _ in variants)
-            rows.extend({**base, "variant": kind, "outcome": "skipped", "reason": reason}
-                        for kind, reason in skipped)
+        base = {**_base_row(unit), "reader": name, **truth}
+        if name == "auto":
+            rows.append({**base, "radius_px": None, "variant": "true", **result})
+        elif not framed:
+            rows.append({**base, "radius_px": 0, "variant": "true", "outcome": "skipped", "reason": SKIP_REASON})
+        else:
+            for radius, trial in simulate.trial_ids(unit.radii, unit.trials):
+                meta = {"radius_px": radius, "trial": trial}
+                rows.append({**base, **meta, "variant": "true", **result})
+                if name == "confirmed" and radius == 0:
+                    variants, skipped = simulate.miscount_variants(unit.truth.counts)
+                    rows.extend({**base, **meta, "variant": kind, **result} for kind, _ in variants)
+                    rows.extend({**base, **meta, "variant": kind, "outcome": "skipped", "reason": reason}
+                                for kind, reason in skipped)
     return rows
 
 
@@ -241,14 +259,14 @@ def run_unit(unit: Unit) -> list[dict]:
     """Every reader trial on one staged image, each as a report row. An error becomes a
     row with outcome error, so the report counts it instead of shrinking n silently."""
     rows: list[dict] = []
-    if corpus.over_budget(unit.canvas, unit.cap):
-        return json.loads(json.dumps(_true_corner_rows(
-            unit, {"outcome": "skipped", "reason": corpus.OVER_BUDGET_REASON})))
+    if over_budget(unit):
+        return json.loads(json.dumps(_unread_rows(unit, {
+            "outcome": "skipped", "skip_kind": corpus.OVER_BUDGET, "reason": corpus.over_budget_reason()})))
     with tempfile.TemporaryDirectory(prefix="qrep-eval-", dir=unit.workdir_root) as tmp:
         try:
             path, size = stage(unit, Path(tmp))
         except Exception as error:  # noqa: BLE001 - recorded on the row, never swallowed
-            return json.loads(json.dumps(_true_corner_rows(unit, {"outcome": "error", "error": repr(error)})))
+            return json.loads(json.dumps(_unread_rows(unit, {"outcome": "error", "error": repr(error)})))
         corners = (scale_corners(unit.truth.corners, unit.canvas, size)
                    if unit.truth.corners is not None else None)
         pitch = (simulate.square_pitch(corners, unit.truth.counts, unit.truth.bands)

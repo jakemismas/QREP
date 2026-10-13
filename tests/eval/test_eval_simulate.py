@@ -1270,45 +1270,110 @@ def test_only_as_fetched_units_above_50_mp_are_over_the_budget():
     assert not corpus.over_budget((10292, 11415), 1400)
 
 
-def test_an_over_budget_unit_is_each_readers_skipped_row_with_no_read(monkeypatch, tmp_path):
-    # A 10292 x 11415 canvas as fetched is over the budget: no stage, no read. Every
-    # reader gets a skipped row where its true-corner read would be (no corners for
-    # auto, 0 px for the others), and the confirmed reader one per miscount variant.
-    # Counts 1 block of 4 x 4: square +1 and -1 on each axis (4), block +1 on each axis
-    # (2), half and double: 8 variants skipped over the budget; block -1 on each axis
-    # leaves 0 blocks: 2 skipped for that reason.
+def test_the_budget_judges_low_res_jpeg_at_the_size_it_reads():
+    # low_res_jpeg hands the reader a copy at most 600 px on its longest side. For a
+    # 10292 x 11415 canvas: scale 600 / 11415 = 0.0525624, 10292 x 0.0525624 = 540.97,
+    # floor(540.97 + 0.5) = 541, and 11415 x 0.0525624 = 600: 541 x 600 = 324,600 px,
+    # within 50,000,000, so that unit runs. Clean or glared, the reader gets all
+    # 117,483,180 px, over. A capped unit is never over.
+    assert degrade.read_size("low_res_jpeg", (10292, 11415)) == (541, 600)
+    assert degrade.read_size("glare", (10292, 11415)) == (10292, 11415)
+
+    def unit(condition, cap=None):
+        return _plain_unit("never-opened.png", canvas=(10292, 11415), corners=None, counts=None,
+                           readers_=("auto",), cap=cap, condition=condition)
+
+    assert not harness.over_budget(unit("low_res_jpeg"))
+    assert harness.over_budget(unit("clean")) and harness.over_budget(unit("glare"))
+    assert not harness.over_budget(unit("clean", cap=2000))
+
+
+def test_an_over_budget_unit_stands_in_rows_wherever_its_reads_would_be(monkeypatch, tmp_path):
+    # A 10292 x 11415 canvas as fetched is over the budget: no stage, no read. Its rows
+    # stand where run_unit would put reads, so every table lists it: auto's one read;
+    # auto-corners and confirmed at radius 0 (1 trial) and 4 (trials = 1); and at 0 px
+    # the confirmed reader's miscounts. Counts 1 block of 4 x 4: square +1 and -1 on each
+    # axis (4), block +1 on each axis (2), half and double: 8 variants skipped over the
+    # budget; block -1 on each axis leaves 0 blocks: 2 skipped for that reason.
+    # Rows: 1 + 2 + (1 + 10 + 1) = 15.
     monkeypatch.setattr(readers, "read_auto", _no_read)
     monkeypatch.setattr(readers, "read_confirmed", _no_read)
     monkeypatch.setattr(harness, "stage", _no_read)
-    unit = _plain_unit(tmp_path / "never-opened.png", canvas=(10292, 11415),
-                       corners=[(100.0, 100.0), (10192.0, 100.0), (10192.0, 11315.0), (100.0, 11315.0)],
+    corners = [(100.0, 100.0), (10192.0, 100.0), (10192.0, 11315.0), (100.0, 11315.0)]
+    unit = _plain_unit(tmp_path / "never-opened.png", canvas=(10292, 11415), corners=corners,
                        counts=Counts(blocks_across=1, blocks_down=1, squares_per_block_across=4,
                                      squares_per_block_down=4),
                        readers_=("auto", "auto-corners", "confirmed"), radii=(0, 4))
     rows = harness.run_unit(unit)
-    over = corpus.OVER_BUDGET_REASON
-    assert [(r["reader"], r["radius_px"], r["variant"], r["outcome"], r["reason"]) for r in rows[:3]] == [
-        ("auto", None, "true", "skipped", over), ("auto-corners", 0, "true", "skipped", over),
-        ("confirmed", 0, "true", "skipped", over)]
-    reasons = {r["variant"]: r["reason"] for r in rows[3:]}
-    assert all(r["reader"] == "confirmed" and r["outcome"] == "skipped" for r in rows[3:])
-    assert reasons == {**{f"square {s} {axis}": over for s in ("+1", "-1") for axis in ("across", "down")},
-                       "block +1 across": over, "block +1 down": over, "half": over, "double": over,
-                       "block -1 across": "blocks_across would be 0", "block -1 down": "blocks_down would be 0"}
+    assert len(rows) == 15
+    true = [r for r in rows if r["variant"] == "true"]
+    assert [(r["reader"], r["radius_px"], r.get("trial")) for r in true] == [
+        ("auto", None, None), ("auto-corners", 0, 0), ("auto-corners", 4, 0), ("confirmed", 0, 0),
+        ("confirmed", 4, 0)]
+    assert all(r["outcome"] == "skipped" and r["skip_kind"] == corpus.OVER_BUDGET
+               and r["reason"] == corpus.over_budget_reason() for r in true)
+    kinds = {r["variant"]: r.get("skip_kind") or r["reason"] for r in rows if r["variant"] != "true"}
+    assert all(r["reader"] == "confirmed" and r["radius_px"] == 0 for r in rows if r["variant"] != "true")
+    assert kinds == {**{f"square {s} {axis}": corpus.OVER_BUDGET for s in ("+1", "-1") for axis in ("across", "down")},
+                     "block +1 across": corpus.OVER_BUDGET, "block +1 down": corpus.OVER_BUDGET,
+                     "half": corpus.OVER_BUDGET, "double": corpus.OVER_BUDGET,
+                     "block -1 across": "blocks_across would be 0", "block -1 down": "blocks_down would be 0"}
+    # Truth dims 1 x 4 = 4 by 1 x 4 = 4; 1 x 1 = 1 block is not periodic (more than 1 is).
+    assert all(r["truth_dims"] == [4, 4] and r["periodic"] is False for r in rows)
+    # A second photo of 2 x 2 blocks of 2 x 2 squares: 2 x 2 = 4 blocks, periodic.
+    periodic = dataclasses.replace(unit, photo="p", truth=dataclasses.replace(
+        unit.truth, counts=Counts(blocks_across=2, blocks_down=2, squares_per_block_across=2,
+                                  squares_per_block_down=2)))
+    rows += harness.run_unit(periodic)
     agg = report.aggregate(rows, runner=_no_git)
-    # The photo stays in its tier at full: 1 photo, 1 skipped, no outcome, n = 0.
+    # Both photos stay in their tier at full: 2 photos, 2 skipped, no outcome, n = 0.
     tier = agg["by_tier"]["auto | A | full"]
-    assert (tier["n_photos"], tier["skipped"], tier["errors"], tier["outcomes"]) == (1, 1, 0, {})
-    assert (tier["false_warning"]["n"], tier["false_warning"]["over_budget"]) == (0, 1)
+    assert (tier["n_photos"], tier["skipped"], tier["errors"], tier["outcomes"]) == (2, 2, 0, {})
+    assert (tier["false_warning"]["n"], tier["false_warning"]["over_budget"]) == (0, 2)
+    # The 4 px jitter row lists both photos as skipped instead of dropping them.
+    four = agg["jitter"]["auto-corners | full | 4"]["false_warning"]
+    assert (four["n"], four["skipped"], four["over_budget"]) == (0, 2, 2)
+    # R1 at full: q in the non-periodic split, p in the periodic one, each listed.
+    r1 = agg["r1"]["by_resolution"]["full"]
+    assert (r1["count_top1_periodic"]["n"], r1["count_top1_periodic"]["over_budget"]) == (0, 1)
+    assert (r1["count_top1_non_periodic"]["n"], r1["count_top1_non_periodic"]["over_budget"]) == (0, 1)
     assert agg["errors"] == []
+
+
+def test_an_unframed_photo_over_the_budget_keeps_its_no_frame_row(monkeypatch, tmp_path):
+    # A refusal-tier photo with no frame or counts, 13376 x 13029 as fetched: auto would
+    # get 174,275,904 px, over the budget, so its row is a budget skip. auto-corners has
+    # nothing to confirm at any size, so its row keeps the no-frame reason, as it does
+    # at 2000 px, and the G4 cell keeps the #243 note for it alone.
+    monkeypatch.setattr(readers, "read_auto", _no_read)
+    monkeypatch.setattr(harness, "stage", _no_read)
+    truth = corpus.TruthView(corners=None, bands=[], counts=None, fabric_count=None,
+                             construction="out_of_scope", provenance={"refusal_class": "verified-jake"})
+    unit = harness.Unit(photo="r1", group="corpus", tier="R", split="dev", license="CC0-1.0",
+                        device_class="museum scan", resolution="full", cap=None, condition="clean",
+                        source=str(tmp_path / "never-opened.png"), canvas=(13376, 13029), truth=truth,
+                        truth_label=truth.label_for("R"), readers=("auto", "auto-corners"), radii=(0, 4),
+                        trials=1, seed="t")
+    rows = harness.run_unit(unit)
+    assert [(r["reader"], r["radius_px"], r["outcome"], r.get("skip_kind"), r["reason"]) for r in rows] == [
+        ("auto", None, "skipped", corpus.OVER_BUDGET, corpus.over_budget_reason()),
+        ("auto-corners", 0, "skipped", None, harness.SKIP_REASON)]
+    text = report.markdown({"header": {"title": "t"}, "aggregate": report.aggregate(rows, runner=_no_git)})
+    cells = {line.split("|")[1].strip(): line.split("|")[7].strip() for line in text.splitlines()
+             if line.startswith(("| auto | museum scan | full | gate |", "| auto-corners | museum scan | full | gate |"))}
+    assert cells == {"auto": "n = 0, 1 skipped (1 over the as-fetched budget)",
+                     "auto-corners": "n = 0, 1 skipped; no frame or counts on the v0 refusal photos (#243)"}
 
 
 def test_a_run_states_the_budget_and_skips_only_as_fetched_units_over_it(monkeypatch, tmp_path):
     # a-dev and r-dev are 160 x 160 = 25,600 px = 0.0256 MP. With the budget lowered to
-    # 0.02 MP both are over it as fetched; the 1400 px cap leaves 160 px unscaled, and a
-    # capped unit never meets the budget. As fetched: a-dev clean plus its 6 degradations
-    # (7 units) and r-dev clean (1): 8 corpus units, all 8 skipped, each as 2 rows (auto
-    # and auto-corners at 0 px): 16 rows. At phone-1400 nothing skips over the budget.
+    # 0.02 MP both are over it as fetched; low_res_jpeg leaves 160 px as it is (under
+    # 600), so it is over too. The 1400 px cap leaves 160 px unscaled, and a capped unit
+    # is never over. As fetched: clean units a-dev and r-dev (2), stress units a-dev's 6
+    # degradations (6), all skipped. Budget rows: a-dev clean, auto plus auto-corners at
+    # 0 and 4 px (3); each stress unit, auto plus auto-corners at 0 px (6 x 2 = 12);
+    # r-dev clean, auto (1), while its auto-corners row keeps the no-frame reason:
+    # 3 + 12 + 1 = 16.
     root, cache = _write_corpus(tmp_path)
     monkeypatch.setattr(corpus, "FULL_BUDGET_MP", 0.02)
     out = tmp_path / "out" / "r"
@@ -1318,17 +1383,28 @@ def test_a_run_states_the_budget_and_skips_only_as_fetched_units_over_it(monkeyp
     payload = json.loads((out.parent / "r.json").read_text(encoding="utf-8"))
     budget = payload["header"]["full_resolution_budget"]
     assert budget.startswith("0.02 MP per as-fetched unit (corpus.FULL_BUDGET_MP")
-    assert "as fetched: 8 corpus units, 8 skipped (a-dev, r-dev)" in budget
-    assert "#166 comment 6145827537" in budget
+    assert ("In this run: clean units 2 as fetched, 2 skipped; stress units 6 as fetched, 6 skipped; "
+            "photos skipped: a-dev, r-dev; the largest image read as fetched: none.") in budget
+    assert "6145827537" in budget and "6146146558" in budget
     rows = payload["rows"]
-    over = [r for r in rows if r.get("reason") == corpus.OVER_BUDGET_REASON]
+    over = [r for r in rows if r.get("skip_kind") == corpus.OVER_BUDGET]
     assert len(over) == 16 and {r["resolution"] for r in over} == {"full"}
     assert all(r["outcome"] == "skipped" for r in rows if r["resolution"] == "full")
+    assert [r["reason"] for r in rows if r["photo"] == "r-dev" and r["reader"] == "auto-corners"
+            and r["resolution"] == "full"] == [harness.SKIP_REASON]
     capped = [r for r in rows if r["resolution"] == "phone-1400"]
-    assert not any(r.get("reason") == corpus.OVER_BUDGET_REASON for r in capped)
+    assert not any(r.get("skip_kind") for r in capped)
     # At 1400 px: a-dev clean read by auto and by auto-corners at 0 and 4 px (3 rows), its
     # 6 degradations by both readers (12), r-dev by auto (1) and skipped by auto-corners,
     # which has no frame to confirm (1): 17 rows, 16 of them reads.
     assert len(capped) == 17 and sum(r["outcome"] != "skipped" for r in capped) == 16
     assert "- Full resolution budget: 0.02 MP per as-fetched unit" in (out.parent / "r.md").read_text(
         encoding="utf-8")
+    # Back at 50 MP nothing here is over it, and the header names the largest image read
+    # as fetched: both photos are 160 x 160 px, and a tie goes to the later name, r-dev.
+    monkeypatch.setattr(corpus, "FULL_BUDGET_MP", 50)
+    assert run_eval.main([*args[:5], str(tmp_path / "out" / "r2"), "--radii", "0", "--resolutions", "full",
+                          "--no-degradations", "--no-photoreal", "--workers", "1"], runner=_fake_git) == 0
+    budget = json.loads((tmp_path / "out" / "r2.json").read_text(encoding="utf-8"))["header"]["full_resolution_budget"]
+    assert ("In this run: clean units 2 as fetched, 0 skipped; photos skipped: none; the largest image read "
+            "as fetched: 160 x 160 px (r-dev).") in budget

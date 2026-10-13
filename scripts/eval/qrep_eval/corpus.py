@@ -36,14 +36,20 @@ PROPOSALS = ("proposed-a", "proposed-b")
 # The automatic read itself passed a 5 GB per-process commit cap at 117.5 MP, and the
 # read is not the eval's to change; the app caps every photo at 2000 px anyway.
 FULL_BUDGET_MP = 50
-OVER_BUDGET_REASON = (f"as fetched exceeds the eval's {FULL_BUDGET_MP} MP budget; the app caps every photo "
-                      "at 2000 px")
+# A row's skip_kind for a unit over the budget; the report counts these by kind, since
+# the reason text carries the budget's number.
+OVER_BUDGET = "over_budget"
 
 
-def over_budget(canvas: tuple[int, int], cap: int | None) -> bool:
-    """Whether a unit would read an image above FULL_BUDGET_MP: only an as-fetched
-    unit can, since a cap holds the longest side to 2000 px or less."""
-    return cap is None and canvas[0] * canvas[1] > FULL_BUDGET_MP * 1_000_000
+def over_budget_reason() -> str:
+    return (f"as fetched exceeds the eval's {FULL_BUDGET_MP} MP budget; the app caps every photo "
+            "at 2000 px")
+
+
+def over_budget(size: tuple[int, int], cap: int | None) -> bool:
+    """Whether the reader would be handed a (width, height) image above FULL_BUDGET_MP
+    uncapped; a cap holds the longest side to 2000 px or less, never over it."""
+    return cap is None and size[0] * size[1] > FULL_BUDGET_MP * 1_000_000
 
 
 def cap_size(width: int, height: int, cap: int | None) -> tuple[int, int]:

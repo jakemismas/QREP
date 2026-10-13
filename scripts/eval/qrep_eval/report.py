@@ -50,7 +50,7 @@ def _scored(rows):
 def _with_unscored(rate: dict, rows) -> dict:
     out = {**rate, "errors": sum(r["outcome"] == "error" for r in rows),
            "skipped": sum(r["outcome"] == "skipped" for r in rows)}
-    over = sum(r["outcome"] == "skipped" and r.get("reason") == corpus.OVER_BUDGET_REASON for r in rows)
+    over = sum(r["outcome"] == "skipped" and r.get("skip_kind") == corpus.OVER_BUDGET for r in rows)
     if over:
         out["over_budget"] = over
     return out

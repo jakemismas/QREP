@@ -63,13 +63,24 @@ def low_res_jpeg(
     """A small, heavily compressed copy: the longest side area-downsampled to longest
     px (never upscaled), then JPEG at quality. Returns the image and its scale."""
     height, width = image.shape[:2]
-    scale = min(1.0, longest / max(width, height))
-    size = (math.floor(width * scale + 0.5), math.floor(height * scale + 0.5))
-    small = cv2.resize(image, size, interpolation=cv2.INTER_AREA) if scale < 1 else image
+    size = _jpeg_size((width, height), longest)
+    small = cv2.resize(image, size, interpolation=cv2.INTER_AREA) if size != (width, height) else image
     ok, data = cv2.imencode(".jpg", small, [cv2.IMWRITE_JPEG_QUALITY, quality])
     if not ok:
         raise RuntimeError("JPEG encode failed")
     return cv2.imdecode(data, cv2.IMREAD_COLOR), size[0] / width
+
+
+def _jpeg_size(size: tuple[int, int], longest: int) -> tuple[int, int]:
+    width, height = size
+    scale = min(1.0, longest / max(width, height))
+    return math.floor(width * scale + 0.5), math.floor(height * scale + 0.5)
+
+
+def read_size(name: str, size: tuple[int, int]) -> tuple[int, int]:
+    """The (width, height) a degradation applied by name hands the reader, given the
+    size it receives: only low_res_jpeg changes it."""
+    return _jpeg_size(size, JPEG_LONGEST) if name == "low_res_jpeg" else size
 
 
 def gaussian_blur(image: np.ndarray, sigma: float = BLUR_SIGMA) -> np.ndarray:

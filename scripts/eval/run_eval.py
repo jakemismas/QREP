@@ -34,14 +34,16 @@ PHOTOREAL_CAPS = (1400, 2000)
 DEFAULT_SEED = "d4a"
 # What the header says when git cannot answer, as under Pyodide.
 GIT_UNAVAILABLE = "unknown (git unavailable)"
-# The measurement behind corpus.FULL_BUDGET_MP, as #166 comment 6145827537 records it.
+# The measurements behind corpus.FULL_BUDGET_MP, as #166 comments 6145827537 and
+# 6146146558 record them.
 BUDGET_EVIDENCE = (
-    "measured 2026-10-13 on the dev split at 78e92e3, each step alone in a fresh process, as peak working "
-    "set / peak commit: the automatic read 0.50 / 1.20 GB at 8.9 MP, 1.18 / 1.88 GB at 15.4 MP and "
-    "1.00 / 1.70 GB at 38.9 MP; under a 5 GB per-process commit cap, the automatic read (its periodicity "
-    "search) and the glare degradation both failed at 117.5 MP. Glare and the lighting gradient now run "
-    "in row bands with the same output, and glare peaks at 0.89 / 1.61 GB at 117.5 MP; the read is "
-    "not the eval's to change (#166 comment 6145827537)")
+    "measured 2026-10-13 on dev photos, each step alone in a fresh process, as peak working set / peak "
+    "commit (#166 comments 6145827537 and 6146146558): at 78e92e3 the automatic read took 0.50 / 1.20 GB "
+    "at 8.9 MP, 1.18 / 1.88 GB at 15.4 MP and 1.00 / 1.70 GB at 38.9 MP, and under a 5 GB per-process "
+    "commit cap both the automatic read (a 456 MiB float32 power spectrum in the padded block "
+    "autocorrelation, qrep/vision/repeats.py) and the glare degradation failed on the 117.5 MP scan; "
+    "banded in 419388c, glare takes 0.89 / 1.61 GB and the lighting gradient 0.87 / 1.59 GB on that "
+    "scan, while the read still fails as fetched and is not the eval's to change")
 
 
 def _parse(argv):
@@ -196,18 +198,28 @@ def _photoreal_units(args, readers_) -> list[harness.Unit]:
     return units
 
 
-def _budget_line(units) -> str:
-    fetched = [u for u in units if u.group != "named" and u.cap is None]
-    over = [u for u in fetched if corpus.over_budget(u.canvas, u.cap)]
-    read = [u.canvas[0] * u.canvas[1] / 1e6 for u in fetched if not corpus.over_budget(u.canvas, u.cap)]
-    names = ", ".join(sorted({u.photo for u in over})) or "none"
-    largest = f"{max(read):.1f} MP" if read else "none"
-    return (f"{corpus.FULL_BUDGET_MP} MP per as-fetched unit (corpus.FULL_BUDGET_MP; #166 comment "
-            "6145839899): a unit read as fetched above it is one skipped row per reader where its "
-            "true-corner read would be, listed beside every rate and never counted as a read, refusal, "
-            "success or failure, and its photo's capped units run as usual; as fetched: "
-            f"{len(fetched)} corpus units, {len(over)} skipped ({names}); the largest read as fetched is "
-            f"{largest}. Why: {BUDGET_EVIDENCE}")
+def _budget_line(units, rows) -> str:
+    """The as-fetched budget as the report states it, with what it skipped in this run and
+    the largest image a reader was handed uncapped."""
+    fetched = [u for u in units if u.cap is None]
+    over = [u for u in fetched if harness.over_budget(u)]
+    groups = (("clean", "corpus"), ("stress", "stress"), ("named", "named"))
+    tally = "; ".join(f"{label} units {sum(u.group == g for u in fetched)} as fetched, "
+                      f"{sum(u.group == g for u in over)} skipped"
+                      for label, g in groups if any(u.group == g for u in fetched))
+    uncapped = {name for name, cap in corpus.RESOLUTIONS.items() if cap is None}
+    read = [(*r["received"]["staged_size"], r["photo"]) for r in rows
+            if r["resolution"] in uncapped and r["outcome"] not in report.UNSCORED and "received" in r]
+    largest = max(read, key=lambda t: (t[0] * t[1], t[2]), default=None)
+    return (f"{corpus.FULL_BUDGET_MP} MP per as-fetched unit (corpus.FULL_BUDGET_MP; #166 comments "
+            "6145839899 and 6146139041), on every split: a unit whose reader would be handed an uncapped "
+            "image above it, judged after any degradation that shrinks the image, is never read; its rows "
+            "stand where its reads would be (auto's read, each corner trial, the confirmed reader's "
+            "miscounts), carry skip_kind over_budget, and are listed beside every rate, never counted as "
+            "a read, refusal, success or failure; a capped unit is never over it. In this run: "
+            f"{tally or 'no units as fetched'}; photos skipped: "
+            f"{', '.join(sorted({u.photo for u in over})) or 'none'}; the largest image read as fetched: "
+            f"{f'{largest[0]} x {largest[1]} px ({largest[2]})' if largest else 'none'}. Why: {BUDGET_EVIDENCE}")
 
 
 def _run(units, workers):
@@ -290,7 +302,7 @@ def main(argv=None, *, runner=subprocess.run) -> int:
                        f"only the confirmed reader, with the same corners and fabric count; picker answer "
                        f"{simulate.PICKER_ANSWER!r} for every photo"),
         "resolutions": args.resolutions,
-        "full_resolution_budget": _budget_line(units),
+        "full_resolution_budget": _budget_line(units, rows),
         "degradations": "none" if args.no_degradations else "; ".join(
             f"{d.name} {d.params}" for d in degrade.DEGRADATIONS) + (
             ", applied at every requested resolution, at true corners, to museum tier A photos "
