@@ -1,0 +1,147 @@
+/* The dev annotate page (C3a, issue #149). One column on a phone; the photo
+   beside the controls from 900 px.
+
+   The theme tokens come in by @import, which inlines them here. Importing
+   tokens.css from this page's JS would make it a chunk shared with the app,
+   and the build would then link it after the app's own stylesheet, letting
+   the token rules override the app's. */
+@import "../../ui/tokens.css";
+
+.an-page {
+  display: grid;
+  gap: 16px;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.an-head {
+  display: grid;
+  gap: 4px;
+}
+
+.an-title {
+  margin: 0;
+  font-size: 1.4rem;
+}
+
+.an-note {
+  margin: 0;
+  color: var(--mut);
+}
+
+.an-files {
+  display: grid;
+  gap: 10px;
+}
+
+.an-file,
+.an-field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.an-file input[type="text"],
+.an-field select {
+  min-height: 44px;
+  max-width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+}
+
+.an-file input[type="file"] {
+  max-width: 100%;
+  min-height: 44px;
+}
+
+.an-ident {
+  margin: 0;
+  color: var(--mut);
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+.an-main {
+  display: grid;
+  gap: 16px;
+  align-items: start;
+}
+
+@media (min-width: 900px) {
+  .an-main {
+    grid-template-columns: minmax(0, 3fr) minmax(320px, 2fr);
+  }
+}
+
+.an-stage {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.an-controls {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.an-group {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+}
+
+.an-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.an-mode {
+  color: var(--mut);
+}
+
+.an-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+}
+
+.an-check input {
+  width: 22px;
+  height: 22px;
+}
+
+.an-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+.an-status {
+  margin: 0;
+  color: var(--sage);
+}
+
+.an-error {
+  margin: 0;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.an-pre {
+  margin: 8px 0 0;
+  overflow: auto;
+  font-size: 0.8rem;
+}

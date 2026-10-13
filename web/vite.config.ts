@@ -12,11 +12,13 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
-      // Two pages: the app at the root, the S0 spike page kept reachable at
-      // /spike.html for the gate e2e.
+      // The app at the root, the S0 spike page kept reachable at /spike.html
+      // for the gate e2e, and the dev annotate page (C3a), which
+      // compose-site.mjs keeps off Pages.
       input: {
         main: "index.html",
         spike: "spike.html",
+        annotate: "annotate.html",
       },
     },
   },
