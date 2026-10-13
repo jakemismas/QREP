@@ -388,11 +388,17 @@ def main(argv=None) -> int:
     self_checks = [run_decode.self_check_result(folder, b, check_jobs, images) for b in decode.BROWSERS]
     wanted = set(args.read_resolutions.split(","))
     read_units = [u for u in units if u.resolution in wanted or u.group == "named"]
+    stops_log = decoded_dir / "parity-work" / "memory-stops.log"
+    stops_log.parent.mkdir(parents=True, exist_ok=True)
     try:
         pixels = run_pixels(units, decoded_dir, args, jobs, sidecars)
         rows = compare(read_units, run_reads(read_units, args, decoded_dir, jobs, sidecars))
     except MemoryStop as stop:
         print(f"run_parity: {stop}", file=sys.stderr)
+        # The report states every stop, so a resumed run's numbers say how they were reached.
+        with stops_log.open("a", encoding="utf-8") as handle:
+            stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+            handle.write(f"{stamp}\t{args.min_free_gb}\t{stop}\n")
         return MEMORY_STOP
 
     import cv2 as cv
@@ -405,6 +411,8 @@ def main(argv=None) -> int:
                 for b in decode.BROWSERS}
     playwright = sorted({s.sidecar.get("playwright_version") for s in sidecars.values() if s.error is None})
     status = _git("status", "--porcelain", "--", "qrep/", "scripts/eval/")
+    floors = Counter(line.split("\t")[1] for line in stops_log.read_text(encoding="utf-8").splitlines()
+                     if line.count("\t") >= 2) if stops_log.exists() else Counter()
     header = {
         "title": "D4b: native and browser decode parity on the v0 dev split",
         "date": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
@@ -427,6 +435,10 @@ def main(argv=None) -> int:
         "readers": ("auto (no corners) and auto-corners (true corners from the annotation, scaled to the staged "
                     "image, and the fabric count run_eval gives), each at 0 px as run_eval reads them; the "
                     "confirmed reader needs B2b"),
+        "memory_floor": (f"{args.min_free_gb:g} GB of free memory checked before each image and each read, "
+                         f"{args.workers} read at a time; memory stops logged, each resumed from the cache: "
+                         + (", ".join(f"{n} at a {float(f):g} GB floor" for f, n in sorted(floors.items()))
+                            or "none")),
         "limits": ("Playwright's WebKit on Windows is the WinCairo port, whose image decoders are not Apple's "
                    "ImageIO, so WebKit here stands for WebKit's canvas path, not for Safari on an iPhone; the "
                    "crop-aware path of #101 waits for C3b; reads at full size are not run, since the D4 "
