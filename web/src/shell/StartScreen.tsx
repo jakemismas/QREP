@@ -6,6 +6,7 @@
  * adds See a sample pattern, which opens the demo quilt on Your pattern; the
  * demo entry into the editor stays until C6a removes the editor.
  */
+import { useRef, useState } from "react";
 import { useProject } from "../state/project";
 
 /** Human age of an autosave, coarse by design ("saved just now" .. days). */
@@ -66,10 +67,23 @@ export function StartScreen({
   const { openDemo, startBlank, resume, autosaveError, resumeAutosave, yourPattern } =
     useProject();
 
+  // One sample load at a time: the button is disabled while it runs, and the
+  // ref ignores a second tap that lands before the disabled state renders.
+  const [loadingSample, setLoadingSample] = useState(false);
+  const loadingSampleRef = useRef(false);
   const seeSample = () => {
-    yourPattern.showPattern("sample");
+    if (loadingSampleRef.current) return;
+    loadingSampleRef.current = true;
+    setLoadingSample(true);
     void openDemo().then((opened) => {
-      if (!opened) yourPattern.showEditor();
+      // Bound only once the sample has opened, so a quilt opened while it
+      // loads (the resume banner, the header's Open) goes to the editor.
+      if (opened) {
+        yourPattern.showPattern("sample");
+        return;
+      }
+      loadingSampleRef.current = false;
+      setLoadingSample(false);
     });
   };
 
@@ -150,6 +164,8 @@ export function StartScreen({
             type="button"
             data-testid="see-sample"
             className="btn btn--secondary"
+            disabled={loadingSample}
+            aria-busy={loadingSample}
             onClick={seeSample}
           >
             See a sample pattern

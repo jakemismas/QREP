@@ -16,8 +16,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
 import { useEngineStatus } from "../engine/engineStatus";
-import { useEngine } from "../engine/useEngine";
-import type { QuiltModel } from "../model/types";
 import { Lightbox } from "../shell/photo/Lightbox";
 import type { LbTab } from "../shell/photo/Lightbox";
 import { useModel } from "../state/model";
@@ -25,21 +23,12 @@ import { useYourPattern } from "../state/pattern";
 import { usePhoto } from "../state/photo";
 import { QuiltCanvas } from "../viewer";
 import { FabricCensus } from "./FabricCensus";
+import { readFlags } from "./flags";
 import { FlaggedOverlay } from "./FlaggedOverlay";
 import { MethodLine } from "./MethodLine";
 import { PatternPdfButton } from "./PatternPdfButton";
+import { patternError } from "./patternError";
 import "./YourPatternScreen.css";
-
-const ENGINE_DOWN = "The pattern engine did not start, so your pattern is not ready yet.";
-
-function parseModel(json: string | undefined): QuiltModel | null {
-  if (!json) return null;
-  try {
-    return JSON.parse(json) as QuiltModel;
-  } catch {
-    return null;
-  }
-}
 
 /** Tracks whether the quilt view has left Fit, from QuiltCanvas's zoom label,
  * and keeps a one-finger drag at Fit for the page. */
@@ -95,14 +84,12 @@ export function YourPatternScreen() {
   const { model, summary: census } = useModel();
   const photo = usePhoto();
   const pattern = useYourPattern();
-  const engine = useEngine();
   const engineStatus = useEngineStatus();
   const [showFlags, setShowFlags] = useState(true);
   const [lightbox, setLightbox] = useState<LbTab | null>(null);
   const quiltRef = useRef<HTMLElement>(null);
 
-  const read = pattern.source === "photo" ? photo.result : null;
-  const readModel = useMemo(() => parseModel(read?.modelJson), [read?.modelJson]);
+  const flags = useMemo(() => readFlags(pattern.source, photo.result), [pattern.source, photo.result]);
   const zoomed = useZoomed(quiltRef, model !== null);
 
   // The screen it replaces may have been scrolled; Your pattern opens at the
@@ -114,28 +101,18 @@ export function YourPatternScreen() {
   if (model === null) return null;
 
   // The read's own model carries the cell confidences the outlines need.
-  const quiltModel = readModel ?? model;
+  const quiltModel = flags.model ?? model;
   const photoUrl = pattern.source === "photo" ? photo.photoUrl : null;
-  const flagged = read !== null && readModel !== null ? read.uncertainCount : null;
+  const showFlagged = flags.model !== null;
   const { summary, pdf } = pattern;
 
-  // A failed boot leaves queued calls waiting forever, so a wait on it gets
-  // the sentence and a Retry that reboots the engine.
-  const waiting = summary.status === "loading" || pdf.status === "busy";
-  let error: { message: string; retry: () => void } | null = null;
-  if (engineStatus.phase === "failed" && waiting) {
-    error = {
-      message: ENGINE_DOWN,
-      retry: () => {
-        engine.retry();
-        if (summary.status !== "ready") pattern.retrySummary();
-      },
-    };
-  } else if (pdf.status === "failed") {
-    error = { message: pdf.message ?? "", retry: pattern.retryPdf };
-  } else if (summary.status === "failed") {
-    error = { message: summary.message, retry: pattern.retrySummary };
-  }
+  const error = patternError(engineStatus.phase === "failed", summary, pdf);
+  const retries = {
+    engine: pattern.retryEngine,
+    pdf: pattern.retryPdf,
+    summary: pattern.retrySummary,
+  };
+  const retry = error?.retry ? retries[error.retry] : null;
 
   return (
     <div
@@ -146,19 +123,27 @@ export function YourPatternScreen() {
     >
       <section className="yp-head">
         <h1 className="yp-title">Your pattern</h1>
-        <MethodLine summary={summary} />
-        <PatternPdfButton pdf={pdf} onSave={pattern.savePdf} />
+        {/* A working line beside an error would say the wait goes on. */}
+        <MethodLine summary={summary} working={error === null} />
+        {/* With the engine down the PDF waits on Retry, so no spinner. */}
+        <PatternPdfButton
+          pdf={pdf}
+          working={error?.retry !== "engine"}
+          onSave={pattern.savePdf}
+        />
         {error !== null ? (
           <div className="yp-error" role="alert" data-testid="pattern-error">
             <p className="yp-error-text">{error.message}</p>
-            <button
-              type="button"
-              className="btn btn--secondary yp-retry"
-              data-testid="pattern-retry"
-              onClick={error.retry}
-            >
-              Retry
-            </button>
+            {retry !== null ? (
+              <button
+                type="button"
+                className="btn btn--secondary yp-retry"
+                data-testid="pattern-retry"
+                onClick={retry}
+              >
+                Retry
+              </button>
+            ) : null}
           </div>
         ) : null}
       </section>
@@ -185,14 +170,14 @@ export function YourPatternScreen() {
           ref={quiltRef}
         >
           {photoUrl ? <figcaption className="yp-eyebrow">Recovered quilt</figcaption> : null}
-          <QuiltCanvas model={quiltModel} showUncertain={flagged !== null && showFlags} />
+          <QuiltCanvas model={quiltModel} showUncertain={showFlagged && showFlags} />
         </figure>
       </section>
 
       <section className="yp-details">
-        {flagged !== null ? (
+        {showFlagged ? (
           <FlaggedOverlay
-            count={flagged}
+            count={flags.count}
             shown={showFlags}
             onToggle={() => setShowFlags((value) => !value)}
           />
@@ -213,7 +198,7 @@ export function YourPatternScreen() {
           tab={lightbox}
           onTab={setLightbox}
           onClose={() => setLightbox(null)}
-          showUncertain={flagged !== null && showFlags}
+          showUncertain={showFlagged && showFlags}
         />
       ) : null}
     </div>

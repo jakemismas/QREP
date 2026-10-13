@@ -10,7 +10,8 @@
  * returns it. A failure is always a plain sentence: a refused outcome shows
  * its reason, which the engine writes for people, and anything else (an
  * engine error, a result without a valid outcome) shows PATTERN_FAILED,
- * never the engine's raw message.
+ * never the engine's raw message. A refusal gets its own status, because
+ * the same quilt is refused again: the screen offers no Retry for it.
  */
 import { parsePatternResult } from "../engine/contract";
 import type { PatternSummary } from "../engine/contract";
@@ -21,14 +22,16 @@ export type EngineCall = (method: string, ...args: unknown[]) => Promise<unknown
 export const PATTERN_FAILED = "Your pattern could not be made this time. Try again.";
 export const SAVE_FAILED = "Your browser did not save the pattern file. Try again.";
 
-type Made = { ok: true; pdfB64: string; summary: PatternSummary } | { ok: false; message: string };
+type Made =
+  | { ok: true; pdfB64: string; summary: PatternSummary }
+  | { ok: false; message: string; refused: boolean };
 
 async function makePattern(call: EngineCall, modelJson: string): Promise<Made> {
   let raw: unknown;
   try {
     raw = await call("export_pattern", modelJson);
   } catch {
-    return { ok: false, message: PATTERN_FAILED };
+    return { ok: false, message: PATTERN_FAILED, refused: false };
   }
   try {
     const result = parsePatternResult(raw);
@@ -36,13 +39,13 @@ async function makePattern(call: EngineCall, modelJson: string): Promise<Made> {
       // parsePatternResult already required both on a ready pattern.
       return { ok: true, pdfB64: result.pdf_b64 as string, summary: result.summary as PatternSummary };
     }
-    return { ok: false, message: (result.reason as { message: string }).message };
+    return { ok: false, message: (result.reason as { message: string }).message, refused: true };
   } catch {
-    return { ok: false, message: PATTERN_FAILED };
+    return { ok: false, message: PATTERN_FAILED, refused: false };
   }
 }
 
-export type PdfStatus = "idle" | "busy" | "failed";
+export type PdfStatus = "idle" | "busy" | "failed" | "refused";
 
 export interface PdfView {
   status: PdfStatus;
@@ -75,15 +78,33 @@ export class PatternPdfController {
   }
 
   /** Make the pattern and save it; a no-op while one is being made. */
-  async start(modelJson: string, filename: string): Promise<void> {
-    if (this.current.status === "busy") return;
+  start(modelJson: string, filename: string): Promise<void> {
+    if (this.current.status === "busy") return Promise.resolve();
+    return this.make(modelJson, filename);
+  }
+
+  /** Run the last request again. */
+  retry(): Promise<void> {
+    if (this.last === null) return Promise.resolve();
+    return this.start(this.last.modelJson, this.last.filename);
+  }
+
+  /** Send the waiting request again after an engine restart rejected it, so
+   * the restart reads as a wait, not a failure; the rejected call's outcome
+   * is dropped. A no-op unless a pattern is being made. */
+  resend(): Promise<void> {
+    if (this.last === null || this.current.status !== "busy") return Promise.resolve();
+    return this.make(this.last.modelJson, this.last.filename);
+  }
+
+  private async make(modelJson: string, filename: string): Promise<void> {
     this.last = { modelJson, filename };
     const run = ++this.run;
     this.set({ status: "busy", message: null });
     const made = await makePattern(this.options.call, modelJson);
     if (run !== this.run) return;
     if (!made.ok) {
-      this.set({ status: "failed", message: made.message });
+      this.set({ status: made.refused ? "refused" : "failed", message: made.message });
       return;
     }
     try {
@@ -93,12 +114,6 @@ export class PatternPdfController {
       return;
     }
     this.set(PDF_IDLE);
-  }
-
-  /** Run the last request again. */
-  retry(): Promise<void> {
-    if (this.last === null) return Promise.resolve();
-    return this.start(this.last.modelJson, this.last.filename);
   }
 
   /** Back to idle, dropping any pattern still being made. */
@@ -118,7 +133,7 @@ export type SummaryView =
   | { status: "idle" }
   | { status: "loading" }
   | { status: "ready"; summary: PatternSummary }
-  | { status: "failed"; message: string };
+  | { status: "failed" | "refused"; message: string };
 
 const SUMMARY_IDLE: SummaryView = { status: "idle" };
 
@@ -167,7 +182,7 @@ export class PatternSummaryLoader {
     this.set(
       made.ok
         ? { status: "ready", summary: made.summary }
-        : { status: "failed", message: made.message },
+        : { status: made.refused ? "refused" : "failed", message: made.message },
     );
   }
 

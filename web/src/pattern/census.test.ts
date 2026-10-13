@@ -9,11 +9,12 @@ import type { FabricLine } from "../engine/contract";
 import type { Fabric, ModelSummary } from "../model/types";
 import { censusRows } from "./census";
 
-// The fixture's two fabrics (tests/fixtures/double_irish_chain.json), with
-// the interim letters equal to the fabric ids (qrep/export/pattern.py).
+// The fixture's two fabrics (tests/fixtures/double_irish_chain.json). The
+// letters are this test's own inputs, carried through the join; they pin
+// nothing about the letters the engine prints.
 const LINES: FabricLine[] = [
-  { letter: "b", fabric_id: "b", name: "Chain blue", yards: 2.5 },
-  { letter: "c", fabric_id: "c", name: "Background cream", yards: 4 },
+  { letter: "A", fabric_id: "b", name: "Chain blue", yards: 2.5 },
+  { letter: "B", fabric_id: "c", name: "Background cream", yards: 4 },
 ];
 
 // Palette names differ from the engine's on purpose: the row must carry the
@@ -47,16 +48,16 @@ describe("censusRows", () => {
   it("joins the engine's letters and names, the palette swatch and the census count", () => {
     // Counts: the design doc's census literals, 1246 blue and 1229 cream.
     expect(censusRows(LINES, PALETTE, census({ b: 1246, c: 1229 }))).toEqual([
-      { fabricId: "b", letter: "b", name: "Chain blue", color: "#9db8d9", count: 1246 },
-      { fabricId: "c", letter: "c", name: "Background cream", color: "#f2e8d5", count: 1229 },
+      { fabricId: "b", letter: "A", name: "Chain blue", color: "#9db8d9", count: 1246 },
+      { fabricId: "c", letter: "B", name: "Background cream", color: "#f2e8d5", count: 1229 },
     ]);
   });
 
   it("keeps the engine's order and leaves the count empty until the census lands", () => {
     const reversed = [LINES[1], LINES[0]];
     expect(censusRows(reversed, PALETTE, null)).toEqual([
-      { fabricId: "c", letter: "c", name: "Background cream", color: "#f2e8d5", count: null },
-      { fabricId: "b", letter: "b", name: "Chain blue", color: "#9db8d9", count: null },
+      { fabricId: "c", letter: "B", name: "Background cream", color: "#f2e8d5", count: null },
+      { fabricId: "b", letter: "A", name: "Chain blue", color: "#9db8d9", count: null },
     ]);
   });
 

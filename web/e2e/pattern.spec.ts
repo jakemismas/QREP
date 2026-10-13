@@ -4,15 +4,17 @@
  * or photo), which holds pattern-photo beside or above pattern-quilt
  * (data-zoomed), open-lightbox (Compare with your photo), method-line or
  * pattern-working while the summary loads, download-pattern (aria-busy,
- * data-state idle, busy or failed), pattern-error with pattern-retry,
- * flagged-count (data-count) with flagged-toggle, and the census rows
- * fabric-letter-<id> and fabric-count-<id> inside fabric-census.
+ * data-state idle, busy, failed or refused), pattern-error with pattern-retry
+ * (no Retry for a refusal), flagged-count (data-count) with flagged-hint and
+ * flagged-toggle, and the census rows fabric-letter-<id> and
+ * fabric-count-<id> inside fabric-census.
  *
- * The photo is generated at test runtime by the native renderer, as in
- * photo.spec.ts, under its own name: save_render writes the PNG and a
+ * The photos are generated at test runtime by the native renderer, as in
+ * photo.spec.ts, under their own names: save_render writes the PNG and a
  * sidecar JSON whose "corners" are the quilt's outer corners in image
  * pixels (top left, top right, bottom right, bottom left), the order of
- * corner-pin-0 to corner-pin-3.
+ * corner-pin-0 to corner-pin-3. Level 0 is the clean render; level 1 adds
+ * fabric texture (qrep/render/renderer.py), so its read flags squares.
  *
  * No screenshot or snapshot assertions; layout checks read element boxes.
  */
@@ -27,15 +29,19 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 const generatedDir = path.join(repoRoot, "tests", "fixtures", "_generated");
 const photoPath = path.join(generatedDir, "pattern_e2e_l0.png");
 const sidecarPath = path.join(generatedDir, "pattern_e2e_l0.json");
+const texturedPath = path.join(generatedDir, "pattern_e2e_l1.png");
+const fixturePath = path.join(repoRoot, "tests", "fixtures", "double_irish_chain.json");
 const READY_TIMEOUT = 300_000;
 const REVERSE_TIMEOUT = 300_000;
+const FAILED_TIMEOUT = 120_000;
 const ENGINE_IMPORT = "**/pyodide/pyodide.mjs";
+const ENGINE_FILES = "**/pyodide/**";
+const SAMPLE_FILE = "**/fixtures/double_irish_chain.json";
 const PHONE = { width: 390, height: 844 };
 const iPhone = devices["iPhone 13"];
 const DESKTOP_OPTIONS = { viewport: { width: 1440, height: 900 }, isMobile: false, hasTouch: false };
 
-test.beforeAll(() => {
-  if (existsSync(photoPath) && existsSync(sidecarPath)) return;
+function renderFixture(level: number, file: string): void {
   mkdirSync(generatedDir, { recursive: true });
   const venvPython = path.join(repoRoot, ".venv", "Scripts", "python.exe");
   const python = process.env.QREP_PYTHON ?? (existsSync(venvPython) ? venvPython : "python");
@@ -43,13 +49,18 @@ test.beforeAll(() => {
   execFileSync(python, [
     "-c",
     "import sys; from pathlib import Path; from qrep.model import load; from qrep.render import save_render; " +
-      "save_render(load(sys.argv[1]), Path(sys.argv[2]), level=0, seed=42, scale=10)",
-    path.join(repoRoot, "tests", "fixtures", "double_irish_chain.json"),
-    photoPath,
+      "save_render(load(sys.argv[1]), Path(sys.argv[2]), level=int(sys.argv[3]), seed=42, scale=10)",
+    fixturePath,
+    file,
+    String(level),
   ]);
-  if (!existsSync(photoPath) || !existsSync(sidecarPath)) {
-    throw new Error("fixture render produced no photo or no sidecar");
-  }
+  if (!existsSync(file)) throw new Error(`fixture render at level ${level} produced no photo`);
+}
+
+test.beforeAll(() => {
+  if (!existsSync(photoPath) || !existsSync(sidecarPath)) renderFixture(0, photoPath);
+  if (!existsSync(sidecarPath)) throw new Error("fixture render produced no sidecar");
+  if (!existsSync(texturedPath)) renderFixture(1, texturedPath);
 });
 
 /** Width and height from the PNG's IHDR chunk (bytes 16 to 23, big endian). */
@@ -77,12 +88,24 @@ async function waitForEngine(page: Page): Promise<void> {
   });
 }
 
-/** Upload the render, set the four pins on its corners, analyze, open Your pattern. */
-async function photoToPattern(page: Page): Promise<void> {
+/** Open the fixture as a project file through the Open dialog. */
+async function openFixtureFile(page: Page): Promise<void> {
+  await page.getByTestId("open-project").click();
+  await page.getByTestId("open-file-input").setInputFiles({
+    name: "double_irish_chain.json",
+    mimeType: "application/json",
+    buffer: readFileSync(fixturePath),
+  });
+}
+
+/** Upload a render and reach the results screen. With pins, set the four pins
+ * on the sidecar's corners first; without, analyze where the corner search
+ * put them, as photo.spec.ts does. */
+async function photoToResults(page: Page, { photo = photoPath, pins = true } = {}): Promise<void> {
   await page.goto("./");
   await page.getByTestId("start-photo").click();
   await expect(page.getByTestId("photo-dropzone")).toBeVisible();
-  await page.getByTestId("photo-file-input").setInputFiles(photoPath);
+  await page.getByTestId("photo-file-input").setInputFiles(photo);
   const crop = page.getByTestId("crop-screen");
   await expect(crop).toBeVisible();
   // The box settles once the photo has loaded and the corner search has
@@ -92,6 +115,14 @@ async function photoToPattern(page: Page): Promise<void> {
     .poll(() => crop.locator("img.pf-corner-img").evaluate((img: HTMLImageElement) => img.naturalWidth))
     .toBeGreaterThan(0);
   await expect(page.getByTestId("crop-detecting")).toHaveCount(0, { timeout: REVERSE_TIMEOUT });
+  if (pins) await pinCorners(page);
+  await page.getByTestId("crop-analyze").click();
+  await expect(page.getByTestId("photo-results")).toBeVisible({ timeout: REVERSE_TIMEOUT });
+}
+
+/** Drag the four pins onto the sidecar's corners. */
+async function pinCorners(page: Page): Promise<void> {
+  const crop = page.getByTestId("crop-screen");
   // PinOverlay places each pin at left/top percent of .pf-corner-box, and a
   // drag stores the pointer's fraction of that same box.
   const targets = cornerFractions();
@@ -112,10 +143,31 @@ async function photoToPattern(page: Page): Promise<void> {
     expect(Math.abs(left / 100 - fx), `pin ${index} left`).toBeLessThan(0.005);
     expect(Math.abs(top / 100 - fy), `pin ${index} top`).toBeLessThan(0.005);
   }
-  await page.getByTestId("crop-analyze").click();
-  await expect(page.getByTestId("photo-results")).toBeVisible({ timeout: REVERSE_TIMEOUT });
+}
+
+async function seePattern(page: Page): Promise<void> {
   await page.getByTestId("see-pattern").click();
   await expect(page.getByTestId("your-pattern")).toHaveAttribute("data-source", "photo");
+}
+
+/** Upload the render, set the four pins on its corners, analyze, open Your pattern. */
+async function photoToPattern(page: Page): Promise<void> {
+  await photoToResults(page);
+  await seePattern(page);
+}
+
+/** The results screen leads with See your pattern and stays inside the viewport. */
+async function expectResultsScreen(page: Page, name: string): Promise<void> {
+  await expect(page.getByTestId("see-pattern")).toHaveClass(/\bpf-btn--primary\b/);
+  await expect(page.getByTestId("open-in-editor")).toHaveClass(/\bpf-btn--secondary\b/);
+  await expectNoHorizontalOverflow(page, name);
+}
+
+/** Your pattern shows a photo read with no confidence pill, meters or wording. */
+async function expectNoConfidence(page: Page): Promise<void> {
+  await expect(page.getByTestId("overall-pill")).toHaveCount(0);
+  await expect(page.locator("[data-testid^='confidence-']")).toHaveCount(0);
+  await expect(page.getByTestId("your-pattern")).not.toContainText(/confidence/i);
 }
 
 async function savePattern(page: Page): Promise<{ bytes: Buffer; name: string }> {
@@ -135,6 +187,7 @@ test("a photo becomes a pattern PDF with only GET requests and no stored photo",
   page.on("request", (request) => requests.push(`${request.method()} ${request.url()}`));
 
   await photoToPattern(page);
+  await expectNoConfidence(page);
   await waitForEngine(page);
   const pdf = await savePattern(page);
   expect(pdf.bytes.subarray(0, 5).toString("latin1")).toBe("%PDF-");
@@ -158,7 +211,8 @@ test("a photo becomes a pattern PDF with only GET requests and no stored photo",
     return { values, databases: databases.map((db) => db.name ?? "") };
   });
   for (const value of stored.values) {
-    for (const marker of ["data:image", "blob:", "iVBORw0KGgo", "/9j/"]) {
+    // Data and object URLs, raw PNG bytes, and base64 PNG, JPEG and WebP.
+    for (const marker of ["data:image", "blob:", "\x89PNG", "iVBORw0KGgo", "/9j/", "UklGR"]) {
       expect(value, `stored value holds ${marker}`).not.toContain(marker);
     }
   }
@@ -181,17 +235,27 @@ test("See a sample pattern shows the method, the census and no photo, and saves 
   );
   await expect(page.getByTestId("pattern-working")).toHaveCount(0);
 
-  // Interim letters equal the fabric ids (qrep/export/pattern.py); names are
-  // the fixture palette's; counts are the design doc's census literals.
+  // Names are the fixture palette's; counts are the design doc's census
+  // literals, each the element's whole text.
   const census = page.getByTestId("fabric-census");
-  await expect(page.getByTestId("fabric-letter-b")).toHaveText("b");
-  await expect(page.getByTestId("fabric-letter-c")).toHaveText("c");
   await expect(census).toContainText("Chain blue");
   await expect(census).toContainText("Background cream");
-  await expect(page.getByTestId("fabric-count-b")).toHaveText(/1,?246 squares/);
-  await expect(page.getByTestId("fabric-count-c")).toHaveText(/1,?229 squares/);
-  // No hex codes: the fixture colors are #9db8d9 and #f2e8d5.
+  await expect(page.getByTestId("fabric-count-b")).toHaveText(/^1,?246 squares$/);
+  await expect(page.getByTestId("fabric-count-c")).toHaveText(/^1,?229 squares$/);
+  // Each of the fixture's two fabrics shows a letter, and no two match. The
+  // engine prints the fabric id as the letter until ticket A4b prints A, B
+  // and C, so no test pins the letter text.
+  const letters = census.locator("[data-testid^='fabric-letter-']");
+  await expect(letters).toHaveCount(2);
+  const letterTexts = (await letters.allTextContents()).map((text) => text.trim());
+  expect(letterTexts.filter((text) => text.length === 0)).toEqual([]);
+  expect(new Set(letterTexts).size).toBe(letterTexts.length);
+  // No hex codes: the fixture colors are #9db8d9 and #f2e8d5, and no row
+  // shows any color code at all.
   await expect(census).not.toContainText(/#|9db8d9|f2e8d5/i);
+  const rows = await census.locator("li").allTextContents();
+  expect(rows).toHaveLength(2);
+  for (const row of rows) expect(row).not.toMatch(/#[0-9a-f]{3,8}\b|\b[0-9a-f]{6}\b/i);
 
   // No photo, so no photo panel, no Compare and no flagged line; no
   // strategy cards, metrics, confidence pill or stage meters.
@@ -229,13 +293,228 @@ test("the sample shows at once and says it is working until the engine is ready"
   await expect(page.getByTestId("download-pattern")).toBeVisible();
 });
 
+test("one Retry after a failed engine boot brings the method, the census and a waiting PDF", async ({
+  page,
+}) => {
+  // Abort every engine file, as app.spec.ts does: the boot fails, and the
+  // calls queued meanwhile (the census, the summary, then the PDF) wait.
+  await page.route(ENGINE_FILES, (route) => route.abort());
+  await openSample(page);
+  const error = page.getByTestId("pattern-error");
+  await expect(error).toBeVisible({ timeout: FAILED_TIMEOUT });
+  await expect(error.locator(".yp-error-text")).toHaveText(
+    "The pattern engine did not start, so your pattern is not ready yet.",
+  );
+  await expect(error).not.toContainText(/traceback|exception|pyodide/i);
+  await expect(page.getByTestId("pattern-retry")).toBeVisible();
+  // A working line or spinner beside the error would say the wait goes on.
+  await expect(page.getByTestId("pattern-working")).toHaveCount(0);
+
+  // Download while the engine is down: the PDF waits, without a spinner.
+  const button = page.getByTestId("download-pattern");
+  await button.click();
+  await expect(button).toHaveAttribute("data-state", "busy");
+  await expect(button).toHaveAttribute("aria-busy", "false");
+
+  await page.unroute(ENGINE_FILES);
+  const download = page.waitForEvent("download", { timeout: READY_TIMEOUT });
+  await page.getByTestId("pattern-retry").click();
+
+  await expect(page.getByTestId("method-line")).toHaveText(
+    "Blocks of 5 x 5 squares repeat across the quilt, so it is strip pieced.",
+    { timeout: READY_TIMEOUT },
+  );
+  const saved = await download;
+  // slugify("Double Irish Chain 75x90"), as in the sample test above.
+  expect(saved.suggestedFilename()).toBe("double-irish-chain-75x90.pdf");
+  // The design doc's census literal, the element's whole text: the census
+  // the restart rejected was asked for again.
+  await expect(page.getByTestId("fabric-count-b")).toHaveText(/^1,?246 squares$/, {
+    timeout: READY_TIMEOUT,
+  });
+  await expect(button).toHaveAttribute("data-state", "idle");
+  await expect(page.getByTestId("pattern-error")).toHaveCount(0);
+  // The restart is not news: no raw engine message reached a toast.
+  await expect(page.getByTestId("toast").filter({ hasText: /restarted|traceback/i })).toHaveCount(0);
+});
+
+test("Download pattern (PDF) reports busy while it works and saves once for a double tap", async ({
+  page,
+}) => {
+  await openSample(page);
+  await waitForEngine(page);
+  await expect(page.getByTestId("method-line")).toBeVisible();
+  await expect(page.getByTestId("fabric-count-b")).toBeVisible();
+  const button = page.getByTestId("download-pattern");
+  await expect(button).toHaveAttribute("data-state", "idle");
+
+  const downloads: Download[] = [];
+  page.on("download", (download) => downloads.push(download));
+  // A MutationObserver keeps every value the two attributes held, so the busy
+  // state is seen however fast the export runs, and a click listener counts
+  // the file saves the page starts (an anchor click with a download name).
+  await button.evaluate((el) => {
+    const record = { state: [] as string[], busy: [] as string[], saves: 0 };
+    (window as unknown as { pdfRecord: typeof record }).pdfRecord = record;
+    new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        const list = mutation.attributeName === "data-state" ? record.state : record.busy;
+        list.push(mutation.oldValue ?? "");
+      }
+    }).observe(el, {
+      attributes: true,
+      attributeOldValue: true,
+      attributeFilter: ["data-state", "aria-busy"],
+    });
+    document.addEventListener(
+      "click",
+      (event) => {
+        if (event.target instanceof HTMLAnchorElement && event.target.download) record.saves += 1;
+      },
+      true,
+    );
+  });
+
+  const first = page.waitForEvent("download");
+  // Two clicks in one task: the second lands before React renders the busy
+  // state, the window a guard on the rendered state alone would miss.
+  await button.evaluate((el: HTMLElement) => {
+    el.click();
+    el.click();
+  });
+  await first;
+  await expect(button).toHaveAttribute("data-state", "idle");
+  // The engine has nothing queued, so a second export cannot still be on its way.
+  await expect(page.getByTestId("engine-chip")).toHaveAttribute("data-engine-phase", "ready");
+
+  const record = await page.evaluate(
+    () => (window as unknown as { pdfRecord: { state: string[]; busy: string[]; saves: number } })
+      .pdfRecord,
+  );
+  // Each list holds the old values; the current one ends it. One busy spell:
+  // idle, busy, idle, and aria-busy false, true, false.
+  expect([...record.state, await button.getAttribute("data-state")]).toEqual([
+    "idle",
+    "busy",
+    "idle",
+  ]);
+  expect([...record.busy, await button.getAttribute("aria-busy")]).toEqual([
+    "false",
+    "true",
+    "false",
+  ]);
+  expect(record.saves).toBe(1);
+  expect(downloads).toHaveLength(1);
+});
+
+test("a textured photo's flagged squares are counted, outlined, and can be hidden", async ({
+  page,
+}) => {
+  // The level 1 render adds fabric texture, so the read scores some squares
+  // below 0.9 (PARITY item 6). The property is a count above 0; the number
+  // itself is the reader's and is not pinned here.
+  await photoToResults(page, { photo: texturedPath, pins: false });
+  await seePattern(page);
+  await expectNoConfidence(page);
+  const flagged = page.getByTestId("flagged-count");
+  await expect(flagged).toHaveAttribute("data-count", /^\d+$/);
+  expect(Number(await flagged.getAttribute("data-count"))).toBeGreaterThan(0);
+  await expect(page.getByTestId("flagged-hint")).toBeVisible();
+  await expect(flagged).not.toContainText(/download|install/i);
+  const toggle = page.getByTestId("flagged-toggle");
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-pressed", "false");
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+});
+
+test("See a sample pattern ignores taps while it loads, and a quilt opened meanwhile goes to the editor", async ({
+  page,
+}) => {
+  // Hold the sample's file unanswered: its load stays pending for the test.
+  await page.route(SAMPLE_FILE, () => {});
+  await page.goto("./");
+  const see = page.getByTestId("see-sample");
+  await see.click();
+  await expect(see).toBeDisabled();
+  await expect(see).toHaveAttribute("aria-busy", "true");
+
+  // Another quilt opens while the sample loads: nothing binds it to Your
+  // pattern, so it goes to the editor.
+  await openFixtureFile(page);
+  await expect(page.getByTestId("editor")).toBeVisible();
+  await expect(page.getByTestId("your-pattern")).toHaveCount(0);
+});
+
+test("after a failed sample load the button works again and the next open goes to the editor", async ({
+  page,
+}) => {
+  await page.route(SAMPLE_FILE, (route) => route.abort(), { times: 1 });
+  await page.goto("./");
+  const see = page.getByTestId("see-sample");
+  await see.click();
+  await expect(page.getByTestId("toast")).toHaveAttribute("data-tone", "error");
+  await expect(see).toBeEnabled();
+  await expect(page.getByTestId("start-screen")).toBeVisible();
+
+  await page.getByTestId("open-demo").click();
+  await expect(page.getByTestId("editor")).toBeVisible();
+  await expect(page.getByTestId("your-pattern")).toHaveCount(0);
+});
+
+test("leaving Your pattern through Open sends no pattern call for the quilt that goes to the editor", async ({
+  page,
+}) => {
+  // Record every engine call the page posts to its worker.
+  await page.addInitScript(() => {
+    const calls: string[] = [];
+    (window as unknown as { engineCalls: string[] }).engineCalls = calls;
+    const post = Worker.prototype.postMessage;
+    Worker.prototype.postMessage = function (this: Worker, ...args: unknown[]) {
+      const message = args[0] as { type?: string; method?: string } | null;
+      if (message?.type === "call" && message.method) calls.push(message.method);
+      return (post as (...rest: unknown[]) => void).apply(this, args);
+    } as typeof Worker.prototype.postMessage;
+  });
+  const patternCalls = () =>
+    page.evaluate(
+      () =>
+        (window as unknown as { engineCalls: string[] }).engineCalls.filter(
+          (method) => method === "export_pattern",
+        ).length,
+    );
+
+  await openSample(page);
+  await waitForEngine(page);
+  await expect(page.getByTestId("method-line")).toBeVisible();
+  await expect(page.getByTestId("fabric-count-b")).toBeVisible();
+  // The summary is the one pattern call so far.
+  expect(await patternCalls()).toBe(1);
+
+  await openFixtureFile(page);
+  await expect(page.getByTestId("editor")).toBeVisible();
+  // A fresh open drops the census, so its count shows again only once the
+  // opened quilt's validate returns; the client posts its next queued call
+  // before that result reaches the page, so any pattern call is out by then.
+  // The editor adds " + borders" to a fabric the borders use.
+  await expect(page.getByTestId("fabric-count-b")).toHaveText(
+    /^1,?246 squares( \+ borders)?$/,
+  );
+  await expect(page.getByTestId("engine-chip")).toHaveAttribute("data-engine-phase", "ready");
+  expect(await patternCalls()).toBe(1);
+});
+
 test.describe("Your pattern at 1440 x 900", { tag: "@phone" }, () => {
   test.use(DESKTOP_OPTIONS);
 
   test("the quilt sits beside the photo from 720 px, stacks below it on a phone, and Compare opens the lightbox", async ({
     page,
   }) => {
-    await photoToPattern(page);
+    await photoToResults(page);
+    await expectResultsScreen(page, "photo-results");
+    await seePattern(page);
+    await expectNoConfidence(page);
     const photo = page.getByTestId("pattern-photo");
     const quilt = page.getByTestId("pattern-quilt");
     await expect(photo).toBeVisible();
@@ -260,10 +539,11 @@ test.describe("Your pattern at 1440 x 900", { tag: "@phone" }, () => {
     await page.setViewportSize({ width: 1440, height: 900 });
 
     // Flagged squares come from the read: a whole count, outlined by default.
+    // The attribute must be there: Number(null) is 0 and would pass.
     const flagged = page.getByTestId("flagged-count");
     await expect(flagged).toBeVisible();
+    await expect(flagged).toHaveAttribute("data-count", /^\d+$/);
     const count = Number(await flagged.getAttribute("data-count"));
-    expect(Number.isInteger(count) && count >= 0).toBe(true);
     if (count > 0) {
       await expect(page.getByTestId("flagged-toggle")).toHaveAttribute("aria-pressed", "true");
     }
@@ -342,6 +622,55 @@ test.describe("Your pattern at 390 x 844 (iPhone emulation)", { tag: "@phone" },
     expect(fit.right).toBeLessThanOrEqual(PHONE.width);
     expect(fit.scrollWidth).toBeLessThanOrEqual(fit.clientWidth);
   });
+
+  test("the results screen stays inside the phone and leads with See your pattern", async ({
+    page,
+  }) => {
+    await photoToResults(page, { pins: false });
+    await expectResultsScreen(page, "photo-results");
+  });
+
+  // Fingers spread across, up and down, and on a diagonal: the page keeps a
+  // vertical one-finger drag at Fit, and a pinch must not read as one.
+  for (const [way, dx, dy] of [
+    ["across", 1, 0],
+    ["up and down", 0, 1],
+    ["on a diagonal", Math.SQRT1_2, Math.SQRT1_2],
+  ] as const) {
+    test(`a two-finger pinch ${way} on the quilt at Fit zooms it`, async ({ page }) => {
+      await openSample(page);
+      const quilt = page.getByTestId("pattern-quilt");
+      const canvas = page.getByTestId("quilt-canvas");
+      await expect(quilt).toHaveAttribute("data-zoomed", "false");
+      await expect(canvas).toHaveAttribute("data-view-scale", /\d/);
+      const scaleAtFit = Number(await canvas.getAttribute("data-view-scale"));
+      const cdp = await page.context().newCDPSession(page);
+
+      const box = (await canvas.boundingBox())!;
+      const innerHeight = await page.evaluate(() => window.innerHeight);
+      const x = box.x + box.width / 2;
+      // Inside both the canvas and the viewport, with room for the spread.
+      const y = Math.min(box.y + box.height / 2, innerHeight - 140);
+      // Two fingers land together 40 px apart and spread to 200 px apart.
+      const fingers = (gap: number) => [
+        { x: x - (dx * gap) / 2, y: y - (dy * gap) / 2, id: 0 },
+        { x: x + (dx * gap) / 2, y: y + (dy * gap) / 2, id: 1 },
+      ];
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: fingers(40) });
+      for (let step = 1; step <= 10; step++) {
+        await cdp.send("Input.dispatchTouchEvent", {
+          type: "touchMove",
+          touchPoints: fingers(40 + step * 16),
+        });
+      }
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+
+      await expect(quilt).toHaveAttribute("data-zoomed", "true");
+      await expect
+        .poll(async () => Number(await canvas.getAttribute("data-view-scale")))
+        .toBeGreaterThan(scaleAtFit);
+    });
+  }
 
   test("a one-finger drag scrolls the page at Fit and pans the quilt once zoomed", async ({
     page,

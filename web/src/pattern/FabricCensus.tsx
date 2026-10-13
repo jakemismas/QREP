@@ -8,6 +8,7 @@ import type { FabricLine } from "../engine/contract";
 import type { Fabric, ModelSummary } from "../model/types";
 import { FabricsPanel } from "../viewer";
 import { censusRows } from "./census";
+import "./FabricCensus.css";
 
 export function FabricCensus({
   lines,

@@ -247,8 +247,9 @@ export function ResultsScreen({ photo }: { photo: PhotoApi }) {
                   className="pf-btn pf-btn--primary"
                   data-testid="see-pattern"
                   onClick={() => {
-                    showPattern("photo");
+                    // Bound after the open, to the read that just opened.
                     photo.openInEditor();
+                    showPattern("photo");
                   }}
                 >
                   See your pattern

@@ -109,6 +109,8 @@ test("editor and export flows never need opencv", async ({ page }) => {
   await waiting;
   // No error toast anywhere in the flow.
   await expect(page.getByTestId("toast")).not.toContainText(/fail|error/i);
+  // Your pattern reports its own failures inline, not in a toast.
+  await expect(page.getByTestId("pattern-error")).toHaveCount(0);
 });
 
 test("idle prefetch: post-prefetch reverse shows no loading bar (PARITY 17)", async ({

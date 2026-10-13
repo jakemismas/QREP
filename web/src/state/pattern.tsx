@@ -12,7 +12,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { useEngine } from "../engine/useEngine";
 import type { Engine } from "../engine/useEngine";
 import { EngineError } from "../engine/rpc";
-import type { QuiltModel } from "../model/types";
+import type { ModelSummary, QuiltModel } from "../model/types";
 import type { SeamStrategy } from "../model/seams";
 import { useToast } from "../ui";
 import { PatternPdfController, PatternSummaryLoader } from "../pattern/patternPdf";
@@ -52,7 +52,8 @@ export type PatternSource = "sample" | "photo";
 export interface YourPatternApi {
   screen: PatternScreen;
   source: PatternSource;
-  /** Show the next quilt that opens on Your pattern. */
+  /** Show the quilt that has just opened on Your pattern; call it right
+   * after the open, so it binds to that quilt and to no later one. */
   showPattern: (source: PatternSource) => void;
   showEditor: () => void;
   summary: SummaryView;
@@ -60,6 +61,8 @@ export interface YourPatternApi {
   pdf: PdfView;
   savePdf: () => void;
   retryPdf: () => void;
+  /** Reboot a failed engine and send Your pattern's waiting calls again. */
+  retryEngine: () => void;
 }
 
 export interface PatternApi {
@@ -90,6 +93,15 @@ export function slugify(name: string): string {
 /** The pattern PDF's file name: the pattern name in kebab case. */
 export function patternFileName(patternName: string): string {
   return `${slugify(patternName)}.pdf`;
+}
+
+/** The file name Download pattern (PDF) saves under: the engine's pattern
+ * name, which is the validate summary's, else the model's own. */
+export function patternPdfName(
+  summary: Pick<ModelSummary, "name"> | null,
+  model: Pick<QuiltModel, "metadata">,
+): string {
+  return patternFileName(summary?.name || model.metadata?.name || "");
 }
 
 export function base64ToArrayBuffer(b64: string): ArrayBuffer {
@@ -142,6 +154,7 @@ export function usePatternState({
   summary,
   latestModel,
   opened,
+  latestOpened,
 }: ModelApi): PatternState {
   const engine = useEngine();
   // ToastProvider rebuilds its value on every toast; keyed on that object,
@@ -199,7 +212,14 @@ export function usePatternState({
 
   // ---- Your pattern (C2a) -------------------------------------------------
 
-  const [screen, setScreen] = useState<PatternScreen>("editor");
+  // Your pattern shows one opened quilt: `bound` holds that open's count
+  // (ModelApi.opened). showPattern binds the quilt that has just opened, so a
+  // quilt opened any other way, say from the header's Open, has a later count
+  // and goes to the editor, as it did before C2a. No flag waits for a future
+  // open, so a slow sample load cannot send some other quilt to Your pattern.
+  const [bound, setBound] = useState<number | null>(null);
+  const boundRef = useRef<number | null>(null);
+  const screen: PatternScreen = bound !== null && bound === opened ? "pattern" : "editor";
   const [source, setSource] = useState<PatternSource>("sample");
   const [summaryView, setSummaryView] = useState<SummaryView>({ status: "idle" });
   const [pdfView, setPdfView] = useState<PdfView>({ status: "idle", message: null });
@@ -224,58 +244,70 @@ export function usePatternState({
   });
 
   const leavePattern = useCallback(() => {
-    setScreen("editor");
+    boundRef.current = null;
+    setBound(null);
     loaderRef.current?.clear();
     pdfRef.current?.reset();
   }, []);
 
-  // showPattern binds Your pattern to the next quilt that opens (the sample
-  // or the read). A quilt opened any other way, say from the header's Open,
-  // is not that quilt: it goes to the editor, as it did before C2a.
-  const expectOpenRef = useRef(false);
-  const openedRef = useRef(opened);
+  // Another quilt opened: drop the bound quilt's summary and any pattern
+  // still being made for it, so it is not saved under the new quilt.
+  const seenOpenRef = useRef(opened);
   useEffect(() => {
-    if (opened === openedRef.current) return;
-    openedRef.current = opened;
-    if (expectOpenRef.current) {
-      expectOpenRef.current = false;
-      return;
-    }
-    leavePattern();
+    if (opened === seenOpenRef.current) return;
+    seenOpenRef.current = opened;
+    if (opened !== boundRef.current) leavePattern();
   }, [opened, leavePattern]);
 
-  const showPattern = useCallback((next: PatternSource) => {
-    expectOpenRef.current = true;
-    // The plans feed the editor's Pattern tab; Your pattern never asks for them.
-    setPatternActive(false);
-    setSource(next);
-    setScreen("pattern");
-    loaderRef.current?.clear();
-    pdfRef.current?.reset();
-  }, []);
+  const showPattern = useCallback(
+    (next: PatternSource) => {
+      const open = latestOpened();
+      boundRef.current = open;
+      setBound(open);
+      // The plans feed the editor's Pattern tab; Your pattern never asks for them.
+      setPatternActive(false);
+      setSource(next);
+      loaderRef.current?.clear();
+      pdfRef.current?.reset();
+    },
+    [latestOpened],
+  );
 
   const showEditor = useCallback(() => {
-    expectOpenRef.current = false;
     leavePattern();
   }, [leavePattern]);
 
-  // One summary per model revision; the loader drops a replaced model's.
+  // One summary per model revision of the bound quilt; the loader drops a
+  // replaced model's. A render that still shows Your pattern can run this
+  // after a newer open (the header's Open), whose quilt goes to the editor
+  // and must not cost an engine call.
   useEffect(() => {
     if (screen !== "pattern" || !model || model !== latestModel()) return;
+    if (boundRef.current !== latestOpened()) return;
     loaderRef.current?.load(JSON.stringify(model));
-  }, [screen, model, latestModel]);
+  }, [screen, model, latestModel, latestOpened]);
 
   const retrySummary = useCallback(() => loaderRef.current?.retry(), []);
 
   const savePdf = useCallback(() => {
     if (!model) return;
-    // The engine's pattern name: the validate summary's, else the model's own.
-    const patternName = summary?.name || model.metadata?.name || "";
-    void pdfRef.current?.start(JSON.stringify(model), patternFileName(patternName));
+    void pdfRef.current?.start(JSON.stringify(model), patternPdfName(summary, model));
   }, [model, summary]);
 
   const retryPdf = useCallback(() => {
     void pdfRef.current?.retry();
+  }, []);
+
+  const retryEngine = useCallback(() => {
+    engineRef.current.retry();
+    // The restart rejects every queued call. Sending Your pattern's again
+    // lets one Retry recover the summary and a waiting PDF alike; the
+    // rejected calls' outcomes are dropped.
+    const loader = loaderRef.current;
+    if (loader && (loader.view.status === "loading" || loader.view.status === "failed")) {
+      loader.retry();
+    }
+    void pdfRef.current?.resend();
   }, []);
 
   const yourPattern = useMemo<YourPatternApi>(
@@ -289,15 +321,26 @@ export function usePatternState({
       pdf: pdfView,
       savePdf,
       retryPdf,
+      retryEngine,
     }),
-    [screen, source, showPattern, showEditor, summaryView, retrySummary, pdfView, savePdf, retryPdf],
+    [
+      screen,
+      source,
+      showPattern,
+      showEditor,
+      summaryView,
+      retrySummary,
+      pdfView,
+      savePdf,
+      retryPdf,
+      retryEngine,
+    ],
   );
 
   const closePattern = useCallback(() => {
     resetPlans(DEFAULT_STRATEGY);
     setPatternActive(false);
     setRoundtripReport(null);
-    expectOpenRef.current = false;
     leavePattern();
   }, [resetPlans, leavePattern]);
 

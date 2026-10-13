@@ -3,6 +3,8 @@
  * own (PhotoResult.uncertainCount), and the outlines QuiltCanvas draws come
  * from the read's cell confidences, never from the editor's model. A sample
  * pattern has no read, so the screen shows no flagged line for it.
+ * QuiltCanvas leaves the outlines off squares too small to read, which at Fit
+ * is often all of them, so a flagged count comes with a hint to zoom in.
  */
 import "./FlaggedOverlay.css";
 
@@ -25,6 +27,10 @@ export function FlaggedOverlay({
             <span className="fo-mark" aria-hidden="true" />
             {count.toLocaleString("en-US")} {count === 1 ? "square is" : "squares are"} flagged
             to double-check against your photo.
+          </p>
+          <p className="fo-hint" data-testid="flagged-hint">
+            Zoom in on the quilt to see their outlines and check them against
+            your photo.
           </p>
           <button
             type="button"

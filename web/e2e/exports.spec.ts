@@ -89,6 +89,9 @@ test("exports are deterministic within a session; PDF saved for pypdf", async ({
   const first = await downloadBytes(page, "download-pattern");
   const pdf = await downloadBytes(page, "download-pattern");
   expect(pdf.bytes.equals(first.bytes)).toBe(true);
+  // SLUG is PARITY item 11's slug, and the one pattern file is the pattern
+  // name in kebab case plus .pdf (REBASELINE.md criterion P27).
+  expect(pdf.name).toBe(`${SLUG}.pdf`);
   expect(pdf.bytes.subarray(0, 5).toString("latin1")).toBe("%PDF-");
   mkdirSync(downloadDir, { recursive: true });
   writeFileSync(path.join(downloadDir, "booklet.pdf"), pdf.bytes);

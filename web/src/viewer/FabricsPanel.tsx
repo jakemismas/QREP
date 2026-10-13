@@ -6,6 +6,8 @@
  * the e2e waits for the real census before asserting. No fabric id or color
  * code is ever shown as text. Swatch colors are user data and never theme.
  */
+// The fp- rules live in pattern/FabricCensus.css, imported by FabricCensus, this
+// panel's one user: plan section 5.C bans injected style strings.
 
 export interface CensusRow {
   fabricId: string;
@@ -14,21 +16,6 @@ export interface CensusRow {
   color: string | null;
   count: number | null;
 }
-
-const FP_CSS = `
-.fp-root { background: var(--card); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 2px 10px var(--shadow); padding: 18px; display: flex; flex-direction: column; gap: 6px; font: 400 16.5px var(--sans, sans-serif); color: var(--ink2); }
-.fp-head { margin-bottom: 4px; }
-.fp-title { margin: 0; font: 700 21px var(--serif, serif); color: var(--denim); }
-.fp-list { list-style: none; margin: 0; padding: 0; }
-.fp-row { display: flex; align-items: center; gap: 12px; padding: 12px 2px; border-bottom: 1px dashed var(--line); }
-.fp-row:last-child { border-bottom: none; }
-.fp-letter { flex: none; min-width: 30px; height: 30px; padding: 0 6px; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; background: var(--card2); border: 1.5px solid var(--line2); font: 700 15px var(--serif, serif); color: var(--ink); }
-.fp-swatch { flex: none; width: 46px; height: 46px; border-radius: 10px; border: 1px solid var(--line2); box-shadow: inset 0 -2px 5px rgba(0, 0, 0, 0.07); }
-.fp-info { min-width: 0; }
-.fp-name { font: 600 16.5px var(--sans, sans-serif); color: var(--ink); overflow-wrap: anywhere; }
-.fp-meta { font-size: 14px; color: var(--mut); margin-top: 2px; }
-.fp-counting { font-style: italic; color: var(--faint); }
-`;
 
 export function FabricsPanel({ rows }: { rows: CensusRow[] }) {
   return (
@@ -62,7 +49,6 @@ export function FabricsPanel({ rows }: { rows: CensusRow[] }) {
           </li>
         ))}
       </ul>
-      <style>{FP_CSS}</style>
     </section>
   );
 }

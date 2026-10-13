@@ -17,6 +17,14 @@
   color: var(--ink2);
 }
 
+.fo-hint {
+  margin: 0;
+  flex: 1 1 100%;
+  order: 1;
+  font: 400 14px/1.4 var(--sans, sans-serif);
+  color: var(--mut);
+}
+
 .fo-mark {
   display: inline-block;
   width: 14px;
