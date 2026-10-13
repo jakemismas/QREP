@@ -585,20 +585,26 @@ def _lab(image_bgr: np.ndarray, sigma: float = IMAGE_SIGMA) -> np.ndarray:
     return lab
 
 
-def ring_models(lab: np.ndarray) -> list[tuple[np.ndarray, float]]:
-    """(median color, tolerance) of each uniform side of the border ring."""
+def ring_stats(lab: np.ndarray) -> list[tuple[np.ndarray, float, float, float]]:
+    """(median color, MAD, tolerance, inlier share) of each side of the border ring: top,
+    bottom, left, right."""
     h, w = lab.shape[:2]
     t = max(3, int(round(RING * min(h, w))))
-    models = []
+    stats = []
     for strip in (lab[:t], lab[h - t:], lab[:, :t], lab[:, w - t:]):
         pixels = strip.reshape(-1, 3)
         median = np.median(pixels, axis=0)
         distances = np.linalg.norm(pixels - median, axis=1)
         mad = float(np.median(distances))
         tolerance = max(TOL_FLOOR, TOL_MADS * mad)
-        if mad <= RING_MAD_MAX and float(np.mean(distances <= tolerance)) >= RING_INLIER_MIN:
-            models.append((median, tolerance))
-    return models
+        stats.append((median, mad, tolerance, float(np.mean(distances <= tolerance))))
+    return stats
+
+
+def ring_models(lab: np.ndarray) -> list[tuple[np.ndarray, float]]:
+    """(median color, tolerance) of each uniform side of the border ring."""
+    return [(median, tolerance) for median, mad, tolerance, inliers in ring_stats(lab)
+            if mad <= RING_MAD_MAX and inliers >= RING_INLIER_MIN]
 
 
 def _segment(image_bgr: np.ndarray) -> tuple[tuple[np.ndarray, np.ndarray] | None, str]:
@@ -879,6 +885,8 @@ def run_photo(job: tuple[Photo, str]) -> tuple[list[dict], list[dict]]:
         staged, (sx, sy) = stage(image, cap)
         for method in METHODS:
             found, reason = explain(method, staged)
+            ring = ([[round(mad, 2), round(inliers, 3)] for _m, mad, _t, inliers in ring_stats(_lab(staged))]
+                    if method != "tiered" else None)
             source = found.corners / [sx, sy] if found is not None else None
             for prov, truth in sorted(photo.truth.items()):
                 square = square_size(truth["outer"], truth["field"], truth["counts"], truth["bands"])
@@ -891,6 +899,7 @@ def run_photo(job: tuple[Photo, str]) -> tuple[list[dict], list[dict]]:
                     "confidence": round(found.confidence, 4) if found is not None else None,
                     "detector_tier": found.tier if found is not None else None,
                     "reason": reason,
+                    "ring_mad_inliers": ring,
                     "errors": _round(errors) if errors is not None else None,
                 })
         for prov, truth in sorted(photo.truth.items()):
