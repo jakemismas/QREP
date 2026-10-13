@@ -176,7 +176,10 @@ def _score_cells(unit: Unit, reading: readers.Reading) -> dict:
     m2o = scoring.score_squares(unit.truth_cells, reading.cells, many, confidence, **kwargs)
     o2o = scoring.score_squares(unit.truth_cells, reading.cells, one, confidence, **kwargs)
     truth_bands = scoring.truth_band_inches(unit.truth.bands, reading.cell_size_eighths)
-    bands_ok = scoring.bands_match(truth_bands, scoring.read_band_inches(reading.band_eighths))
+    # Truth bands run from the outside in (qrep/contract.py, OuterEdgeFrame), while a
+    # read's come from Quilt.borders, innermost first (qrep/export/svg.py reverses them to
+    # paint the outermost first), so the read is turned outside in before comparing.
+    bands_ok = scoring.bands_match(truth_bands, scoring.read_band_inches(reading.band_eighths[::-1]))
     return {
         "squares": squares,
         "accuracy_many_to_one": m2o.accuracy,

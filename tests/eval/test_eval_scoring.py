@@ -798,3 +798,18 @@ def test_the_g4_cell_names_each_skip_reason():
     # keeps both photos, and the skipped column shows 1.
     tier = agg["by_tier"]["auto-corners | R | full"]
     assert (tier["n_photos"], tier["skipped"], tier["outcomes"]) == (2, 1, {"refused": 1})
+
+
+def test_two_unequal_bands_read_in_the_engines_order_count_as_matching():
+    # The truth lists bands from the outside in (qrep/contract.py, OuterEdgeFrame); a read
+    # lists Quilt.borders innermost first (qrep/export/svg.py draws reversed(quilt.borders)
+    # to paint the outermost first). Truth: an outer band of 2 squares and an inner one of
+    # 1, at the read's 16 eighths (2 in) a square: 2 x 16 / 8 = 4.0 in, then 1 x 16 / 8 =
+    # 2.0 in. A right read of that quilt lists the inner band first, 2.0 in = 16 eighths,
+    # then 4.0 in = 32 eighths; outside in that is 4.0 then 2.0, the truth. With every
+    # square, both fabrics and both bands right, the interior is fully correct. Read as
+    # [32, 16], the bands are inner 4.0 and outer 2.0 in, each 2 in off, beyond 1/4 in.
+    out = harness.score(_unit(bands=(2, 1)), _reading("read", cells=TRUTH, confidence=ONES, bands=(16, 32)))
+    assert out["bands_ok"] is True and out["fully_correct"] is True
+    out = harness.score(_unit(bands=(2, 1)), _reading("read", cells=TRUTH, confidence=ONES, bands=(32, 16)))
+    assert out["bands_ok"] is False and out["fully_correct"] is False
