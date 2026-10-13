@@ -32,6 +32,20 @@ DEVICE_CLASS = {
 PROPOSALS = ("proposed-a", "proposed-b")
 
 
+# The largest image a unit reads as fetched, in megapixels (#166 comment 6145839899).
+# The automatic read itself passed a 5 GB per-process commit cap at 117.5 MP, and the
+# read is not the eval's to change; the app caps every photo at 2000 px anyway.
+FULL_BUDGET_MP = 50
+OVER_BUDGET_REASON = (f"as fetched exceeds the eval's {FULL_BUDGET_MP} MP budget; the app caps every photo "
+                      "at 2000 px")
+
+
+def over_budget(canvas: tuple[int, int], cap: int | None) -> bool:
+    """Whether a unit would read an image above FULL_BUDGET_MP: only an as-fetched
+    unit can, since a cap holds the longest side to 2000 px or less."""
+    return cap is None and canvas[0] * canvas[1] > FULL_BUDGET_MP * 1_000_000
+
+
 def cap_size(width: int, height: int, cap: int | None) -> tuple[int, int]:
     """The app's targetSize: the longest side down to the cap, the other side rounded
     half up as JavaScript's Math.round does; never upscaled."""

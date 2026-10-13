@@ -771,3 +771,30 @@ def test_jitter_reports_the_realized_move_beside_the_radius():
     assert four["mean_moved_squares"] == pytest.approx(0.15)
     text = report.markdown({"header": {"title": "t"}, "aggregate": report.aggregate(rows, runner=_no_git)})
     assert "| auto-corners | full | 4 | 0.200 | 0.150 | 2 |" in text
+
+
+def test_the_g4_cell_names_each_skip_reason():
+    # r1 refused (scored: 1/1); r2 skipped for want of a frame; r3 skipped because it was
+    # read as fetched above the 50 MP budget (#166 comment 6145839899). Neither skip enters
+    # n, so G4 stays k 1 of n 1, with 2 skipped, 1 of them over the budget.
+    over = corpus.OVER_BUDGET_REASON
+    rows = [_row("r1", "refused", tier="R"), _row("r2", "skipped", tier="R", reason=harness.SKIP_REASON),
+            _row("r3", "skipped", tier="R", reason=over)]
+    agg = report.aggregate(rows, runner=_no_git)
+    g4 = next(e for e in agg["gate_metrics"] if e["truth"] == "gate" and e["device_class"] == "museum scan")["G4"]
+    assert (g4["k"], g4["n"], g4["skipped"], g4["over_budget"]) == (1, 1, 2, 1)
+    text = report.markdown({"header": {"title": "t"}, "aggregate": agg}).splitlines()
+    cell = next(r for r in text if r.startswith("| auto-corners | museum scan | full | gate |")).split("|")[7]
+    assert cell.strip().endswith(", 2 skipped (1 over the as-fetched budget); "
+                                 "no frame or counts on the v0 refusal photos (#243)")
+    # Only the budget skip: the cell says so, and the #243 note stays out, since every
+    # skipped photo had a frame.
+    agg = report.aggregate([rows[0], rows[2]], runner=_no_git)
+    text = report.markdown({"header": {"title": "t"}, "aggregate": agg}).splitlines()
+    cell = next(r for r in text if r.startswith("| auto-corners | museum scan | full | gate |")).split("|")[7]
+    assert cell.strip().endswith(", 1 skipped (1 over the as-fetched budget)")
+    # A skipped row is no read, refusal, success or failure: the tier table's outcomes
+    # count r1 alone (read / warned / held / refused = 0 / 0 / 0 / 1), the photo count
+    # keeps both photos, and the skipped column shows 1.
+    tier = agg["by_tier"]["auto-corners | R | full"]
+    assert (tier["n_photos"], tier["skipped"], tier["outcomes"]) == (2, 1, {"refused": 1})

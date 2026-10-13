@@ -48,8 +48,12 @@ def _scored(rows):
 
 
 def _with_unscored(rate: dict, rows) -> dict:
-    return {**rate, "errors": sum(r["outcome"] == "error" for r in rows),
-            "skipped": sum(r["outcome"] == "skipped" for r in rows)}
+    out = {**rate, "errors": sum(r["outcome"] == "error" for r in rows),
+           "skipped": sum(r["outcome"] == "skipped" for r in rows)}
+    over = sum(r["outcome"] == "skipped" and r.get("reason") == corpus.OVER_BUDGET_REASON for r in rows)
+    if over:
+        out["over_budget"] = over
+    return out
 
 
 def _blocked_rate(rows):
@@ -225,7 +229,11 @@ def aggregate(rows: list[dict], *, runner=subprocess.run) -> dict:
 
 def _unscored(rate: dict) -> str:
     text = f", {rate['errors']} errors" if rate.get("errors") else ""
-    return text + (f", {rate['skipped']} skipped" if rate.get("skipped") else "")
+    if rate.get("skipped"):
+        text += f", {rate['skipped']} skipped"
+        if rate.get("over_budget"):
+            text += f" ({rate['over_budget']} over the as-fetched budget)"
+    return text
 
 
 def _fmt(rate: dict | None, what: str = "", digits: int = 3) -> str:
@@ -281,7 +289,7 @@ def markdown(report: dict) -> str:
         g2 = e["G2"]
         truth = e["truth"] + (f" ({e['conflict_rows']} conflict rows)" if e.get("conflict_rows") else "")
         g4 = "n/a" if e["G4"] is None else _fmt(e["G4"]) + (
-            f"; {G4_CORNERS}" if e["G4"].get("skipped") else "")
+            f"; {G4_CORNERS}" if e["G4"].get("skipped", 0) > e["G4"].get("over_budget", 0) else "")
         g1 = "n/a" if e["G1"] is None else _fmt(e["G1"])
         g2_text = "n/a" if g2 is None else f"{g2['photos']} photos: {_fmt(g2, 'squares', 4)}"
         lines.append(f"| {e['reader']} | {e['device_class']} | {e['resolution']} | {truth} "

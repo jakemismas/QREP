@@ -468,6 +468,37 @@ def test_glare_sigma_follows_the_shorter_side():
     assert out[35, 70, 0] == 247
 
 
+def test_glare_and_gradient_in_bands_equal_their_whole_image_formulas(monkeypatch):
+    # Bands bound the float64 copies on a 117 MP scan; they must not move a pixel. The
+    # reference is each docstring's formula over the whole image at once, the form the
+    # hand-computed tests above check: alpha = 0.85 x exp(-d^2 / (2 sigma^2)) blended
+    # toward 255, and brightness times 1 - (1 - 0.55) x column / (width - 1). The ramp
+    # keeps the form 1 - 0.55: in binary that is 0.44999999999999996, not 0.45, and a
+    # pixel on a half level rounds by it. Bands of 7 rows over 100 rows cross 14 band
+    # edges, and the last band holds 2 rows.
+    image = (np.arange(100 * 120 * 3) % 251).astype(np.uint8).reshape(100, 120, 3)
+    box = (10.0, 5.0, 110.0, 95.0)
+    cx, cy, sigma = 10.0 + 0.35 * 100.0, 5.0 + 0.35 * 90.0, 0.15 * 90.0
+    ys, xs = np.mgrid[0:100, 0:120]
+    alpha = (0.85 * np.exp(-((xs - cx) ** 2 + (ys - cy) ** 2) / (2 * sigma * sigma)))[..., None]
+    glare = np.clip(np.rint(image.astype(np.float64) * (1 - alpha) + 255.0 * alpha), 0, 255).astype(np.uint8)
+    ramp = 1.0 - (1.0 - 0.55) * np.arange(120) / 119
+    gradient = np.clip(np.rint(image.astype(np.float64) * ramp[None, :, None]), 0, 255).astype(np.uint8)
+    seen = []
+    to_uint8 = degrade._to_uint8
+
+    def spy(values):
+        seen.append(values.shape[0])
+        return to_uint8(values)
+
+    monkeypatch.setattr(degrade, "BAND_ROWS", 7)
+    monkeypatch.setattr(degrade, "_to_uint8", spy)
+    assert np.array_equal(degrade.glare(image, box), glare)
+    assert np.array_equal(degrade.lighting_gradient(image), gradient)
+    # No float copy holds more than one band: 14 bands of 7 rows and one of 2, twice.
+    assert seen == ([7] * 14 + [2]) * 2
+
+
 def test_apply_dispatches_each_degradation_by_name():
     image = (np.arange(60 * 80 * 3) % 251).astype(np.uint8).reshape(60, 80, 3)
     box = (10.0, 5.0, 70.0, 55.0)
@@ -1220,3 +1251,84 @@ def test_the_realized_move_is_the_clamped_displacement_over_the_pitch(monkeypatc
     assert all(r["moved_squares"] == pytest.approx(r["moved_px_mean"] / 20.0) for r in rows)
     assert all(r["radius_squares"] == pytest.approx(4 / 20) for r in rows)
     assert any(r["moved_px_mean"] < 4.0 - 1e-9 for r in rows)
+
+
+def test_only_as_fetched_units_above_50_mp_are_over_the_budget():
+    # The budget is 50 MP, 50,000,000 pixels, on the as-fetched canvas
+    # (#166 comment 6145839899). 10292 x 11415 = 117,483,180 and 13376 x 13029 =
+    # 174,275,904 are above it; 5038 x 7721 = 38,898,398 is within. 10000 x 5000 =
+    # 50,000,000 exactly is within (over means above); 10000 x 5001 = 50,010,000 is over.
+    assert corpus.FULL_BUDGET_MP == 50
+    assert corpus.over_budget((10292, 11415), None)
+    assert corpus.over_budget((13376, 13029), None)
+    assert not corpus.over_budget((5038, 7721), None)
+    assert not corpus.over_budget((10000, 5000), None)
+    assert corpus.over_budget((10000, 5001), None)
+    # A capped unit is read at most cap px on its longest side, 2000 x 2000 = 4 MP at
+    # most, so the 117.5 MP scan at either cap is within the budget.
+    assert not corpus.over_budget((10292, 11415), 2000)
+    assert not corpus.over_budget((10292, 11415), 1400)
+
+
+def test_an_over_budget_unit_is_each_readers_skipped_row_with_no_read(monkeypatch, tmp_path):
+    # A 10292 x 11415 canvas as fetched is over the budget: no stage, no read. Every
+    # reader gets a skipped row where its true-corner read would be (no corners for
+    # auto, 0 px for the others), and the confirmed reader one per miscount variant.
+    # Counts 1 block of 4 x 4: square +1 and -1 on each axis (4), block +1 on each axis
+    # (2), half and double: 8 variants skipped over the budget; block -1 on each axis
+    # leaves 0 blocks: 2 skipped for that reason.
+    monkeypatch.setattr(readers, "read_auto", _no_read)
+    monkeypatch.setattr(readers, "read_confirmed", _no_read)
+    monkeypatch.setattr(harness, "stage", _no_read)
+    unit = _plain_unit(tmp_path / "never-opened.png", canvas=(10292, 11415),
+                       corners=[(100.0, 100.0), (10192.0, 100.0), (10192.0, 11315.0), (100.0, 11315.0)],
+                       counts=Counts(blocks_across=1, blocks_down=1, squares_per_block_across=4,
+                                     squares_per_block_down=4),
+                       readers_=("auto", "auto-corners", "confirmed"), radii=(0, 4))
+    rows = harness.run_unit(unit)
+    over = corpus.OVER_BUDGET_REASON
+    assert [(r["reader"], r["radius_px"], r["variant"], r["outcome"], r["reason"]) for r in rows[:3]] == [
+        ("auto", None, "true", "skipped", over), ("auto-corners", 0, "true", "skipped", over),
+        ("confirmed", 0, "true", "skipped", over)]
+    reasons = {r["variant"]: r["reason"] for r in rows[3:]}
+    assert all(r["reader"] == "confirmed" and r["outcome"] == "skipped" for r in rows[3:])
+    assert reasons == {**{f"square {s} {axis}": over for s in ("+1", "-1") for axis in ("across", "down")},
+                       "block +1 across": over, "block +1 down": over, "half": over, "double": over,
+                       "block -1 across": "blocks_across would be 0", "block -1 down": "blocks_down would be 0"}
+    agg = report.aggregate(rows, runner=_no_git)
+    # The photo stays in its tier at full: 1 photo, 1 skipped, no outcome, n = 0.
+    tier = agg["by_tier"]["auto | A | full"]
+    assert (tier["n_photos"], tier["skipped"], tier["errors"], tier["outcomes"]) == (1, 1, 0, {})
+    assert (tier["false_warning"]["n"], tier["false_warning"]["over_budget"]) == (0, 1)
+    assert agg["errors"] == []
+
+
+def test_a_run_states_the_budget_and_skips_only_as_fetched_units_over_it(monkeypatch, tmp_path):
+    # a-dev and r-dev are 160 x 160 = 25,600 px = 0.0256 MP. With the budget lowered to
+    # 0.02 MP both are over it as fetched; the 1400 px cap leaves 160 px unscaled, and a
+    # capped unit never meets the budget. As fetched: a-dev clean plus its 6 degradations
+    # (7 units) and r-dev clean (1): 8 corpus units, all 8 skipped, each as 2 rows (auto
+    # and auto-corners at 0 px): 16 rows. At phone-1400 nothing skips over the budget.
+    root, cache = _write_corpus(tmp_path)
+    monkeypatch.setattr(corpus, "FULL_BUDGET_MP", 0.02)
+    out = tmp_path / "out" / "r"
+    args = ["--corpus", str(root), "--cache", str(cache), "--out", str(out), "--radii", "0,4",
+            "--trials", "1", "--resolutions", "full,phone-1400", "--no-photoreal", "--workers", "1"]
+    assert run_eval.main(args, runner=_fake_git) == 0
+    payload = json.loads((out.parent / "r.json").read_text(encoding="utf-8"))
+    budget = payload["header"]["full_resolution_budget"]
+    assert budget.startswith("0.02 MP per as-fetched unit (corpus.FULL_BUDGET_MP")
+    assert "as fetched: 8 corpus units, 8 skipped (a-dev, r-dev)" in budget
+    assert "#166 comment 6145827537" in budget
+    rows = payload["rows"]
+    over = [r for r in rows if r.get("reason") == corpus.OVER_BUDGET_REASON]
+    assert len(over) == 16 and {r["resolution"] for r in over} == {"full"}
+    assert all(r["outcome"] == "skipped" for r in rows if r["resolution"] == "full")
+    capped = [r for r in rows if r["resolution"] == "phone-1400"]
+    assert not any(r.get("reason") == corpus.OVER_BUDGET_REASON for r in capped)
+    # At 1400 px: a-dev clean read by auto and by auto-corners at 0 and 4 px (3 rows), its
+    # 6 degradations by both readers (12), r-dev by auto (1) and skipped by auto-corners,
+    # which has no frame to confirm (1): 17 rows, 16 of them reads.
+    assert len(capped) == 17 and sum(r["outcome"] != "skipped" for r in capped) == 16
+    assert "- Full resolution budget: 0.02 MP per as-fetched unit" in (out.parent / "r.md").read_text(
+        encoding="utf-8")

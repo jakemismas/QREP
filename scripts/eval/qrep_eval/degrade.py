@@ -26,10 +26,19 @@ GLARE_STRENGTH = 0.85
 PATCH_CENTER = (0.6, 0.6)
 PATCH_SIDE = 0.25
 PATCH_GRAY = 128
+# Glare and the gradient work in float64 one band of rows at a time: over a whole
+# 117 MP scan their float copies passed 5 GB in one process, while a band of a
+# 10292 px wide scan holds about 63 MB per copy. The formula per pixel is unchanged.
+BAND_ROWS = 256
 
 
 def _to_uint8(values: np.ndarray) -> np.ndarray:
     return np.clip(np.rint(values), 0, 255).astype(np.uint8)
+
+
+def _bands(height: int):
+    for top in range(0, height, BAND_ROWS):
+        yield slice(top, min(top + BAND_ROWS, height))
 
 
 def grayscale(image: np.ndarray) -> np.ndarray:
@@ -42,7 +51,10 @@ def lighting_gradient(image: np.ndarray, low: float = GRADIENT_LOW) -> np.ndarra
     down linearly to low at the right edge."""
     width = image.shape[1]
     ramp = 1.0 - (1.0 - low) * np.arange(width) / max(width - 1, 1)
-    return _to_uint8(image.astype(np.float64) * ramp[None, :, None])
+    out = np.empty(image.shape, np.uint8)
+    for rows in _bands(image.shape[0]):
+        out[rows] = _to_uint8(image[rows].astype(np.float64) * ramp[None, :, None])
+    return out
 
 
 def low_res_jpeg(
@@ -72,10 +84,14 @@ def glare(image: np.ndarray, box: Box) -> np.ndarray:
     x0, y0, x1, y1 = box
     cx, cy = x0 + GLARE_CENTER[0] * (x1 - x0), y0 + GLARE_CENTER[1] * (y1 - y0)
     sigma = GLARE_SIGMA * min(x1 - x0, y1 - y0)
-    ys, xs = np.mgrid[0 : image.shape[0], 0 : image.shape[1]]
-    alpha = GLARE_STRENGTH * np.exp(-((xs - cx) ** 2 + (ys - cy) ** 2) / (2 * sigma * sigma))
-    alpha = alpha[..., None]
-    return _to_uint8(image.astype(np.float64) * (1 - alpha) + 255.0 * alpha)
+    dx2 = (np.arange(image.shape[1]) - cx) ** 2
+    out = np.empty(image.shape, np.uint8)
+    for rows in _bands(image.shape[0]):
+        dy2 = (np.arange(rows.start, rows.stop) - cy) ** 2
+        alpha = GLARE_STRENGTH * np.exp(-(dx2[None, :] + dy2[:, None]) / (2 * sigma * sigma))
+        alpha = alpha[..., None]
+        out[rows] = _to_uint8(image[rows].astype(np.float64) * (1 - alpha) + 255.0 * alpha)
+    return out
 
 
 def occlusion(image: np.ndarray, box: Box) -> np.ndarray:

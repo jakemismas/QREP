@@ -34,6 +34,14 @@ PHOTOREAL_CAPS = (1400, 2000)
 DEFAULT_SEED = "d4a"
 # What the header says when git cannot answer, as under Pyodide.
 GIT_UNAVAILABLE = "unknown (git unavailable)"
+# The measurement behind corpus.FULL_BUDGET_MP, as #166 comment 6145827537 records it.
+BUDGET_EVIDENCE = (
+    "measured 2026-10-13 on the dev split at 78e92e3, each step alone in a fresh process, as peak working "
+    "set / peak commit: the automatic read 0.50 / 1.20 GB at 8.9 MP, 1.18 / 1.88 GB at 15.4 MP and "
+    "1.00 / 1.70 GB at 38.9 MP; under a 5 GB per-process commit cap, the automatic read (its periodicity "
+    "search) and the glare degradation both failed at 117.5 MP. Glare and the lighting gradient now run "
+    "in row bands with the same output, and glare peaks at 0.89 / 1.61 GB at 117.5 MP; the read is "
+    "not the eval's to change (#166 comment 6145827537)")
 
 
 def _parse(argv):
@@ -188,6 +196,20 @@ def _photoreal_units(args, readers_) -> list[harness.Unit]:
     return units
 
 
+def _budget_line(units) -> str:
+    fetched = [u for u in units if u.group != "named" and u.cap is None]
+    over = [u for u in fetched if corpus.over_budget(u.canvas, u.cap)]
+    read = [u.canvas[0] * u.canvas[1] / 1e6 for u in fetched if not corpus.over_budget(u.canvas, u.cap)]
+    names = ", ".join(sorted({u.photo for u in over})) or "none"
+    largest = f"{max(read):.1f} MP" if read else "none"
+    return (f"{corpus.FULL_BUDGET_MP} MP per as-fetched unit (corpus.FULL_BUDGET_MP; #166 comment "
+            "6145839899): a unit read as fetched above it is one skipped row per reader where its "
+            "true-corner read would be, listed beside every rate and never counted as a read, refusal, "
+            "success or failure, and its photo's capped units run as usual; as fetched: "
+            f"{len(fetched)} corpus units, {len(over)} skipped ({names}); the largest read as fetched is "
+            f"{largest}. Why: {BUDGET_EVIDENCE}")
+
+
 def _run(units, workers):
     if workers > 1:
         with ProcessPoolExecutor(max_workers=workers) as pool:
@@ -268,6 +290,7 @@ def main(argv=None, *, runner=subprocess.run) -> int:
                        f"only the confirmed reader, with the same corners and fabric count; picker answer "
                        f"{simulate.PICKER_ANSWER!r} for every photo"),
         "resolutions": args.resolutions,
+        "full_resolution_budget": _budget_line(units),
         "degradations": "none" if args.no_degradations else "; ".join(
             f"{d.name} {d.params}" for d in degrade.DEGRADATIONS) + (
             ", applied at every requested resolution, at true corners, to museum tier A photos "
