@@ -14,9 +14,16 @@
  * The L0 upload is generated at test runtime by the native CLI (the same
  * seeded renderer the round-trip harness trusts); recovered dims 45x55 and
  * the 1246/1229 census are the fixture's hand-known geometry.
+ *
+ * C3b (issue #101; docs/sprint-5/REBASELINE.md): the crop screen is now the
+ * confirm screen, whose pins start at a neutral inset with nothing detected.
+ * uploadPhoto reaches the read by placing the four pins (corner-pin-0..3,
+ * data-x and data-y in source pixels) on the render's sidecar corners and
+ * entering the counts, 9 blocks x 5 squares across and 11 x 5 down, before
+ * Continue (crop-analyze). The assertions after the read are unchanged.
  */
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test, type Page } from "@playwright/test";
@@ -24,12 +31,15 @@ import { expect, test, type Page } from "@playwright/test";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const generatedDir = path.join(repoRoot, "tests", "fixtures", "_generated");
 const l0Path = path.join(generatedDir, "photo_e2e_l0.png");
+// save_render writes the sidecar beside the PNG; its "corners" are the
+// quilt's outer corners in image pixels, in pin order.
+const l0SidecarPath = path.join(generatedDir, "photo_e2e_l0.json");
 const outDir = path.join(repoRoot, "web", "test-results", "photo");
 const READY_TIMEOUT = 300_000;
 const REVERSE_TIMEOUT = 300_000;
 
 test.beforeAll(() => {
-  if (existsSync(l0Path)) return;
+  if (existsSync(l0Path) && existsSync(l0SidecarPath)) return;
   mkdirSync(generatedDir, { recursive: true });
   const venvPython = path.join(repoRoot, ".venv", "Scripts", "python.exe");
   const python = process.env.QREP_PYTHON ?? (existsSync(venvPython) ? venvPython : "python");
@@ -42,18 +52,88 @@ test.beforeAll(() => {
     path.join(repoRoot, "tests", "fixtures", "double_irish_chain.json"),
     l0Path,
   ]);
-  if (!existsSync(l0Path)) throw new Error("fixture render produced no file");
+  if (!existsSync(l0Path) || !existsSync(l0SidecarPath)) throw new Error("fixture render produced no file or sidecar");
 });
 
-async function uploadPhoto(page: Page): Promise<void> {
-  await page.goto("./");
+interface Point {
+  x: number;
+  y: number;
+}
+
+/** Drags a pin near the target, then nudges it with the arrow keys (Shift for 10 source px) onto it exactly. */
+async function placePin(page: Page, index: number, target: Point): Promise<void> {
+  const crop = page.getByTestId("crop-screen");
+  const width = Number(await crop.getAttribute("data-canvas-width"));
+  const height = Number(await crop.getAttribute("data-canvas-height"));
+  const pin = page.getByTestId(`corner-pin-${index}`);
+  const image = (await page.getByTestId("pin-image").boundingBox())!;
+  const box = (await pin.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(image.x + (target.x / width) * image.width, image.y + (target.y / height) * image.height, {
+    steps: 4,
+  });
+  await page.mouse.up();
+  await pin.focus();
+  for (let round = 0; round < 4; round++) {
+    const dx = target.x - Number(await pin.getAttribute("data-x"));
+    const dy = target.y - Number(await pin.getAttribute("data-y"));
+    if (dx === 0 && dy === 0) break;
+    for (const [delta, plus, minus] of [
+      [dx, "ArrowRight", "ArrowLeft"],
+      [dy, "ArrowDown", "ArrowUp"],
+    ] as const) {
+      const key = delta > 0 ? plus : minus;
+      for (let i = 0; i < Math.floor(Math.abs(delta) / 10); i++) await page.keyboard.press(`Shift+${key}`);
+      for (let i = 0; i < Math.abs(delta) % 10; i++) await page.keyboard.press(key);
+    }
+  }
+  await expect(pin).toHaveAttribute("data-x", String(target.x));
+  await expect(pin).toHaveAttribute("data-y", String(target.y));
+}
+
+interface UploadOptions {
+  /** Load the start screen first; off when the test has loaded it already and waited on something there. */
+  navigate?: boolean;
+  /** Place the pins and enter the counts; off presses Continue on the default pins and counts. */
+  pins?: boolean;
+}
+
+/**
+ * Upload the L0 render and press Continue on the confirm screen (C3b, issue
+ * #101). With pins (the default), first set the four pins on the render's
+ * sidecar corners and the counts to 9 blocks x 5 squares across (45) and
+ * 11 x 5 down (55), the render's grid.
+ */
+async function uploadPhoto(page: Page, { navigate = true, pins = true }: UploadOptions = {}): Promise<void> {
+  if (navigate) await page.goto("./");
   await page.getByTestId("start-photo").click();
   await expect(page.getByTestId("photo-dropzone")).toBeVisible();
   await page.getByTestId("photo-file-input").setInputFiles(l0Path);
-  // S2 traversal amendment (issue #68): the crop screen now sits between the
-  // dropzone and analysis; click through it with the pins untouched, which
-  // preserves the pre-S2 automatic-detection behavior bit-for-bit.
   await expect(page.getByTestId("crop-screen")).toBeVisible();
+  if (pins) {
+    // The pins map through the photo's own box, so it must have loaded first.
+    await expect
+      .poll(() => page.getByTestId("pin-image").evaluate((img: HTMLImageElement) => img.naturalWidth))
+      .toBeGreaterThan(0);
+    const sidecar = JSON.parse(readFileSync(l0SidecarPath, "utf8")) as { corners: [number, number][] };
+    for (const [index, [x, y]] of sidecar.corners.entries()) await placePin(page, index, { x, y });
+    for (const [axis, blocks] of [
+      ["across", 9],
+      ["down", 11],
+    ] as const) {
+      for (const [part, value] of [
+        ["blocks", blocks],
+        ["squares", 5],
+      ] as const) {
+        const input = page.getByTestId(`counts-${axis}-${part}`);
+        await input.fill(String(value));
+        await input.blur();
+        // A refused count shows its old value again once the field is left.
+        await expect(input).toHaveValue(String(value));
+      }
+    }
+  }
   await page.getByTestId("crop-analyze").click();
 }
 
@@ -165,11 +245,8 @@ test("idle prefetch: post-prefetch reverse shows no loading bar (PARITY 17)", as
   await expect(page.locator("body")).toHaveAttribute("data-vision-state", "ready", {
     timeout: READY_TIMEOUT,
   });
-  await page.getByTestId("start-photo").click();
-  await page.getByTestId("photo-file-input").setInputFiles(l0Path);
-  // S2 traversal amendment (issue #68): click through the crop screen.
-  await expect(page.getByTestId("crop-screen")).toBeVisible();
-  await page.getByTestId("crop-analyze").click();
+  // C3b: through the confirm screen with the pins and counts set.
+  await uploadPhoto(page, { navigate: false });
   // The vision stack is already here: straight to stages, no loading bar.
   await expect(page.getByTestId("vision-loading")).toHaveCount(0);
   await expect(page.getByTestId("photo-results")).toBeVisible({ timeout: REVERSE_TIMEOUT });
@@ -215,12 +292,8 @@ test("vision loading copy is loading, sized, and cached on repeat", async ({ pag
     await gate;
     await route.continue();
   });
-  await page.goto("./");
-  await page.getByTestId("start-photo").click();
-  await page.getByTestId("photo-file-input").setInputFiles(l0Path);
-  // S2 traversal amendment (issue #68): click through the crop screen.
-  await expect(page.getByTestId("crop-screen")).toBeVisible();
-  await page.getByTestId("crop-analyze").click();
+  // C3b: through the confirm screen with the pins and counts set.
+  await uploadPhoto(page);
   const progress = page.getByTestId("photo-progress");
   await expect(progress).toBeVisible();
   const loading = page.getByTestId("vision-loading");
@@ -251,7 +324,8 @@ test("corner adjust re-runs reverse with user corners", async ({ page }) => {
   await uploadPhoto(page);
   await expect(page.getByTestId("photo-results")).toBeVisible({ timeout: REVERSE_TIMEOUT });
   // S2 traversal amendment (issue #68): "Adjust the crop" returns to the
-  // crop screen (the corners screen is retired); the pins and the re-run
+  // crop screen (the corners screen is retired), the confirm screen since
+  // C3b, holding the pins and counts the read used; the pins and the re-run
   // assertions below are unchanged.
   await page.getByTestId("adjust-corners").click();
   const editor = page.getByTestId("crop-screen");
@@ -287,7 +361,9 @@ test("round-trip demo panel renders, reverses, and compares", async ({ page }) =
 });
 
 test("the photo bitmap is session-only (PARITY 7)", async ({ page }) => {
-  await uploadPhoto(page);
+  // Not on C3b's record rows, so it keeps its traversal: straight through
+  // the confirm screen on the default pins and counts.
+  await uploadPhoto(page, { pins: false });
   await expect(page.getByTestId("photo-results")).toBeVisible({ timeout: REVERSE_TIMEOUT });
   await page.getByTestId("open-in-editor").click();
   await expect(page.getByTestId("editor")).toBeVisible();

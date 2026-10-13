@@ -9,6 +9,12 @@
  * fidelity evidence on #74), which the frozen trust gate excludes, so
  * "Start in the editor" must open the PLAIN blank grid (Background +
  * Accent 1), not recovered fabrics.
+ *
+ * C3b (issue #101; REBASELINE.md, verdicts.spec.ts "Before then"): the
+ * upload lands on the confirm screen, where nothing is detected, and
+ * Continue reads it on the default pins (the 15% neutral inset) and the
+ * default counts (one block of one square each way). The read still reaches
+ * the failure panel until C3c retires this test.
  */
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -25,8 +31,8 @@ test("no_grid: failure panel, collapsed disclosure, banner on expand, plain blan
   await page.getByTestId("start-photo").click();
   await page.getByTestId("photo-file-input").setInputFiles(solidFixture);
 
-  // crop screen with default pins (a solid rectangle detects no quad; the
-  // cold-start contract keeps the screen usable), analyze straight through
+  // the confirm screen with its default pins and counts (no quad is
+  // detected for any photo since C3b), Continue straight through
   await expect(page.getByTestId("crop-screen")).toBeVisible();
   await page.getByTestId("crop-analyze").click();
   const results = page.getByTestId("photo-results");

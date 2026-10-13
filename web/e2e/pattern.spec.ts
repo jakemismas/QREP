@@ -13,9 +13,11 @@
  * photo.spec.ts, under their own names: save_render writes the PNG and a
  * sidecar JSON whose "corners" are the quilt's outer corners in image
  * pixels (top left, top right, bottom right, bottom left), the order of
- * corner-pin-0 to corner-pin-3. Level 0 is the clean render; level 1 adds
- * fabric texture (qrep/render/renderer.py), so its read flags squares. Each
- * pinned test pins a render to its own sidecar.
+ * corner-pin-0 to corner-pin-3 on the confirm screen (C3b, issue #101),
+ * whose data-x and data-y are image pixels too. Level 0 is the clean render;
+ * level 1 adds fabric texture (qrep/render/renderer.py), so its read flags
+ * squares. Each pinned test pins a render exactly to its own sidecar and
+ * enters its grid, 9 blocks x 5 squares across and 11 x 5 down.
  *
  * No screenshot or snapshot assertions; layout checks read element boxes.
  */
@@ -66,24 +68,9 @@ test.beforeAll(() => {
   if (!existsSync(texturedSidecarPath)) throw new Error("level 1 render produced no sidecar");
 });
 
-/** Width and height from the PNG's IHDR chunk (bytes 16 to 23, big endian). */
-function pngSize(file: string): { width: number; height: number } {
-  const bytes = readFileSync(file);
-  return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
-}
-
 /** A render's own sidecar: save_render writes it beside the PNG, same stem. */
 function sidecarOf(photo: string): string {
   return photo.replace(/\.png$/, ".json");
-}
-
-/** The render's sidecar quilt corners as fractions of the photo, in pin order. */
-function cornerFractions(photo: string): [number, number][] {
-  const { width, height } = pngSize(photo);
-  const sidecar = JSON.parse(readFileSync(sidecarOf(photo), "utf8")) as {
-    corners: [number, number][];
-  };
-  return sidecar.corners.map(([x, y]) => [x / width, y / height]);
 }
 
 async function openSample(page: Page): Promise<void> {
@@ -109,49 +96,75 @@ async function openFixtureFile(page: Page): Promise<void> {
 }
 
 /** Upload a render and reach the results screen. With pins, set the four pins
- * on that render's own sidecar corners first; without, analyze where the
- * corner search put them, as photo.spec.ts does. */
+ * on that render's own sidecar corners and the counts to its grid, 9 blocks
+ * x 5 squares across and 11 x 5 down, first; without, press Continue on the
+ * confirm screen's default pins and counts, as photo.spec.ts's session-only
+ * test does (C3b, issue #101: nothing is detected). */
 async function photoToResults(page: Page, { photo = photoPath, pins = true } = {}): Promise<void> {
   await page.goto("./");
   await page.getByTestId("start-photo").click();
   await expect(page.getByTestId("photo-dropzone")).toBeVisible();
   await page.getByTestId("photo-file-input").setInputFiles(photo);
-  const crop = page.getByTestId("crop-screen");
-  await expect(crop).toBeVisible();
-  // The box settles once the photo has loaded and the corner search has
-  // finished (its status line sits above the box); a pin the search moves
-  // after a drag would also undo that drag.
+  await expect(page.getByTestId("crop-screen")).toBeVisible();
+  // The pins map through the photo's own box, so it must have loaded before a drag.
   await expect
-    .poll(() => crop.locator("img.pf-corner-img").evaluate((img: HTMLImageElement) => img.naturalWidth))
+    .poll(() => page.getByTestId("pin-image").evaluate((img: HTMLImageElement) => img.naturalWidth))
     .toBeGreaterThan(0);
-  await expect(page.getByTestId("crop-detecting")).toHaveCount(0, { timeout: REVERSE_TIMEOUT });
-  if (pins) await pinCorners(page, photo);
+  if (pins) {
+    await pinCorners(page, photo);
+    for (const [axis, blocks] of [
+      ["across", 9],
+      ["down", 11],
+    ] as const) {
+      for (const [part, value] of [
+        ["blocks", blocks],
+        ["squares", 5],
+      ] as const) {
+        const input = page.getByTestId(`counts-${axis}-${part}`);
+        await input.fill(String(value));
+        await input.blur();
+        // A refused count shows its old value again once the field is left.
+        await expect(input).toHaveValue(String(value));
+      }
+    }
+  }
   await page.getByTestId("crop-analyze").click();
   await expect(page.getByTestId("photo-results")).toBeVisible({ timeout: REVERSE_TIMEOUT });
 }
 
-/** Drag the four pins onto the render's own sidecar corners. */
+/** Set the four pins exactly on the render's own sidecar corners: drag each
+ * near its corner through the photo's box (PinLayer maps a pointer through
+ * the img element's own rect), then nudge it with the arrow keys, Shift for
+ * 10 image px, until its data-x and data-y are the corner. */
 async function pinCorners(page: Page, photo: string): Promise<void> {
   const crop = page.getByTestId("crop-screen");
-  // PinOverlay places each pin at left/top percent of .pf-corner-box, and a
-  // drag stores the pointer's fraction of that same box.
-  const targets = cornerFractions(photo);
-  for (const [index, [fx, fy]] of targets.entries()) {
-    const box = (await crop.locator(".pf-corner-box").boundingBox())!;
+  const width = Number(await crop.getAttribute("data-canvas-width"));
+  const height = Number(await crop.getAttribute("data-canvas-height"));
+  const sidecar = JSON.parse(readFileSync(sidecarOf(photo), "utf8")) as { corners: [number, number][] };
+  for (const [index, [x, y]] of sidecar.corners.entries()) {
     const pin = page.getByTestId(`corner-pin-${index}`);
-    const pinBox = (await pin.boundingBox())!;
-    await page.mouse.move(pinBox.x + pinBox.width / 2, pinBox.y + pinBox.height / 2);
+    const image = (await page.getByTestId("pin-image").boundingBox())!;
+    const box = (await pin.boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     await page.mouse.down();
-    await page.mouse.move(box.x + fx * box.width, box.y + fy * box.height, { steps: 4 });
+    await page.mouse.move(image.x + (x / width) * image.width, image.y + (y / height) * image.height, { steps: 4 });
     await page.mouse.up();
-  }
-  for (const [index, [fx, fy]] of targets.entries()) {
-    const style = (await page.getByTestId(`corner-pin-${index}`).getAttribute("style")) ?? "";
-    const left = Number(/left:\s*([\d.]+)%/.exec(style)?.[1]);
-    const top = Number(/top:\s*([\d.]+)%/.exec(style)?.[1]);
-    // A drag lands within a pixel of its target; the box is at least 300 px.
-    expect(Math.abs(left / 100 - fx), `pin ${index} left`).toBeLessThan(0.005);
-    expect(Math.abs(top / 100 - fy), `pin ${index} top`).toBeLessThan(0.005);
+    await pin.focus();
+    for (let round = 0; round < 4; round++) {
+      const dx = x - Number(await pin.getAttribute("data-x"));
+      const dy = y - Number(await pin.getAttribute("data-y"));
+      if (dx === 0 && dy === 0) break;
+      for (const [delta, plus, minus] of [
+        [dx, "ArrowRight", "ArrowLeft"],
+        [dy, "ArrowDown", "ArrowUp"],
+      ] as const) {
+        const key = delta > 0 ? plus : minus;
+        for (let i = 0; i < Math.floor(Math.abs(delta) / 10); i++) await page.keyboard.press(`Shift+${key}`);
+        for (let i = 0; i < Math.abs(delta) % 10; i++) await page.keyboard.press(key);
+      }
+    }
+    await expect(pin, `pin ${index} x`).toHaveAttribute("data-x", String(x));
+    await expect(pin, `pin ${index} y`).toHaveAttribute("data-y", String(y));
   }
 }
 
