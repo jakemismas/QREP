@@ -1253,7 +1253,8 @@ def test_a_read_result_carries_details_on_a_read_and_only_there(l0_render):
 
 def test_read_confirmed_refuses_more_fabrics_than_the_cap(tmp_path):
     # Source: plan B2b criterion 2 at the bridge: a quilt whose silhouette
-    #   peaks at 12 fabrics is refused, never merged silently.
+    #   at 12 fabrics comes within the margin of the best is refused, never
+    #   merged silently.
     # Inputs: the 13-color construction of
     #   tests/test_read_fabrics.py::test_more_fabrics_than_the_cap_refuse_as_too_many_fabrics,
     #   an 8 x 13 grid at (r + c) mod 13, each color 8 times, with its lattice
@@ -1267,7 +1268,8 @@ def test_read_confirmed_refuses_more_fabrics_than_the_cap(tmp_path):
     #   values hold: 0.991815 at k = 12 (only the close pair shares a fabric)
     #   and at most 0.918 at k = 11, lower still below. Rounding to 8-bit
     #   codes moves each color by half a code step, a fraction of a Lab unit,
-    #   small against the gaps of 2 and 20, so the peak stays at 12, the cap.
+    #   small against the gaps of 2 and 20, so the best stays at 12, the cap,
+    #   within any margin of itself.
     # Expected: outcome refused, reason too_many_fabrics, no model or details.
     import cv2
     import numpy as np

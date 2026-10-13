@@ -39,8 +39,8 @@ TYPE_AGREEMENT = 0.75
 # A block of a type of one copy joins the type its block period predicts
 # when it agrees with that type on at least this share of squares.
 ATTACH_AGREEMENT = 0.5
-# The read fits the light surface only from this many samples: three per
-# coefficient of the six-term quadratic in position.
+# The read fits the light only from this many samples, at least the
+# k + 5 coefficients of its fit at any fabric count (17 at k = 12).
 SHADING_MIN_SQUARES = 18
 # Rounds of shading fit and reassignment for one fabric count.
 SHADING_ROUNDS = 10
@@ -50,7 +50,8 @@ LIGHT_CONFIDENCE_POWER = 2
 # The most the fitted light may vary across the field, brightest over dimmest
 # luminance; past it the read keeps no shading correction.
 LIGHT_MAX_RATIO = 6.0
-# Lloyd iterations per k-means run, and deterministic seedings per count.
+# Lloyd iterations per k-means run, and golden-ratio seedings per count,
+# which one farthest-first seeding follows.
 KMEANS_ITERATIONS = 100
 KMEANS_SEEDINGS = 4
 # The silhouette compares every pair of samples, so it runs on at most this
@@ -95,7 +96,10 @@ KNOBS: dict[str, Knob] = {
         COUNT_CAP_MARGIN,
         "synthetic grids only (#137 comment 6147407435): the best silhouette minus the one at "
         "12 ran 0 to 0.0372 on 18 grids of 16 to 30 fabrics, 0.0504 to 0.1303 on 8 of 10 and "
-        "11, and 0.3688 or more on 18 of 3; 0.044 sits between. D5 measures how often it "
+        "11, and 0.3688 or more on 18 of 3; 0.044 sits between. Out of sample (PR #251 round "
+        "2) it both refuses and merges: 11 fabrics at least 15 apart refuse on 2, 3 and 2 of "
+        "4 grids at noise 2.0, 2.5 and 3.0, and read 10 at noise 1.5 seed 7 and noise 3.0 "
+        "seed 3; the count tests reuse the grids it was set on. D5 measures how often it "
         "refuses real quilts of 12 or fewer fabrics (#248)",
     ),
     "VOTE_THRESHOLD": Knob(
@@ -121,7 +125,10 @@ KNOBS: dict[str, Knob] = {
         "half sits between them",
     ),
     "SHADING_MIN_SQUARES": Knob(
-        SHADING_MIN_SQUARES, "not measured: three squares per coefficient of a six-term quadratic"
+        SHADING_MIN_SQUARES,
+        "not measured: set as three squares per term of the six-term quadratic each fabric "
+        "once had; the shared light fits a level per fabric and five position terms, k + 5 "
+        "coefficients, at most 17, so 18 samples always determine it",
     ),
     "SHADING_ROUNDS": Knob(SHADING_ROUNDS, "not measured: a compute bound"),
     "LIGHT_CONFIDENCE_POWER": Knob(
@@ -141,7 +148,12 @@ KNOBS: dict[str, Knob] = {
         "light of about 2.6 stops, the correction still drops whole",
     ),
     "KMEANS_ITERATIONS": Knob(KMEANS_ITERATIONS, "not measured: a compute bound"),
-    "KMEANS_SEEDINGS": Knob(KMEANS_SEEDINGS, "not measured: a compute bound"),
+    "KMEANS_SEEDINGS": Knob(
+        KMEANS_SEEDINGS,
+        "a compute bound; the farthest-first seeding after them seeds a small far fabric "
+        "they miss: a 9-square accent at noise 3 on 55 x 45 was lost on 14 of 30 grids "
+        "with these alone and on 0 of 30 with it (PR #251 round 2)",
+    ),
     "SILHOUETTE_SAMPLES": Knob(
         SILHOUETTE_SAMPLES, "a memory bound: 2000 x 2000 float64 distances take 32 MB"
     ),

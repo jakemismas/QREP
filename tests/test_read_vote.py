@@ -108,7 +108,7 @@ def test_period_of_one_never_votes_even_with_many_copies():
     # With type_agreement 0 every 1 x 1 block joins the one type: its
     # agreement with any pattern (1 or 0) is at least 0.
     merged = _vote(labels, confidence, 1, 1, type_agreement=0.0)
-    # Source: ticket step 6, "never vote with a period of 1".
+    # Source: criterion 5 of #137, "never vote with a period of 1".
     # Formula: a type votes only when block_rows x block_cols > 1.
     # Inputs: one type of 9 copies (at least min_copies 3), every square at
     #   confidence 0.5 (below the threshold 0.8), block 1 x 1.
@@ -129,7 +129,8 @@ def test_period_of_one_never_votes_even_with_many_copies():
     assert merged.repeat == (3, 3)
 
     split = _vote(labels, confidence, 1, 1)
-    # Source: ticket steps 4 and 5; vision-22 for the repeat.
+    # Source: criteria 5 (types) and 6 (the repeat) of #137; vision-22 for
+    #   the repeat.
     # Formula: a 1 x 1 block agrees with a pattern 1.0 when equal, else 0.0,
     #   so at type_agreement 0.75 each label is its own type, numbered by
     #   first appearance; a 1 x 1 block confirms no repeat, so the repeat is
@@ -151,7 +152,8 @@ def test_fewer_copies_than_min_copies_do_not_vote():
     confidence = [[1.0, 1.0, 1.0, 1.0], [1.0, 1.0, 1.0, 0.1]]
 
     held = _vote(labels, confidence, 2, 2)
-    # Source: ticket step 6, VOTE_MIN_COPIES.
+    # Source: criterion 5 of #137; knobs.VOTE_MIN_COPIES (REBASELINE.md
+    #   literal B5).
     # Formula: a type votes only with at least min_copies blocks.
     # Inputs: blocks [[0,0],[1,1]] and [[0,0],[1,0]], the second's (1, 1) at
     #   confidence 0.1.
@@ -170,7 +172,7 @@ def test_fewer_copies_than_min_copies_do_not_vote():
     assert held.repeat == (2, 2)
 
     voted = _vote(labels, confidence, 2, 2, min_copies=2)
-    # Source: ticket step 6, the same type at min_copies 2.
+    # Source: criterion 5 of #137, the same type at min_copies 2.
     # Formula: share = majority weight / total weight at the position.
     # Inputs: position (1, 1): label 1 at 1.0, label 0 at 0.1.
     # Arithmetic: majority 1, share 1.0 / 1.1 = 10/11 = 0.90909; the 0 at
@@ -186,7 +188,8 @@ def test_fewer_copies_than_min_copies_do_not_vote():
 def test_low_confidence_misread_takes_the_majority():
     labels, confidence = _three_copies_with_misread(read=0, conf=0.3)
     result = _vote(labels, confidence, 3, 3)
-    # Source: ticket steps 4 to 6 and 8.
+    # Source: criterion 5 of #137 (a square takes the majority only below
+    #   the threshold); the header's typing, share and agreement rules.
     # Formula: typing agreement = matching weight / block weight; share =
     #   majority weight / total weight; a differing square below the
     #   threshold takes the majority.
@@ -216,8 +219,8 @@ def test_low_confidence_misread_takes_the_majority():
 def test_confident_disagreement_keeps_its_read_as_a_break(conf):
     labels, confidence = _three_copies_with_misread(read=0, conf=conf)
     result = _vote(labels, confidence, 3, 3)
-    # Source: ticket step 6, "otherwise it keeps its read and is listed as a
-    #   Break".
+    # Source: criterion 5 of #137, "every confident square that disagrees
+    #   keeps its read and is listed in repeat_breaks".
     # Formula: a differing square at or above the threshold is a Break with
     #   its read, the majority and its own confidence.
     # Inputs: as the misread test, but (1, 7) at 0.8 (the threshold itself)
@@ -244,8 +247,8 @@ def test_alternating_types_vote_within_each_type():
     confidence = np.ones((9, 6))
     confidence[3, 1] = 0.3
     result = _vote(labels, confidence, 3, 3)
-    # Source: ticket steps 4 to 7, "alternating layouts vote within each
-    #   type".
+    # Source: criteria 5 and 6 of #137, "so alternating layouts ... vote
+    #   within each type".
     # Formula: as above; types by agreement >= 0.75, numbered in raster
     #   order.
     # Inputs: a checkerboard of A (an X) and B (a plus), 3 blocks down by 2
@@ -311,7 +314,7 @@ def _fixture_labels() -> np.ndarray:
 def test_double_irish_chain_fixture_votes_without_change():
     labels = _fixture_labels()
     result = vote(labels, np.ones(labels.shape), 5, 5)
-    # Source: ticket test 5 and the plan's S7-5 replacement criterion, with
+    # Source: criterion 7 of #137 (the S7-5a to S7-5c replacements), with
     #   the default knobs.
     # Formula: as above.
     # Inputs: the fixture, 55 x 45 squares in 5 x 5 blocks (11 down by 9
@@ -582,7 +585,8 @@ def test_double_irish_chain_misread_takes_its_own_types_majority():
     confidence = np.ones(labels.shape)
     confidence[1, 6] = 0.3
     result = _vote(labels, confidence, 5, 5)
-    # Source: ticket test 5, a misread planted in a type-B copy.
+    # Source: criteria 5 and 7 of #137, a misread planted in a type-B copy
+    #   of the fixture.
     # Formula: as above.
     # Inputs: field (1, 6) is block (0, 1), a B copy, at in-block (1, 1),
     #   where B has c (1) and A has b (0); it reads b at 0.3.
@@ -640,8 +644,10 @@ def test_double_irish_chain_misread_takes_its_own_types_majority():
     ids=["one-type", "all-distinct", "checkerboard", "row-period", "one-by-one"],
 )
 def test_repeat_comes_from_the_type_layout(labels, block, types, repeat):
-    # Source: ticket step 7.
-    # Formula: py is the smallest p with T[i] == T[i - p] for every i >= p,
+    # Source: criterion 6 of #137, the repeat only from the confirmed block
+    #   period.
+    # Formula: py is the smallest p, at most blocks down // 2 (two whole
+    #   copies), with T[i] == T[i - p] for every i >= p, else blocks down;
     #   px likewise on columns; repeat = (py x block_rows, px x block_cols).
     # Inputs, Arithmetic: in each case's comment above; confidence 1.0.
     # Expected: the listed types and repeat.
@@ -659,7 +665,7 @@ def test_agreement_counts_only_types_with_two_or_more_copies():
     labels[0, 6], confidence[0, 6] = 1, 0.4
     labels[2, 8], confidence[2, 8] = 1, 0.9
     result = _vote(labels, confidence, 3, 3)
-    # Source: ticket steps 6 and 8.
+    # Source: the header's agreement rule (Vote.agreement).
     # Formula: agreement = squares equal to their type majority / squares,
     #   over the types with at least two copies only.
     # Inputs: blocks A, A with (2, 0) read 1 at 0.2, A with (0, 0) read 1 at
@@ -689,7 +695,8 @@ def test_all_zero_weights_fall_back_to_counts():
     labels = [[5, 1, 5, 1, 5, 0, 5, 1]]
     confidence = [[1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0]]
     result = _vote(labels, confidence, 1, 2)
-    # Source: ticket steps 2, 3 and 6, the zero-weight rules.
+    # Source: the header's majority, share and agreement rules at total
+    #   weight 0.
     # Formula: with all weights 0, counts pick the majority and its share,
     #   and a block of weight 0 agrees by its plain share of equal squares.
     # Inputs: 1 x 2 blocks [5, 1], [5, 1], [5, 0], [5, 1]; the second square
@@ -712,7 +719,8 @@ def test_majority_ties_go_to_the_larger_count_then_the_lower_label():
         1,
         4,
     )
-    # Source: ticket step 2, ties go to the larger count, then the lower label.
+    # Source: the header's majority rule: ties go to the larger count, then
+    #   the lower label.
     # Formula: as above.
     # Inputs: four 1 x 4 blocks [9, 9, 9, x] with x = 4, 6, 4, 6 at 0.5.
     # Arithmetic: each joins at 1.0 or 3.0 / 3.5 = 0.857. Position 3: label 4
@@ -726,7 +734,7 @@ def test_majority_ties_go_to_the_larger_count_then_the_lower_label():
     count = _vote(
         [[9, 9, 9, 3, 9, 9, 9, 3, 9, 9, 9, 2]], [[1, 1, 1, 0.4, 1, 1, 1, 0.4, 1, 1, 1, 0.8]], 1, 4
     )
-    # Source: ticket step 2.
+    # Source: the header's majority rule.
     # Formula: as above.
     # Inputs: three 1 x 4 blocks [9, 9, 9, x] with x = 3 at 0.4, 3 at 0.4,
     #   2 at 0.8.
@@ -743,7 +751,7 @@ def test_majority_ties_go_to_the_larger_count_then_the_lower_label():
 def test_type_ties_go_to_the_lower_type_id():
     labels = np.array([[1, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0]])
     result = _vote(labels, np.ones((1, 12)), 1, 4)
-    # Source: ticket steps 4 and 5, "ties: the lower type id".
+    # Source: the typing rule (vote._best): ties go to the lower type id.
     # Formula: agreement = equal squares / 4 (all weights 1.0).
     # Inputs: 1 x 4 blocks b0 = 1100, b1 = 0000, b2 = 1000.
     # Arithmetic: b0 starts t0; b1 vs t0 2/4 starts t1; b2 scores 3/4 against
@@ -769,7 +777,8 @@ def test_refinement_pass_reassigns_and_renumbers_types():
     ]
     labels = np.array(blocks).reshape(1, 48)
     result = _vote(labels, np.ones((1, 48)), 1, 8)
-    # Source: ticket steps 4 and 5.
+    # Source: the typing rule (vote._type_blocks): a raster pass, then one
+    #   refinement.
     # Formula: agreement = equal squares / 8 (all weights 1.0); join the best
     #   type at >= 0.75 (ties to the lower id), else a new type.
     # Inputs: six 1 x 8 blocks b0 to b5 as listed.

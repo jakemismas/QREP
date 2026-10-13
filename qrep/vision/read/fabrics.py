@@ -142,7 +142,10 @@ def _draw(mass: np.ndarray, u: float) -> int:
 
 def _seed(lab: np.ndarray, weights: np.ndarray, k: int, seeding: int, l_weight: float):
     """k-means++ seeding number seeding, its draws from the golden-ratio
-    sequence that starts at frac((seeding + 1) x 0.618...)."""
+    sequence that starts at frac((seeding + 1) x 0.618...). Seeding
+    KMEANS_SEEDINGS, the last, draws only its first center and then takes
+    the sample of the largest mass each time (farthest first)."""
+    farthest = seeding == KMEANS_SEEDINGS
     u = (seeding + 1) * _GOLDEN % 1.0
     chosen = [_draw(weights, u)]
     nearest = _squared(lab, lab[chosen], l_weight)[:, 0]
@@ -154,7 +157,7 @@ def _seed(lab: np.ndarray, weights: np.ndarray, k: int, seeding: int, l_weight: 
             chosen += [chosen[-1]] * (k - len(chosen))
             break
         u = (u + _GOLDEN) % 1.0
-        chosen.append(_draw(mass, u))
+        chosen.append(int(np.argmax(mass)) if farthest else _draw(mass, u))
         nearest = np.minimum(nearest, _squared(lab, lab[chosen[-1:]], l_weight)[:, 0])
     return lab[chosen].copy()
 
@@ -178,9 +181,14 @@ def _kmeans(lab: np.ndarray, weights: np.ndarray, k: int, l_weight: float):
     (ties to the earlier seeding). argmin breaks distance ties to the lower
     index, which keeps a repeated center empty. Centers stay in plain Lab,
     since a weighted mean commutes with the L scaling, so an L weight of 0
-    still keeps each center's lightness."""
+    still keeps each center's lightness.
+
+    The draws can all miss a small fabric far from the rest: a 9-square
+    accent holds a small share of the mass, and the read then splits the
+    background instead. The farthest-first seeding always seeds it, and the
+    inertia decides which read stays."""
     best = None
-    for seeding in range(KMEANS_SEEDINGS):
+    for seeding in range(KMEANS_SEEDINGS + 1):
         centers = _seed(lab, weights, k, seeding, l_weight)
         labels = np.argmin(_squared(lab, centers, l_weight), axis=1)
         for _ in range(KMEANS_ITERATIONS):

@@ -237,12 +237,13 @@ def test_a_requested_count_from_2_to_12_is_kept(k):
 
 
 def test_more_fabrics_than_the_cap_refuse_as_too_many_fabrics():
-    # Source: plan B2b criterion 2 (the silhouette still rises at k = 12).
+    # Source: criterion 2 of #137 (never merge fabrics silently); the
+    #   margin rule in fabrics.suggest.
     # Inputs: 13 colors at L* 50 (the L weight cancels): 12 on a lattice,
     #   a* in {-60, -20, 20, 60} by b* in {-40, 0, 40}, 40 apart, and a 13th
     #   at (64, 40), 4 from lattice color (60, 40). An 8 x 13 grid at
-    #   (r + c) mod 13 holds each color 8 times; any two colors together
-    #   hold 16 members, under 18, so their fabric's surface is constant.
+    #   (r + c) mod 13 holds each color 8 times. Every square is exact and
+    #   the light flat, so the shared light fits at 1 and moves no distance.
     # Arithmetic at k = 12: merging the close pair costs inertia
     #   2 x 8 x 2^2 = 64, any other merge at least 2 x 8 x 20^2 = 6400, so
     #   the pair shares a fabric and each lattice color has its own. Lone
@@ -255,8 +256,9 @@ def test_more_fabrics_than_the_cap_refuse_as_too_many_fabrics():
     #   15 = 21.33 and b <= 40.1 (a perpendicular neighbor), so s <= 0.468,
     #   and the mean is at most (9 x 8 + 16 x 1 + 16 x 0.468) / 104 = 0.918.
     #   Fewer fabrics merge more far colors and score lower still.
-    # Expected: the silhouette peaks at 12, so the read refuses with
-    #   too_many_fabrics instead of merging two fabrics silently.
+    # Expected: the best silhouette is the one at 12, within any margin of
+    #   itself, so the read refuses with too_many_fabrics instead of merging
+    #   two fabrics silently.
     lattice = [(50.0, a, b) for b in (-40, 0, 40) for a in (-60, -20, 20, 60)]
     colors = np.array(lattice + [(50.0, 64.0, 40.0)])
     rows, cols = 8, 13
@@ -604,6 +606,37 @@ def test_a_fabric_away_from_the_center_shows_its_own_color():
     assert result.centers[0] == pytest.approx(colors[0], abs=0.5)
 
 
+def test_a_small_far_fabric_is_seeded_and_kept():
+    # Source: PR #251 round 2: four golden-ratio seedings all missed a
+    #   9-square accent, and the read shipped two background colors.
+    # Inputs: a 55 x 45 grid at (85, 0, 10) with a 3 x 3 accent at rows 40
+    #   to 42, columns 5 to 7, at (35, 20, -30), flat light, Gaussian noise
+    #   of sd 3 on every channel (PCG64, seed 0); k = 2.
+    # Formula: d^2 = (0.5 dL)^2 + da^2 + db^2.
+    # Arithmetic: the accent sits (0.5 x 50)^2 + 20^2 + 40^2 = 625 + 400 +
+    #   1600 = 2625 from the background in squared distance, sqrt 51.235,
+    #   against noise of 1.5^2 + 3^2 + 3^2 = 20.25 per square, so the
+    #   farthest-first seeding takes an accent square as its second center.
+    #   The read with the accent costs the noise alone. A read that splits
+    #   the background in two instead removes at most the 2 / pi share of
+    #   one sd-3 channel's variance, 2466 x 9 x 2 / pi = 14130, and moves
+    #   each half's center 3 sqrt(2 / pi) = 2.39 from the background's, so
+    #   the accent's 9 squares stay at least (51.235 - 2.39)^2 = 2386 away,
+    #   9 x 2386 = 21471 > 14130: the read with the accent has the lower
+    #   inertia and is kept. The accent's mean of 9 squares has noise sd
+    #   3 / 3 = 1 per channel.
+    # Expected: every square right (the accent darkest, fabric 0) and its
+    #   center within 5 (5 sd) of (35, 20, -30).
+    rows, cols = 55, 45
+    truth = np.ones((rows, cols), dtype=int)
+    truth[40:43, 5:8] = 0
+    colors = np.array([(35.0, 20.0, -30.0), (85.0, 0.0, 10.0)])
+    lab = colors[truth.ravel()] + np.random.default_rng(0).normal(0.0, 3.0, (rows * cols, 3))
+    result = read_fabrics(squares_of(lab.reshape(rows, cols, 3)), 2)
+    assert np.array_equal(result.labels, truth)
+    assert result.centers[0] == pytest.approx(colors[0], abs=5.0)
+
+
 def test_strips_join_at_their_area_and_their_center():
     # Source: the ticket's sample rule for band strips.
     # Inputs: counts 4 x 3 and bands 0.5 then 1.5 squares (as in
@@ -868,7 +901,9 @@ def test_a_scrappy_quilt_is_refused(fabrics, seed):
     #   cap of 12 by construction. These are the four measured grids whose
     #   silhouette peaked under 12 (at 11, 11, 10 and 11), which a refusal
     #   only at a peak of 12 merged; the last is the measurement's closest
-    #   scrappy grid to the margin.
+    #   scrappy grid to the margin. The margin was set on these grids, so
+    #   this test cannot fail for its value; knobs.COUNT_CAP_MARGIN records
+    #   how it does out of sample.
     # Expected: too_many_fabrics, since the quilt holds more than 12.
     lab, positions = counted_grid(fabrics, seed, 1.5)
     result = fabrics_module.suggest(lab, np.ones(len(lab)), positions)
@@ -883,7 +918,9 @@ def test_a_quilt_of_11_fabrics_keeps_its_count(seed):
     # Inputs: counted_grid(11, seed, noise 1.5, spaced), 11 fabrics at least
     #   15 apart by construction; the measurement's closest grids to the
     #   margin from this side, since splitting one of 11 fabrics costs the
-    #   silhouette least.
+    #   silhouette least. The margin was set on these grids too; out of
+    #   sample, 11-fabric grids refuse at noise 2.0 and up and some read 10
+    #   (knobs.COUNT_CAP_MARGIN, #248).
     # Expected: no refusal, and the count read is the 11 the grid holds.
     lab, positions = counted_grid(11, seed, 1.5, spaced=True)
     result = fabrics_module.suggest(lab, np.ones(len(lab)), positions)
@@ -895,8 +932,9 @@ def test_a_quilt_of_11_fabrics_keeps_its_count(seed):
 def test_a_noisy_three_fabric_quilt_is_not_refused(seed):
     # Source: criterion 2 of #137: a quilt within the cap never refuses.
     # Inputs: counted_grid(3, seed, noise 4), 3 fabrics by construction.
-    # Expected: no refusal. (The count read may be 2 when two fabrics sit
-    #   close, as on seed 1, 15.3 apart; #248 records that case.)
+    # Expected: no refusal. It shows only that the margin leaves this grid
+    #   alone, not that the read never merges: the count read may be 2 when
+    #   two fabrics sit close, as on seed 1, 15.3 apart (#248).
     lab, positions = counted_grid(3, seed, 4.0)
     result = fabrics_module.suggest(lab, np.ones(len(lab)), positions)
     assert not isinstance(result, Refusal)
