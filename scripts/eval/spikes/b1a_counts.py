@@ -76,10 +76,13 @@ MAD_EPS = 0.5
 # Spike choice: the square-grid prior. Tier A is one uniform square grid (corpus/README.md), so
 # the two pitches of a pair agree up to perspective and piecing error; 15 percent is generous.
 PITCH_PRIOR = 1.15
-# Spike choices for the tap: the local window's half-size as a share of the shorter side, and
-# how far past the tapped square's bracket the pitch may reach.
+# Spike choices for the tap: the local window's half-size as a share of the shorter side; the
+# L*0.5 color distance within which a pixel belongs to the tapped fabric; and the pitch search
+# range as a share of the tapped region's size (it may be the square, a run of squares, or a
+# print-split part of one).
 TAP_WINDOW = 0.15
-TAP_CAP = 1.3
+TAP_TOLERANCE = 10.0
+TAP_RANGE = (0.5, 2.0)
 # grid.py's fundamental rule: the smallest lag at least half as strong as the strongest.
 FUNDAMENTAL_FACTOR = 0.5
 # Fabric labels for the block period of a candidate: k-means over the squares' colors.
@@ -344,7 +347,7 @@ def _edge_ratio(edge: np.ndarray, seams: np.ndarray, centres: np.ndarray) -> flo
     return (float(seams.mean()) + delta) / (float(centres.mean()) + delta)
 
 
-def _fit_axis(field: FieldImage, axis: int) -> list[int]:
+def _fit_axis(field: FieldImage, axis: int, interior: bool = False) -> list[int]:
     extent, edge = field.axis(axis)
     lines = field.lines(axis)
     offsets = _offsets()
@@ -352,8 +355,11 @@ def _fit_axis(field: FieldImage, axis: int) -> list[int]:
     for n in candidate_counts(extent):
         pitch = extent / n
         seams = _sample(edge, pitch * np.arange(1, n))
-        centres = _sample(edge, pitch * (np.arange(n) + 0.5))
         aligned = pitch * (np.arange(n)[:, None] + offsets[None, :])
+        # exp2 samples each square's centre; the interior variant samples its inner 70 percent,
+        # so a block-sized candidate whose centre lands inside a flat square still sees the
+        # seams inside its blocks.
+        centres = _sample(edge, aligned.ravel() if interior else pitch * (np.arange(n) + 0.5))
         shifted = pitch * (np.arange(n - 1)[:, None] + 0.5 + offsets[None, :])
         gain = (_segment_mad(lines, shifted) + MAD_EPS) / (_segment_mad(lines, aligned) + MAD_EPS)
         scores[n] = _edge_ratio(edge, seams, centres) * gain
@@ -362,6 +368,10 @@ def _fit_axis(field: FieldImage, axis: int) -> list[int]:
 
 def fit_score(field: FieldImage) -> tuple[list[int], list[int]]:
     return _fit_axis(field, 0), _fit_axis(field, 1)
+
+
+def fit_interior(field: FieldImage) -> tuple[list[int], list[int]]:
+    return _fit_axis(field, 0, interior=True), _fit_axis(field, 1, interior=True)
 
 
 def _square_mad(ab: np.ndarray, xs: np.ndarray, ys: np.ndarray) -> float:
@@ -396,14 +406,6 @@ def fit_2d(field: FieldImage, nx: int, ny: int) -> dict[str, float]:
     return {"edge_ratio": ratio, "mad": mad, "chroma_gain": gain, "fit": ratio * gain}
 
 
-def _edge_peaks(profile: np.ndarray) -> np.ndarray:
-    """grid._binarize's spikes without its one-pixel dilation: local maxima above mean + std."""
-    threshold = profile.mean() + profile.std()
-    inner = profile[1:-1]
-    keep = (inner > threshold) & (inner >= profile[:-2]) & (inner >= profile[2:])
-    return np.flatnonzero(keep) + 1
-
-
 def _refine_lag(corr: np.ndarray, lag: int, harmonics: int = 8) -> float:
     """Sub-pixel pitch, as grid._find_pitch refines it: a parabola through each harmonic's peak,
     and the mean of peak / k, each harmonic searched near k times the running estimate."""
@@ -424,14 +426,29 @@ def _refine_lag(corr: np.ndarray, lag: int, harmonics: int = 8) -> float:
     return estimate
 
 
-def _tap_axis(profile: np.ndarray, tap: float, extent: int) -> list[int]:
-    peaks = _edge_peaks(profile)
-    left, right = peaks[peaks < tap], peaks[peaks > tap]
-    bracket = float(right.min() - left.max()) if left.size and right.size else None
+def tap_region(field: FieldImage, tap: Sequence[float]) -> tuple[float | None, float | None]:
+    """Width and height of the 4-connected same-fabric region under the tap: the tapped square,
+    a run of same-fabric squares, or a print-split part of one. An axis whose region spans half
+    the field or more (a background fabric) gives None."""
+    lab = cv2.GaussianBlur(field.lab, (0, 0), 2.0)
+    x = int(np.clip(tap[0], 0, field.width - 1))
+    y = int(np.clip(tap[1], 0, field.height - 1))
+    seed = np.median(lab[max(0, y - 2):y + 3, max(0, x - 2):x + 3].reshape(-1, 3), axis=0)
+    mask = (np.linalg.norm(lab - seed, axis=2) < TAP_TOLERANCE).astype(np.uint8)
+    _n, labels, stats, _c = cv2.connectedComponentsWithStats(mask, connectivity=4)
+    label = labels[y, x]
+    if label == 0:
+        return None, None
+    width, height = float(stats[label, cv2.CC_STAT_WIDTH]), float(stats[label, cv2.CC_STAT_HEIGHT])
+    return (width if width < field.width / 2 else None,
+            height if height < field.height / 2 else None)
+
+
+def _tap_axis(profile: np.ndarray, bracket: float | None, extent: int) -> list[int]:
     corr = qgrid._autocorrelate(qgrid._binarize(profile))
-    cap = TAP_CAP * bracket if bracket else len(corr) - 1
-    lags = [i for i in range(MIN_PITCH_PX, len(corr) - 1)
-            if corr[i] > 0 and corr[i] >= corr[i - 1] and corr[i] >= corr[i + 1] and i <= cap]
+    lo, hi = (TAP_RANGE[0] * bracket, TAP_RANGE[1] * bracket) if bracket else (0, len(corr))
+    lags = [i for i in range(max(MIN_PITCH_PX, int(math.ceil(lo))), len(corr) - 1)
+            if i <= hi and corr[i] > 0 and corr[i] >= corr[i - 1] and corr[i] >= corr[i + 1]]
     if lags:
         strongest = max(corr[i] for i in lags)
         pitch = _refine_lag(corr, next(i for i in lags if corr[i] >= FUNDAMENTAL_FACTOR * strongest))
@@ -447,22 +464,25 @@ def _tap_axis(profile: np.ndarray, tap: float, extent: int) -> list[int]:
 
 
 def tap_seed(field: FieldImage, tap: Sequence[float]) -> tuple[list[int], list[int]]:
-    """Counts from one tap at field coordinates tap = (x, y)."""
-    half = max(4 * MIN_PITCH_PX, int(round(TAP_WINDOW * min(field.width, field.height))))
+    """Counts from one tap at field coordinates tap = (x, y): the tapped region's size bounds
+    the pitch, and the local window's autocorrelation sets it."""
+    bracket_x, bracket_y = tap_region(field, tap)
+    half = max(4 * MIN_PITCH_PX, int(round(TAP_WINDOW * min(field.width, field.height))),
+               int(3 * max(bracket_x or 0, bracket_y or 0)))
     x0, x1 = max(0, int(tap[0]) - half), min(field.width, int(tap[0]) + half)
     y0, y1 = max(0, int(tap[1]) - half), min(field.height, int(tap[1]) + half)
     if x1 - x0 < 4 * MIN_PITCH_PX or y1 - y0 < 4 * MIN_PITCH_PX:
         return [], []
     local_x = field.sobel_x[y0:y1, x0:x1].sum(axis=0)
     local_y = field.sobel_y[y0:y1, x0:x1].sum(axis=1)
-    return (_tap_axis(local_x, tap[0] - x0, field.width),
-            _tap_axis(local_y, tap[1] - y0, field.height))
+    return _tap_axis(local_x, bracket_x, field.width), _tap_axis(local_y, bracket_y, field.height)
 
 
 METHODS: dict[str, Callable[[FieldImage], tuple[list[int], list[int]]]] = {
     "autocorr": autocorr_period,
     "seam": seam_energy,
     "fit": fit_score,
+    "fit_interior": fit_interior,
 }
 # Functions in modules B6b deletes (plan B6b; REBASELINE.md "detector (B6b)") each method calls.
 B6B_FUNCTIONS = {
@@ -470,6 +490,7 @@ B6B_FUNCTIONS = {
                  "qrep.vision.grid._binarize", "qrep.vision.grid.MIN_PITCH_PX"],
     "seam": ["qrep.vision.grid.MIN_PITCH_PX"],
     "fit": ["qrep.vision.grid.MIN_PITCH_PX"],
+    "fit_interior": ["qrep.vision.grid.MIN_PITCH_PX"],
     "tap": ["qrep.vision.grid._autocorrelate", "qrep.vision.grid._binarize",
             "qrep.vision.grid.MIN_PITCH_PX"],
     "quilter_units": ["qrep.vision.repeats.detect_repeat", "qrep.vision.repeats._axis_period"],

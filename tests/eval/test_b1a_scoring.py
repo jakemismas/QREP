@@ -194,7 +194,7 @@ def _checkerboard(n: int = 12, pitch: int = 20) -> np.ndarray:
 FULL_FIELD = np.array([[0.0, 0.0], [240.0, 0.0], [240.0, 240.0], [0.0, 240.0]])
 
 
-@pytest.mark.parametrize("method", ["autocorr", "fit"])
+@pytest.mark.parametrize("method", ["autocorr", "fit", "fit_interior"])
 def test_checkerboard_methods_find_twelve(method):
     # A 12 x 12 checkerboard of 20 px squares fills the 240 x 240 field. Every one of the 11
     # interior seams on each axis is the same step, and nothing else changes inside a square.
@@ -204,7 +204,12 @@ def test_checkerboard_methods_find_twelve(method):
     # and every half-pitch-shifted square straddles a step while every aligned square is
     # flat. A divisor (6) puts its centres on steps (edge gain about 1); a multiple (24) puts
     # half its seams on flat fabric (lower seam mean); any other count misses most steps.
-    # So both rank 12 first on both axes.
+    # Fit interior samples each square's inner 70 percent (3 to 17 px of a 20 px square): at 12
+    # those samples sit 3 px or more from a step, where the blurred step has fallen to about a
+    # quarter of its height, so the interior mean is about a tenth of the seam mean; at 24, 12
+    # of the 23 seam samples sit on flat fabric while the 10 px squares' interiors come within
+    # 1.5 px of a step; divisors and other counts fail as for the centre-sampled fit.
+    # So all three rank 12 first on both axes.
     field = b1a.FieldImage.from_bgr(_checkerboard(), FULL_FIELD)
     ranking_x, ranking_y = b1a.METHODS[method](field)
     assert ranking_x[0] == 12
@@ -212,11 +217,13 @@ def test_checkerboard_methods_find_twelve(method):
 
 
 def test_tap_seed_on_checkerboard_finds_twelve():
-    # A tap at the centre of square (5, 5), (110, 110), with no jitter. The local window
-    # (half-size 0.15 x 240 = 36 px, so x and y in [74, 146]) holds the steps at 80, 100,
-    # 120 and 140. The nearest steps around the tap are 100 and 120: a 20 px square. The
-    # window's autocorrelation peaks at 20 and 40; the smallest strong lag no wider than
-    # 1.3 x 20 = 26 px is 20, so the pitch is 20 px and the count is 240 / 20 = 12.
+    # A tap at the centre of square (5, 5), (110, 110), with no jitter. Its 4-connected
+    # same-fabric region is that square alone (same-fabric squares meet it only at corners),
+    # 20 px wide less a pixel or two of blur at each side, so the pitch is searched in about
+    # [9, 40] px. The local window (half-size max(0.15 x 240, 3 x the region) = about 57 px)
+    # holds steps every 20 px, so its autocorrelation peaks at 20 and 40; the fundamental rule
+    # (the smallest lag at least half as strong as the strongest) takes 20, and the count is
+    # 240 / 20 = 12.
     field = b1a.FieldImage.from_bgr(_checkerboard(), FULL_FIELD)
     ranking_x, ranking_y = b1a.tap_seed(field, (110.0, 110.0))
     assert ranking_x[0] == 12
