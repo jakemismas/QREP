@@ -119,6 +119,9 @@ def roles_of(recipe):
         ([50, 49], True),
         # Quarter boundary: 2 types over 8 blocks, 2 x 4 = 8 <= 8.
         ([4, 4], True),
+        # Just past it: 2 types over 4 + 3 = 7 blocks, 2 x 4 = 8 > 7; no type is
+        # used once and 2 <= 8, so only the quarter rule fails.
+        ([4, 3], False),
         # One single-use type is allowed: 2 types over 11 blocks, 2 x 4 = 8 <= 11.
         ([10, 1], True),
         # Two single-use types are not: 3 types over 12 blocks, 3 x 4 = 12 <= 12,
@@ -184,10 +187,12 @@ def test_gate_skips_a_period_that_cuts_a_goose():
 
 
 def test_units_separate_block_types_and_their_confidence_does_not():
-    # Three 1 x 1 blocks on "aaa": an HST tl_br, an HST tr_bl, then tl_br again
-    # read at confidence 0.5. The diagonal makes a second type; confidence does
-    # not, so the third block is type 0: layout [0, 1, 0], counts [2, 1].
-    units = [hst(0, 0), hst(0, 1, diagonal="tr_bl"), hst(0, 2, confidence=0.5)]
+    # Three 1 x 1 blocks on "aaa": an a/b HST, an a/c HST, then the a/b HST again
+    # read at confidence 0.5. No turn makes an a/b HST into an a/c one, so the
+    # fabric pair makes a second type; confidence does not, so the third block
+    # is type 0: layout [0, 1, 0], counts [2, 1].
+    other = HstUnit(row=0, col=1, diagonal="tl_br", upper="a", lower="c", confidence=1.0)
+    units = [hst(0, 0), other, hst(0, 2, confidence=0.5)]
     blocks = ConfirmedBlocks(blocks_across=3, blocks_down=1, squares_across=1, squares_down=1)
     structure = block_structure(quilt_from(["aaa"], units=units, confirmed=blocks))
     assert structure.layout == [[0, 1, 0]]
