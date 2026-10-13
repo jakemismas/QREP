@@ -17,21 +17,22 @@ reading. Truth is proposals only (proposed-a and proposed-b); no verified-jake c
 
 ## Decision
 
-Pending a question on #135. The rule (issue #135, criterion 5): go when the 90th-percentile
-corner error is at most 0.22 of a square on both the screenshot tier and the museum tier;
-otherwise C3 starts the pins at a neutral inset. `decide` in the script applies it, and the
-Go column comes from it.
+No-go, provisional: C3 starts the pins at a neutral inset. The rule (issue #135, criterion 5):
+go when the 90th-percentile corner error is at most 0.22 of a square on both the screenshot
+tier and the museum tier; otherwise C3 starts the pins at a neutral inset. `decide` in the
+script applies it, and the Go column comes from it. #252 reruns the spike on the screenshot
+tier once D3c (#165) lands its truth, and the decision is revisited then.
 
 - Museum tier: backdrop_hull meets the bar in all four groups (two proposal passes by two
   caps). Its p90 is 0.188 (phone, proposed-a; 32 corners of 8 suggested photos), 0.179
   (desktop, proposed-a; 36 corners of 9), 0.182 (phone, proposed-b; 32 of 8) and 0.178
-  (desktop, proposed-b; 36 of 9): a margin of 0.032 to 0.042 of a square.
-- Screenshot tier: n = 0. D3c (#165) has not landed truth for the private screenshots, so
-  nothing was measured there, and `decide` gives no-go for every row, because a tier with no
-  corners cannot show that the bar is met. The Go column reads no-go throughout for that reason
-  alone.
-- Whether to wait for D3c's screenshot truth or to record no-go now is the question posted on
-  #135; the decision is recorded on #135 and #104 once it is answered.
+  (desktop, proposed-b; 36 of 9): a margin of 0.032 to 0.042 of a square. It gives no
+  suggestion on 3 of 11 photos at the phone cap and 2 of 11 at the desktop cap.
+- Screenshot tier: not measured, n = 0. D3c (#165) has not landed truth for the private
+  screenshots, and `decide` gives no-go for every row, because a tier with no corners cannot
+  show that the bar is met. The Go column reads no-go throughout for that reason alone.
+- The decision is recorded on #135 and #104 under the rule as written, without waiting for
+  D3c.
 - The other two methods miss the bar on the museum tier alone: backdrop_lines at 0.865 to
   0.886 and the old tiered detector at 10.355 to 10.395.
 - The museum result is provisional twice over: on proposed truth, and on 8 or 9 suggested
@@ -91,7 +92,8 @@ makes no band decision.
 
 ## For other tickets
 
-- B7 and C3: if the answer on #135 lets the museum result stand, the method to build is
+- B7 and C3: no corner suggestion ships for now, and the pins start at a neutral inset. If
+  #252 records go once the screenshot tier is measured, the method to build is
   backdrop_hull. It needs `_quad_from_contour` and `_order_corners` from
   `qrep/vision/rectify.py`, which B6b deletes; the script carries copies taken at c8e4f8a.
   Its ring rule fails on tight crops (two of the three photos with no suggestion), its
