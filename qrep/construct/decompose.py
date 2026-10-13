@@ -62,8 +62,9 @@ def _most_squares(cell: int, cut_add: int, usable: int) -> int:
 
 
 def _split(count: int, most: int) -> list[int]:
-    # The fewest pieces that fit (M-04), as equal as whole squares allow, so
-    # repeated runs give one cut size instead of a full one and a remainder.
+    # M-04 fixes the count, the fewest pieces that fit, and leaves the sizes
+    # open; near-equal sizes give repeated runs one cut size instead of a full
+    # piece and a remainder.
     parts = _ceil_div(count, most)
     size, longer = divmod(count, parts)
     return [size + 1] * longer + [size] * (parts - longer)
@@ -162,10 +163,11 @@ class RecipeBand(BaseModel):
 
 
 class CutLine(BaseModel):
-    """Identical pieces of one fabric, short side first (PATTERN-SPEC C-10)."""
+    """Identical pieces of one fabric, short side first (PATTERN-SPEC C-10).
+    A rectangle and a piece of one size share a line, because each line gets
+    its own strips (MATH.md F2)."""
 
     fabric_id: str
-    role: Literal["rectangle", "piece"]
     short: int
     long: int
     quantity: int
@@ -190,31 +192,30 @@ class BlockDecomposition(BaseModel):
         return strips
 
 
-def _add_cut_lines(
-    lines: dict[tuple[str, str, int, int], int], band: Band, role: str, quantity: int
-) -> None:
+def _add_cut_lines(lines: dict[tuple[str, int, int], int], band: Band, quantity: int) -> None:
     for piece in band.pieces:
         if piece.kind == "piece":
             short, long = sorted((piece.cut_length, piece.cut_width))
-            key = (piece.fabric_id, role, short, long)
+            key = (piece.fabric_id, short, long)
             lines[key] = lines.get(key, 0) + quantity
 
 
-def _cut_line_list(lines: dict[tuple[str, str, int, int], int]) -> list[CutLine]:
+def _cut_line_list(lines: dict[tuple[str, int, int], int]) -> list[CutLine]:
     return [
-        CutLine(fabric_id=fabric, role=role, short=short, long=long, quantity=quantity)
-        for (fabric, role, short, long), quantity in lines.items()
+        CutLine(fabric_id=fabric, short=short, long=long, quantity=quantity)
+        for (fabric, short, long), quantity in lines.items()
     ]
 
 
 def _can_strip_piece(band: Band) -> bool:
-    # A row with a unit is sewn in the block steps, and a single-fabric row is
-    # a rectangle, never a set that sews a fabric to itself (M-05; engine-05).
+    # A row with a unit is sewn in the block steps. Two strips of one fabric
+    # side by side (a single-fabric row, or a run split at the cap) would sew a
+    # fabric to itself (M-05; engine-05).
     return (
         band.lines == 1
         and not band.has_unit
-        and not band.single_fabric
         and MIN_SET_STRIPS <= len(band.pieces) <= MAX_SET_STRIPS
+        and all(a.fabric_id != b.fabric_id for a, b in zip(band.pieces, band.pieces[1:]))
     )
 
 
@@ -259,7 +260,7 @@ def decompose_blocks(quilt: Quilt, structure: BlockStructure) -> BlockDecomposit
     ]
 
     recipes: list[list[RecipeBand]] = []
-    lines: dict[tuple[str, str, int, int], int] = {}
+    lines: dict[tuple[str, int, int], int] = {}
     for kind, bands in enumerate(bands_by_type):
         recipe = []
         for band in bands:
@@ -274,7 +275,7 @@ def decompose_blocks(quilt: Quilt, structure: BlockStructure) -> BlockDecomposit
                 continue
             role = "rectangle" if band.single_fabric else "pieced"
             recipe.append(RecipeBand(band=band, role=role))
-            _add_cut_lines(lines, band, "rectangle" if role == "rectangle" else "piece", structure.counts[kind])
+            _add_cut_lines(lines, band, structure.counts[kind])
         recipes.append(recipe)
     return BlockDecomposition(
         structure=structure, recipes=recipes, signatures=signatures, cut_lines=_cut_line_list(lines)
@@ -291,23 +292,39 @@ class RowsLayout(BaseModel):
         return sum(1 for band in self.bands for piece in band.pieces if piece.kind == "piece")
 
 
+def _units_whole(quilt: Quilt, axis: Literal["rows", "columns"]) -> bool:
+    # A flying goose covers two squares; sewn across two lines it would need a
+    # partial seam (M-13).
+    index = 0 if axis == "rows" else 1
+    return all(
+        len({square[index] for square in unit.squares()}) == 1
+        for unit in quilt.center.unit_map or []
+    )
+
+
 def rows_layout(quilt: Quilt) -> RowsLayout:
     """M-07 c: the grid sewn line by line from merged pieces and units, by
-    columns only when that cuts fewer pieces. Units count the same either way,
-    so only plain pieces decide."""
+    columns only when that cuts fewer pieces. Each unit is made once either
+    way, so only plain pieces decide, among the axes that keep every unit in
+    one line."""
     cell = quilt.center.cell_size
     cut_add = quilt.settings.cut_add
     usable = quilt.settings.wof
     rows = grid_squares(quilt.center)
     columns = [list(column) for column in zip(*rows, strict=True)]
-    by_rows = RowsLayout(
-        axis="rows", bands=decompose_lines(rows, cell, cut_add, usable), cut_lines=[]
-    )
-    by_columns = RowsLayout(
-        axis="columns", bands=decompose_lines(columns, cell, cut_add, usable), cut_lines=[]
-    )
-    layout = by_columns if by_columns.piece_count < by_rows.piece_count else by_rows
-    lines: dict[tuple[str, str, int, int], int] = {}
+    candidates = [
+        RowsLayout(axis=axis, bands=decompose_lines(lines, cell, cut_add, usable), cut_lines=[])
+        for axis, lines in (("rows", rows), ("columns", columns))
+        if _units_whole(quilt, axis)
+    ]
+    if not candidates:
+        raise ValueError(
+            "flying geese lie both across and down, so no row or column layout keeps "
+            "every goose whole"
+        )
+    # min keeps the first of equals, so rows win a tie.
+    layout = min(candidates, key=lambda candidate: candidate.piece_count)
+    cut_lines: dict[tuple[str, int, int], int] = {}
     for band in layout.bands:
-        _add_cut_lines(lines, band, "rectangle" if band.single_fabric else "piece", 1)
-    return layout.model_copy(update={"cut_lines": _cut_line_list(lines)})
+        _add_cut_lines(cut_lines, band, 1)
+    return layout.model_copy(update={"cut_lines": _cut_line_list(cut_lines)})

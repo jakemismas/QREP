@@ -1,9 +1,9 @@
 """A3a: block structure, merged runs, strip-set signatures and the rows layout.
 
 Every expected value is computed by hand in the comment beside it, from
-PATTERN-SPEC section 3 (M-03 to M-07, the worked example), its literals L-03
-and L-13, and MATH.md F1 to F3. Lengths are eighths: 1 in = 8, and a square
-cut size is finished + 1/2 in (F1), so a 1 1/2 in square cuts 12 + 4 = 16.
+PATTERN-SPEC section 3 (M-03 to M-07, M-13, the worked example), its literals
+L-03 and L-13, and MATH.md F1 to F3. Lengths are eighths: 1 in = 8, and a
+square cut size is finished + 1/2 in (F1), so a 1 1/2 in square cuts 12 + 4 = 16.
 """
 
 import random
@@ -37,24 +37,26 @@ from qrep.model.schema import (
     QuiltMetadata,
     Settings,
 )
-from qrep.model.unitmap import HstUnit, PlainUnit
+from qrep.model.unitmap import GooseUnit, HstUnit, PlainUnit
 
 ODD_BLOCK = Path(__file__).parent / "fixtures" / "pattern_models" / "dic_odd_block.json"
 
 COLORS = ("#112233", "#445566", "#778899", "#aabbcc", "#ddeeff", "#102030")
 
 
-def quilt_from(rows, cell=12, wof=320, units=None, confirmed=None):
-    """A square-grid quilt from rows of one-letter fabric ids. units maps a
-    square to its non-plain unit; every other square gets a plain unit."""
-    named = {f for unit in (units or {}).values() for f in unit.fabric_ids()}
+def quilt_from(rows, cell=12, wof=320, units=(), confirmed=None):
+    """A square-grid quilt from rows of one-letter fabric ids. units lists the
+    non-plain units; every square they leave uncovered gets a plain unit."""
+    named = {f for unit in units for f in unit.fabric_ids()}
     fabrics = sorted({f for row in rows for f in row} | named | {"a", "b"})
     unit_map = None
-    if units is not None:
-        unit_map = [
-            units.get((r, c)) or PlainUnit(row=r, col=c, confidence=1.0)
+    if units:
+        covered = {square for unit in units for square in unit.squares()}
+        unit_map = list(units) + [
+            PlainUnit(row=r, col=c, confidence=1.0)
             for r in range(len(rows))
             for c in range(len(rows[0]))
+            if (r, c) not in covered
         ]
     return Quilt(
         metadata=QuiltMetadata(name="test"),
@@ -78,6 +80,10 @@ def plain(text):
     return [Square(fabric_id=f) for f in text]
 
 
+def hst(r, c, diagonal="tl_br", confidence=1.0):
+    return HstUnit(row=r, col=c, diagonal=diagonal, upper="a", lower="b", confidence=confidence)
+
+
 def random_rows(seed):
     rng = random.Random(seed)
     return ["".join(rng.choice("bc") for _ in range(40)) for _ in range(40)]
@@ -89,8 +95,12 @@ def dic_at_40_in():
     return Quilt.model_validate(data)
 
 
-def lines_of(decomposition):
-    return [(c.fabric_id, c.role, c.short, c.long, c.quantity) for c in decomposition.cut_lines]
+def lines_of(planned):
+    return [(c.fabric_id, c.short, c.long, c.quantity) for c in planned.cut_lines]
+
+
+def roles_of(recipe):
+    return [(b.role, b.signature, b.reversed) for b in recipe]
 
 
 # --- M-03 gate (L-13) -------------------------------------------------------
@@ -126,15 +136,62 @@ def test_block_gate_applies_the_l13_numbers(counts, passes):
 
 @pytest.mark.parametrize("seed", [1, 2, 3])
 def test_random_two_fabric_grid_has_no_block_structure(seed):
-    # Source: PATTERN-SPEC Appendix B, C5, and M-03.
-    # The 20 x 20 tiling of a 40 x 40 grid has 4 blocks of 400 random squares;
-    # two of them match with probability 2^-400, so it is 4 types used once each.
-    # L-13: 4 single-use types > 1, and 4 types > 4 blocks / 4 = 1, so it fails.
+    # Source: PATTERN-SPEC Appendix B, C5, and M-03. The periods of 40 x 40 are
+    # 2, 4, 5, 8, 10, 20 and 40, and each fails L-13 on random squares:
+    # - p = 2: 400 blocks of 4 squares, 16 patterns; 8 or fewer types needs 8
+    #   patterns absent from 400 random blocks, each absent with (15/16)^400.
+    # - p = 4, 5, 8: 100, 64 and 25 blocks of 16, 25 and 64 squares; 8 or fewer
+    #   types needs nearly every block to repeat another exactly.
+    # - p = 10: 16 blocks of 100 squares, so 16 types (> 8) unless a pair of
+    #   blocks matches, at most 120 pairs x 2^-100.
+    # - p = 20: 4 blocks of 400 squares, 4 types used once (at most 6 pairs x
+    #   2^-400 that any match); 4 single-use types > 1, and 4 > 4 / 4.
+    # - p = 40: 1 type over 1 block, 1 x 4 > 1.
     quilt = quilt_from(random_rows(seed))
     tiled = tile_blocks(grid_squares(quilt.center), 20, 20, "gate")
     assert tiled.counts == [1, 1, 1, 1]
     assert passes_block_gate(tiled.counts) is False
     assert block_structure(quilt) is None
+
+
+def test_gate_keeps_the_smallest_passing_period():
+    # 2 x 2 blocks of one fabric in a checkerboard, 8 x 8 squares; periods 2, 4, 8.
+    # p = 2: 16 blocks, solid a where block row + col is even, else solid b:
+    # counts [8, 8], 2 types, 2 x 4 <= 16, passes. p = 4 also passes (one type
+    # aabb/aabb/bbaa/bbaa x 4, 1 x 4 <= 4). The smaller period is kept, the
+    # rule infer_block_structure applies today (strategies.py:44-46).
+    rows = ["aabbaabb", "aabbaabb", "bbaabbaa", "bbaabbaa"] * 2
+    structure = block_structure(quilt_from(rows))
+    assert (structure.squares_across, structure.squares_down) == (2, 2)
+    assert structure.counts == [8, 8]
+
+
+def test_gate_skips_a_period_that_cuts_a_goose():
+    # 12 x 12 squares, every row "bbc" x 4, with a goose pointing up (body b,
+    # sky d) on columns 0-1, 3-4, 6-7 and 9-10 of every row. Periods 2, 3, 4, 6, 12.
+    # p = 2 puts a block seam between columns 3 and 4 (3 // 2 = 1, 4 // 2 = 2),
+    # through a goose (M-13), so it is skipped. p = 3 keeps each goose in one
+    # block (0-1, 3-4, 6-7, 9-10 // 3 = 0, 1, 2, 3); every block is the rows
+    # [goose, goose, c] three times, 1 type x 16 blocks, 1 x 4 <= 16, passes.
+    geese = [
+        GooseUnit(row=r, col=c, points="up", body="b", sky="d", confidence=1.0)
+        for r in range(12)
+        for c in (0, 3, 6, 9)
+    ]
+    structure = block_structure(quilt_from(["bbc" * 4] * 12, units=geese))
+    assert (structure.squares_across, structure.squares_down) == (3, 3)
+    assert structure.counts == [16]
+
+
+def test_units_separate_block_types_and_their_confidence_does_not():
+    # Three 1 x 1 blocks on "aaa": an HST tl_br, an HST tr_bl, then tl_br again
+    # read at confidence 0.5. The diagonal makes a second type; confidence does
+    # not, so the third block is type 0: layout [0, 1, 0], counts [2, 1].
+    units = [hst(0, 0), hst(0, 1, diagonal="tr_bl"), hst(0, 2, confidence=0.5)]
+    blocks = ConfirmedBlocks(blocks_across=3, blocks_down=1, squares_across=1, squares_down=1)
+    structure = block_structure(quilt_from(["aaa"], units=units, confirmed=blocks))
+    assert structure.layout == [[0, 1, 0]]
+    assert structure.counts == [2, 1]
 
 
 def test_confirmed_structure_is_taken_without_the_gate():
@@ -225,8 +282,7 @@ def test_no_merge_includes_a_unit_square():
     # Two all-blue rows; row 2 has an HST at column 3. Row 1 stays a 1-row
     # rectangle (row 2 is not all plain), and row 2 splits around the unit:
     # blue 2 squares (28), the unit, blue 2 squares (28).
-    hst = HstUnit(row=1, col=2, diagonal="tl_br", upper="b", lower="c", confidence=1.0)
-    quilt = quilt_from(["bbbbb", "bbbbb"], units={(1, 2): hst})
+    quilt = quilt_from(["bbbbb", "bbbbb"], units=[hst(1, 2)])
     bands = decompose_lines(grid_squares(quilt.center), cell=12, cut_add=4, usable=320)
     assert [(b.line, b.lines) for b in bands] == [(0, 1), (1, 1)]
     assert [(p.kind, p.fabric_id, p.squares) for p in bands[0].pieces] == [("piece", "b", 5)]
@@ -238,32 +294,46 @@ def test_no_merge_includes_a_unit_square():
 
 
 # --- M-04 cap at the strip-cutting width (MATH.md Q8) ---------------------------
+#
+# A piece of n squares cuts n x cell + 4. At U = 320 it fits when
+# n <= (320 - 4) // cell: 26 squares of 12 e (26 x 12 + 4 = 316; 27 would cut
+# 328), 19 squares of 16 e (19 x 16 + 4 = 308; 20 would cut 324, although
+# 320 // 16 = 20, so the seam allowance alone sets that cap). M-04 asks for the
+# fewest pieces that fit, ceil(n / most); when n is a multiple of the most, the
+# only such split is full pieces, so these sizes come from the spec alone.
 
 
 @pytest.mark.parametrize(
-    ("run", "expected"),
+    ("cell", "run", "expected"),
     [
-        # At U = 320 and 12 e squares, a piece of n squares cuts 12n + 4 <= 320, so
-        # n <= (320 - 4) // 12 = 26: 26 squares cut 316, 27 squares would cut 328.
-        (26, [(0, 26, 316)]),
-        # 27 squares: ceil(27 / 26) = 2 pieces, 14 + 13; 14 x 12 + 4 = 172, 13 x 12 + 4 = 160.
-        (27, [(0, 14, 172), (14, 13, 160)]),
-        # 30 squares: ceil(30 / 26) = 2 pieces, 15 + 15; 15 x 12 + 4 = 184 each.
-        (30, [(0, 15, 184), (15, 15, 184)]),
+        (12, 26, [(0, 26, 316)]),
+        (12, 52, [(0, 26, 316), (26, 26, 316)]),
+        (16, 19, [(0, 19, 308)]),
+        (16, 38, [(0, 19, 308), (19, 19, 308)]),
     ],
 )
-def test_merged_run_is_capped_at_the_usable_width(run, expected):
-    pieces = merge_line(plain("b" * run), cell=12, cut_add=4, usable=320)
+def test_merged_run_splits_into_the_fewest_full_pieces(cell, run, expected):
+    pieces = merge_line(plain("b" * run), cell=cell, cut_add=4, usable=320)
     assert [(p.start, p.squares, p.cut_length) for p in pieces] == expected
-    assert all(p.cut_length <= 320 for p in pieces)
+
+
+@pytest.mark.parametrize(("cell", "run"), [(12, 27), (16, 20)])
+def test_one_square_over_the_cap_takes_a_second_piece(cell, run):
+    # 27 > 26 and 20 > 19 squares: ceil(27 / 26) = ceil(20 / 19) = 2 pieces,
+    # together the whole run, each cut at most 320. M-04 leaves their sizes open.
+    pieces = merge_line(plain("b" * run), cell=cell, cut_add=4, usable=320)
+    assert len(pieces) == 2
+    assert sum(p.squares for p in pieces) == run
+    assert pieces[1].start == pieces[0].squares
+    assert max(p.cut_length for p in pieces) <= 320
 
 
 def test_merged_rectangle_height_is_capped_too():
-    # 30 all-blue rows 1 square wide: one group of 30 rows, split like a run
-    # into 15 + 15 rows, each band cut 16 long and 15 x 12 + 4 = 184 wide.
-    bands = decompose_lines([plain("b")] * 30, cell=12, cut_add=4, usable=320)
-    assert [(b.line, b.lines) for b in bands] == [(0, 15), (15, 15)]
-    assert [(p.cut_length, p.cut_width) for b in bands for p in b.pieces] == [(16, 184), (16, 184)]
+    # 52 all-blue rows 1 square wide: one group of 52 rows, split like a run into
+    # 26 + 26 rows; each band cuts 16 long and 26 x 12 + 4 = 316 wide.
+    bands = decompose_lines([plain("b")] * 52, cell=12, cut_add=4, usable=320)
+    assert [(b.line, b.lines) for b in bands] == [(0, 26), (26, 26)]
+    assert [(p.cut_length, p.cut_width) for b in bands for p in b.pieces] == [(16, 316), (16, 316)]
 
 
 def test_square_wider_than_the_strip_is_refused():
@@ -275,12 +345,12 @@ def test_square_wider_than_the_strip_is_refused():
 # --- M-05 strip-set signatures ------------------------------------------------
 
 
-def one_row_blocks(rows, units=None):
+def one_row_blocks(rows, units=(), wof=320):
     """Each grid row is one block, len(row) squares across and 1 down."""
     blocks = ConfirmedBlocks(
         blocks_across=1, blocks_down=len(rows), squares_across=len(rows[0]), squares_down=1
     )
-    quilt = quilt_from(rows, units=units, confirmed=blocks)
+    quilt = quilt_from(rows, wof=wof, units=units, confirmed=blocks)
     return decompose_blocks(quilt, block_structure(quilt))
 
 
@@ -291,13 +361,22 @@ def test_seven_strips_make_a_set_and_eight_do_not():
     assert [(s.fabric_ids, s.strip_widths, s.segments_needed, s.sets) for s in seven.signatures] == [
         (list("abababa"), [16] * 7, 10, 1)
     ]
-    assert [b.role for b in seven.recipes[0]] == ["strip_set"]
+    assert roles_of(seven.recipes[0]) == [("strip_set", 0, False)]
     # 8 strips is over the cap of 7, so the row is pieced: 4 a and 4 b squares
     # per block, 16 x 16, times 10 blocks.
     eight = one_row_blocks(["abababab"] * 10)
     assert eight.signatures == []
-    assert [b.role for b in eight.recipes[0]] == ["pieced"]
-    assert lines_of(eight) == [("a", "piece", 16, 16, 40), ("b", "piece", 16, 16, 40)]
+    assert roles_of(eight.recipes[0]) == [("pieced", None, False)]
+    assert lines_of(eight) == [("a", 16, 16, 40), ("b", 16, 16, 40)]
+
+
+def test_strips_are_counted_after_merging():
+    # 12 squares "aabbaabbaabb" merge to 6 strips, each 2 x 12 + 4 = 28; 2 <= 6
+    # <= 7, and 10 blocks fill half a set (above): 1 set.
+    merged = one_row_blocks(["aabbaabbaabb"] * 10)
+    assert [(s.fabric_ids, s.strip_widths, s.segments_needed, s.sets) for s in merged.signatures] == [
+        (list("ababab"), [28] * 6, 10, 1)
+    ]
 
 
 def test_a_row_and_its_reverse_share_one_set():
@@ -308,17 +387,27 @@ def test_a_row_and_its_reverse_share_one_set():
     assert [(s.fabric_ids, s.strip_widths, s.segments_needed, s.sets) for s in shared.signatures] == [
         (["a", "b"], [28, 16], 10, 1)
     ]
-    assert [(b.role, b.signature, b.reversed) for r in shared.recipes for b in r] == [
-        ("strip_set", 0, False),
-        ("strip_set", 0, True),
+    assert [roles_of(r) for r in shared.recipes] == [
+        [("strip_set", 0, False)],
+        [("strip_set", 0, True)],
     ]
 
 
-@pytest.mark.parametrize(("blocks", "role"), [(10, "strip_set"), (9, "pieced")])
-def test_a_signature_must_fill_half_a_set(blocks, role):
-    # per_set = 20 (above). L-03: 2 x needed >= 20. 10 blocks: 20 >= 20 holds;
-    # 9 blocks: 18 < 20 fails, so the row is cut piece by piece.
-    decomposition = one_row_blocks(["aba"] * blocks)
+@pytest.mark.parametrize(
+    ("wof", "blocks", "role"),
+    [
+        # per_set = 320 // 16 = 20. L-03: 2 x needed >= 20. 10 blocks: 20 >= 20;
+        # 9 blocks: 18 < 20, so the row is cut piece by piece.
+        (320, 10, "strip_set"),
+        (320, 9, "pieced"),
+        # per_set = 336 // 16 = 21 (the fixture's 42 in). 10 blocks: 20 < 21;
+        # 11 blocks: 22 >= 21.
+        (336, 10, "pieced"),
+        (336, 11, "strip_set"),
+    ],
+)
+def test_a_signature_must_fill_half_a_set(wof, blocks, role):
+    decomposition = one_row_blocks(["aba"] * blocks, wof=wof)
     assert [b.role for b in decomposition.recipes[0]] == [role]
     assert len(decomposition.signatures) == (1 if role == "strip_set" else 0)
 
@@ -327,22 +416,32 @@ def test_a_single_piece_row_is_a_rectangle():
     # "aaa" merges to one piece: 3 x 12 + 4 = 40 by 16, cut as a rectangle, x 10.
     decomposition = one_row_blocks(["aaa"] * 10)
     assert decomposition.signatures == []
-    assert [b.role for b in decomposition.recipes[0]] == ["rectangle"]
-    assert lines_of(decomposition) == [("a", "rectangle", 16, 40, 10)]
+    assert roles_of(decomposition.recipes[0]) == [("rectangle", None, False)]
+    assert lines_of(decomposition) == [("a", 16, 40, 10)]
+
+
+def test_a_row_split_at_the_cap_never_sews_a_fabric_to_itself():
+    # 52 a squares split into 26 + 26 (316 each, above). Alone the row is two
+    # rectangles, 2 x 10 = 20; beside a b square it would be the set a a b,
+    # which sews a to a (engine-05), so it is pieced: a 16 x 316 x 20, b 16 x 16 x 10.
+    alone = one_row_blocks(["a" * 52] * 10)
+    assert alone.signatures == []
+    assert [b.role for b in alone.recipes[0]] == ["rectangle"]
+    assert lines_of(alone) == [("a", 16, 316, 20)]
+    beside = one_row_blocks(["a" * 52 + "b"] * 10)
+    assert beside.signatures == []
+    assert [b.role for b in beside.recipes[0]] == ["pieced"]
+    assert lines_of(beside) == [("a", 16, 316, 20), ("b", 16, 16, 10)]
 
 
 def test_a_row_with_a_unit_is_never_strip_pieced():
     # "aba" x 10 makes a set (half-set test above); an HST on the first square
     # of every row leaves b 16 and a 16 beside the unit, cut one by one.
-    units = {
-        (r, 0): HstUnit(row=r, col=0, diagonal="tl_br", upper="a", lower="b", confidence=1.0)
-        for r in range(10)
-    }
-    decomposition = one_row_blocks(["aba"] * 10, units=units)
+    decomposition = one_row_blocks(["aba"] * 10, units=[hst(r, 0) for r in range(10)])
     assert decomposition.structure.counts == [10]
     assert decomposition.signatures == []
     assert [b.role for b in decomposition.recipes[0]] == ["pieced"]
-    assert lines_of(decomposition) == [("b", "piece", 16, 16, 10), ("a", "piece", 16, 16, 10)]
+    assert lines_of(decomposition) == [("b", 16, 16, 10), ("a", 16, 16, 10)]
 
 
 # --- PATTERN-SPEC section 3 worked example --------------------------------------
@@ -358,6 +457,7 @@ def test_worked_example_on_the_dic_at_40_in():
     #   1 x 50 = 50 segments, ceil(50 / 20) = ceil(2.5) = 3 sets.
     # Set 3, Block B rows 1 and 5 "b c c c b": blue 16, cream 40, blue 16;
     #   2 x 49 = 98 segments, ceil(98 / 20) = ceil(4.9) = 5 sets.
+    # 5 + 3 + 5 = 13 three-strip sets.
     assert [
         (s.fabric_ids, s.strip_widths, s.segment_cut_width, s.segments_needed, s.per_set, s.sets)
         for s in decomposition.signatures
@@ -366,62 +466,69 @@ def test_worked_example_on_the_dic_at_40_in():
         (["c", "b", "c"], [16, 40, 16], 16, 50, 20, 3),
         (["b", "c", "b"], [16, 40, 16], 16, 98, 20, 5),
     ]
-    # 5 + 3 + 5 = 13 three-strip sets; 2 long seams each: 26.
-    assert sum(s.sets for s in decomposition.signatures) == 13
+    # 13 sets x 2 long seams each = 26.
     assert decomposition.long_seams == 26
+    # Every signature reads the same both ways, so no segment is turned.
+    assert [roles_of(recipe) for recipe in decomposition.recipes] == [
+        [
+            ("strip_set", 0, False),
+            ("rectangle", None, False),
+            ("strip_set", 1, False),
+            ("rectangle", None, False),
+            ("strip_set", 0, False),
+        ],
+        [("strip_set", 2, False), ("rectangle", None, False), ("strip_set", 2, False)],
+    ]
     # Block A rows 2 and 4 are all blue and not adjacent: each a 16 x 64
     # (2 x 8 in) rectangle, 2 per block x 50 = 100. Block B rows 2 to 4 are one
     # 40 x 64 (5 x 8 in) cream rectangle, 1 per block x 49 = 49.
-    assert lines_of(decomposition) == [
-        ("b", "rectangle", 16, 64, 100),
-        ("c", "rectangle", 40, 64, 49),
-    ]
-    assert [[b.role for b in recipe] for recipe in decomposition.recipes] == [
-        ["strip_set", "rectangle", "strip_set", "rectangle", "strip_set"],
-        ["strip_set", "rectangle", "strip_set"],
-    ]
+    assert lines_of(decomposition) == [("b", 16, 64, 100), ("c", 40, 64, 49)]
     # Cream set strips: 2 in (16) is 1 per set 1 x 5 + 2 per set 2 x 3 = 11;
     # 5 in (40) is 1 per set 3 x 5 = 5.
     strips = decomposition.set_strips()
     assert (strips[("c", 16)], strips[("c", 40)]) == (11, 5)
     # Cream rectangles, F2: 5 in strips, floor(320 / 64) = 5 per strip,
-    # ceil(49 / 5) = 10 strips (50 in); the 8 in strips would take
+    # ceil(49 / 5) = 10 strips (50 in); 8 in strips would take
     # ceil(49 / floor(320 / 40)) = ceil(49 / 8) = 7 x 8 in = 56 in, so 5 in wins.
-    cream = strip_yield(49, 40, 64, 320, 4)
-    assert (cream.strip_width, cream.pieces_per_strip, cream.strips) == (40, 5, 10)
+    cream = decomposition.cut_lines[1]
+    plan = strip_yield(cream.quantity, cream.short, cream.long, quilt.settings.wof, 4)
+    assert (plan.strip_width, plan.pieces_per_strip, plan.strips) == (40, 5, 10)
 
 
 # --- M-07 c rows layout ---------------------------------------------------------
 
 
 def seven_bars(vertical):
-    # 7 bars, each 2 squares wide and 20 long, a and b alternating (a, b, a,
-    # b, a, b, a: 4 bars of a, 3 of b), 3 in (24 e) squares.
-    row = "".join(("a" if i % 2 == 0 else "b") * 2 for i in range(7))
+    # 7 bars, each 3 squares wide and 26 long, a and b alternating (a, b, a,
+    # b, a, b, a: 4 bars of a, 3 of b). 26 and 21 share no factor, so the grid
+    # has no period to make blocks from.
+    row = "".join(("a" if i % 2 == 0 else "b") * 3 for i in range(7))
     if vertical:
-        return [row] * 20
-    return ["".join(row[r] for _ in range(20)) for r in range(14)]
+        return [row] * 26
+    return ["".join(row[r] for _ in range(26)) for r in range(21)]
 
 
 def test_seven_bar_quilt_plans_merged_bar_pieces_by_columns():
-    # Rows: every row is 7 runs of 2 squares and no row is one fabric, so
-    # 20 rows x 7 = 140 pieces. Columns: each bar is 2 columns of one fabric,
-    # one rectangle 2 x 24 + 4 = 52 wide and 20 squares long. Cap: (320 - 4) //
-    # 24 = 13 squares, so 20 splits into ceil(20 / 13) = 2 pieces of 10, each
-    # 10 x 24 + 4 = 244 long (6 1/2 x 30 1/2 in): 7 bars x 2 = 14 pieces.
-    layout = rows_layout(quilt_from(seven_bars(vertical=True), cell=24))
+    # 3 in (24 e) squares. Rows: every row is 7 runs of 3 squares and no row
+    # is one fabric, so 26 rows x 7 = 182 pieces. Columns: each bar is 3
+    # columns of one fabric, one rectangle 3 x 24 + 4 = 76 wide and 26 squares
+    # long; the cap is (320 - 4) // 24 = 13 squares, so ceil(26 / 13) = 2
+    # pieces of 13, each 13 x 24 + 4 = 316 long (9 1/2 x 39 1/2 in):
+    # 7 bars x 2 = 14 pieces, a 4 x 2 = 8, b 3 x 2 = 6.
+    quilt = quilt_from(seven_bars(vertical=True), cell=24)
+    assert block_structure(quilt) is None
+    layout = rows_layout(quilt)
     assert layout.axis == "columns"
     assert layout.piece_count == 14
-    assert [(c.fabric_id, c.role, c.short, c.long, c.quantity) for c in layout.cut_lines] == [
-        ("a", "rectangle", 52, 244, 8),
-        ("b", "rectangle", 52, 244, 6),
-    ]
+    assert lines_of(layout) == [("a", 76, 316, 8), ("b", 76, 316, 6)]
 
 
 def test_seven_bar_quilt_turned_a_quarter_keeps_rows():
-    # The same bars lying across: each bar is 2 full-width rows, 52 x 244 twice
-    # (as above), 14 pieces; columns would cut 20 x 7 = 140.
-    layout = rows_layout(quilt_from(seven_bars(vertical=False), cell=24))
+    # The same bars lying across: each bar is 3 full-width rows, 76 x 316 twice
+    # (as above), 14 pieces; columns would cut 26 x 7 = 182.
+    quilt = quilt_from(seven_bars(vertical=False), cell=24)
+    assert block_structure(quilt) is None
+    layout = rows_layout(quilt)
     assert layout.axis == "rows"
     assert layout.piece_count == 14
 
@@ -430,6 +537,39 @@ def test_rows_layout_keeps_rows_on_a_tie():
     # "ab" over "ba": 2 pieces per row, 2 per column, 4 either way: rows win.
     layout = rows_layout(quilt_from(["ab", "ba"]))
     assert (layout.axis, layout.piece_count) == ("rows", 4)
+
+
+def test_a_rectangle_and_a_piece_of_one_size_share_a_cut_line():
+    # Row 1 is 52 a squares: a single-fabric band split 26 + 26, two 16 x 316
+    # rectangles. Row 2 is 26 a then 26 b: a 16 x 316 piece and a b one. Rows
+    # cut 4 pieces; columns would cut 1 rectangle (columns 1 to 26 are a over a)
+    # plus 26 x 2 = 52, so rows stay. Each cut line gets its own strips (MATH.md
+    # F2), so the three a pieces of one size are one line: a 16 x 316 x 3.
+    layout = rows_layout(quilt_from(["a" * 52, "a" * 26 + "b" * 26]))
+    assert (layout.axis, layout.piece_count) == ("rows", 4)
+    assert lines_of(layout) == [("a", 16, 316, 3), ("b", 16, 316, 1)]
+
+
+def test_rows_layout_keeps_every_goose_in_one_line():
+    # A goose pointing left covers squares (0, 0) and (1, 0). Rows would cut 2
+    # pieces (a x 4, c x 4) but sew the goose across two rows (M-13), so the
+    # layout turns to columns: column 1 is the goose, columns 2 to 5 are a over
+    # c, 2 pieces each: 8 pieces, a 16 x 16 x 4 and c 16 x 16 x 4.
+    goose = GooseUnit(row=0, col=0, points="left", body="a", sky="c", confidence=1.0)
+    layout = rows_layout(quilt_from(["baaaa", "bcccc"], units=[goose]))
+    assert (layout.axis, layout.piece_count) == ("columns", 8)
+    assert lines_of(layout) == [("a", 16, 16, 4), ("c", 16, 16, 4)]
+
+
+def test_rows_layout_refuses_geese_lying_both_ways():
+    # One goose down column 1 and one across row 1: rows split the first and
+    # columns split the second, so no line layout sews both whole.
+    units = [
+        GooseUnit(row=0, col=0, points="left", body="a", sky="c", confidence=1.0),
+        GooseUnit(row=0, col=1, points="up", body="b", sky="c", confidence=1.0),
+    ]
+    with pytest.raises(ValueError, match="goose"):
+        rows_layout(quilt_from(["abb", "abb"], units=units))
 
 
 # --- the odd-block model for A3b ------------------------------------------------
@@ -473,9 +613,9 @@ def test_odd_block_model_keeps_its_confirmed_5_x_5_structure():
     # Block B's cream 40 x 64 x 48; the odd block's rows 2 and 4 are single
     # cream rows, 16 x 64 x 2; its row 3 pieces: cream 16 x 28 x 2, blue 16 x 16 x 1.
     assert lines_of(decomposition) == [
-        ("b", "rectangle", 16, 64, 100),
-        ("c", "rectangle", 40, 64, 48),
-        ("c", "rectangle", 16, 64, 2),
-        ("c", "piece", 16, 28, 2),
-        ("b", "piece", 16, 16, 1),
+        ("b", 16, 64, 100),
+        ("c", 40, 64, 48),
+        ("c", 16, 64, 2),
+        ("c", 16, 28, 2),
+        ("b", 16, 16, 1),
     ]

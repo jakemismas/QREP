@@ -124,9 +124,20 @@ def passes_block_gate(counts: Sequence[int]) -> bool:
     )
 
 
+def _units_inside_blocks(region: GridRegion, squares_across: int, squares_down: int) -> bool:
+    # A block seam through a flying goose could only be sewn with a partial
+    # seam (M-13), so such a period is no block structure.
+    for unit in region.unit_map or []:
+        blocks = {(r // squares_down, c // squares_across) for r, c in unit.squares()}
+        if len(blocks) > 1:
+            return False
+    return True
+
+
 def block_structure(quilt: Quilt) -> BlockStructure | None:
     """The confirmed structure when the model has one; otherwise the smallest
-    square period whose blocks pass the gate, or None (engine-11)."""
+    square period whose blocks keep every unit whole and pass the gate, or
+    None (engine-11)."""
     region = quilt.center
     squares = grid_squares(region)
     confirmed = quilt.confirmed_blocks
@@ -141,7 +152,7 @@ def block_structure(quilt: Quilt) -> BlockStructure | None:
         return tile_blocks(squares, confirmed.squares_across, confirmed.squares_down, "confirmed")
     g = gcd(region.rows, region.cols)
     for p in range(2, g + 1):
-        if g % p == 0:
+        if g % p == 0 and _units_inside_blocks(region, p, p):
             structure = tile_blocks(squares, p, p, "gate")
             if passes_block_gate(structure.counts):
                 return structure
