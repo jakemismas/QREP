@@ -19,12 +19,13 @@ from __future__ import annotations
 import importlib
 import io
 import itertools
+import math
 from collections.abc import Callable, Iterator, Mapping
 from functools import partial
 from xml.sax.saxutils import escape
 
 from reportlab import rl_config
-from reportlab.graphics.shapes import String
+from reportlab.graphics.shapes import Drawing, String
 from reportlab.lib.colors import HexColor, black
 from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.styles import ParagraphStyle
@@ -116,7 +117,7 @@ def render_pdf(document: PatternDocument) -> bytes:
     if stringWidth(document.name, FONT, FOOTER_SIZE) > CONTENT_WIDTH:
         raise ValueError(f"the pattern name {document.name!r} is too wide for one footer line")
     probe = _PageProbe()
-    story = _story(document, _drawers(), probe)
+    story = _keep_headings(_story(document, _drawers(), probe))
     out = io.BytesIO()
     template = BaseDocTemplate(
         out,
@@ -136,8 +137,8 @@ def render_pdf(document: PatternDocument) -> bytes:
     )
     template.addPageTemplates([PageTemplate(id="page", frames=[frame])])
     # The canvas takes invariant=1 from the template, which fixes the timestamp
-    # and the document id; pdfdoc also reads the module setting, so it is pinned
-    # for the build and restored after.
+    # and the document id. renderPDF orders a drawing's state changes only under
+    # the module setting (renderPDF.py:213), so that is pinned for the build too.
     previous = rl_config.invariant
     rl_config.invariant = 1
     try:
@@ -161,20 +162,60 @@ def _drawers() -> Mapping[str, Drawer]:
     return getattr(module, "DRAWERS", {})
 
 
+class _Group(list):
+    """Flowables that share one page: a step or paragraph with its figure, a step
+    with its details, or one part of a figure."""
+
+
 def _story(document: PatternDocument, drawers: Mapping[str, Drawer], probe: Flowable) -> list:
     numbers = itertools.count(1)
     cover, *rest = document.sections
-    story = [TextFlowable(escape(document.name), _TITLE)]
+    items = [TextFlowable(escape(document.name), _TITLE)]
     for block in cover.blocks:
-        story += _block(block, numbers, drawers, document.name)
-    story.append(probe)
+        items += _block(block, numbers, drawers, document.name)
+    items.append(probe)
     if rest:
-        story.append(PageBreak())
+        items.append(PageBreak())
     for section in rest:
-        story.append(TextFlowable(escape(section.kind.value), _HEADING))
+        items.append(TextFlowable(escape(section.kind.value), _HEADING))
         for block in section.blocks:
-            story += _block(block, numbers, drawers, document.name)
-    return story
+            items += _block(block, numbers, drawers, document.name)
+    return items
+
+
+def _keep_headings(items: list) -> list:
+    """Each group as a KeepTogether that also holds the headings just before it.
+
+    reportlab's keepWithNext never joins a heading to a KeepTogether
+    (doctemplate.py, _ktAllow), so a heading followed by steps or a figure would
+    otherwise sit alone at the foot of a page. A heading whose group already
+    fills a page stays outside it, so the group itself never splits.
+    """
+    story, pending = [], []
+    for item in items:
+        if isinstance(item, _Group):
+            if pending and _height([*pending, *item]) <= FRAME_HEIGHT:
+                item = [*pending, *item]
+            else:
+                story += pending
+            story.append(KeepTogether(list(item)))
+            pending = []
+        elif item.getKeepWithNext():
+            pending.append(item)
+        else:
+            story += [*pending, item]
+            pending = []
+    return story + pending
+
+
+def _height(parts: list) -> float:
+    """The height parts need at the top of a frame, where reportlab drops the
+    first space before; the last space after never has to fit."""
+    total = sum(
+        p.wrap(CONTENT_WIDTH, FRAME_HEIGHT)[1] + p.getSpaceBefore() + p.getSpaceAfter()
+        for p in parts
+    )
+    return total - parts[0].getSpaceBefore() - parts[-1].getSpaceAfter()
 
 
 def _block(block: Block, numbers: Iterator[int], drawers: Mapping[str, Drawer], name: str) -> list:
@@ -186,21 +227,23 @@ def _block(block: Block, numbers: Iterator[int], drawers: Mapping[str, Drawer], 
             return [TextFlowable(escape(block.text), style)]
         number = next(numbers)
         parts = [TextFlowable(escape(_cite(block.text, number)), style)]
-        return [_together(parts + _figure(block.figure, number, drawers, name), "the paragraph")]
+        return [_with_figure(parts, block.figure, number, drawers, name, "the paragraph")]
     if isinstance(block, Steps):
-        flowables = []
+        groups = []
         for n, step in enumerate(block.items, start=1):
             number = next(numbers) if step.figure is not None else None
             parts = [TextFlowable(f"{n}. {escape(_cite(step.text, number))}", _STEP)]
             parts += [TextFlowable(escape(detail), _DETAIL) for detail in step.details]
-            if step.figure is not None:
-                parts += _figure(step.figure, number, drawers, name)
-            flowables.append(_together(parts, f"step {n}", check=step.figure is not None))
-        return flowables
+            if step.figure is None:
+                groups.append(_Group(parts))
+            else:
+                groups.append(_with_figure(parts, step.figure, number, drawers, name, f"step {n}"))
+        return groups
     if isinstance(block, Table):
         return [_table(block), Spacer(1, 10)]
     if isinstance(block, Figure):
-        return [KeepTogether(_figure(block.request, None, drawers, name))]
+        return [_Group([part, Spacer(1, 10)])
+                for part in _figure_parts(block.request, drawers, name)]
     if isinstance(block, PrintScaleSquare):
         return [_print_scale_square(block), Spacer(1, 10)]
     raise TypeError(f"no layout for block {block!r}")
@@ -216,60 +259,86 @@ def _cite(text: str, number: int | None) -> str:
     return f"{text} (Fig. {number})"
 
 
-def _together(parts: list, what: str, check: bool = True) -> KeepTogether:
-    # KeepTogether falls back to splitting a group taller than a page, so a step
-    # and its figure that cannot share one page are refused rather than split.
-    if check:
-        height = sum(
-            p.wrap(CONTENT_WIDTH, FRAME_HEIGHT)[1] + p.getSpaceBefore() + p.getSpaceAfter()
-            for p in parts
+def _with_figure(parts: list, request: FigureRequest, number: int, drawers: Mapping[str, Drawer],
+                 name: str, what: str) -> _Group:
+    figure = _figure_parts(request, drawers, name)
+    if len(figure) != 1:
+        raise ValueError(
+            f"the figure {request.label!r} is cited from text, so it must be one drawing, "
+            f"not {len(figure)}"
         )
-        if height > FRAME_HEIGHT:
-            raise ValueError(f"{what} and its figure do not fit on one page ({height:.0f} pt)")
-    return KeepTogether(parts)
+    group = _Group([*parts, figure[0], TextFlowable(f"Fig. {number}", _CAPTION)])
+    # KeepTogether falls back to splitting a group taller than a page, so text and
+    # its figure that cannot share one page are refused rather than split.
+    height = _height(group)
+    if height > FRAME_HEIGHT:
+        raise ValueError(f"{what} and its figure do not fit on one page ({height:.0f} pt)")
+    return group
 
 
 # ---------------------------------------------------------------- figures
 
 
-def _figure(request: FigureRequest, number: int | None, drawers: Mapping[str, Drawer],
-            name: str) -> list:
+def _figure_parts(request: FigureRequest, drawers: Mapping[str, Drawer], name: str) -> list:
+    """The drawing for a request, or its parts when one figure spans pages (S10).
+
+    Every part fits the requested size, which fits one page's figure area.
+    """
     if request.width > CONTENT_WIDTH or request.height > MAX_FIGURE_HEIGHT:
         raise ValueError(
             f"figure {request.label!r} ({request.width:g} x {request.height:g} pt) does not fit "
             f"the {CONTENT_WIDTH} x {MAX_FIGURE_HEIGHT} pt figure area"
         )
     draw = drawers.get(request.kind)
-    body = _Placeholder(request) if draw is None else _drawn(draw, request, name)
-    if number is None:
-        return [body, Spacer(1, 10)]
-    return [body, TextFlowable(f"Fig. {number}", _CAPTION)]
+    if draw is None:
+        return [_Placeholder(request)]
+    drawn = draw(request)
+    parts = list(drawn) if isinstance(drawn, list | tuple) else [drawn]
+    if not parts:
+        raise ValueError(f"the {request.kind} drawer returned nothing for {request.label!r}")
+    for part in parts:
+        _check_drawing(part, request, name)
+        part.hAlign = "CENTER"
+    return parts
 
 
-def _drawn(draw: Drawer, request: FigureRequest, name: str) -> Flowable:
-    drawing = draw(request)
+def _check_drawing(drawing: Flowable, request: FigureRequest, name: str) -> None:
     width, height = drawing.wrap(CONTENT_WIDTH, FRAME_HEIGHT)
     if width > request.width + 0.5 or height > request.height + 0.5:
         raise ValueError(
             f"the {request.kind} drawer returned {width:g} x {height:g} pt, larger than the "
             f"{request.width:g} x {request.height:g} pt requested for {request.label!r}"
         )
-    for label in _strings(drawing):
-        if label.fontSize < LABEL_MIN:
+    if isinstance(drawing, Drawing):
+        # A shape past the drawing's own box prints past the size it declared,
+        # into the margins or over the text beside it.
+        bounds = drawing.getBounds()
+        if bounds is not None and (
+            bounds[0] < -0.5 or bounds[1] < -0.5
+            or bounds[2] > drawing.width + 0.5 or bounds[3] > drawing.height + 0.5
+        ):
             raise ValueError(
-                f"figure label {label.text!r} in {request.label!r} is {label.fontSize:g} pt; "
+                f"the {request.kind} drawer draws outside its {drawing.width:g} x "
+                f"{drawing.height:g} pt drawing for {request.label!r}"
+            )
+    for label, size in _labels(drawing):
+        if size < LABEL_MIN - 0.01:
+            raise ValueError(
+                f"figure label {label.text!r} in {request.label!r} prints at {size:g} pt; "
                 f"L-10 needs at least {LABEL_MIN} pt"
             )
         check_text(label.text, name)
-    drawing.hAlign = "CENTER"
-    return drawing
 
 
-def _strings(node) -> Iterator[String]:
+def _labels(node, scale: float = 1.0) -> Iterator[tuple[String, float]]:
+    """Every string in a drawing with the size it prints at, through each
+    group's transform and the drawing's render scale."""
+    a, b, c, d = (getattr(node, "transform", None) or (1, 0, 0, 1))[:4]
+    scale *= math.sqrt(abs(a * d - b * c)) * getattr(node, "renderScale", 1.0)
     if isinstance(node, String):
-        yield node
+        yield node, node.fontSize * scale
     for child in getattr(node, "contents", ()):
-        yield from _strings(child)
+        yield from _labels(child, scale)
 
 
 class _Placeholder(Flowable):
@@ -322,7 +391,8 @@ class _Swatch(Flowable):
 
 
 def _table(block: Table) -> TableFlowable:
-    data = [[TextFlowable(escape(text), _CELL_HEAD) for text in block.header]]
+    head = 1 if block.header else 0
+    data = [[TextFlowable(escape(text), _CELL_HEAD) for text in block.header]] if head else []
     style = [
         ("GRID", (0, 0), (-1, -1), 0.5, _FRAME),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
@@ -331,7 +401,7 @@ def _table(block: Table) -> TableFlowable:
         ("TOPPADDING", (0, 0), (-1, -1), 2),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
     ]
-    for r, row in enumerate(block.rows, start=1):
+    for r, row in enumerate(block.rows, start=head):
         cells = []
         for c, cell in enumerate(row):
             if isinstance(cell, Swatch):
@@ -341,11 +411,11 @@ def _table(block: Table) -> TableFlowable:
             else:
                 cells.append(TextFlowable(escape(cell), _CELL))
         data.append(cells)
-    weights = block.widths or (1,) * len(block.header)
+    weights = block.widths or (1,) * block.columns
     widths = [CONTENT_WIDTH * w / sum(weights) for w in weights]
-    # reportlab splits a table between rows only, never inside one (G-04), and
-    # repeats the header row on each page the table continues on.
-    table = TableFlowable(data, colWidths=widths, repeatRows=1)
+    # Split between rows only, never inside one (G-04), repeating the header row
+    # on each page the table continues on.
+    table = TableFlowable(data, colWidths=widths, repeatRows=head, splitByRow=1, splitInRow=0)
     table.setStyle(TableStyle(style))
     return table
 

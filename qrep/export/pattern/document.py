@@ -151,7 +151,8 @@ class Swatch:
 class Table:
     """A table whose rows never split across pages (G-04).
 
-    widths, when given, are relative column weights.
+    An empty header prints no header row, as for a piece list. widths, when
+    given, are relative column weights.
     """
 
     header: tuple[str, ...]
@@ -161,13 +162,20 @@ class Table:
     def __post_init__(self) -> None:
         object.__setattr__(self, "header", tuple(self.header))
         object.__setattr__(self, "rows", tuple(tuple(row) for row in self.rows))
+        if not self.header and not self.rows:
+            raise ValueError("a table needs a header or a row")
+        columns = self.columns
         if self.widths is not None:
             object.__setattr__(self, "widths", tuple(self.widths))
-            if len(self.widths) != len(self.header) or min(self.widths) <= 0:
+            if len(self.widths) != columns or min(self.widths) <= 0:
                 raise ValueError("a table needs one positive width per column")
         for row in self.rows:
-            if len(row) != len(self.header):
-                raise ValueError(f"row {row!r} has {len(row)} cells for {len(self.header)} columns")
+            if len(row) != columns:
+                raise ValueError(f"row {row!r} has {len(row)} cells for {columns} columns")
+
+    @property
+    def columns(self) -> int:
+        return len(self.header) if self.header else len(self.rows[0])
 
 
 @dataclass(frozen=True)
@@ -208,6 +216,9 @@ class PatternDocument:
         object.__setattr__(self, "sections", tuple(self.sections))
         if not self.name.strip() or "\n" in self.name:
             raise ValueError("a pattern needs a one-line name")
+        # The name prints in every footer, where no date may appear (G-02, PS-03).
+        if _DATE.search(self.name):
+            raise PatternTextError(f"the pattern name {self.name!r} holds a date")
         kinds = [section.kind for section in self.sections]
         if not kinds or kinds[0] is not SectionKind.COVER:
             raise ValueError("the cover must be the first section")
@@ -293,6 +304,11 @@ class PatternTextError(ValueError):
     """Text the pattern must never print (PS-05, PS-06, G-02)."""
 
 
+_DATE = re.compile(
+    r"\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2}/\d{1,2}/\d{2,4}\b|"
+    r"\b(?:January|February|March|April|May|June|July|August|September|October|"
+    r"November|December) \d{1,2}\b"
+)
 _BANNED = [
     (re.compile(r"\b(?:historical|modern|strip strategy|difficulty|minutes|heuristic)\b",
                 re.IGNORECASE), "a strategy name, difficulty or time word"),
@@ -304,11 +320,11 @@ _BANNED = [
     (re.compile(r"\d\.\d"), "a decimal number"),
     (re.compile(r"\b\d+-\d+/\d+\b"), "a hyphenated fraction"),
     (re.compile("[¼-¾⅐-⅞⁄]"), "a fraction glyph"),
-    (re.compile(r"\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2}/\d{1,2}/\d{2,4}\b|"
-                r"\b(?:January|February|March|April|May|June|July|August|September|October|"
-                r"November|December) \d{1,2}\b"), "a date"),
+    (_DATE, "a date"),
 ]
 _FRACTION = re.compile(r"\b(\d+)/(\d+)\b")
+# A fraction is only ever a length or a yardage, so it carries its unit (C-07).
+_BARE_FRACTION = re.compile(r'\b\d+/\d+\b(?!"| yd\b)')
 _SEPARATOR = re.compile(r"\d( ?)([xX×])( ?)(?=\d|WOF)")
 
 
@@ -330,6 +346,9 @@ def check_text(text: str, name: str = "") -> None:
         num, den = int(found.group(1)), int(found.group(2))
         if den not in (2, 4, 8) or not 0 < num < den or math.gcd(num, den) != 1:
             raise PatternTextError(f"fraction {found.group(0)!r} is not in lowest eighths in {text!r}")
+    found = _BARE_FRACTION.search(text)
+    if found:
+        raise PatternTextError(f"fraction {found.group(0)!r} has no inch mark or yd in {text!r}")
     for found in _SEPARATOR.finditer(plain):
         if found.group(1, 2, 3) != (" ", "x", " "):
             raise PatternTextError(f"dimension {found.group(0)!r} needs ' x ' in {text!r}")
