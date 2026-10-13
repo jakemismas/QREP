@@ -179,6 +179,35 @@ describe("clamping to the image", () => {
     });
   });
 
+  it("floors a near side at .7 and ceils a far side at .2, where rounding would not", () => {
+    // 1000 x 800 image, squarePx 9.2: margin = ceil(9.2) = 10 (round gives 9).
+    // Near side x 50.7, y 60.7: floor gives 50 and 60, round 51 and 61.
+    // Far side x 700.2, y 500.2: ceil gives 701 and 501, round 700 and 500.
+    // x0 = max(0, 50 - 10) = 40, y0 = max(0, 60 - 10) = 50 (neither clamped),
+    // x1 = min(1000, 701 + 10) = 711, y1 = min(800, 501 + 10) = 511 (neither clamped).
+    // crop = (711 - 40, 511 - 50) = (671, 461), under the cap.
+    // Math.round everywhere would give x0 = 51 - 9 = 42, y0 = 61 - 9 = 52,
+    // x1 = 700 + 9 = 709, y1 = 500 + 9 = 509: crop 667 x 457.
+    const corners: Corners = {
+      top_left: { x: 50.7, y: 60.7 },
+      top_right: { x: 700.2, y: 60.7 },
+      bottom_right: { x: 700.2, y: 500.2 },
+      bottom_left: { x: 50.7, y: 500.2 },
+    };
+    const plan = planCrop({ width: 1000, height: 800 }, corners, 9.2);
+    expect(plan.offset).toEqual({ x: 40, y: 50 });
+    expect(plan.crop).toEqual({ width: 671, height: 461 });
+    expect(plan.staged).toEqual({ width: 671, height: 461 });
+    // Scale 1: x - 40 and y - 50: 50.7 - 40 = 10.7, 700.2 - 40 = 660.2,
+    // 60.7 - 50 = 10.7, 500.2 - 50 = 450.2.
+    expectCorners(plan.corners, {
+      top_left: { x: 10.7, y: 10.7 },
+      top_right: { x: 660.2, y: 10.7 },
+      bottom_right: { x: 660.2, y: 450.2 },
+      bottom_left: { x: 10.7, y: 450.2 },
+    });
+  });
+
   it("keeps at least one pixel of margin for a sub-pixel square", () => {
     // squarePx 0.4: margin = ceil(0.4) = 1; quad 10..20 of a 100 x 100 image:
     // x0 = y0 = 10 - 1 = 9, x1 = y1 = 20 + 1 = 21, crop = 12 x 12.
@@ -262,6 +291,44 @@ describe("no viewport input (ux-06)", () => {
     // And it is the docs-03 plan computed by hand above.
     expect(desktop.offset).toEqual({ x: 256, y: 1009 });
     expect(desktop.staged).toEqual({ width: 778, height: 778 });
+  });
+
+  it("caps a crop longer than 1400 px at 2000 with a 390 px window", () => {
+    // The docs-03 crop is 778 px, under the old 1400 px phone cap, so it
+    // cannot tell the caps apart. This one is longer than 1400.
+    // A 3000 x 2000 photo of 100 px squares, pins (100, 100) to (2900, 1900),
+    // 28 x 1 = 28 squares across and 18 x 1 = 18 down, field frame:
+    // 2800 / 28 = 100 and 1800 / 18 = 100, so squarePx = 100, margin = 100.
+    // x0 = max(0, 100 - 100) = 0, y0 = 0, x1 = min(3000, 2900 + 100) = 3000,
+    // y1 = min(2000, 1900 + 100) = 2000: crop 3000 x 2000.
+    // capLongest(3000, 2000) at 2000: 2000 x round(2000 x 2000 / 3000 =
+    // 1333.33) = 2000 x 1333. The phone cap would give 1400 x round(933.33) = 1400 x 933.
+    vi.stubGlobal("innerWidth", 390);
+    const corners: Corners = {
+      top_left: { x: 100, y: 100 },
+      top_right: { x: 2900, y: 100 },
+      bottom_right: { x: 2900, y: 1900 },
+      bottom_left: { x: 100, y: 1900 },
+    };
+    const squares = frameSquares("field", { blocks: 28, squaresPerBlock: 1 }, { blocks: 18, squaresPerBlock: 1 }, []);
+    const px = squarePx(corners, squares);
+    expect(px).toBe(100);
+    const plan = planCrop({ width: 3000, height: 2000 }, corners, px);
+    expect(plan.offset).toEqual({ x: 0, y: 0 });
+    expect(plan.crop).toEqual({ width: 3000, height: 2000 });
+    expect(plan.staged).toEqual({ width: 2000, height: 1333 });
+    // x: 100 x 2000 / 3000 = 66.666667, 2900 x 2000 / 3000 = 1933.333333
+    // y: 100 x 1333 / 2000 = 66.65, 1900 x 1333 / 2000 = 1266.35
+    expectCorners(
+      plan.corners,
+      {
+        top_left: { x: 66.666667, y: 66.65 },
+        top_right: { x: 1933.333333, y: 66.65 },
+        bottom_right: { x: 1933.333333, y: 1266.35 },
+        bottom_left: { x: 66.666667, y: 1266.35 },
+      },
+      5,
+    );
   });
 });
 
@@ -385,6 +452,42 @@ describe("decodePhoto", () => {
     const text = new Blob(["hello, this is not a photo"], { type: "text/plain" });
     await expect(decodePhoto(text)).rejects.toThrow(DECODE_ERROR);
     expect(DECODE_ERROR).toBe("QREP could not open this file. Choose a JPG or PNG photo of your quilt.");
+  });
+
+  it("reads only the 16-byte head of a file that is neither JPEG nor PNG", async () => {
+    // A GIF head (47 49 46 38 39 61, "GIF89a") is neither FF D8 FF nor
+    // 89 50 4E 47 0D 0A 1A 0A, so the whole file is never read: its
+    // arrayBuffer throws, and only slice(0, 16) gives bytes.
+    const bitmap = { width: 4, height: 3, close: vi.fn() };
+    const create = vi.fn().mockResolvedValue(bitmap);
+    vi.stubGlobal("createImageBitmap", create);
+    const slices: [number | undefined, number | undefined][] = [];
+    const whole = vi.fn(() => {
+      throw new Error("read the whole file");
+    });
+    const file = {
+      size: 50_000_000,
+      type: "image/gif",
+      slice: (start?: number, end?: number) => {
+        slices.push([start, end]);
+        return new Blob([new TextEncoder().encode("GIF89a\x04\x00\x03\x00")]);
+      },
+      arrayBuffer: whole,
+    } as unknown as Blob;
+    await expect(decodePhoto(file)).resolves.toBe(bitmap);
+    expect(slices).toEqual([[0, 16]]);
+    expect(whole).not.toHaveBeenCalled();
+    expect(create).toHaveBeenCalledWith(file, { imageOrientation: "from-image" });
+  });
+
+  it("reads the whole file of a JPEG head for the integrity walk", async () => {
+    // SMALL_JPEG starts FF D8 FF, so its whole 858 bytes are walked to FF D9.
+    const bitmap = { width: 8, height: 8, close: vi.fn() };
+    vi.stubGlobal("createImageBitmap", vi.fn().mockResolvedValue(bitmap));
+    const file = new Blob([fromBase64(SMALL_JPEG)], { type: "image/jpeg" });
+    const whole = vi.spyOn(file, "arrayBuffer");
+    await expect(decodePhoto(file)).resolves.toBe(bitmap);
+    expect(whole).toHaveBeenCalledTimes(1);
   });
 
   it("rejects a truncated JPEG before the browser can decode it blank", async () => {

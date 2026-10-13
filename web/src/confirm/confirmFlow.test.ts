@@ -6,7 +6,7 @@
  * in the comments.
  */
 import { describe, expect, it } from "vitest";
-import { ConfirmFlow, DEFAULT_COUNTS, DEFAULT_FRAME_MODE } from "./confirmFlow";
+import { ConfirmFlow, DEFAULT_COUNTS, DEFAULT_FRAME_MODE, DISPLAY_ERROR } from "./confirmFlow";
 import { quadProblem } from "./frame";
 
 // neutralInset of a 894 x 1044 photo (frame.ts, inset 0.15):
@@ -304,6 +304,114 @@ describe("beginStaging and endStaging", () => {
     flow.setBands([{ width_squares: 1 }]);
     expect(frame.corners).toEqual(PINS_A);
     expect(frame.bands).toEqual([]);
+  });
+});
+
+describe("restore (Adjust the crop shows what was read)", () => {
+  it("puts back the frame the read used when its sequence is current", () => {
+    const { flow } = readyFlow();
+    flow.setCounts({ blocks: 9, squaresPerBlock: 5 }, { blocks: 11, squaresPerBlock: 5 });
+    flow.setBands([{ width_squares: 2.5 }]);
+    const frame = flow.beginStaging()!;
+    // Changes made while the read staged, which the read never saw.
+    flow.setCorner("top_left", { x: 140, y: 160 });
+    flow.setCounts({ blocks: 3, squaresPerBlock: 3 }, { blocks: 4, squaresPerBlock: 4 });
+    flow.setBands([]);
+    flow.setMode("field");
+    flow.endStaging(frame.seq);
+    expect(flow.restore(frame)).toBe(true);
+    // The frame as staged: PINS_A, 9 x 5 by 11 x 5, one 2.5 band, outer edge.
+    expect(flow.corners).toEqual(PINS_A);
+    expect(flow.across).toEqual({ blocks: 9, squaresPerBlock: 5 });
+    expect(flow.down).toEqual({ blocks: 11, squaresPerBlock: 5 });
+    expect(flow.bands).toEqual([{ width_squares: 2.5 }]);
+    expect(flow.mode).toBe("outer_edge");
+    // Copies, so editing the flow afterwards cannot edit the kept frame.
+    flow.setCorner("top_left", { x: 1, y: 1 });
+    flow.across.blocks = 99;
+    expect(frame.corners.top_left).toEqual({ x: 134, y: 157 });
+    expect(frame.across.blocks).toBe(9);
+  });
+
+  it("does nothing for a frame from an older photo", () => {
+    const { flow } = readyFlow();
+    const old = flow.beginStaging()!;
+    const seq = flow.newPhoto();
+    flow.decoded(seq, SIZE_B);
+    flow.setCounts({ blocks: 2, squaresPerBlock: 2 }, { blocks: 3, squaresPerBlock: 3 });
+    expect(flow.restore(old)).toBe(false);
+    // Photo B keeps its own pins and counts.
+    expect(flow.corners).toEqual(PINS_B);
+    expect(flow.across).toEqual({ blocks: 2, squaresPerBlock: 2 });
+    expect(flow.down).toEqual({ blocks: 3, squaresPerBlock: 3 });
+  });
+
+  it("does nothing after clear", () => {
+    const { flow } = readyFlow();
+    const frame = flow.beginStaging()!;
+    flow.clear();
+    expect(flow.restore(frame)).toBe(false);
+    expect(flow.corners).toBeNull();
+    expect(flow.status).toBe("empty");
+  });
+});
+
+describe("the displayed photo must match the decoded one", () => {
+  it("leaves Continue on when the img loads at the decoded size", () => {
+    const { flow, seq } = readyFlow();
+    expect(flow.displayLoaded(seq, { width: 894, height: 1044 })).toBe(true);
+    expect(flow.displayProblem).toBeNull();
+    expect(flow.canContinue).toBe(true);
+  });
+
+  it("blocks Continue when the img loads at another size", () => {
+    const { flow, seq } = readyFlow();
+    // 1044 x 894 is the decoded 894 x 1044 turned a quarter: an img that
+    // ignored the EXIF orientation createImageBitmap applied.
+    expect(flow.displayLoaded(seq, { width: 1044, height: 894 })).toBe(true);
+    expect(flow.canContinue).toBe(false);
+    expect(flow.blocked).toBe(DISPLAY_ERROR);
+    expect(DISPLAY_ERROR).toBe("QREP could not show this photo the way it reads it. Go back and choose it again.");
+    expect(flow.beginStaging()).toBeNull();
+  });
+
+  it("blocks Continue when the img fails to load", () => {
+    const { flow, seq } = readyFlow();
+    expect(flow.displayFailed(seq)).toBe(true);
+    expect(flow.canContinue).toBe(false);
+    expect(flow.blocked).toBe(DISPLAY_ERROR);
+  });
+
+  it("clears an earlier failure when the img then loads at the decoded size", () => {
+    const { flow, seq } = readyFlow();
+    flow.displayFailed(seq);
+    expect(flow.displayLoaded(seq, SIZE_A)).toBe(true);
+    expect(flow.canContinue).toBe(true);
+  });
+
+  it("ignores a load or failure from an older photo", () => {
+    const { flow, seq: old } = readyFlow();
+    const seq = flow.newPhoto();
+    flow.decoded(seq, SIZE_B);
+    // Photo A's img reporting its own 894 x 1044, or failing, after B is up.
+    expect(flow.displayLoaded(old, SIZE_A)).toBe(false);
+    expect(flow.displayFailed(old)).toBe(false);
+    expect(flow.displayProblem).toBeNull();
+    expect(flow.canContinue).toBe(true);
+  });
+
+  it("ignores a load before the photo is decoded, and a new photo starts with no problem", () => {
+    const flow = new ConfirmFlow();
+    const seq = flow.newPhoto();
+    expect(flow.displayLoaded(seq, SIZE_A)).toBe(false);
+    expect(flow.displayFailed(seq)).toBe(false);
+    flow.decoded(seq, SIZE_A);
+    flow.displayFailed(seq);
+    expect(flow.canContinue).toBe(false);
+    const next = flow.newPhoto();
+    flow.decoded(next, SIZE_B);
+    expect(flow.displayProblem).toBeNull();
+    expect(flow.canContinue).toBe(true);
   });
 });
 

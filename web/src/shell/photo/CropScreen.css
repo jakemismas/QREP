@@ -25,6 +25,10 @@
 }
 .pf-confirm__photo .cf-pins__zoom { justify-content: center; }
 .pf-confirm__side { grid-area: side; display: grid; gap: 18px; align-content: start; min-width: 0; }
+/* The fieldset only makes the controls inert while Continue stages; a
+   fieldset's default min-width is its content's, which would push a narrow
+   phone sideways, so it is zeroed with the border and padding. */
+.pf-confirm__controls { display: grid; gap: 18px; align-content: start; min-width: 0; margin: 0; padding: 0; border: 0; }
 .pf-confirm__group { display: grid; gap: 8px; min-width: 0; }
 .pf-confirm__h2 { margin: 0; font: 700 18px var(--serif); color: var(--denim); }
 .pf-confirm__field { display: grid; gap: 4px; font-size: 14.5px; color: var(--ink2); }

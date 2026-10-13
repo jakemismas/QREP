@@ -25,6 +25,14 @@ export const DEFAULT_COUNTS: { readonly across: AxisCount; readonly down: AxisCo
   down: Object.freeze({ blocks: 1, squaresPerBlock: 1 }),
 });
 
+/**
+ * Why Continue stays off when the photo on screen is not the decoded photo:
+ * the pins are placed through the img element's own pixels and the crop is
+ * cut from the decoded bitmap's, so a browser that orients or sizes one
+ * differently from the other would cut a quad the user never pinned.
+ */
+export const DISPLAY_ERROR = "QREP could not show this photo the way it reads it. Go back and choose it again.";
+
 /** What Continue reads: the frame as confirmed, bound to its staging sequence. */
 export interface ConfirmedFrame {
   seq: number;
@@ -64,6 +72,8 @@ export class ConfirmFlow {
    * until a read gives A10's default (carried item from C3a, #149).
    */
   squareEighths: number | null = null;
+  /** DISPLAY_ERROR once the img shows another size than the decoded photo, or fails to load; else null. */
+  displayProblem: string | null = null;
 
   private reset(status: ConfirmStatus): void {
     this.status = status;
@@ -77,6 +87,7 @@ export class ConfirmFlow {
     this.down = { ...DEFAULT_COUNTS.down };
     this.staging = false;
     this.squareEighths = null;
+    this.displayProblem = null;
   }
 
   /** Starts a photo: seq += 1, status "decoding", everything else back to defaults. */
@@ -113,6 +124,25 @@ export class ConfirmFlow {
     return true;
   }
 
+  /**
+   * The confirm screen's img loaded at its natural size. False (no change)
+   * when stale or not ready; else a size that differs from the decoded one
+   * blocks Continue, and a matching one clears an earlier failure.
+   */
+  displayLoaded(seq: number, natural: Size): boolean {
+    if (!this.isCurrent(seq) || this.status !== "ready" || !this.size) return false;
+    const same = natural.width === this.size.width && natural.height === this.size.height;
+    this.displayProblem = same ? null : DISPLAY_ERROR;
+    return true;
+  }
+
+  /** The confirm screen's img failed to load. False when stale or not ready; else it blocks Continue. */
+  displayFailed(seq: number): boolean {
+    if (!this.isCurrent(seq) || this.status !== "ready") return false;
+    this.displayProblem = DISPLAY_ERROR;
+    return true;
+  }
+
   setCorner(name: CornerName, point: Point): void {
     if (!this.corners) return;
     // A new object, so a render keyed on the corners sees the move.
@@ -136,10 +166,11 @@ export class ConfirmFlow {
     this.squareEighths = eighths;
   }
 
-  /** Why Continue is off, or null: not ready, already staging, or quadProblem(corners). */
+  /** Why Continue is off, or null: not ready, a display problem, already staging, or quadProblem(corners). */
   get blocked(): string | null {
     if (this.status === "empty" || this.status === "failed") return "Choose a photo of your quilt first.";
     if (this.status === "decoding" || !this.corners) return "QREP is still opening the photo.";
+    if (this.displayProblem) return this.displayProblem;
     if (this.staging) return "QREP is preparing the photo.";
     return quadProblem(this.corners);
   }
@@ -170,6 +201,22 @@ export class ConfirmFlow {
   /** staging = false, only for the current seq. */
   endStaging(seq: number): void {
     if (this.isCurrent(seq)) this.staging = false;
+  }
+
+  /**
+   * Puts back the frame a read used, for "Adjust the crop": a pin, count,
+   * band or mode change made while that read staged never reached it, so
+   * showing the change would claim it had been read. Only for the current
+   * seq; false (no change) otherwise.
+   */
+  restore(frame: ConfirmedFrame): boolean {
+    if (!this.isCurrent(frame.seq) || this.status !== "ready") return false;
+    this.mode = frame.mode;
+    this.corners = copyCorners(frame.corners);
+    this.bands = copyBands(frame.bands);
+    this.across = { ...frame.across };
+    this.down = { ...frame.down };
+    return true;
   }
 
   /** seq += 1, so in-flight work goes stale; status "empty"; all defaults. */

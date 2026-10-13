@@ -19,7 +19,7 @@ import type { VisionState } from "../engine/rpc";
 import { parseSizeResult } from "../engine/contract";
 import type { BorderBand, Corners, Point } from "../engine/contract";
 import { ConfirmFlow } from "../confirm/confirmFlow";
-import type { ConfirmStatus } from "../confirm/confirmFlow";
+import type { ConfirmedFrame, ConfirmStatus } from "../confirm/confirmFlow";
 import type { AxisCount } from "../confirm/counts";
 import { CORNER_NAMES } from "../confirm/frame";
 import type { CornerName, FrameMode } from "../confirm/frame";
@@ -93,6 +93,8 @@ export interface PhotoResult {
 /** The confirm screen's state and gestures (C3b, issue #101): a snapshot of
  * ConfirmFlow taken after every change. Corners are in decoded-photo pixels. */
 export interface ConfirmApi {
+  /** The staging sequence this snapshot belongs to; the display callbacks echo it back. */
+  seq: number;
   status: ConfirmStatus;
   /** Why the last photo could not be opened, in plain words. */
   error: string | null;
@@ -114,6 +116,10 @@ export interface ConfirmApi {
   setMode: (mode: FrameMode) => void;
   setBands: (bands: BorderBand[]) => void;
   setCounts: (across: AxisCount, down: AxisCount) => void;
+  /** The confirm screen's img loaded at its natural size. */
+  displayLoaded: (seq: number, natural: Size) => void;
+  /** The confirm screen's img failed to load. */
+  displayFailed: (seq: number) => void;
 }
 
 /** The photo-reverse flow API (owned by the state layer; PhotoFlow consumes it).
@@ -198,7 +204,10 @@ function readSizeView(entry: SizeEntryState): SizeView {
   };
 }
 
-type ConfirmView = Omit<ConfirmApi, "setCorner" | "setMode" | "setBands" | "setCounts">;
+type ConfirmView = Omit<
+  ConfirmApi,
+  "setCorner" | "setMode" | "setBands" | "setCounts" | "displayLoaded" | "displayFailed"
+>;
 
 const copyPoint = (p: Point): Point => ({ x: p.x, y: p.y });
 
@@ -207,6 +216,7 @@ const copyPoint = (p: Point): Point => ({ x: p.x, y: p.y });
 function readConfirmView(flow: ConfirmFlow): ConfirmView {
   const c = flow.corners;
   return {
+    seq: flow.seq,
     status: flow.status,
     error: flow.error,
     size: flow.size ? { width: flow.size.width, height: flow.size.height } : null,
@@ -304,6 +314,9 @@ export function usePhotoState(model: QuiltModel | null): PhotoFlowState {
   const stagedDimsRef = useRef<{ width: number; height: number } | null>(null);
   const stagedTokenRef = useRef<string | null>(null);
   const reverseTokenRef = useRef<{ cancelled: boolean }>({ cancelled: false });
+  // The frame the read on the results screen used, so "Adjust the crop"
+  // shows what was read rather than a change made while it staged.
+  const readFrameRef = useRef<ConfirmedFrame | null>(null);
   const retryGateRef = useRef<(() => void) | null>(null);
   const prefetchedRef = useRef(false);
 
@@ -333,6 +346,13 @@ export function usePhotoState(model: QuiltModel | null): PhotoFlowState {
     stagedBytesRef.current = null;
     stagedDimsRef.current = null;
     stagedTokenRef.current = null;
+    readFrameRef.current = null;
+  }, []);
+
+  /** Stops a pending read's vision-retry loop without restarting the engine. */
+  const stopReverse = useCallback(() => {
+    reverseTokenRef.current.cancelled = true;
+    retryGateRef.current?.();
   }, []);
 
   // Mirror the RPC vision state onto <body> for the e2e and the loading bar,
@@ -596,6 +616,7 @@ export function usePhotoState(model: QuiltModel | null): PhotoFlowState {
         outcome = await runReverse(staged, optionsJson, token);
       }
       if (stale()) return;
+      readFrameRef.current = frame;
       applyReverse(outcome.model, outcome.ms, outcome.verdict, outcome.diagnostics, outcome.requested, outcome.achieved);
       machineRef.current.results();
       syncPhoto();
@@ -631,12 +652,28 @@ export function usePhotoState(model: QuiltModel | null): PhotoFlowState {
       const bytes = new Uint8Array(base64ToArrayBuffer(rendered.png_b64));
       stagedBytesRef.current = bytes;
       stagedTokenRef.current = null;
+      // The sample still skips the confirm screen on the way in, but "Adjust
+      // the crop" from its results opens it, so the flow holds the sample as
+      // a decoded photo with its default pins, and Continue re-reads it.
+      const flow = confirmRef.current;
+      const seq = flow.newPhoto();
+      let bitmap: ImageBitmap | null = null;
       try {
-        const bitmap = await createImageBitmap(new Blob([bytes], { type: "image/png" }));
-        stagedDimsRef.current = { width: bitmap.width, height: bitmap.height };
-        if (typeof bitmap.close === "function") bitmap.close();
+        bitmap = await decodePhoto(new Blob([bytes], { type: "image/png" }));
       } catch {
+        bitmap = null;
+      }
+      if (token.cancelled) {
+        closeBitmap(bitmap);
+        return;
+      }
+      if (bitmap && flow.decoded(seq, { width: bitmap.width, height: bitmap.height })) {
+        bitmapRef.current = bitmap;
+        stagedDimsRef.current = { width: bitmap.width, height: bitmap.height };
+      } else {
+        closeBitmap(bitmap);
         stagedDimsRef.current = null;
+        flow.decodeFailed(seq, "The sample could not be opened as a photo.");
       }
       setSessionPhoto(URL.createObjectURL(new Blob([bytes], { type: "image/png" })));
       const outcome = await runReverse(bytes, "{}", token);
@@ -647,6 +684,8 @@ export function usePhotoState(model: QuiltModel | null): PhotoFlowState {
     } catch {
       if (token.cancelled) return;
       toast.push("The sample didn’t load, try again?", "error");
+      confirmRef.current.clear();
+      dropStaged();
       machineRef.current.reset();
       syncPhoto();
     }
@@ -694,9 +733,11 @@ export function usePhotoState(model: QuiltModel | null): PhotoFlowState {
     }
   }, [photoResult, toast]);
 
-  // "Adjust the crop" from results: back to the confirm screen, where the
-  // flow still holds the confirmed corners, counts, bands and frame.
+  // "Adjust the crop" from results: back to the confirm screen with the
+  // corners, counts, bands and frame the read used.
   const toCrop = useCallback(() => {
+    const frame = readFrameRef.current;
+    if (frame) confirmRef.current.restore(frame);
     machineRef.current.seedFromConfirmed();
     syncPhoto();
   }, [syncPhoto]);
@@ -724,6 +765,7 @@ export function usePhotoState(model: QuiltModel | null): PhotoFlowState {
   }, [dropStaged, setSessionPhoto, syncPhoto]);
 
   const backToDropzone = useCallback(() => {
+    stopReverse();
     confirmRef.current.clear();
     dropStaged();
     setPhotoActive(true);
@@ -734,7 +776,7 @@ export function usePhotoState(model: QuiltModel | null): PhotoFlowState {
     // vision prefetch fires on photo-flow ENTRY, not on drop (S2 contract);
     // this is also the entry path from the start screen
     engineRef.current.prefetchVision();
-  }, [dropStaged, setSessionPhoto, syncPhoto]);
+  }, [dropStaged, setSessionPhoto, stopReverse, syncPhoto]);
 
   const exitToEditor = useCallback(() => {
     // The editor never returns to Confirm, so the decoded bitmap (192 MB for a
@@ -747,6 +789,7 @@ export function usePhotoState(model: QuiltModel | null): PhotoFlowState {
   }, [dropStaged]);
 
   const reset = useCallback(() => {
+    stopReverse();
     confirmRef.current.clear();
     dropStaged();
     setPhotoActive(false);
@@ -755,7 +798,7 @@ export function usePhotoState(model: QuiltModel | null): PhotoFlowState {
     setPhotoResult(null);
     setShowUncertain(false);
     setSessionPhoto(null);
-  }, [dropStaged, setSessionPhoto, syncPhoto]);
+  }, [dropStaged, setSessionPhoto, stopReverse, syncPhoto]);
 
   // ---- derived uncertainty for the open (photo-sourced) model --------------
 
@@ -810,6 +853,12 @@ export function usePhotoState(model: QuiltModel | null): PhotoFlowState {
       setCounts: (across: AxisCount, down: AxisCount) => {
         confirmRef.current.setCounts(across, down);
         syncConfirm();
+      },
+      displayLoaded: (seq: number, natural: Size) => {
+        if (confirmRef.current.displayLoaded(seq, natural)) syncConfirm();
+      },
+      displayFailed: (seq: number) => {
+        if (confirmRef.current.displayFailed(seq)) syncConfirm();
       },
     }),
     [syncConfirm],

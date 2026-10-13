@@ -83,6 +83,8 @@ export function CropScreen({ photo }: { photo: PhotoApi }) {
 
   const size = confirm.size;
   const corners = confirm.corners;
+  // Bound to this render's photo, so a late load of an older photo's img changes nothing.
+  const seq = confirm.seq;
   const outer = confirm.mode === "outer_edge";
   const bands = useMemo(() => (outer ? confirm.bands : []), [outer, confirm.bands]);
   const problem = corners ? quadProblem(corners) : null;
@@ -164,6 +166,8 @@ export function CropScreen({ photo }: { photo: PhotoApi }) {
             activeId={activeId}
             onActivate={setActiveId}
             onMove={onMove}
+            onImageLoad={(natural) => confirm.displayLoaded(seq, natural)}
+            onImageError={() => confirm.displayFailed(seq)}
             overlay={
               homography ? (
                 <GridOverlay
@@ -181,51 +185,55 @@ export function CropScreen({ photo }: { photo: PhotoApi }) {
 
       {size ? (
         <div className="pf-confirm__side">
-          <section className="pf-confirm__group" aria-labelledby="pf-confirm-frame">
-            <h2 className="pf-confirm__h2" id="pf-confirm-frame">
-              Frame
-            </h2>
-            <label className="pf-confirm__field">
-              <span>The pins mark</span>
-              <select
-                className="pf-confirm__select"
-                data-testid="frame-mode"
-                value={confirm.mode}
-                onChange={(e) => changeMode(e.target.value as FrameMode)}
-              >
-                <option value="outer_edge">The outer edge, with any borders</option>
-                <option value="field">The corners of the pieced field, no border</option>
-              </select>
-            </label>
-          </section>
-
-          <section className="pf-confirm__group" aria-labelledby="pf-confirm-counts">
-            <h2 className="pf-confirm__h2" id="pf-confirm-counts">
-              Squares
-            </h2>
-            <CountsPanel
-              across={confirm.across}
-              down={confirm.down}
-              onChange={(across, down) => confirm.setCounts(across, down)}
-            />
-          </section>
-
-          {outer ? (
-            <section className="pf-confirm__group" aria-labelledby="pf-confirm-bands">
-              <h2 className="pf-confirm__h2" id="pf-confirm-bands">
-                Borders
+          {/* Inert while Continue stages: a change made now could not reach
+              the read in flight, yet would show afterwards as if read. */}
+          <fieldset className="pf-confirm__controls" disabled={confirm.staging}>
+            <section className="pf-confirm__group" aria-labelledby="pf-confirm-frame">
+              <h2 className="pf-confirm__h2" id="pf-confirm-frame">
+                Frame
               </h2>
-              <BandsControl
-                bands={confirm.bands}
-                onChange={confirm.setBands}
-                activeBand={band}
-                onSelect={setActiveBand}
-                squareEighths={confirm.squareEighths}
+              <label className="pf-confirm__field">
+                <span>The pins mark</span>
+                <select
+                  className="pf-confirm__select"
+                  data-testid="frame-mode"
+                  value={confirm.mode}
+                  onChange={(e) => changeMode(e.target.value as FrameMode)}
+                >
+                  <option value="outer_edge">The outer edge, with any borders</option>
+                  <option value="field">The corners of the pieced field, no border</option>
+                </select>
+              </label>
+            </section>
+
+            <section className="pf-confirm__group" aria-labelledby="pf-confirm-counts">
+              <h2 className="pf-confirm__h2" id="pf-confirm-counts">
+                Squares
+              </h2>
+              <CountsPanel
+                across={confirm.across}
+                down={confirm.down}
+                onChange={(across, down) => confirm.setCounts(across, down)}
               />
             </section>
-          ) : null}
 
-          <SizeBlock photo={photo} />
+            {outer ? (
+              <section className="pf-confirm__group" aria-labelledby="pf-confirm-bands">
+                <h2 className="pf-confirm__h2" id="pf-confirm-bands">
+                  Borders
+                </h2>
+                <BandsControl
+                  bands={confirm.bands}
+                  onChange={confirm.setBands}
+                  activeBand={band}
+                  onSelect={setActiveBand}
+                  squareEighths={confirm.squareEighths}
+                />
+              </section>
+            ) : null}
+
+            <SizeBlock photo={photo} />
+          </fieldset>
         </div>
       ) : null}
 

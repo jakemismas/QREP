@@ -192,6 +192,12 @@ async function orientedBitmap(file: Blob): Promise<ImageBitmap> {
   }
 }
 
+/** True when the head starts with the JPEG (FF D8 FF) or the PNG signature. */
+function isJpegOrPng(head: Uint8Array): boolean {
+  if (head.length >= 3 && head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff) return true;
+  return head.length >= 8 && PNG_SIGNATURE.every((value, i) => head[i] === value);
+}
+
 /**
  * Decodes a file with EXIF orientation applied; rejects with a plain-English
  * Error for anything the browser cannot decode (a text file, a truncated JPEG).
@@ -202,8 +208,13 @@ export async function decodePhoto(file: Blob): Promise<ImageBitmap> {
     // (Playwright's build of Safari's engine) resolves one cut to 2 to 95
     // percent of its bytes as a full-size, fully transparent bitmap (C3b
     // probe, 2026-10-13), which would open the confirm screen on a blank
-    // photo. So the bytes are checked before the browser decodes them.
-    if (isTruncatedImage(new Uint8Array(await file.arrayBuffer()))) throw new Error("the file stops early");
+    // photo. So a JPEG's or PNG's bytes are checked before the browser
+    // decodes them. The head comes first, so a file of any other type (a
+    // large video picked by mistake) is never read whole into memory.
+    const head = new Uint8Array(await file.slice(0, 16).arrayBuffer());
+    if (isJpegOrPng(head) && isTruncatedImage(new Uint8Array(await file.arrayBuffer()))) {
+      throw new Error("the file stops early");
+    }
     return await orientedBitmap(file);
   } catch (error) {
     throw new Error(DECODE_ERROR, { cause: error });

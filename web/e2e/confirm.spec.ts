@@ -7,14 +7,15 @@
  * bottom right and bottom left, whose data-x and data-y are source pixels;
  * pin-image; counts-<across|down>-<blocks|squares>; band-add and
  * band-<k>-width and band-<k>-inches, or bands-inches-off while no square
- * size is known; confirm-bar with crop-back and crop-analyze, the Continue
- * button).
+ * size is known; size-block; confirm-bar with crop-back and crop-analyze, the
+ * Continue button, and crop-blocked, why Continue is off). From results,
+ * adjust-corners returns to the confirm screen.
  *
  * Staging is watched where it leaves the page: an init script wraps
  * Worker.prototype.postMessage, as pattern.spec.ts does, and keeps a copy of
- * the PNG bytes of every stage_photo call and the options of every
- * reverse_photo call, each with performance.now(). The bytes are decoded and
- * hashed in the page.
+ * the PNG bytes of every stage_photo call, the options of every reverse_photo
+ * call and the time of every detect_quad call, each with performance.now().
+ * The bytes are decoded and hashed in the page.
  *
  * No input image is committed here. The level 0 render comes from the native
  * renderer at test runtime under this spec's own name (save_render also
@@ -103,6 +104,7 @@ function sidecarCorners(file: string): Point[] {
 interface StagingRecord {
   staged: { bytes: Uint8Array<ArrayBuffer>; at: number }[];
   reads: { options: string; at: number }[];
+  quads: { at: number }[];
 }
 
 interface ReadOptions {
@@ -110,10 +112,10 @@ interface ReadOptions {
   crop_offset: Point;
 }
 
-/** Keeps every stage_photo and reverse_photo call the page posts to its worker, from the first load on. */
+/** Keeps every stage_photo, reverse_photo and detect_quad call the page posts to its worker, from the first load on. */
 async function watchStaging(page: Page): Promise<void> {
   await page.addInitScript(() => {
-    const record: StagingRecord = { staged: [], reads: [] };
+    const record: StagingRecord = { staged: [], reads: [], quads: [] };
     (window as unknown as { stagingRecord: StagingRecord }).stagingRecord = record;
     const post = Worker.prototype.postMessage;
     Worker.prototype.postMessage = function (this: Worker, ...args: unknown[]) {
@@ -123,6 +125,8 @@ async function watchStaging(page: Page): Promise<void> {
         record.staged.push({ bytes: new Uint8Array(message.args?.[0] as Uint8Array), at: performance.now() });
       } else if (message?.type === "call" && message.method === "reverse_photo") {
         record.reads.push({ options: String(message.args?.[1]), at: performance.now() });
+      } else if (message?.type === "call" && message.method === "detect_quad") {
+        record.quads.push({ at: performance.now() });
       }
       return (post as (...rest: unknown[]) => void).apply(this, args);
     } as typeof Worker.prototype.postMessage;
@@ -134,6 +138,11 @@ function stagingCounts(page: Page): Promise<{ staged: number; reads: number }> {
     const record = (window as unknown as { stagingRecord: StagingRecord }).stagingRecord;
     return { staged: record.staged.length, reads: record.reads.length };
   });
+}
+
+/** How many detect_quad calls the page has posted: criteria U3-4 allows none. */
+function detectQuadCalls(page: Page): Promise<number> {
+  return page.evaluate(() => (window as unknown as { stagingRecord: StagingRecord }).stagingRecord.quads.length);
 }
 
 /** One staged PNG decoded in the page: its size, its SHA-256 and when it was posted. */
@@ -191,6 +200,8 @@ interface Scene {
   grid?: { left: number; top: number; cell: number; cols: number; rows: number; colors: [string, string] };
   /** Seeded color noise tiled over everything at alpha, so a JPEG carries a photo's entropy, not a flat chart's. */
   noise?: { tile: number; alpha: number; seed: number };
+  /** Also keeps the encoded file in the page as window.keptPhotos[keep], for chooseInPage. */
+  keep?: string;
 }
 
 /** Draws a scene on a canvas in the page and returns the encoded file. */
@@ -239,6 +250,10 @@ async function drawInPage(page: Page, scene: Scene): Promise<Buffer> {
     canvas.width = 0;
     canvas.height = 0;
     if (!blob) throw new Error("the canvas did not encode");
+    if (s.keep) {
+      const holder = window as unknown as { keptPhotos?: Record<string, File> };
+      holder.keptPhotos = { ...holder.keptPhotos, [s.keep]: new File([blob], s.keep, { type: s.type }) };
+    }
     const url = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(String(reader.result));
@@ -271,6 +286,31 @@ function withOrientation(jpeg: Buffer, orientation: number): Buffer {
   expect(app1.length).toBe(36);
   return Buffer.concat([jpeg.subarray(0, 2), app1, jpeg.subarray(2)]);
 }
+
+/**
+ * Chooses kept photos on the dropzone's file input one after another in a
+ * single task, as two quick picks would: each assignment fires the change
+ * event the input's onChange reads. Returns performance.now() before the first.
+ */
+function chooseInPage(page: Page, names: string[]): Promise<number> {
+  return page.evaluate((keys) => {
+    const input = document.querySelector<HTMLInputElement>("[data-testid='photo-file-input']");
+    const kept = (window as unknown as { keptPhotos?: Record<string, File> }).keptPhotos ?? {};
+    if (!input) throw new Error("no file input");
+    const started = performance.now();
+    for (const key of keys) {
+      const file = kept[key];
+      if (!file) throw new Error(`no kept photo ${key}`);
+      const transfer = new DataTransfer();
+      transfer.items.add(file);
+      input.files = transfer.files;
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    return started;
+  }, names);
+}
+
+const pageNow = (page: Page): Promise<number> => page.evaluate(() => performance.now());
 
 // ---- The confirm screen ---------------------------------------------------
 
@@ -599,6 +639,79 @@ test("the same photo and pins stage the same bytes and corners at 1440 x 900 and
   ]);
 });
 
+test("a crop longer than 1400 px stages at the 2000 px cap with the same bytes and corners at 1440 x 900 and 390 x 844", async ({
+  page,
+}) => {
+  // Every crop staged at phone width elsewhere in this spec is under 1400 px,
+  // 834d8be's phone cap, so none of them can tell a cap picked from the window
+  // width (ux-06) from the one 2000 px cap. This crop is longer than 1400.
+  await watchStaging(page);
+  await page.goto("./");
+  // A 3000 x 2000 PNG checkerboard of 100 px squares, 30 x 20 from (0, 0).
+  const photo = await drawInPage(page, {
+    width: 3000,
+    height: 2000,
+    type: "image/png",
+    background: "#f2e8d5",
+    grid: { left: 0, top: 0, cell: 100, cols: 30, rows: 20, colors: ["#2f4f8f", "#f2e8d5"] },
+  });
+  const pins = [
+    { x: 100, y: 100 },
+    { x: 2900, y: 100 },
+    { x: 2900, y: 1900 },
+    { x: 100, y: 1900 },
+  ];
+  const runs: { staged: { width: number; height: number; sha256: string }; read: ReadOptions }[] = [];
+  for (const size of [DESKTOP, PHONE]) {
+    await page.setViewportSize(size);
+    await openDropzone(page);
+    await page.getByTestId("photo-file-input").setInputFiles({ name: "grid-3000.png", mimeType: "image/png", buffer: photo });
+    await waitForPhoto(page);
+    await expect(page.getByTestId("crop-screen")).toHaveAttribute("data-canvas-width", "3000");
+    await placePins(page, pins);
+    await enterCount(page, "across", 28, 1);
+    await enterCount(page, "down", 18, 1);
+    await page.getByTestId("crop-analyze").click();
+    await expect.poll(() => stagingCounts(page), { timeout: READY_TIMEOUT }).toEqual({ staged: 1, reads: 1 });
+    const { width, height, sha256 } = await stagedPhoto(page, 0);
+    const { corners, crop_offset } = await readCall(page, 0);
+    runs.push({ staged: { width, height, sha256 }, read: { corners, crop_offset } });
+  }
+  const [desktop, phone] = runs;
+  // ux-06: one photo and one set of pins give one staged crop at any window width.
+  expect(phone.staged.sha256).toBe(desktop.staged.sha256);
+  expect(phone.read).toEqual(desktop.read);
+
+  // The plan by hand (stagePhoto.ts): outer edge, no bands, 28 x 1 = 28
+  // squares across and 18 x 1 = 18 down. Top and bottom 2900 - 100 = 2800 px,
+  // 2800 / 28 = 100; left and right 1900 - 100 = 1800 px, 1800 / 18 = 100.
+  // squarePx = 100, margin = ceil(100) = 100.
+  // x0 = max(0, 100 - 100) = 0, y0 = max(0, 100 - 100) = 0,
+  // x1 = min(3000, 2900 + 100) = 3000, y1 = min(2000, 1900 + 100) = 2000:
+  // crop 3000 x 2000. capLongest(3000, 2000) at 2000: 2000 x round(2000 x
+  // 2000 / 3000 = 1333.33) = 2000 x 1333. The 1400 px phone cap would give
+  // 1400 x round(2000 x 1400 / 3000 = 933.33) = 1400 x 933.
+  for (const [name, run] of [
+    ["desktop", desktop],
+    ["phone", phone],
+  ] as const) {
+    expect({ width: run.staged.width, height: run.staged.height }, name).toEqual({ width: 2000, height: 1333 });
+    expect(run.read.crop_offset, name).toEqual({ x: 0, y: 0 });
+  }
+  // Corners scaled per axis: x 100 x 2000 / 3000 = 66.667, 2900 x 2000 / 3000
+  // = 1933.333; y 100 x 1333 / 2000 = 66.65, 1900 x 1333 / 2000 = 1266.35.
+  const expected = [
+    [66.667, 66.65],
+    [1933.333, 66.65],
+    [1933.333, 1266.35],
+    [66.667, 1266.35],
+  ];
+  for (const [i, [x, y]] of expected.entries()) {
+    expect(desktop.read.corners[i][0], `corner ${i} x`).toBeCloseTo(x, 3);
+    expect(desktop.read.corners[i][1], `corner ${i} y`).toBeCloseTo(y, 3);
+  }
+});
+
 test("the 2000 px cap keeps a phone screenshot's squares at 18.5 px", async ({ page }) => {
   await page.setViewportSize(PHONE);
   await watchStaging(page);
@@ -828,18 +941,61 @@ test("Continue stays in view without scrolling and the photo takes the available
       const image = (await page.getByTestId("pin-image").boundingBox())!;
       const barBox = (await bar.boundingBox())!;
       expect(image.y + image.height, `${view.name}: photo bottom`).toBeLessThanOrEqual(barBox.y);
-      // Why 40 percent: the L0 render is 894 x 1044.
-      // At 1440 x 900 the height binds: CropScreen.tsx gives the photo the
-      // window less what sits above it and the bar, and CropScreen.css takes
-      // 96 px of PinLayer chrome off that. The header, title, lede and bar
-      // total under 300 px, so the photo gets at least 900 - 300 - 26 (gap
-      // and margin) - 96 = 478 px, 53 percent of 900.
-      // At 390 x 844 the width binds: 390 - 2 x 14 (.app-main padding) -
-      // 2 x 22 (PinLayer's gutter) = 318 px wide, so 318 x 1044 / 894 = 371 px
-      // tall, 44 percent of 844, unless the chrome above and below passes
-      // 844 - 26 - 96 - 371 = 351 px, where the height would bind first.
-      expect(image.height, `${view.name}: photo height`).toBeGreaterThanOrEqual(0.4 * view.size.height);
+      // Criterion: the size block stays on the confirm screen until C3c.
+      await expect(page.getByTestId("size-block"), `${view.name}: size block`).toBeVisible();
+
+      // The photo's height, from the rules that size it. CropScreen.tsx sets
+      // available = window height - the photo box's top - the bar's height
+      // - 14 (ROW_GAP_PX) - 12 (BOTTOM_MARGIN_PX), and CropScreen.css sizes
+      // PinLayer's stage to fit available less 96 px of PinLayer chrome
+      // (2 x 22 stage padding + an 8 px gap + the 44 px zoom row), or the
+      // photo column's width, whichever binds. The L0 render is 894 x 1044.
+      // scrollY is 0, so the photo box's viewport top is its document top.
+      const photoTop = (await page.locator(".pf-confirm__photo").boundingBox())!.y;
+      const chrome = photoTop + barBox.height;
+      // Whole-pixel offsetTop and offsetHeight in CropScreen.tsx and the
+      // Math.floor there against fractional boxes here: within 2 px.
+      const heightBound = Math.floor(view.size.height - chrome - 14 - 12) - 96;
+      if (view.name === "desktop") {
+        // At 1440 x 900 the height binds: .app-main is 1420 px less 2 x 22
+        // padding = 1376 px, the photo column 1376 - 24 (gap) - 390 (side)
+        // = 962 px, and an available - 96 px tall photo is
+        // (available - 96) x 894 / 1044 wide, under 962 - 44 for any
+        // available up to 900. With the header, title, lede and bar under
+        // 300 px, the photo is at least 900 - 300 - 26 - 96 = 478 px tall,
+        // 478 / 900 = 53 percent of the window.
+        expect(chrome, "desktop: chrome above and below the photo").toBeLessThanOrEqual(300);
+        expect(image.height, "desktop: photo height").toBeGreaterThanOrEqual(478);
+        expect(Math.abs(image.height - heightBound), "desktop: photo takes the available height").toBeLessThanOrEqual(2);
+      } else {
+        // At 390 x 844 the width binds: 390 - 2 x 14 (.app-main padding)
+        // = 362 px of stage, less 2 x 22 padding = 318 px of photo, so
+        // 318 x 1044 / 894 = 331992 / 894 = 371.36 px tall, 371.36 / 844 =
+        // 44 percent of the window. The height would bind first only if the
+        // chrome passed 844 - 26 - 96 - 371.36 = 350.64 px.
+        expect(chrome, "phone: chrome above and below the photo").toBeLessThanOrEqual(350);
+        expect(heightBound, "phone: the height does not bind").toBeGreaterThanOrEqual(371);
+        expect(image.width, "phone: photo width").toBeCloseTo(318, 0);
+        expect(image.height, "phone: photo height").toBeCloseTo(371.36, 0);
+      }
       await expectNoHorizontalOverflow(page, "confirm-screen");
+
+      if (view.name === "phone") {
+        // The tall 647 x 1400 screenshot fixture: here the height binds
+        // ((available - 96) x 647 / 1400 is under 318 px), and Continue
+        // still sits in view without scrolling.
+        await page.getByTestId("crop-back").click();
+        await page.getByTestId("photo-file-input").setInputFiles(screenshotPath);
+        await waitForPhoto(page);
+        await expect(page.getByTestId("crop-screen")).toHaveAttribute("data-canvas-height", "1400");
+        expect(await page.evaluate(() => window.scrollY), "phone, tall photo: scrolled").toBe(0);
+        await expect(bar, "phone, tall photo: confirm bar").toBeInViewport({ ratio: 1 });
+        await expect(page.getByTestId("crop-analyze"), "phone, tall photo: Continue").toBeInViewport({ ratio: 1 });
+        const tall = (await page.getByTestId("pin-image").boundingBox())!;
+        const tallBar = (await bar.boundingBox())!;
+        expect(tall.y + tall.height, "phone, tall photo: photo bottom").toBeLessThanOrEqual(tallBar.y);
+        await expectNoHorizontalOverflow(page, "confirm-screen-tall");
+      }
     } finally {
       await context.close();
     }
@@ -847,6 +1003,7 @@ test("Continue stays in view without scrolling and the photo takes the available
 });
 
 test("a typed band width in inches converts with the read's default square size", async ({ page }) => {
+  await watchStaging(page);
   await openDropzone(page);
   await page.getByTestId("photo-file-input").setInputFiles(l0Path);
   await waitForPhoto(page);
@@ -863,15 +1020,31 @@ test("a typed band width in inches converts with the read's default square size"
   await enterCount(page, "down", 11, 5);
   await page.getByTestId("crop-analyze").click();
   await expect(page.getByTestId("photo-results")).toBeVisible({ timeout: REVERSE_TIMEOUT });
+  // Criteria U3-4: nothing detects the quad, through a whole Continue to results.
+  expect(await detectQuadCalls(page)).toBe(0);
 
   await page.getByTestId("adjust-corners").click();
   await expect(page.getByTestId("crop-screen")).toBeVisible();
-  // A10's default (#149 decision): the L0 read recovers 45 x 55 squares of 12
-  // eighths (the size.spec.ts header) and finishes at 600 x 720 eighths, with
-  // the 30 eighth border on both sides: 45 x 12 + 60 = 600, 55 x 12 + 60 = 720.
-  // size_pattern with source "default" (qrep/model/sizing.py) snaps that
-  // size in 1/4 in (2 eighth) square steps; 12 is a multiple of 2 that fits
-  // 600 x 720 exactly, so the default square stays 12 eighths, 1 1/2 in.
+  // A10's default (#149 decision), worked from the code:
+  // - The L0 render draws eighths x scale / 8 px (qrep/render/renderer.py:73-74,
+  //   px() at :84), and beforeAll renders at scale 10: 10 px per inch.
+  // - The pins sit on the sidecar's outer corners, 822 - 72 = 750 px apart
+  //   across. The staged crop, 72 to 822 by 72 to 972 plus a margin of
+  //   ceil(750 / 45) = 17, is 784 x 934 (stagePhoto.ts planCrop), under the
+  //   2000 px cap, so 1 staged px is 1 photo px, and rectify keeps
+  //   that scale: its width is the mean top and bottom edge, 750 px
+  //   (qrep/vision/rectify.py:522).
+  // - 750 px spans 45 squares plus a 30 eighth border on both sides, and
+  //   30 / 12 = 2.5 squares, so 45 + 2 x 2.5 = 50 squares of 750 / 50 = 15 px.
+  // - The read assumes 10 px per inch (ASSUMED_PPI, qrep/vision/pipeline.py:53)
+  //   and sets cell_size = round(pitch x 8 / ASSUMED_PPI) (pipeline.py:236):
+  //   round(15 x 8 / 10) = 12 eighths, 15 / 10 = 1.5 in.
+  // - size_pattern with source "default" (qrep/model/sizing.py:323) fits the
+  //   read's own size in SQUARE_STEP = 2 eighth (1/4 in) squares
+  //   (sizing.py:53). 12 is a multiple of 2, so the read's own square is one
+  //   of the steps and keeps the read's size up to the 1/4 in border snap
+  //   (BORDER_STEP, sizing.py:54); a step of 10 or 14 moves the 45 squares
+  //   across alone by 45 x 2 = 90 eighths. The default square stays 12.
   await expect(page.getByTestId("bands-inches-off")).toHaveCount(0, { timeout: READY_TIMEOUT });
   await page.getByTestId("band-add").click();
   // A new band is 1 square wide: 1 x 12 / 8 = 1.5 in, shown as 1 1/2 in (BandsControl.tsx formatInches).
@@ -880,7 +1053,309 @@ test("a typed band width in inches converts with the read's default square size"
   await expect(inches).toBeEnabled();
   await inches.fill("3");
   await inches.press("Enter");
-  // 3 in rounds to the quarter inch as 3 in = 24 eighths; 24 / 12 = 2 squares
+  // 3 in = 24 eighths, already a whole quarter inch; 24 / 12 = 2 squares
   // (confirm/bands.ts inchesToSquares), shown as 2 x 12 / 8 = 3 in.
   await expect(page.getByTestId("band-1-width")).toHaveText("2 squares, 3 in");
+});
+
+test("Adjust the crop after the sample opens the sample with its default pins, and Continue reads it again", async ({
+  page,
+}) => {
+  await watchStaging(page);
+  await page.goto("./");
+  await page.getByTestId("start-photo").click();
+  await page.getByTestId("photo-sample").click();
+  // The sample still bypasses the confirm screen on the way in.
+  await expect(page.getByTestId("crop-screen")).toHaveCount(0);
+  await expect(page.getByTestId("photo-results")).toBeVisible({ timeout: REVERSE_TIMEOUT });
+  await expect(page.getByTestId("crop-screen")).toHaveCount(0);
+
+  await page.getByTestId("adjust-corners").click();
+  await waitForPhoto(page);
+  // The sample is the level 0 render of double_irish_chain.json at scale 10
+  // (photo.tsx startSample: render(demo, 0, 42, 10), as this spec's beforeAll):
+  // 600 x 720 eighths x 10 / 8 = 750 x 900 px plus a margin of
+  // round(0.08 x 900) = 72 on each side (renderer.py MARGIN_FRACTION): 894 x 1044.
+  const crop = page.getByTestId("crop-screen");
+  await expect(crop).toHaveAttribute("data-canvas-width", "894");
+  await expect(crop).toHaveAttribute("data-canvas-height", "1044");
+  // Its neutral inset (frame.ts, 0.15): x round(134.1) = 134 and round(759.9)
+  // = 760, y round(156.6) = 157 and round(887.4) = 887.
+  const pins = [
+    { x: 134, y: 157 },
+    { x: 760, y: 157 },
+    { x: 760, y: 887 },
+    { x: 134, y: 887 },
+  ];
+  for (const [i, pin] of pins.entries()) {
+    await expect(page.getByTestId(`corner-pin-${i}`)).toBeVisible();
+    expect(await pinAt(page, i), `pin ${i}`).toEqual(pin);
+  }
+  const analyze = page.getByTestId("crop-analyze");
+  await expect(analyze).toBeEnabled();
+
+  await analyze.click();
+  // The sample's own read sent its bytes with reverse_photo; this read
+  // stages a crop first, so one stage_photo and a second reverse_photo.
+  await expect.poll(() => stagingCounts(page), { timeout: READY_TIMEOUT }).toEqual({ staged: 1, reads: 2 });
+  // One square per axis: squarePx = max(760 - 134, 887 - 157) = max(626, 730)
+  // = 730, so the margin clamps the crop to the whole 894 x 1044, under the cap.
+  const staged = await stagedPhoto(page, 0);
+  expect({ width: staged.width, height: staged.height }).toEqual({ width: 894, height: 1044 });
+  const read = await readCall(page, 1);
+  expect(read.crop_offset).toEqual({ x: 0, y: 0 });
+  expect(read.corners).toEqual(pins.map((p) => [p.x, p.y]));
+});
+
+test("a pin moved while Continue stages shows where the read had it after Adjust the crop", async ({ page }) => {
+  await watchStaging(page);
+  // Notes whether the side controls' fieldset is ever disabled.
+  await page.addInitScript(() => {
+    const seen = { disabled: false };
+    (window as unknown as { controlsSeen: typeof seen }).controlsSeen = seen;
+    new MutationObserver(() => {
+      if (document.querySelector("fieldset.pf-confirm__controls[disabled]")) seen.disabled = true;
+    }).observe(document, { subtree: true, childList: true, attributes: true, attributeFilter: ["disabled"] });
+  });
+  await openDropzone(page);
+  await page.getByTestId("photo-file-input").setInputFiles(l0Path);
+  await waitForPhoto(page);
+  const outer = sidecarCorners(l0SidecarPath);
+  await placePins(page, outer);
+  await enterCount(page, "across", 9, 5);
+  await enterCount(page, "down", 11, 5);
+
+  // Continue, then in the same task one arrow-key nudge of the top-left pin,
+  // as a hand still on the pin would make while the crop stages.
+  await page.evaluate(() => {
+    document.querySelector<HTMLButtonElement>("[data-testid='crop-analyze']")!.click();
+    document
+      .querySelector("[data-testid='corner-pin-0']")!
+      .dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, cancelable: true }));
+  });
+  await expect(page.getByTestId("photo-results")).toBeVisible({ timeout: REVERSE_TIMEOUT });
+  // The side controls were inert while it staged.
+  expect(await page.evaluate(() => (window as unknown as { controlsSeen: { disabled: boolean } }).controlsSeen.disabled)).toBe(true);
+  expect(await detectQuadCalls(page)).toBe(0);
+
+  // The read used the pins as they were at Continue: the sidecar corners
+  // (72, 72) to (822, 972), 45 x 55 squares, squarePx = max(750 / 45, 900 /
+  // 55) = 16.667, margin 17, offset (72 - 17, 72 - 17) = (55, 55), crop
+  // 784 x 934 at scale 1: corners (17, 17), (767, 17), (767, 917), (17, 917).
+  const read = await readCall(page, 0);
+  expect(read.crop_offset).toEqual({ x: 55, y: 55 });
+  expect(read.corners).toEqual([
+    [17, 17],
+    [767, 17],
+    [767, 917],
+    [17, 917],
+  ]);
+
+  await page.getByTestId("adjust-corners").click();
+  await waitForPhoto(page);
+  // The read's top-left pin (72, 72), not the nudged (73, 72), and its counts.
+  expect(await pinAt(page, 0)).toEqual(outer[0]);
+  for (const [i, corner] of outer.entries()) expect(await pinAt(page, i), `pin ${i}`).toEqual(corner);
+  await expect(page.getByTestId("counts-across-blocks")).toHaveValue("9");
+  await expect(page.getByTestId("counts-across-squares")).toHaveValue("5");
+  await expect(page.getByTestId("counts-down-blocks")).toHaveValue("11");
+  await expect(page.getByTestId("counts-down-squares")).toHaveValue("5");
+  await expect(page.getByTestId("crop-analyze")).toBeEnabled();
+});
+
+test("Continue stays off while the photo on screen is not the photo QREP decoded", async ({ page }) => {
+  await openDropzone(page);
+  await page.getByTestId("photo-file-input").setInputFiles(l0Path);
+  await waitForPhoto(page);
+  const analyze = page.getByTestId("crop-analyze");
+  await expect(analyze).toBeEnabled();
+  const image = page.getByTestId("pin-image");
+  const decodedSrc = (await image.getAttribute("src"))!;
+  const message = "QREP could not show this photo the way it reads it. Go back and choose it again.";
+
+  // A 10 x 10 PNG in place of the decoded 894 x 1044 photo, as a browser
+  // that sized or turned the img differently from createImageBitmap would show.
+  await image.evaluate((img: HTMLImageElement) => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 10;
+    canvas.height = 10;
+    img.src = canvas.toDataURL("image/png");
+  });
+  await expect(analyze).toBeDisabled();
+  await expect(page.getByTestId("crop-blocked")).toHaveText(message);
+
+  // The decoded photo again: the sizes match and Continue comes back.
+  await image.evaluate((img: HTMLImageElement, src: string) => {
+    img.src = src;
+  }, decodedSrc);
+  await expect(analyze).toBeEnabled();
+  await expect(page.getByTestId("crop-blocked")).toHaveCount(0);
+
+  // An img that fails to load.
+  await image.evaluate((img: HTMLImageElement) => {
+    img.src = "data:image/png;base64,AAAA";
+  });
+  await expect(analyze).toBeDisabled();
+  await expect(page.getByTestId("crop-blocked")).toHaveText(message);
+});
+
+test("leaving for home during a read that waits on the vision engine stops its retries", async ({ page }) => {
+  // Every reverse_photo is answered at once with the envelope worker.ts posts
+  // when the vision wheel fails to load (serve's fail("internal", ...) with
+  // ensureVision's message), so photo.tsx runReverse waits for its 2000 ms
+  // safety-net timer and asks again. An aborted opencv fetch does not give
+  // that reply reliably: Pyodide's loadPackage can resolve without opencv,
+  // and the read then fails with another error that is not retried.
+  await page.addInitScript(() => {
+    const record = { reads: 0 };
+    (window as unknown as { visionRecord: typeof record }).visionRecord = record;
+    const post = Worker.prototype.postMessage;
+    Worker.prototype.postMessage = function (this: Worker, ...args: unknown[]) {
+      const message = args[0] as { type?: string; method?: string; id?: number } | null;
+      if (message?.type === "call" && message.method === "reverse_photo") {
+        record.reads += 1;
+        const reply = {
+          type: "result",
+          id: message.id,
+          envelope: {
+            ok: false,
+            error: { kind: "internal", message: "the vision engine failed to load; retry when back online" },
+          },
+        };
+        setTimeout(() => this.onmessage?.(new MessageEvent("message", { data: reply })), 50);
+        return;
+      }
+      return (post as (...rest: unknown[]) => void).apply(this, args);
+    } as typeof Worker.prototype.postMessage;
+  });
+  const reads = () => page.evaluate(() => (window as unknown as { visionRecord: { reads: number } }).visionRecord.reads);
+  await openDropzone(page);
+  await page.getByTestId("photo-file-input").setInputFiles(l0Path);
+  await waitForPhoto(page);
+  await page.getByTestId("crop-analyze").click();
+  // Two reads: the first and at least one retry, so the loop is running.
+  await expect.poll(reads, { timeout: READY_TIMEOUT }).toBeGreaterThanOrEqual(2);
+  await expect(page.getByTestId("photo-progress")).toBeVisible();
+
+  await page.getByRole("button", { name: "Back to the start screen" }).click();
+  await expect(page.getByTestId("photo-progress")).toHaveCount(0);
+  const before = await reads();
+  // 5000 ms is two and a half 2000 ms retry periods: a live loop would ask
+  // at least twice more.
+  await page.waitForTimeout(5_000);
+  expect(await reads()).toBe(before);
+});
+
+test("a photo chosen while a larger one decodes is the one the confirm screen shows", async ({ page }) => {
+  await page.goto("./");
+  // A: 4000 x 3000 JPEG of 100 px squares under noise, so it decodes slowly
+  // the way a phone photo does. B: a 300 x 200 PNG.
+  await drawInPage(page, {
+    width: 4000,
+    height: 3000,
+    type: "image/jpeg",
+    background: "#f2e8d5",
+    grid: { left: 0, top: 0, cell: 100, cols: 40, rows: 30, colors: ["#2f4f8f", "#f2e8d5"] },
+    noise: { tile: 509, alpha: 0.15, seed: 7 },
+    keep: "a.jpg",
+  });
+  await drawInPage(page, {
+    width: 300,
+    height: 200,
+    type: "image/png",
+    background: "#808080",
+    rects: [{ x: 0, y: 0, w: 60, h: 60, color: "#ff0000" }],
+    keep: "b.png",
+  });
+  await page.getByTestId("start-photo").click();
+  const crop = page.getByTestId("crop-screen");
+
+  // A alone first, to time its decode: from the pick to the confirm screen.
+  const aStarted = await chooseInPage(page, ["a.jpg"]);
+  await expect(crop).toHaveAttribute("data-canvas-width", "4000", { timeout: BIG_PHOTO_TIMEOUT });
+  const decodeMs = (await pageNow(page)) - aStarted;
+  await page.getByTestId("crop-back").click();
+  await expect(page.getByTestId("photo-dropzone")).toBeVisible();
+
+  // A, then B at once: B's decode starts while A's runs.
+  const started = await chooseInPage(page, ["a.jpg", "b.png"]);
+  await expect(crop).toHaveAttribute("data-canvas-width", "300", { timeout: BIG_PHOTO_TIMEOUT });
+  await expect(crop).toHaveAttribute("data-canvas-height", "200");
+  // Well past A's decode: three times its measured time plus a second.
+  const settle = 3 * decodeMs + 1000;
+  const waited = (await pageNow(page)) - started;
+  if (waited < settle) await page.waitForTimeout(settle - waited);
+  console.log(`A decoded alone in ${Math.round(decodeMs)} ms; checked B ${Math.round(settle)} ms after the picks`);
+  await expect(crop).toHaveAttribute("data-canvas-width", "300");
+  await expect(crop).toHaveAttribute("data-canvas-height", "200");
+  const natural = await page
+    .getByTestId("pin-image")
+    .evaluate((img: HTMLImageElement) => ({ width: img.naturalWidth, height: img.naturalHeight }));
+  expect(natural).toEqual({ width: 300, height: 200 });
+  await expect(page.getByTestId("crop-analyze")).toBeEnabled();
+});
+
+test("Back pressed as Continue starts staging a large photo posts nothing for it", async ({ page }) => {
+  await watchStaging(page);
+  await page.goto("./");
+  // Booted first: an engine call posts at once only when the engine is ready
+  // and idle (rpc.ts pump), so a stage_photo cannot hide in the queue.
+  await expect(page.getByTestId("engine-chip")).toHaveAttribute("data-engine-phase", "ready", {
+    timeout: READY_TIMEOUT,
+  });
+  await drawInPage(page, {
+    width: 4000,
+    height: 3000,
+    type: "image/jpeg",
+    background: "#f2e8d5",
+    grid: { left: 0, top: 0, cell: 100, cols: 40, rows: 30, colors: ["#2f4f8f", "#f2e8d5"] },
+    noise: { tile: 509, alpha: 0.15, seed: 11 },
+    keep: "large.jpg",
+  });
+  await page.getByTestId("start-photo").click();
+  const analyze = page.getByTestId("crop-analyze");
+
+  // Timing run: Continue alone, from the click to its stage_photo.
+  await chooseInPage(page, ["large.jpg"]);
+  await waitForPhoto(page, BIG_PHOTO_TIMEOUT);
+  await expect(analyze).toBeEnabled();
+  const clicked = await page.evaluate(() => {
+    const at = performance.now();
+    document.querySelector<HTMLButtonElement>("[data-testid='crop-analyze']")!.click();
+    return at;
+  });
+  await expect.poll(() => stagingCounts(page), { timeout: BIG_PHOTO_TIMEOUT }).toEqual({ staged: 1, reads: 1 });
+  const timed = await stagedPhoto(page, 0);
+  const stageMs = timed.at - clicked;
+  // Default pins and one square per axis: squarePx = max(3400 - 600,
+  // 2550 - 450) = 2800, so the crop is the whole 4000 x 3000, capped at
+  // 2000 x round(3000 x 2000 / 4000) = 2000 x 1500.
+  expect({ width: timed.width, height: timed.height }).toEqual({ width: 2000, height: 1500 });
+  await page.getByTestId("photo-cancel").click();
+  await expect(page.getByTestId("photo-dropzone")).toBeVisible();
+  // Cancel restarts the engine; wait for the new one, for the same reason as above.
+  await expect(page.getByTestId("engine-chip")).toHaveAttribute("data-engine-phase", "ready", {
+    timeout: READY_TIMEOUT,
+  });
+
+  // The same photo, then Continue and Back in one task.
+  await chooseInPage(page, ["large.jpg"]);
+  await waitForPhoto(page, BIG_PHOTO_TIMEOUT);
+  await expect(analyze).toBeEnabled();
+  const backAt = await page.evaluate(() => {
+    document.querySelector<HTMLButtonElement>("[data-testid='crop-analyze']")!.click();
+    document.querySelector<HTMLButtonElement>("[data-testid='crop-back']")!.click();
+    return performance.now();
+  });
+  await expect(page.getByTestId("photo-dropzone")).toBeVisible();
+  // Three times the measured staging plus a second, so a crop that was not
+  // discarded would have posted by now.
+  const settle = 3 * stageMs + 1000;
+  const waited = (await pageNow(page)) - backAt;
+  if (waited < settle) await page.waitForTimeout(settle - waited);
+  console.log(`staging took ${Math.round(stageMs)} ms; checked ${Math.round(settle)} ms after Back`);
+  // Only the timing run's stage_photo and reverse_photo, both before Back.
+  expect(await stagingCounts(page)).toEqual({ staged: 1, reads: 1 });
+  expect(timed.at).toBeLessThan(backAt);
+  expect((await readCall(page, 0)).at).toBeLessThan(backAt);
 });
