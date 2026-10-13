@@ -80,10 +80,7 @@ test.describe("photo-flow components in the editor at 1440 x 900", { tag: "@phon
     await expect(page.getByTestId("editor")).toBeVisible();
   });
 
-  // Temporary (#232 criterion 2): web-spike runs this test 20 times. The next
-  // commit removes the loop.
-  for (let run = 1; run <= 20; run++) {
-  test(`the Pattern tab's round-trip panel is styled and holds its content (run ${run} of 20)`, async ({ page }) => {
+  test("the Pattern tab's round-trip panel is styled and holds its content", async ({ page }) => {
     await page.goto("./");
     await page.getByTestId("open-demo").click();
     await expect(page.getByTestId("editor")).toBeVisible();
@@ -173,5 +170,4 @@ test.describe("photo-flow components in the editor at 1440 x 900", { tag: "@phon
       else await record().catch(() => undefined);
     }
   });
-  }
 });
