@@ -7,23 +7,26 @@ W - H = (cols - rows) * cell_size exactly. Sizing never changes the counts,
 so the size moves in whole squares and whole blocks; changing the block
 count to reach a size is editing, not sizing.
 
-The pattern rule (any square step but the sprint 3 one-eighth step): on each
-requested axis, pick the offered square whose achieved extent (the squares
-plus the borders scaled to that square and snapped) is nearest the request;
-when two squares miss by the same amount, the larger wins, the half-up
-direction round_div rounds. With both axes given, take the smaller of the two
-squares, so the quilt never grows past one asked-for side to come closer to
-the other. Offered squares run in 1/4 in steps (SQUARE_STEP) and borders snap
-to 1/4 in, so every square's cut size is a whole quarter inch.
+The pattern rule (a square step in whole quarter inches): each offered square
+gives an achieved size, the squares plus the borders scaled to that square
+and snapped; pick the square whose combined miss, the sum of the misses on
+the axes you set, is smallest. When two squares miss by the same amount, the
+larger wins, the half-up direction round_div rounds. Offered squares run in
+1/4 in steps (SQUARE_STEP), narrowed to those that keep every corner leg a
+whole eighth, and borders snap to 1/4 in, so square, border and plain-piece
+cut sizes are whole quarter inches. Triangle cut sizes follow MATH.md F14:
+an exact half-square triangle cuts at F + 7/8 in, never a whole quarter.
 
-The one-eighth step is the sprint 3 reconcile, kept exactly for its callers
-(the crop-screen size and the editor's size edit): the exact cell rounded
-half-up per axis, the smaller of the two, borders to the eighth. Both rules
-use the frozen clamps (PARITY item 4; REBASELINE.md literals B8 to B10, and
-C3 for the pattern's band cap): an entry outside them returns the size at the
-clamp with its miss reported, never an error. Callers receive {requested,
-achieved}; size_pattern also stores both in the model's size basis.
+The one-eighth step is the sprint 3 reconcile for its callers (the crop-screen
+size and the editor's size edit): the exact cell rounded half-up per axis,
+the smaller of the two, borders to the eighth. Both rules use the frozen
+clamps and cap borders at BAND_MAX (PARITY item 4; REBASELINE.md literals B8
+to B10, and C3 for the band cap): an entry outside them returns the size at
+the clamp with its miss reported, never an error. Callers receive {requested,
+achieved}, and the model records both in its size basis.
 """
+
+from math import lcm
 
 from qrep.contract import SizeBasis, SizeRequest, SizeResult
 from qrep.model.schema import FinishedSizeBasis, Quilt
@@ -44,8 +47,9 @@ CELL_MAX = 32  # 4"
 BAND_FLOOR = 2  # 1/4"
 BAND_MAX = 112  # 14", the bridge's band cap, which the model lacked
 # A setting, not a formula: the step the finished square size snaps to on the
-# pattern path, recorded in the size basis as its rounding step. Keep it a
-# multiple of 1/4 in, or cut sizes stop being whole quarter inches.
+# pattern path. The size basis records it as its rounding step, or the
+# coarser step a corner leg needs. It must be a multiple of 1/4 in, or cut
+# sizes stop being whole quarter inches; the pattern path refuses any other.
 SQUARE_STEP = 2  # 1/4"
 BORDER_STEP = 2  # 1/4"
 
@@ -98,24 +102,53 @@ def _fits_units(quilt: Quilt, square: int) -> bool:
     )
 
 
-def _offered(quilt: Quilt, step: int) -> list[int]:
-    sizes = [square for square in square_sizes(step) if _fits_units(quilt, square)]
+def _square_step(quilt: Quilt, step: int) -> int:
+    """The step the offered squares actually move in: a leg p/q in lowest
+    terms is whole on multiples of q, so the squares are the multiples of
+    lcm(step, every leg's q)."""
+    units = quilt.center.unit_map or []
+    return lcm(step, *(unit.leg.denominator for unit in units if isinstance(unit, CornerUnit)))
+
+
+def _check_pattern_step(step: int) -> None:
+    if step < 1 or step % BORDER_STEP:
+        raise ValueError(
+            f"a pattern square step must be a whole quarter inch ({BORDER_STEP} e), got {step} e"
+        )
+
+
+def offered_squares(quilt: Quilt, step: int | None = None) -> tuple[int, ...]:
+    """The finished square sizes the pattern offers this quilt: square_sizes(step)
+    narrowed to the sizes that keep every corner leg a whole eighth. Raises
+    when a leg leaves none, because the pattern cannot size that quilt."""
+    step = SQUARE_STEP if step is None else step
+    whole = _square_step(quilt, step)
+    sizes = tuple(square for square in square_sizes(step) if square % whole == 0)
     if not sizes:
         raise ValueError(
-            f"no square size in {step} e steps keeps this quilt's corner legs whole eighths"
+            f"no square size in {step} e steps keeps this quilt's corner legs whole eighths: "
+            f"they need a multiple of {whole} e, and the largest square is {CELL_MAX} e"
         )
     return sizes
 
 
 def _nearest_square(
-    target: int, cells: int, bands0: list[int], cell0: int, sizes: list[int]
+    width: int | None,
+    height: int | None,
+    cols: int,
+    rows: int,
+    bands0: list[int],
+    cell0: int,
+    sizes: tuple[int, ...],
 ) -> int:
-    # The extent rises with the square, so the misses fall, then rise, and a
-    # tie can only fall between the two sizes either side of the request.
     best, best_miss = sizes[0], None
     for square in sizes:
-        extent = cells * square + 2 * sum(_pattern_band(b, cell0, square) for b in bands0)
-        miss = abs(extent - target)
+        border = 2 * sum(_pattern_band(b, cell0, square) for b in bands0)
+        miss = 0
+        if width is not None:
+            miss += abs(cols * square + border - width)
+        if height is not None:
+            miss += abs(rows * square + border - height)
         # Sizes ascend, so <= hands a tie to the larger square.
         if best_miss is None or miss <= best_miss:
             best, best_miss = square, miss
@@ -133,18 +166,15 @@ def _sprint3_cell(target: int, cells: int, cell0: int, band_total0: int) -> int:
     return round_div(target, cells)
 
 
-def apply_finished_size(
-    quilt: Quilt, width: int | None, height: int | None, step: int = 1
-) -> tuple[Quilt, dict, dict]:
-    """Reconcile a requested finished size onto the quilt's grid.
-
-    width/height are integer eighths; either may be None. step is the square
-    size step in eighths: 1, the default, is the sprint 3 reconcile; any
-    other step is the pattern rule (the module docstring has both). Returns
-    (updated quilt, requested, achieved). Never raises for out-of-range
-    requests: the clamps and the misses are the honest answer. The updated
-    quilt carries no size basis, because the old one no longer describes it;
-    size_pattern writes a new one."""
+def _reconcile(
+    quilt: Quilt, width: int | None, height: int | None, step: int
+) -> tuple[Quilt, dict, dict, int]:
+    """apply_finished_size without the basis, plus the step it applied."""
+    if width is None and height is None:
+        raise ValueError("apply_finished_size needs a width or a height")
+    for name, value in (("width", width), ("height", height)):
+        if value is not None and value < 1:
+            raise ValueError(f"a finished {name} must be at least 1 e, got {value}")
     rows, cols = quilt.center.rows, quilt.center.cols
     cell0 = quilt.center.cell_size
     bands0 = [band.width for band in quilt.borders]
@@ -156,26 +186,21 @@ def apply_finished_size(
             candidates.append(_sprint3_cell(width, cols, cell0, band_total0))
         if height is not None:
             candidates.append(_sprint3_cell(height, rows, cell0, band_total0))
-        if not candidates:
-            raise ValueError("apply_finished_size needs a width or a height")
         cell = max(CELL_MIN, min(CELL_MAX, min(candidates)))
         if not _fits_units(quilt, cell):
             raise ValueError(
                 f"a {cell} e square leaves a corner leg off whole eighths; size the pattern "
                 "in its own square steps"
             )
-        new_bands = [max(BAND_FLOOR, round_div(w * cell, cell0)) for w in bands0]
+        # Capping changes no cell pick; it changes only a band past 14 in.
+        new_bands = [max(BAND_FLOOR, min(BAND_MAX, round_div(w * cell, cell0))) for w in bands0]
+        applied = 1
     else:
-        sizes = _offered(quilt, step)
-        candidates = []
-        if width is not None:
-            candidates.append(_nearest_square(width, cols, bands0, cell0, sizes))
-        if height is not None:
-            candidates.append(_nearest_square(height, rows, bands0, cell0, sizes))
-        if not candidates:
-            raise ValueError("apply_finished_size needs a width or a height")
-        cell = min(candidates)
+        _check_pattern_step(step)
+        sizes = offered_squares(quilt, step)
+        cell = _nearest_square(width, height, cols, rows, bands0, cell0, sizes)
         new_bands = [_pattern_band(w, cell0, cell) for w in bands0]
+        applied = _square_step(quilt, step)
 
     updated = quilt.model_copy(deep=True)
     updated.center.cell_size = cell
@@ -191,6 +216,38 @@ def apply_finished_size(
         "borders": new_bands,
     }
     requested = {"width": width, "height": height}
+    return updated, requested, achieved, applied
+
+
+def apply_finished_size(
+    quilt: Quilt, width: int | None, height: int | None, step: int = 1
+) -> tuple[Quilt, dict, dict]:
+    """Reconcile a finished size you entered onto the quilt's grid.
+
+    width/height are integer eighths, at least 1; either may be None. step is
+    the square size step in eighths: 1, the default, is the sprint 3
+    reconcile; a step in whole quarter inches is the pattern rule (the module
+    docstring has both). Returns (updated quilt, requested, achieved). A size
+    outside the clamps returns the size at the clamp with its miss. Raises
+    ValueError with no width and no height, for a size below 1 e, for a step
+    that is neither 1 nor a whole quarter inch, and when no square keeps
+    every corner leg whole (at step 1, when the reconciled square breaks
+    one).
+
+    Every caller passes a size you entered (the crop-screen size and the
+    editor's size edit), so the updated quilt records a typed size basis at
+    1.0 with the step applied; a basis the old size had cannot describe the
+    new one."""
+    updated, requested, achieved, applied = _reconcile(quilt, width, height, step)
+    updated.size_basis = FinishedSizeBasis(
+        source="typed",
+        requested_width=width,
+        requested_height=height,
+        achieved_width=achieved["width"],
+        achieved_height=achieved["height"],
+        rounding_step=applied,
+        confidence=1.0,
+    )
     return updated, requested, achieved
 
 
@@ -199,19 +256,22 @@ def size_at(
 ) -> Quilt:
     """The quilt at a chosen finished square size and border widths.
 
-    square must be one of square_sizes(step) and keep every corner leg whole.
-    borders gives one width per band, each snapped to 1/4 in; None keeps the
-    model's widths, snapped. The counts never change, so the achieved size,
-    the returned quilt's finished width and height, moves in whole squares
-    and blocks. The returned quilt carries no size basis: the basis has no
-    source for a chosen square yet."""
-    offered = square_sizes(step)
+    square must be one of offered_squares(quilt, step). borders gives one
+    width per band, each snapped to 1/4 in; None keeps the model's widths,
+    snapped. The counts never change, so the achieved size, the returned
+    quilt's finished width and height, moves in whole squares and blocks.
+    The returned quilt carries no size basis: the basis has no source for a
+    chosen square yet (#240)."""
+    step = SQUARE_STEP if step is None else step
+    _check_pattern_step(step)
+    offered = offered_squares(quilt, step)
     if square not in offered:
-        raise ValueError(
-            f"a finished square of {square} e is not offered; choose one of {list(offered)}"
+        reason = (
+            "leaves a corner leg off whole eighths"
+            if square in square_sizes(step)
+            else "is not offered"
         )
-    if not _fits_units(quilt, square):
-        raise ValueError(f"a {square} e square leaves a corner leg off whole eighths")
+        raise ValueError(f"a finished square of {square} e {reason}; choose one of {list(offered)}")
     widths = [band.width for band in quilt.borders] if borders is None else list(borders)
     if len(widths) != len(quilt.borders):
         raise ValueError(f"{len(widths)} border widths given for {len(quilt.borders)} border bands")
@@ -252,7 +312,8 @@ def _estimate_confidence(quilt: Quilt) -> float:
         if basis.source != "default":
             raise ValueError(
                 f"this model's size was set by a {basis.source} size, so it holds no photo "
-                "estimate to label as one; size the model the read returned"
+                "estimate to label as one; send that size as a typed or preset request, or "
+                "size the model the read returned"
             )
         return basis.confidence
     return 1.0 if _hand_authored(quilt) else UNMEASURED_ESTIMATE
@@ -263,7 +324,9 @@ def size_pattern(quilt: Quilt, request: SizeRequest) -> SizeResult:
     (SPEC.md section 6.3): a typed or preset size snaps by the pattern rule in
     1/4 in squares, and the default fits the model's own estimate the same
     way. Returns the sized model, whose size basis matches its finished size,
-    and that basis."""
+    and that basis. Raises ValueError for an unknown preset, a default on a
+    model whose basis records a size you set, and a corner leg no offered
+    square keeps whole; the bridge returns each as kind value."""
     if request.source == "typed":
         width, height = request.width, request.height
         confidence = 1.0
@@ -274,7 +337,7 @@ def size_pattern(quilt: Quilt, request: SizeRequest) -> SizeResult:
         width, height = quilt.finished_width, quilt.finished_height
         confidence = _estimate_confidence(quilt)
 
-    sized, _requested, _achieved = apply_finished_size(quilt, width, height, step=SQUARE_STEP)
+    sized, _requested, _achieved, applied = _reconcile(quilt, width, height, SQUARE_STEP)
     if request.source == "default":
         width = height = None
     sized.size_basis = FinishedSizeBasis(
@@ -283,7 +346,7 @@ def size_pattern(quilt: Quilt, request: SizeRequest) -> SizeResult:
         requested_height=height,
         achieved_width=sized.finished_width,
         achieved_height=sized.finished_height,
-        rounding_step=SQUARE_STEP,
+        rounding_step=applied,
         confidence=confidence,
     )
     basis = SizeBasis(
