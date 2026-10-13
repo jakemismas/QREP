@@ -12,12 +12,17 @@
  * 376px panel with a segmented Tabs control (Fabrics active; Sizing and
  * Pattern are disabled teasers); phone shows one region at a time with a
  * bottom tab bar.
+ *
+ * C2a (issue #96): an open quilt shows on Your pattern instead of the
+ * editor when it came from See a sample pattern or See your pattern.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ThemeProvider, ToastProvider, Tabs } from "./ui";
 import type { TabItem } from "./ui";
 import { EngineProvider } from "./engine/useEngine";
 import { ProjectProvider, useProject } from "./state/project";
+import { useYourPattern } from "./state/pattern";
+import { YourPatternScreen } from "./pattern/YourPatternScreen";
 import { Header } from "./shell/Header";
 import { StartScreen } from "./shell/StartScreen";
 import { OpenModal } from "./shell/OpenModal";
@@ -226,12 +231,14 @@ function PhoneEditor({ tab, onTab }: { tab: PhoneTab; onTab: (tab: PhoneTab) => 
 
 function AppShell() {
   const { model, photo } = useProject();
+  const { screen } = useYourPattern();
   const isDesk = useIsDesktop();
   const [modalOpen, setModalOpen] = useState(false);
   const [tab, setTab] = useState<PhoneTab>("quilt");
   const openModal = useCallback(() => setModalOpen(true), []);
   // `idle` doubles as the dropzone, so route on the flow flag, not the state.
   const inPhotoFlow = photo.active;
+  const onPattern = !inPhotoFlow && model !== null && screen === "pattern";
 
   // A freshly-opened project starts on the Quilt tab (phone). Fire only on the
   // null -> model transition, not on every in-place edit.
@@ -250,13 +257,15 @@ function AppShell() {
       <Header isDesk={isDesk} onOpenProject={openModal} />
       <main
         className={
-          inPhotoFlow || model === null ? "app-main" : "app-main app-main--editor"
+          inPhotoFlow || model === null || onPattern ? "app-main" : "app-main app-main--editor"
         }
       >
         {inPhotoFlow ? (
           <PhotoFlow />
         ) : model === null ? (
           <StartScreen onOpenProject={openModal} onStartPhoto={photo.backToDropzone} />
+        ) : onPattern ? (
+          <YourPatternScreen />
         ) : isDesk ? (
           <DesktopEditor />
         ) : (

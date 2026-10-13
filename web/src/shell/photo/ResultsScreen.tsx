@@ -1,13 +1,18 @@
 /*
  * Results (photo.state === "results"): side-by-side photo and recovered
  * quilt, per-stage confidence meters, the overall pill, the uncertain toggle,
- * the lightbox and the timing line.
+ * the lightbox and the timing line. C2a (issue #96): See your pattern is the
+ * primary action, and Open in the editor stays beside it until C6a. See your
+ * pattern waits while Apply size runs: it opens the read as it stands, and a
+ * size that lands after it would change the read Your pattern outlines but
+ * not the quilt it prints.
  */
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { QuiltCanvas } from "../../viewer";
 import { verdictStory } from "../../model/verdictStory";
 import type { QuiltModel } from "../../model/types";
 import { useUncertainty } from "../../state/photo";
+import { useYourPattern } from "../../state/pattern";
 import type { PhotoApi } from "../photoApi";
 import { Lightbox } from "./Lightbox";
 import type { LbTab } from "./Lightbox";
@@ -40,7 +45,29 @@ function parseModel(json: string | undefined | null): QuiltModel | null {
 
 export function ResultsScreen({ photo }: { photo: PhotoApi }) {
   const uncertainty = useUncertainty();
+  const { showPattern, showEditor } = useYourPattern();
   const [lb, setLb] = useState<LbTab | null>(null);
+  // Applies still running: a count, since a second Apply can start before
+  // the first ends, and a ref, so a tap in the same task as Apply, before the
+  // disabled button renders, is held too.
+  const applyingRef = useRef(0);
+  const [applying, setApplying] = useState(false);
+  const sizePhoto = useMemo<PhotoApi>(
+    () => ({
+      ...photo,
+      applySizeFromResults: async () => {
+        applyingRef.current += 1;
+        setApplying(true);
+        try {
+          await photo.applySizeFromResults();
+        } finally {
+          applyingRef.current -= 1;
+          setApplying(applyingRef.current > 0);
+        }
+      },
+    }),
+    [photo],
+  );
 
   const result = photo.result;
   const model = useMemo(() => parseModel(result?.modelJson), [result?.modelJson]);
@@ -161,7 +188,7 @@ export function ResultsScreen({ photo }: { photo: PhotoApi }) {
                 <QuiltCanvas model={model} showUncertain={showUncertain} />
               </div>
               <div className="pf-recovered-cap">
-                <SizeStory photo={photo} model={model} />
+                <SizeStory photo={sizePhoto} model={model} />
                 <span>
                   {model.center.cols} &times; {model.center.rows} squares
                 </span>
@@ -173,7 +200,7 @@ export function ResultsScreen({ photo }: { photo: PhotoApi }) {
                 <QuiltCanvas model={model} showUncertain={showUncertain} />
               </div>
               <div className="pf-recovered-cap">
-                <SizeStory photo={photo} model={model} />
+                <SizeStory photo={sizePhoto} model={model} />
                 <span>
                   {model.center.cols} &times; {model.center.rows} squares
                 </span>
@@ -238,14 +265,33 @@ export function ResultsScreen({ photo }: { photo: PhotoApi }) {
 
           <div className="pf-actions">
             {story.failurePanel ? null : (
-              <button
-                type="button"
-                className="pf-btn pf-btn--primary"
-                data-testid="open-in-editor"
-                onClick={() => photo.openInEditor()}
-              >
-                Open in the editor
-              </button>
+              <>
+                <button
+                  type="button"
+                  className="pf-btn pf-btn--primary"
+                  data-testid="see-pattern"
+                  disabled={applying}
+                  onClick={() => {
+                    if (applyingRef.current > 0) return;
+                    // Bound after the open, to the read that just opened.
+                    photo.openInEditor();
+                    showPattern("photo");
+                  }}
+                >
+                  See your pattern
+                </button>
+                <button
+                  type="button"
+                  className="pf-btn pf-btn--secondary"
+                  data-testid="open-in-editor"
+                  onClick={() => {
+                    showEditor();
+                    photo.openInEditor();
+                  }}
+                >
+                  Open in the editor
+                </button>
+              </>
             )}
             <button
               type="button"

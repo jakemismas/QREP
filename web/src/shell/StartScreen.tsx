@@ -2,8 +2,12 @@
  * First-run screen (S2 + S3, issues #42 / #43). Photo entry is an S6 feature,
  * so "Start from a photo" is a visibly disabled teaser here. S3 adds the
  * blank-grid card, the autosave resume banner (with the save age), and the
- * loud autosave-error surface for a foreign schema_version.
+ * loud autosave-error surface for a foreign schema_version. C2a (issue #96)
+ * adds See a sample pattern, which opens the demo quilt on Your pattern and
+ * holds every other entry here until it has loaded; the demo entry into the
+ * editor stays until C6a removes the editor.
  */
+import { useRef, useState } from "react";
 import { useProject } from "../state/project";
 
 /** Human age of an autosave, coarse by design ("saved just now" .. days). */
@@ -61,7 +65,36 @@ export function StartScreen({
   // shell still type-checks before that wiring lands.
   onStartPhoto?: () => void;
 }) {
-  const { openDemo, startBlank, resume, autosaveError, resumeAutosave } = useProject();
+  const { openDemo, startBlank, resume, autosaveError, resumeAutosave, yourPattern } =
+    useProject();
+
+  // While the demo quilt loads (See a sample pattern or the old demo entry),
+  // every entry here that opens or starts something is disabled: openDemo
+  // installs the quilt whenever its fetch lands and cannot tell it was
+  // overtaken, so a quilt opened meanwhile would be replaced by it. The ref
+  // also ignores a tap that lands before the disabled state renders. A failed
+  // load enables them all again.
+  const [loadingSample, setLoadingSample] = useState(false);
+  const loadingSampleRef = useRef(false);
+  const unlessLoading =
+    (action: (() => void) | undefined) =>
+    (): void => {
+      if (!loadingSampleRef.current) action?.();
+    };
+  const loadDemo = (onOpened?: () => void) => {
+    if (loadingSampleRef.current) return;
+    loadingSampleRef.current = true;
+    setLoadingSample(true);
+    void openDemo().then((opened) => {
+      if (opened) {
+        onOpened?.();
+        return;
+      }
+      loadingSampleRef.current = false;
+      setLoadingSample(false);
+    });
+  };
+  const seeSample = () => loadDemo(() => yourPattern.showPattern("sample"));
 
   return (
     <div data-testid="start-screen" className="start-screen">
@@ -91,7 +124,8 @@ export function StartScreen({
             type="button"
             data-testid="resume-accept"
             className="btn btn--secondary start-resume-btn"
-            onClick={resumeAutosave}
+            disabled={loadingSample}
+            onClick={unlessLoading(resumeAutosave)}
           >
             Continue
           </button>
@@ -107,7 +141,8 @@ export function StartScreen({
           className="start-resume-idle"
           aria-hidden="true"
           tabIndex={-1}
-          onClick={resumeAutosave}
+          disabled={loadingSample}
+          onClick={unlessLoading(resumeAutosave)}
         />
       )}
 
@@ -131,18 +166,29 @@ export function StartScreen({
             type="button"
             data-testid="start-photo"
             className="btn start-cta"
-            onClick={onStartPhoto}
+            disabled={loadingSample}
+            onClick={unlessLoading(onStartPhoto)}
           >
             Start from a photo
           </button>
 
           <button
             type="button"
+            data-testid="see-sample"
+            className="btn btn--secondary"
+            disabled={loadingSample}
+            aria-busy={loadingSample}
+            onClick={seeSample}
+          >
+            See a sample pattern
+          </button>
+
+          <button
+            type="button"
             data-testid="open-demo"
             className="btn btn--secondary"
-            onClick={() => {
-              void openDemo();
-            }}
+            disabled={loadingSample}
+            onClick={() => loadDemo()}
           >
             Open the demo quilt instead
           </button>
@@ -151,7 +197,8 @@ export function StartScreen({
             type="button"
             data-testid="start-blank"
             className="btn btn--link"
-            onClick={startBlank}
+            disabled={loadingSample}
+            onClick={unlessLoading(startBlank)}
           >
             No photo handy? Start from a blank grid
           </button>
@@ -160,7 +207,8 @@ export function StartScreen({
             type="button"
             data-testid="open-project"
             className="btn btn--link"
-            onClick={onOpenProject}
+            disabled={loadingSample}
+            onClick={unlessLoading(onOpenProject)}
           >
             Open a saved project
           </button>

@@ -1,0 +1,175 @@
+/* Your pattern (C2a). Phone first: heading, method and the PDF button, then
+   the photo and quilt stacked, then the details. From 720 px (the app's
+   breakpoint) the quilt sits beside the photo, and the media row sticks
+   under the header while the details scroll beneath it. From 1100 px, where
+   a side column leaves both wide enough to read the rulers, the media becomes
+   a sticky column beside it (ux-22). */
+.yp-root {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "head"
+    "media"
+    "details";
+  gap: 16px;
+  animation: qFade 0.35s ease;
+}
+
+.yp-head {
+  grid-area: head;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.yp-title {
+  margin: 0;
+  font: 700 26px var(--serif, serif);
+  color: var(--ink);
+}
+
+.yp-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--accentBg);
+  border: 1px solid var(--accentLn);
+}
+
+.yp-error-text {
+  margin: 0;
+  flex: 1 1 200px;
+  font: 500 15px/1.4 var(--sans, sans-serif);
+  color: var(--ink);
+}
+
+.yp-retry {
+  cursor: pointer;
+}
+
+.yp-media {
+  grid-area: media;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: 14px;
+}
+
+.yp-figure {
+  margin: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.yp-eyebrow {
+  font: 600 12.5px var(--sans, sans-serif);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mut);
+}
+
+.yp-photo-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 70vh;
+  object-fit: contain;
+  border-radius: 10px;
+  background: var(--stage);
+}
+
+/* QuiltCanvas styles itself; these rules apply only inside this screen. Its
+   toolbar wraps in a narrow column instead of pushing the page wider. */
+.yp-quilt .qc-toolbar {
+  flex-wrap: wrap;
+}
+
+/* At Fit a one-finger vertical drag scrolls the page (web-17); zoomed, the
+   canvas keeps touch-action none and pans the quilt. */
+.yp-quilt[data-zoomed="false"] .qc-canvas {
+  touch-action: pan-y;
+}
+
+.yp-compare {
+  align-self: flex-start;
+  cursor: pointer;
+}
+
+.yp-details {
+  grid-area: details;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+@media (min-width: 720px) {
+  .yp-media--pair {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+/* Below the side-column layout the details follow the media, so the media
+   row holds the quilt in view: it sticks just under the header, which is
+   60 px tall at these widths (top tucks 2 px under it so no sliver of the
+   details shows between them), and its opaque background hides the details
+   scrolling beneath. The row is about 45vh tall, so the rows below stay
+   readable; the stage leaves room in it for the zoom toolbar, the size
+   caption and the padding. */
+@media (min-width: 720px) and (max-width: 1099.98px) {
+  .yp-media {
+    position: sticky;
+    top: 58px;
+    z-index: 2;
+    padding: 10px 0;
+    background: var(--bg);
+  }
+
+  .yp-quilt .qc-stage {
+    height: clamp(120px, calc(45vh - 110px), 560px);
+  }
+
+  .yp-photo-img {
+    max-height: clamp(120px, calc(45vh - 110px), 560px);
+  }
+}
+
+@media (min-width: 1100px) {
+  .yp-root {
+    grid-template-columns: minmax(0, 1fr) clamp(280px, 30vw, 376px);
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+      "media head"
+      "media details";
+    gap: 16px 22px;
+    align-items: start;
+  }
+
+  /* The header is sticky too; the media column stops just below it. */
+  .yp-media {
+    position: sticky;
+    top: 76px;
+    align-self: start;
+  }
+
+  /* Short enough that the sticky column fits under the header. */
+  .yp-quilt .qc-stage {
+    height: clamp(180px, calc(100vh - 230px), 760px);
+  }
+
+  /* Beside a photo, each column also carries its caption line. */
+  .yp-media--pair .qc-stage {
+    height: clamp(180px, calc(100vh - 270px), 720px);
+  }
+
+  .yp-photo-img {
+    max-height: clamp(180px, calc(100vh - 270px), 720px);
+  }
+}

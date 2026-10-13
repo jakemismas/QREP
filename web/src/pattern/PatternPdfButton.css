@@ -1,0 +1,36 @@
+/* The pattern PDF button on Your pattern (C2a). */
+.pb-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 50px;
+  cursor: pointer;
+}
+
+.pb-button[aria-busy="true"] {
+  cursor: progress;
+}
+
+.pb-spin {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  animation: pb-turn 0.9s linear infinite;
+}
+
+@keyframes pb-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pb-spin {
+    animation: none;
+  }
+}

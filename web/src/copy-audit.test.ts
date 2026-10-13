@@ -23,6 +23,8 @@ const ALLOWLIST: string[] = [
   "download-yardage", // S5 export button test id (not UI copy)
   "download-svg", // S5 export button test id (not UI copy)
   "download-pdf", // S5 export button test id (not UI copy)
+  "Download pattern (PDF)", // C2a: the one user-initiated file save on Your pattern
+  "download-pattern", // C2a Download pattern (PDF) button test id (not UI copy)
 ];
 
 function sourceFiles(dir: string): string[] {
