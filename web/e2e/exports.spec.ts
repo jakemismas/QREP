@@ -6,12 +6,15 @@
  * yardage-row-<fabricId|binding|backing|batting> rows carrying
  * data-quarter-yards, download buttons download-cutlist-csv / -cutlist-md /
  * -yardage / -svg / -pdf, print-plan + print-sheet, copy-settings, and the
- * Seams mode via mode-seams in the toolbar.
+ * Seams mode via mode-seams in the toolbar. The yardage test reads Your
+ * pattern's shopping lines instead (C2b, issue #148): shop-binding,
+ * shop-backing and shop-batting with data-yards, shop-widths, the
+ * strip-width select and the census rows fabric-yards-<fabricId>.
  *
  * Golden discipline: byte-compares read the CANONICAL files from
  * tests/golden/ at test runtime. No snapshot APIs. Known literals: strip
  * strip_set_count 25 and historical piece_count 2479 (test_construct),
- * backing 5.5 yd = 22 quarter-yards (design doc), batting 83" x 98"
+ * backing 23 quarter yards = 5 3/4 yd (MATH.md V-BACK-09), batting 83" x 98"
  * (PARITY item 9), slug double-irish-chain-75x90 (PARITY item 11).
  */
 import { expect, test, type Download, type Page } from "@playwright/test";
@@ -106,30 +109,53 @@ test("strategy cards show bridge metrics field-for-field", async ({ page }) => {
   await expect(page.getByTestId("strategy-card-strip")).toContainText(/rough heuristic/i);
 });
 
-test("yardage table: binding, backing 5 1/2 yd, batting row, engine usable width", async ({
+test("yardage on Your pattern: binding, backing 5 3/4 yd, batting, both widths", async ({
   page,
 }) => {
-  await openPattern(page);
-  const table = page.getByTestId("yardage-table");
-  await expect(table).toBeVisible();
-  await expect(page.getByTestId("yardage-row-binding")).toBeVisible();
-  // Backing per MATH.md V-BACK-09: 2 vertical panels x 98" = 1568 eighths,
-  // + 72 pieced allowance = 1640; ceil(1640 / 72) = 23 quarter-yards = 5 3/4 yd.
-  const backing = page.getByTestId("yardage-row-backing");
-  await expect(backing).toHaveAttribute("data-quarter-yards", "23");
-  await expect(backing).toContainText("5 3/4");
-  // Batting per PARITY item 9: finished + 8" per axis = 83" x 98".
-  const batting = page.getByTestId("yardage-row-batting");
-  await expect(batting).toContainText('83"');
-  await expect(batting).toContainText('98"');
-  // Usable width copy reads the engine settings value, never hardcoded 40.
-  await expect(page.getByTestId("pattern-panel")).toContainText('42"');
-  // Every fabric row's quarter-yards attribute is a positive integer
-  // (multiples of 0.25 yd by construction).
-  for (const row of await page.locator("[data-testid^='yardage-row-']").all()) {
-    const quarters = Number(await row.getAttribute("data-quarter-yards"));
-    expect(Number.isInteger(quarters)).toBe(true);
-    expect(quarters).toBeGreaterThan(0);
+  // C2b (issue #148; REBASELINE.md): the yardage table's checks move onto
+  // Your pattern's shopping lines for the sample, every amount from the
+  // engine summary. The summary is export_pattern's, which builds the whole
+  // pattern PDF in the browser engine, so its first arrival gets 60 s.
+  await openSamplePattern(page);
+  await expect(page.getByTestId("shopping-lines")).toBeVisible({ timeout: 60_000 });
+
+  // The binding line shows as the summary gives it. The summary carries no
+  // strip count yet (a later commit adds it), so only its amount is checked.
+  const binding = page.getByTestId("shop-binding");
+  await expect(binding).toBeVisible();
+  expect(Number(await binding.getAttribute("data-yards"))).toBeGreaterThan(0);
+
+  // V-BACK-09: 2 vertical panels x 98 in = 1568 e, + 72 e pieced allowance =
+  // 1640 e; ceil(1640 / 72) = 23 quarter yards = 23 / 4 = 5.75 yd.
+  const backing = page.getByTestId("shop-backing");
+  await expect(backing).toHaveAttribute("data-yards", "5.75");
+  await expect(backing.locator(".sl-amount")).toHaveText("5 3/4 yd");
+
+  // V-BATT-01: the finished 75 x 90 in plus 4 in a side, (75 + 8) x (90 + 8)
+  // in = 83 x 98 in.
+  await expect(page.getByTestId("shop-batting")).toContainText("83 x 98 in");
+
+  // Both widths named (MATH.md D-16). The cutting width offers 40 in as its
+  // default (MATH.md section 1.3, U), but the fixture stores wof 336 e =
+  // 42 in until A6, so the select and the copy show 42 in for cutting (MATH.md
+  // section 3.2, row web/e2e/exports.spec.ts); the backing is the 42 in
+  // default (B, backing_width 336 e).
+  const stripWidth = page.getByTestId("strip-width");
+  await expect(stripWidth.locator("option", { hasText: "40 in (default)" })).toHaveCount(1);
+  await expect(stripWidth).toHaveValue("336");
+  const widths = page.getByTestId("shop-widths");
+  await expect(widths).toContainText("strips at 42 in");
+  await expect(widths).toContainText("fabric 42 in wide");
+
+  // A positive amount on every fabric line, each a whole number of quarter
+  // yards. The fixture's palette has two fabrics, b and c, and the top uses
+  // both, so both rows carry yards.
+  const fabricYards = page.locator("[data-testid^='fabric-yards-']");
+  await expect(fabricYards).toHaveCount(2);
+  for (const row of await fabricYards.all()) {
+    const yards = Number(await row.getAttribute("data-yards"));
+    expect(yards).toBeGreaterThan(0);
+    expect(Number.isInteger(yards * 4)).toBe(true);
   }
 });
 
