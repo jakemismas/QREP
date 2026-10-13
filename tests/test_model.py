@@ -307,13 +307,15 @@ def test_misspelled_source_reports_only_the_source():
     assert [error["loc"] for error in refused.value.errors()] == [("source",)]
 
 
-# Where each stored value comes from (docs/SPEC.md section 8). A CV value names
-# every carrier of its confidence, joined by "+"; a user value lives in a model
-# that records it at 1.0. The other kinds carry no confidence of their own:
-# settings and authored values are set by hand, derived values follow
-# deterministically from the read or other fields, format values describe the
-# file, provenance values name where a value came from, and confidence fields
-# are the carriers. B2a adds its fields here.
+# Where each stored value comes from (docs/SPEC.md section 8). A labeled value
+# names every carrier of its confidence, joined by "+", each after "cv:" for a
+# CV value or "user:" for a user fact; a carrier without a prefix takes the one
+# before it. A user carrier is a stage the confirmed read records at 1.0
+# (USER_STAGES); a plain "user" value lives in a model that records it at 1.0.
+# The other kinds carry no confidence of their own: settings and authored
+# values are set by hand, derived values follow deterministically from the
+# read or other fields, format values describe the file, provenance values
+# name where a value came from, and confidence fields are the carriers.
 FIELD_SOURCES = {
     "Quilt.schema_version": "format",
     "QuiltMetadata.name": "derived",
@@ -322,20 +324,23 @@ FIELD_SOURCES = {
     "Fabric.name": "derived",
     "Fabric.color": "cv:stage:palette",
     "GridRegion.kind": "format",
-    "GridRegion.rows": "cv:stage:grid",
-    "GridRegion.cols": "cv:stage:grid",
-    # A read measures squares and borders in pixels (the grid and border
-    # stages) and scales them to eighths by an assumed photo resolution
-    # (qrep/vision/pipeline.py ASSUMED_PPI), so their physical size is also the
+    # The confirmed read takes rows and columns from your counts (the grid
+    # stage) inside the field your border bands leave (the border stage).
+    "GridRegion.rows": "user:stage:grid+stage:border",
+    "GridRegion.cols": "user:stage:grid+stage:border",
+    # A read scales squares to eighths by an assumed photo resolution
+    # (qrep/vision/read/knobs.py ASSUMED_PPI), so the square size is the
     # photo's size estimate until the user sets a size (engine-09); the size
-    # basis carries that estimate.
-    "GridRegion.cell_size": "cv:stage:grid+size_estimate",
+    # basis carries that estimate (#207).
+    "GridRegion.cell_size": "cv:size_estimate",
     "GridRegion.cells": "cv:cell",
     "GridRegion.cell_confidence": "confidence",
-    "BorderBand.fabric_id": "cv:stage:border",
-    "BorderBand.width": "cv:stage:border+size_estimate",
-    # The read binds in the border fabric it found (qrep/vision/pipeline.py).
-    "Binding.fabric_id": "cv:stage:border",
+    # The read labels each band's strips as it labels squares (the cells stage).
+    "BorderBand.fabric_id": "cv:stage:cells",
+    # Your band width in squares (the border stage) times the estimated square.
+    "BorderBand.width": "user:stage:border+cv:size_estimate",
+    # The read binds in the outermost border fabric it found.
+    "Binding.fabric_id": "cv:stage:cells",
     "Binding.strip_width": "setting",
     "QuiltingMotif.name": "authored",
     "QuiltingMotif.x": "authored",
@@ -411,6 +416,12 @@ FIELD_SOURCES = {
 
 KINDS = {"user", "derived", "authored", "setting", "format", "provenance", "confidence"}
 
+# The stages the confirmed read takes from you, recorded at 1.0 (criterion
+# S7-6 replacement, docs/sprint-5/REBASELINE.md): corners, counts and border
+# bands. A CV value never finds its confidence in one of them.
+USER_STAGES = ("rectify", "grid", "border")
+USER_STAGE_CARRIERS = {f"stage:{stage}" for stage in USER_STAGES}
+
 def one_unit_of_each_kind(confidence: float = 1.0) -> list:
     """A unit map for a 2 x 4 grid of 12-eighth squares with every kind once:
     the four one-square kinds on row 0, two geese lying across row 1. The
@@ -465,23 +476,14 @@ CARRIER_ON_MODEL = {
     **{f"unit:{kind}": (lambda q, kind=kind: _unit_confidences(q, kind)) for kind in UNIT_KINDS},
 }
 
-# CV values a read stores with no confidence for part of what they measure:
-# the read scales squares and borders by an assumed resolution but records no
-# size basis (#207, B2a). Named here so the walk states the gap instead of
-# passing over it; #207 empties this set.
-UNRECORDED_CONFIDENCE = {"GridRegion.cell_size", "BorderBand.width"}
-
-# CV values a read does not store at all: the achieved size lives in the size
-# basis, which no read fills yet (#207). Every other CV value must be stored by
-# read_shaped_quilt and so meet the presence check; a new optional CV field
-# fails until it is stored there or named here. No read writes a unit map until
-# B4a (#139), so the unit values are named too, and #139's criterion removes
-# them; unit_shaped_quilt checks their confidences instead.
+# CV values a read does not store at all. Every other CV value must be stored
+# by read_shaped_quilt and so meet the presence check; a new optional CV field
+# fails until it is stored there or named here. The confirmed read writes no
+# unit map, so the unit values are named, and unit_shaped_quilt checks their
+# confidences instead (#139 writes the map; #136 comment 6110977318 asks Jake
+# whether this set empties then).
 UNIT_VALUES = {path for path, source in FIELD_SOURCES.items() if source.startswith("cv:unit:")}
-NOT_STORED_ON_A_READ = {
-    "FinishedSizeBasis.achieved_width",
-    "FinishedSizeBasis.achieved_height",
-} | UNIT_VALUES
+NOT_STORED_ON_A_READ = UNIT_VALUES
 
 # Every variant of each model that holds user facts, built with overrides.
 USER_FACT_MODELS = {
@@ -506,10 +508,16 @@ CARRIER_FIELDS = {
 }
 
 
-def read_shaped_quilt() -> Quilt:
-    """A model shaped as a photo read returns it (qrep/vision/pipeline.py, the
-    recovered Quilt): CV provenance with all six stages, a confidence per
-    square, a border band, and none of the optional records."""
+def read_shaped_quilt(**stages: float) -> Quilt:
+    """A model shaped as the confirmed read returns it (bridge.read_confirmed):
+    CV provenance with all six stages, the ones you confirmed at 1.0 unless a
+    test overrides them, a confidence per square, one border band of 2.5
+    squares, your counts as the confirmed block structure, and the photo's
+    size estimate as a default size basis."""
+    # Counts: 2 blocks across and 1 down, each 1 x 1 square, so rows = 1 x 1 = 1
+    # and cols = 2 x 1 = 2. The band is 2.5 squares of 12 eighths = 30.
+    # Size: 2 x 12 + 2 x 30 = 84 wide and 1 x 12 + 2 x 30 = 72 tall.
+    confidence = {stage: 0.5 for stage in STAGES} | {stage: 1.0 for stage in USER_STAGES}
     return Quilt(
         metadata=QuiltMetadata(name="Recovered quilt"),
         palette=Palette(
@@ -523,12 +531,38 @@ def read_shaped_quilt() -> Quilt:
         ),
         borders=[BorderBand(fabric_id="f1", width=30)],
         binding=Binding(fabric_id="f1"),
-        provenance=Provenance(source="cv", stage_confidence={stage: 0.5 for stage in STAGES}),
+        provenance=Provenance(source="cv", stage_confidence=confidence | stages),
+        confirmed_blocks=ConfirmedBlocks(
+            blocks_across=2, blocks_down=1, squares_across=1, squares_down=1
+        ),
+        size_basis=default_basis(
+            achieved_width=84, achieved_height=72, rounding_step=2, confidence=0.0
+        ),
     )
 
 
-def _carriers(source: str) -> list[str]:
-    return source[3:].split("+")
+def _parts(source: str) -> list[tuple[str, str]]:
+    """(kind, carrier) for each carrier of a labeled source, kind "cv" or "user"."""
+    parts, kind = [], None
+    for part in source.split("+"):
+        for prefix in ("cv:", "user:"):
+            if part.startswith(prefix):
+                kind, part = prefix[:-1], part[len(prefix) :]
+        parts.append((kind, part))
+    return parts
+
+
+def _labeled(source: str) -> bool:
+    return source.startswith(("cv:", "user:"))
+
+
+def _carriers(source: str, kind: str = "cv") -> list[str]:
+    """The carriers of one kind that a labeled source names."""
+    return [carrier for k, carrier in _parts(source) if k == kind] if _labeled(source) else []
+
+
+CV_PATHS = {path for path, source in FIELD_SOURCES.items() if _carriers(source)}
+USER_STAGE_PATHS = {path for path, source in FIELD_SOURCES.items() if _carriers(source, "user")}
 
 
 def unit_shaped_quilt() -> Quilt:
@@ -632,10 +666,13 @@ def test_schema_walk_classifies_every_stored_value():
     assert sorted(leaves - set(FIELD_SOURCES)) == [], "fields with no recorded source"
     assert sorted(set(FIELD_SOURCES) - leaves) == [], "recorded sources with no field"
     for path, source in FIELD_SOURCES.items():
-        if source.startswith("cv:"):
-            for carrier in _carriers(source):
+        if _labeled(source):
+            for kind, carrier in _parts(source):
                 assert carrier in CV_CARRIERS, f"{path}: unknown confidence carrier {carrier}"
                 assert carrier in CARRIER_ON_MODEL, f"{path}: carrier {carrier} has no place"
+                # A user fact sits only in a stage you confirm, and a CV value
+                # never borrows that stage's 1.0.
+                assert (carrier in USER_STAGE_CARRIERS) == (kind == "user"), f"{path}: {kind}"
         else:
             assert source in KINDS, f"{path}: unknown source {source}"
     # Only the carriers are labeled confidence, so a CV value cannot hide there.
@@ -650,7 +687,6 @@ def test_schema_walk_classifies_every_stored_value():
         {
             carrier
             for source in FIELD_SOURCES.values()
-            if source.startswith("cv:")
             for carrier in _carriers(source)
         }
     ),
@@ -674,26 +710,59 @@ def test_every_cv_value_on_a_read_finds_its_confidence():
         for name in type(model).model_fields
         if getattr(model, name) is not None
     }
-    cv_paths = {p for p, s in FIELD_SOURCES.items() if s.startswith("cv:")}
-    cv_stored = cv_paths & stored
-    assert cv_paths - stored == NOT_STORED_ON_A_READ
-    assert {"GridRegion.cells", "BorderBand.width", "Fabric.color"} <= cv_stored
+    cv_stored = CV_PATHS & stored
+    assert CV_PATHS - stored == NOT_STORED_ON_A_READ
+    assert {
+        "GridRegion.cells",
+        "GridRegion.cell_size",
+        "BorderBand.width",
+        "Fabric.color",
+        "FinishedSizeBasis.achieved_width",
+    } <= cv_stored
     missing = {
         path
         for path in cv_stored
         if any(CARRIER_ON_MODEL[c](quilt) is None for c in _carriers(FIELD_SOURCES[path]))
     }
-    assert missing == UNRECORDED_CONFIDENCE
-    # Once the read records its size estimate, nothing is missing. The read's
-    # size: 2 x 12 + 2 x 30 = 84 wide and 1 x 12 + 2 x 30 = 72 tall.
-    estimated = quilt.model_copy(
-        update={"size_basis": default_basis(achieved_width=84, achieved_height=72, confidence=0.25)}
-    )
-    assert all(
-        CARRIER_ON_MODEL[c](estimated) is not None
-        for path in cv_stored
-        for c in _carriers(FIELD_SOURCES[path])
-    )
+    # #207: the size basis carries the estimate's confidence, so the square size
+    # and every border width find one.
+    assert missing == set()
+    # The estimate is a guess, below 1.0; the achieved size is the model's own:
+    # 2 x 12 + 2 x 30 = 84 by 1 x 12 + 2 x 30 = 72 (read_shaped_quilt).
+    assert quilt.size_basis.confidence < 1.0
+    assert (quilt.size_basis.achieved_width, quilt.size_basis.achieved_height) == (84, 72)
+    assert (quilt.finished_width, quilt.finished_height) == (84, 72)
+
+
+def _user_stage_values_below_one(quilt: Quilt) -> set[str]:
+    """Every user-fact path whose stage carrier on quilt is not exactly 1.0."""
+    return {
+        path
+        for path in USER_STAGE_PATHS
+        if any(CARRIER_ON_MODEL[c](quilt) != 1.0 for c in _carriers(FIELD_SOURCES[path], "user"))
+    }
+
+
+def test_every_user_fact_on_a_read_is_recorded_at_one():
+    # Criterion S7-6 replacement: your counts and border bands are user facts,
+    # so the stages that carry them read exactly 1.0 on a read, never any grid
+    # or border confidence the read measured.
+    assert USER_STAGE_PATHS == {"GridRegion.rows", "GridRegion.cols", "BorderBand.width"}
+    assert _user_stage_values_below_one(read_shaped_quilt()) == set()
+    assert _user_stage_values_below_one(read_shaped_quilt(grid=0.5)) == {
+        "GridRegion.rows",
+        "GridRegion.cols",
+    }
+    assert _user_stage_values_below_one(read_shaped_quilt(border=0.875)) == USER_STAGE_PATHS
+
+
+def test_read_counts_follow_the_confirmed_blocks():
+    # The rows and columns a read stores are your counts: blocks times squares
+    # per block, 1 x 1 = 1 row and 2 x 1 = 2 columns (read_shaped_quilt).
+    quilt = read_shaped_quilt()
+    blocks = quilt.confirmed_blocks
+    assert quilt.center.rows == blocks.blocks_down * blocks.squares_down == 1
+    assert quilt.center.cols == blocks.blocks_across * blocks.squares_across == 2
 
 
 @pytest.mark.parametrize(
