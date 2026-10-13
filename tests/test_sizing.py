@@ -52,6 +52,13 @@ def _grid_model(rows: int, cols: int, cell: int, band: int | None = None) -> Qui
     )
 
 
+def _two_bands(rows: int, cols: int, cell: int, band: int) -> Quilt:
+    """_grid_model with two border bands of `band` e each."""
+    data = json.loads(dumps(_grid_model(rows, cols, cell, band)))
+    data["borders"] = data["borders"] * 2
+    return loads(json.dumps(data))
+
+
 def _read_shaped(cell: int, band: int, basis: dict | None = None) -> Quilt:
     """The DIC as a photo read stores it: a guessed square and border."""
     data = json.loads(dumps(load(FIXTURE)))
@@ -418,6 +425,66 @@ def test_the_combined_miss_is_the_plain_sum():
     assert (result.basis.achieved_width, result.basis.achieved_height) == (600, 720)
 
 
+def test_a_height_alone_is_fitted_on_the_rows():
+    # Source: docs/SPEC.md section 6.3, with one side set the combined miss is
+    # that side's own miss. Formula: miss = |rows x s + 2 x band - height|,
+    # band = 2 x round_div(30 s, 24). Inputs: the DIC (55 rows, cell0 12 e,
+    # one 30 e band), a typed height of 850 e (106 1/4 in) and no width.
+    #   12 e: band 30, 55 x 12 + 60 = 720, short by 130
+    #   14 e: band 2 x round_div(420, 24) = 2 x (432 // 24) = 36,
+    #     55 x 14 + 72 = 770 + 72 = 842, short by 8
+    #   16 e: band 2 x round_div(480, 24) = 2 x (492 // 24) = 40,
+    #     55 x 16 + 80 = 880 + 80 = 960, over by 110
+    # Below 12 e the height falls further short and above 16 e it overshoots
+    # further. Expected: 14 e, 45 x 14 + 72 = 630 + 72 = 702 by 842.
+    # Fitting 850 on the 45 columns instead would pick 16 e (800, 50 short,
+    # against 902 at 18 e, 52 over), and ignoring it would tie every square
+    # at 0 and take 32 e, so 14 e tells the height was read on the rows.
+    result = size_pattern(load(FIXTURE), _typed(height=850))
+    assert result.model.center.cell_size == 14
+    assert [band.width for band in result.model.borders] == [36]
+    assert (result.basis.achieved_width, result.basis.achieved_height) == (702, 842)
+    assert (result.basis.requested_width, result.basis.requested_height) == (None, 850)
+
+
+def test_each_band_snaps_on_its_own_not_the_band_total():
+    # Source: docs/SPEC.md section 6.3, border widths snap to the nearest
+    # 1/4 in, half-up, from 1/4 in to 14 in; each band is its own border.
+    # Formula: band = max(2, min(112, 2 x round_div(w0 x s, 2 x cell0))).
+    # Inputs: 13 columns by 10 rows, cell0 12 e, two 3 e bands, a typed
+    # 172 x 136 e. Each band at s is 2 x round_div(3 s, 24):
+    #   10 e: 2 x round_div(30, 24) = 2 x (42 // 24) = 2 e each, 4 in total:
+    #     13 x 10 + 2 x 4 = 138 by 10 x 10 + 8 = 108, misses 34 + 28 = 62
+    #   12 e: 2 x round_div(36, 24) = 2 x (48 // 24) = 4 e each, 8 in total:
+    #     13 x 12 + 2 x 8 = 172 by 10 x 12 + 16 = 136, misses 0 + 0 = 0
+    #   14 e: 2 x round_div(42, 24) = 2 x (54 // 24) = 4 e each, 8 in total:
+    #     13 x 14 + 16 = 198 by 10 x 14 + 16 = 156, misses 26 + 20 = 46
+    # Expected: 12 e, bands [4, 4], 172 x 136. Snapping the 6 e total as one
+    # band, 2 x round_div(72, 24) = 2 x 3 = 6 e, would give 168 x 132.
+    result = size_pattern(_two_bands(10, 13, 12, 3), _typed(172, 136))
+    assert result.model.center.cell_size == 12
+    assert [band.width for band in result.model.borders] == [4, 4]
+    assert (result.basis.achieved_width, result.basis.achieved_height) == (172, 136)
+
+
+def test_each_band_stops_at_the_cap_on_its_own():
+    # Source: docs/SPEC.md section 6.3 and REBASELINE.md literal C3, each
+    # border at most 14 in (BAND_MAX = 112 e). Inputs: 13 columns by 10 rows,
+    # cell0 12 e, two 100 e bands, a typed width of 2000 e (250 in).
+    # The width grows with the square, and at the largest, 32 e, each band
+    # would scale to 2 x round_div(100 x 32, 24) = 2 x ((3200 + 12) // 24)
+    # = 2 x 133 = 266 e and stops at 112 e:
+    #   width 13 x 32 + 2 x (112 + 112) = 416 + 448 = 864, short of 2000
+    #   height 10 x 32 + 448 = 320 + 448 = 768
+    # so every square falls short and 32 e misses least. Expected: bands
+    # [112, 112], 864 x 768. Capping the 200 e total as one band at 112 e
+    # would give 416 + 224 = 640 wide.
+    result = size_pattern(_two_bands(10, 13, 12, 100), _typed(width=2000))
+    assert result.model.center.cell_size == 32
+    assert [band.width for band in result.model.borders] == [112, 112]
+    assert (result.basis.achieved_width, result.basis.achieved_height) == (864, 768)
+
+
 def test_a_preset_records_its_size_as_requested():
     # Twin is 70 x 90 in = 560 x 720 e (PRESETS). Combined misses:
     #   1 1/4 in: 502 x 602, 58 + 118 = 176
@@ -435,6 +502,63 @@ def test_a_preset_records_its_size_as_requested():
     # a preset is a user fact at 1.0, like a typed size
     assert result.model.size_basis.source == "preset"
     assert result.model.size_basis.confidence == 1.0
+
+
+def test_a_preset_fits_the_orientation_suggest_preset_matched():
+    # The DIC's counts, square and border turned on its side: 55 columns by
+    # 45 rows of 12 e in one 30 e band, 55 x 12 + 2 x 30 = 720 e wide by
+    # 45 x 12 + 60 = 600 e tall.
+    # Source: suggest_preset (qrep/model/finished_size.py) compares long side
+    # over short side, so it pairs the quilt's long side with the preset's.
+    #   quilt 720 / 600 = 1.2; Queen 108 / 90 = 1.2, a difference of 0, the
+    #   only preset within 0.04 (Twin 90 / 70 = 1.286, Throw 65 / 50 = 1.3,
+    #   Full 90 / 84 = 1.071, Crib 52 / 36 = 1.444, King 110 / 108 = 1.019)
+    # so Queen's 108 in side lies along the 720 e width: 864 x 720 e.
+    # Formula: combined miss = |W - 864| + |H - 720|, band = 2 x round_div(30 s, 24).
+    #   12 e: band 30, 720 x 600, misses 144 + 120 = 264
+    #   14 e: band 2 x (432 // 24) = 36, 55 x 14 + 72 = 842 by
+    #     45 x 14 + 72 = 702, misses 22 + 18 = 40
+    #   16 e: band 2 x (492 // 24) = 40, 55 x 16 + 80 = 960 by
+    #     45 x 16 + 80 = 800, misses 96 + 80 = 176
+    # Below 12 e both sides fall further short and above 16 e both overshoot
+    # further. Expected: 14 e, 842 x 702. Queen as listed, 720 x 864, picks
+    # 12 e instead: 0 + 264 = 264 against 122 + 162 = 284 at 14 e.
+    turned = _grid_model(45, 55, 12, 30)
+    assert (turned.finished_width, turned.finished_height) == (720, 600)
+    assert finished_size.suggest_preset(720 / 600) == "Queen"
+    result = size_pattern(turned, SizeRequest(source="preset", preset="Queen"))
+    assert result.model.center.cell_size == 14
+    assert (result.basis.requested_width, result.basis.requested_height) == (864, 720)
+    assert (result.basis.achieved_width, result.basis.achieved_height) == (842, 702)
+
+
+def test_a_preset_lies_long_side_along_an_upright_quilt():
+    # The upright DIC is 600 x 720 e, taller than wide, so the preset's long
+    # side runs down it (suggest_preset's long-over-short pairing).
+    # Queen is listed taller than wide, 90 x 108 in = 720 x 864 e, so it
+    # applies as listed. Combined misses, |W - 720| + |H - 864|:
+    #   12 e: 600 x 720, 120 + 144 = 264
+    #   14 e: band 2 x (432 // 24) = 36, 45 x 14 + 72 = 702 by
+    #     55 x 14 + 72 = 842, 18 + 22 = 40
+    #   16 e: band 40, 45 x 16 + 80 = 800 by 55 x 16 + 80 = 960, 80 + 96 = 176
+    # Expected: 14 e, 702 x 842, asked as 720 x 864.
+    queen = size_pattern(load(FIXTURE), SizeRequest(source="preset", preset="Queen"))
+    assert queen.model.center.cell_size == 14
+    assert (queen.basis.requested_width, queen.basis.requested_height) == (720, 864)
+    assert (queen.basis.achieved_width, queen.basis.achieved_height) == (702, 842)
+    # King is listed wider than tall, 110 x 108 in = 880 x 864 e, so on the
+    # upright DIC it turns to 864 x 880 e. Combined misses, |W - 864| + |H - 880|:
+    #   14 e: 702 x 842, 162 + 38 = 200
+    #   16 e: 800 x 960, 64 + 80 = 144
+    #   18 e: band 2 x round_div(540, 24) = 2 x (552 // 24) = 46,
+    #     45 x 18 + 92 = 902 by 55 x 18 + 92 = 1082, 38 + 202 = 240
+    # Expected: 16 e, 800 x 960, asked as 864 x 880. King as listed lands on
+    # 16 e as well (80 + 96 = 176 against 200 at 14 e and 240 at 18 e), so the
+    # asked size alone shows the orientation.
+    king = size_pattern(load(FIXTURE), SizeRequest(source="preset", preset="King"))
+    assert king.model.center.cell_size == 16
+    assert (king.basis.requested_width, king.basis.requested_height) == (864, 880)
+    assert (king.basis.achieved_width, king.basis.achieved_height) == (800, 960)
 
 
 def test_a_size_you_set_on_a_read_stays_a_user_fact():

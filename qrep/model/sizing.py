@@ -285,9 +285,17 @@ def size_at(
     return updated
 
 
-def _preset_size(name: str) -> tuple[int, int]:
+def _preset_size(name: str, quilt: Quilt) -> tuple[int, int]:
+    """The preset's size in the orientation suggest_preset matches it in.
+
+    suggest_preset (qrep/model/finished_size.py) compares long side over
+    short side, so it pairs the quilt's long side with the preset's. A preset
+    listed the other way round from the quilt is turned to fit that pairing;
+    a square quilt takes it as listed, since turning cannot change its miss."""
     for preset, width, height in PRESETS:
         if preset == name:
+            if (width - height) * (quilt.finished_width - quilt.finished_height) < 0:
+                return height, width
             return width, height
     names = ", ".join(preset for preset, _w, _h in PRESETS)
     raise ValueError(f"unknown preset {name!r}; presets: {names}")
@@ -323,16 +331,17 @@ def _estimate_confidence(quilt: Quilt) -> float:
 def size_pattern(quilt: Quilt, request: SizeRequest) -> SizeResult:
     """Sizes the pattern for the size you set, for the bridge's size_pattern
     (SPEC.md section 6.3): a typed or preset size snaps by the pattern rule in
-    1/4 in squares, and the default fits the model's own estimate the same
-    way. Returns the sized model, whose size basis matches its finished size,
-    and that basis. Raises ValueError for an unknown preset, a default on a
-    model whose basis records a size you set, and a corner leg no offered
-    square keeps whole; the bridge returns each as kind value."""
+    1/4 in squares, a preset with its long side along the quilt's long side,
+    and the default fits the model's own estimate the same way. Returns the
+    sized model, whose size basis matches its finished size, and that basis.
+    Raises ValueError for an unknown preset, a default on a model whose basis
+    records a size you set, and a corner leg no offered square keeps whole;
+    the bridge returns each as kind value."""
     if request.source == "typed":
         width, height = request.width, request.height
         confidence = 1.0
     elif request.source == "preset":
-        width, height = _preset_size(request.preset)
+        width, height = _preset_size(request.preset, quilt)
         confidence = 1.0
     else:
         width, height = quilt.finished_width, quilt.finished_height
