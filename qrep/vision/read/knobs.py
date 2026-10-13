@@ -49,7 +49,7 @@ SHADING_ROUNDS = 10
 LIGHT_CONFIDENCE_POWER = 2
 # The most the fitted light may vary across the field, brightest over dimmest
 # luminance; past it the read keeps no shading correction.
-LIGHT_MAX_RATIO = 6.0
+LIGHT_MAX_RATIO = 2.0
 # Lloyd iterations per k-means run, and golden-ratio seedings per count,
 # which one farthest-first seeding follows.
 KMEANS_ITERATIONS = 100
@@ -127,10 +127,19 @@ KNOBS: dict[str, Knob] = {
     "SHADING_MIN_SQUARES": Knob(
         SHADING_MIN_SQUARES,
         "not measured: set as three squares per term of the six-term quadratic each fabric "
-        "once had; the shared light fits a level per fabric and five position terms, k + 5 "
-        "coefficients, at most 17, so 18 samples always determine it",
+        "once had; the shared light fits a level per fabric and up to five position terms, "
+        "k + 5 coefficients, at most 17, so 18 samples are enough to count but do not always "
+        "determine it: samples on a diagonal, fabrics that each hold whole columns alone, or "
+        "samples at zero margin (zero weight) can leave it short of rank, and lstsq then "
+        "returns its minimum-norm fit",
     ),
-    "SHADING_ROUNDS": Knob(SHADING_ROUNDS, "not measured: a compute bound"),
+    "SHADING_ROUNDS": Knob(
+        SHADING_ROUNDS,
+        "synthetic grids only (PR #251 round 3): the cap catches a runaway light only once it "
+        "passes it, which on 6 gray bands (L* 25 + 12i, noise 3) comes in rounds 4 to 10, "
+        "round 10 on seed 6; 9 rounds leave seed 6 at 0.888 of squares right and 8 rounds "
+        "seeds 1, 2, 4 and 6 at 0.874 to 0.900, against 0.952 to 0.968 at 10",
+    ),
     "LIGHT_CONFIDENCE_POWER": Knob(
         LIGHT_CONFIDENCE_POWER,
         "synthetic grids only (PR #251 round 1): on 4 bands of rising lightness at noise 4, "
@@ -139,13 +148,15 @@ KNOBS: dict[str, Knob] = {
     ),
     "LIGHT_MAX_RATIO": Knob(
         LIGHT_MAX_RATIO,
-        "synthetic grids only (PR #251 round 2, #137 comment 6148562029): value-only falloffs "
-        "of 50 to 85 percent fit at 1.97 to 5.34 and read 0.95 to 1.00 of squares right at "
-        "noise 0.5 and 1.0, where 2.0 dropped them to 0.55 to 0.65; on 4 bands of rising "
-        "lightness the light runs away past 6 at noise 6 and at noise 5 seed 0 (only in round "
-        "10, on to 8.35), and the cap keeps the flat read; it misses noise 5 seed 3, which "
-        "settles between 2 and 3 and reads 0.827 against 0.970 at 2.0. Past the cap, a fitted "
-        "light of about 2.6 stops, the correction still drops whole",
+        "the orchestrator's ruling (#137 comment 6149208104): the light correction never "
+        "reads a quilt worse than the uncorrected read, and past the cap the read is the "
+        "uncorrected read. Synthetic grids only (PR #251 rounds 1 to 3, #248): the "
+        "criterion's 30 percent falloff (a light of 1 / 0.7 = 1.43) fits at 1.43 and a 50 "
+        "percent falloff at 1.98, both read every square; 65 to 85 percent falloffs pass "
+        "the cap and keep the uncorrected read, 0.50 to 0.59 of squares right. Cap 6 read "
+        "those falloffs right but read 6 gray bands (L* 25 + 12i, noise 3) at 0.625 to "
+        "0.952 against 0.952 to 0.968 here, and no amplitude cap separates the two cases "
+        "(#261). On 4 bands at noise 5 seed 0 the light passes 2.0 in round 4, at 2.016",
     ),
     "KMEANS_ITERATIONS": Knob(KMEANS_ITERATIONS, "not measured: a compute bound"),
     "KMEANS_SEEDINGS": Knob(

@@ -396,10 +396,11 @@ def cluster(
             margin = _margins(lab, _lit(centers, light), labels, k, l_weight)
             light = _light(basis, lab, weights * margin**LIGHT_CONFIDENCE_POWER, labels)
             if (light.max() / light.min()) ** 3 > LIGHT_MAX_RATIO:
-                # On the measured grids a light this uneven is the fit taking
-                # a change between fabrics for shading and feeding on its own
-                # misreads, while true falloffs to 85 percent fit under it
-                # (knobs.LIGHT_MAX_RATIO), so the read keeps none.
+                # A light this uneven may be the fit taking a change between
+                # fabrics for shading and feeding on its own misreads, and the
+                # amplitude cannot tell it from a real falloff (#261), so the
+                # read keeps none and returns k-means' read
+                # (knobs.LIGHT_MAX_RATIO).
                 light = np.ones(len(lab))
                 centers, labels = plain
                 break

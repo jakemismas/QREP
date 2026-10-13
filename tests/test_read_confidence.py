@@ -42,7 +42,12 @@ def test_knob_values_match_their_sources():
     # Source: plan sections 2.1 (L*0.5, Jake's default) and 5.B; B2a's P = 32
     # and inset 0.2 (plan B2a); the 2 to 12 fabric range (SPEC.md section
     # 12.1); REBASELINE.md literal B5 keeps 3 copies; the 3/4 in and 4 in
-    # square bounds are literals B8 and B9 (6 and 32 eighths).
+    # square bounds are literals B8 and B9 (6 and 32 eighths). The vote's
+    # threshold 0.8 is the old vote's VOTE_HIGH_MARGIN (qrep/vision/repeats.py),
+    # and 0.8, 0.75 and 0.5 are the values the hand computations in
+    # tests/test_read_vote.py use. The light cap 2.0 is the ruling in #137
+    # comment 6149208104, and 10 shading rounds the count at which the 6-band
+    # ramp's light passes that cap on every seed (knobs.SHADING_ROUNDS).
     expected = {
         "L_WEIGHT": 0.5,
         "P": 32,
@@ -53,6 +58,11 @@ def test_knob_values_match_their_sources():
         "SQUARE_MIN": 6,
         "SQUARE_MAX": 32,
         "SIZE_STEP": 2,
+        "VOTE_THRESHOLD": 0.8,
+        "TYPE_AGREEMENT": 0.75,
+        "ATTACH_AGREEMENT": 0.5,
+        "LIGHT_MAX_RATIO": 2.0,
+        "SHADING_ROUNDS": 10,
     }
     assert {name: knobs.KNOBS[name].value for name in expected} == expected
 
