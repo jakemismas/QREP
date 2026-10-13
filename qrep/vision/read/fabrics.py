@@ -144,7 +144,8 @@ def _seed(lab: np.ndarray, weights: np.ndarray, k: int, seeding: int, l_weight: 
     """k-means++ seeding number seeding, its draws from the golden-ratio
     sequence that starts at frac((seeding + 1) x 0.618...). Seeding
     KMEANS_SEEDINGS, the last, draws only its first center and then takes
-    the sample of the largest mass each time (farthest first)."""
+    the sample farthest from the chosen centers each time (farthest
+    first)."""
     farthest = seeding == KMEANS_SEEDINGS
     u = (seeding + 1) * _GOLDEN % 1.0
     chosen = [_draw(weights, u)]
@@ -157,7 +158,10 @@ def _seed(lab: np.ndarray, weights: np.ndarray, k: int, seeding: int, l_weight: 
             chosen += [chosen[-1]] * (k - len(chosen))
             break
         u = (u + _GOLDEN) % 1.0
-        chosen.append(int(np.argmax(mass)) if farthest else _draw(mass, u))
+        # Farthest by distance alone: weighted, a heavy band strip near a
+        # chosen center would outrank a small fabric far from all of them.
+        far = int(np.argmax(np.where(weights > 0, nearest, -1.0)))
+        chosen.append(far if farthest else _draw(mass, u))
         nearest = np.minimum(nearest, _squared(lab, lab[chosen[-1:]], l_weight)[:, 0])
     return lab[chosen].copy()
 

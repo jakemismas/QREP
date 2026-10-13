@@ -637,6 +637,43 @@ def test_a_small_far_fabric_is_seeded_and_kept():
     assert result.centers[0] == pytest.approx(colors[0], abs=5.0)
 
 
+@pytest.mark.parametrize("seed", range(30))
+def test_heavy_strips_do_not_hide_a_small_far_fabric(seed):
+    # Source: PR #251 round 2 self-review: weighted by area, a band strip
+    #   near the first center outranked the accent in the farthest-first
+    #   seeding, and the read lost the accent on 15 of these 30 grids.
+    # Inputs: the grid of the test above with noise seed `seed`, then, from
+    #   the same generator, 4 band strips at (81, 0, 10), a border 4 darker
+    #   than the background, plus noise of sd 0.5, at the area weights of a
+    #   2.5-square band (112.5 and 137.5) and outside the field; k = 2,
+    #   through fabrics.cluster.
+    # Arithmetic: a strip sits about (0.5 x 4)^2 = 4 from the background
+    #   color in squared distance and the accent 2625, so by distance alone
+    #   the sample farthest from a first center on the background or a strip
+    #   is an accent square, and from one in the accent a background sample
+    #   or strip: one center per fabric. The strips cost a read with the
+    #   accent about 4 x 125 x 4 = 2000, and a split read saves at most that
+    #   plus the 14130 of the test above, about 16130 < 21471, the least it
+    #   loses on the accent.
+    # Expected: the accent's 9 squares share one label, every other square
+    #   and every strip the other.
+    rows, cols = 55, 45
+    truth = np.ones((rows, cols), dtype=int)
+    truth[40:43, 5:8] = 0
+    colors = np.array([(35.0, 20.0, -30.0), (85.0, 0.0, 10.0)])
+    rng = np.random.default_rng(seed)
+    squares = colors[truth.ravel()] + rng.normal(0.0, 3.0, (rows * cols, 3))
+    strips = np.array([81.0, 0.0, 10.0]) + rng.normal(0.0, 0.5, (4, 3))
+    lab = np.vstack([squares, strips])
+    weights = np.concatenate([np.ones(rows * cols), [112.5, 137.5, 112.5, 137.5]])
+    r, c = np.divmod(np.arange(rows * cols), cols)
+    field = np.stack([(c + 0.5) / cols, (r + 0.5) / rows], axis=1)
+    outside = np.array([(0.5, -0.02), (1.03, 0.5), (0.5, 1.02), (-0.03, 0.5)])
+    result = cluster(lab, weights, np.vstack([field, outside]), 2)
+    expected = np.concatenate([truth.ravel(), np.ones(4, dtype=int)])
+    assert same_partition(result.labels, [np.flatnonzero(expected == i) for i in (0, 1)])
+
+
 def test_strips_join_at_their_area_and_their_center():
     # Source: the ticket's sample rule for band strips.
     # Inputs: counts 4 x 3 and bands 0.5 then 1.5 squares (as in

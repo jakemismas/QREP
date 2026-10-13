@@ -463,36 +463,97 @@ def test_unique_blocks_between_plain_blocks_stay_their_own(design_conf):
     assert result.agreement == 1.0
 
 
-def test_unique_blocks_in_plain_sashing_stay_their_own():
+def test_unique_blocks_in_plain_sashing_keep_their_designs():
     pieced = [(1, 1), (1, 3), (3, 1), (3, 3)]
     labels, confidence = _plain_with_pieced(5, 5, pieced, 0.6)
     result = _vote(labels, confidence, 5, 5)
     # Source: PR #251 round 2 (critical), the same class: plain sashing
-    #   blocks fill every even row and column of blocks.
+    #   blocks fill every even row and column of blocks. Here the layout
+    #   cannot tell the unique blocks from varied copies, so they attach,
+    #   and the attached-block rule keeps their designs.
     # Inputs: _plain_with_pieced(5, 5, ...): plain wherever i or j is even,
     #   21 blocks; pieced at (1, 1), (1, 3), (3, 1), (3, 3), m = 1 to 4,
     #   designs at 0.6.
     # Arithmetic: each pieced block agrees with plain, and with the others,
     #   on 16 / 21.4 = 0.7477 < 0.75: four wild blocks beside plain's 21
-    #   copies. Down, at p = 1 column 1 reads plain, pieced, plain, pieced,
-    #   plain, so each of its pairs holds a wild block: no evidence of p = 1
-    #   (column 0 alone, all plain, would have given p = 1). At p = 2 column
-    #   1 holds the plain pairs at rows 2 and 0 and rows 4 and 2, columns 0,
-    #   2 and 4 are all plain, all equal: p = 2. Across, likewise 2. The
-    #   blocks a whole number of periods from (1, 1) are (1, 3), (3, 1) and
-    #   (3, 3), all wild: none attaches. Types: plain 0, pieced 1 to 4.
-    #   Repeat: row 2 equals row 0, but row 3 differs from row 1 (types 3
-    #   and 1 in column 1), so py = 5, and px = 5 likewise, (25, 25).
-    # Expected: those types, repeat (25, 25), no changes or breaks, labels
-    #   unchanged.
-    types = np.zeros((5, 5), dtype=int)
-    for m, (i, j) in enumerate(pieced, start=1):
-        types[i, j] = m
+    #   copies. Down, at p = 1 columns 0, 2 and 4 hold plain pairs, all
+    #   equal, and every pair in columns 1 and 3 holds a wild block, so
+    #   p = 1; across likewise. Every block is a whole number of periods
+    #   away, the 21 not wild are plain (21 >= 3, so plain votes), and
+    #   0.7477 >= 0.5 attaches each pieced block. Types all 0, repeat (5, 5).
+    #   The vote never changes an attached block's squares, and each of the
+    #   4 x 9 = 36 design squares is a Break at 0.6, majority 0. Agreement:
+    #   625 squares, 36 differ, 589 / 625.
+    # Expected: types all 0, repeat (5, 5), no changes, the 36 design
+    #   squares as breaks in raster order, labels unchanged.
+    np.testing.assert_array_equal(result.types, np.zeros((5, 5), dtype=int))
+    assert result.repeat == (5, 5)
+    assert result.changes == ()
+    design = zip(*(axis.tolist() for axis in np.nonzero(labels)))
+    assert result.breaks == tuple(
+        Break(r, c, int(labels[r, c]), 0, _approx(0.6)) for r, c in design
+    )
+    assert len(result.breaks) == 36
+    np.testing.assert_array_equal(result.labels, labels)
+    assert result.agreement == _approx(589 / 625)
+
+
+def test_a_varied_copy_in_the_middle_of_a_small_field_attaches():
+    labels, confidence = _plain_with_pieced(3, 3, [(1, 1)], 0.9)
+    result = _vote(labels, confidence, 5, 5)
+    # Source: PR #251 round 2 self-review: a pair of blocks that are not
+    #   wild in every column would ask too much, since a copy in the middle
+    #   of a 3 x 3 field touches every pair of its column.
+    # Inputs: _plain_with_pieced(3, 3, [(1, 1)], 0.9): 8 plain blocks and,
+    #   at the center, one that reads 1 on its centre 9 squares at 0.9.
+    # Arithmetic: it agrees with plain on 16 / (16 + 9 x 0.9) = 16 / 24.1 =
+    #   0.6639 < 0.75: wild beside plain's 8 copies. Down, p <= 3 // 2 = 1:
+    #   columns 0 and 2 hold plain pairs, all equal, so p = 1; across
+    #   likewise. Plain has 8 >= 3 own copies, and 0.6639 >= 0.5 attaches the
+    #   block. Types all 0, repeat (5, 5); its 9 squares differ from the
+    #   majority 0 and are Breaks at 0.9; agreement (225 - 9) / 225.
+    # Expected: types all 0, repeat (5, 5), no changes, 9 breaks, agreement
+    #   216 / 225.
+    np.testing.assert_array_equal(result.types, np.zeros((3, 3), dtype=int))
+    assert result.repeat == (5, 5)
+    assert result.changes == ()
+    design = zip(*(axis.tolist() for axis in np.nonzero(labels)))
+    assert result.breaks == tuple(Break(r, c, 1, 0, _approx(0.9)) for r, c in design)
+    assert result.agreement == _approx(216 / 225)
+
+
+def test_a_block_never_attaches_to_a_type_that_does_not_vote():
+    a, b, c = (np.full((5, 5), v) for v in (0, 1, 2))
+    varied = c.copy()
+    varied.ravel()[:10] = 3
+    even, odd = np.hstack([a, a, b]), np.hstack([a, c, b])
+    labels = np.vstack([even, odd, even, odd, even, np.hstack([a, varied, b])])
+    result = _vote(labels, np.ones(labels.shape), 5, 5)
+    # Source: PR #251 round 2 self-review: an attached block's differences
+    #   are breaks only where its type votes, so a type of 2 copies must not
+    #   take one.
+    # Inputs: 6 x 3 blocks of 5 x 5, plain blocks A (label 0), B (1) and C
+    #   (2) at confidence 1.0: rows [A, A, B] at even block rows and [A, C,
+    #   B] at odd ones, except block (5, 1), C with its first 10 squares
+    #   read 3.
+    # Arithmetic: block (5, 1) agrees with C on 15 / 25 = 0.6 < 0.75 and
+    #   with A and B on 0: wild. Down, p = 1 fails (C under A in column 1);
+    #   p = 2 holds, with known pairs in every column; across, p = 1 fails
+    #   (B beside A) and 3 // 2 = 1, so 3. The blocks 2 rows apart in column
+    #   1 from (5, 1) are C and C, so the predicted type is C, which has 2
+    #   own copies, under min_copies 3: no attach. Types by first
+    #   appearance: A 0, B 1, C 2, the varied block 3. Repeat: row 5 differs
+    #   from row 3 and row 3 from row 0, so py = 6; px = 3; (30, 15). A and
+    #   B vote, every copy clean: no changes or breaks; agreement over A, B
+    #   and C (2 copies) is 1.0.
+    # Expected: those types, repeat (30, 15), no changes or breaks.
+    types = np.array([[0, 0, 1], [0, 2, 1]] * 3)
+    types[5, 1] = 3
     np.testing.assert_array_equal(result.types, types)
-    assert result.repeat == (25, 25)
+    assert result.repeat == (30, 15)
     assert result.changes == ()
     assert result.breaks == ()
-    np.testing.assert_array_equal(result.labels, labels)
+    assert result.agreement == 1.0
 
 
 def test_an_attached_block_keeps_every_square_and_shows_each_difference():

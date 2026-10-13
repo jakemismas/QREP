@@ -115,27 +115,29 @@ def _best(agreement: np.ndarray) -> np.ndarray:
 
 def _period(layout: np.ndarray, wild: np.ndarray | None = None) -> int:
     """The smallest p, at most half the rows, with layout[i] == layout[i - p]
-    wherever neither block is wild, and with at least one such pair in every
-    column; the row count when none.
+    wherever neither block is wild, and with at least one such pair; the
+    row count when none.
 
     A repeat needs two whole copies: a p past half compares only the first
     rows with the last, so rows X, Y, Y, X would read as a period of 3. So a
     layout of one and a half copies, such as a 3 x 3 Double Irish Chain,
-    reports the whole field. A column whose every pair at p holds a wild
-    block holds no evidence of p: where unique blocks alternate with plain
-    ones, every pair at p = 1 does, and p = 1 would rest on no comparison."""
+    reports the whole field. A p with no pair of blocks that are not wild
+    rests on no comparison: where unique blocks alternate with plain ones,
+    every pair at p = 1 holds a wild block. A pair per column would ask too
+    much: a varied copy in the middle of a 3 x 3 field touches every pair of
+    its column."""
     n = layout.shape[0]
     if wild is None:
         wild = np.zeros(layout.shape, dtype=bool)
     for p in range(1, n // 2 + 1):
         known = ~(wild[p:] | wild[:-p])
-        if known.any(axis=0).all() and np.all((layout[p:] == layout[:-p]) | ~known):
+        if known.any() and np.all((layout[p:] == layout[:-p]) | ~known):
             return p
     return n
 
 
 def _attach(
-    layout, wild, period, codes, weights, n_labels: int, floor: float
+    layout, wild, period, codes, weights, n_labels: int, floor: float, min_copies: int
 ) -> tuple[np.ndarray, np.ndarray]:
     """The layout with each wild block moved to the type its block period
     predicts when it agrees with that type's majority on at least floor of
@@ -144,9 +146,10 @@ def _attach(
 
     The predicted type is the most common one among the blocks that are not
     wild a whole number of periods away (ties to the lower id). A block with
-    no such neighbor, or one that agrees with it on fewer squares than floor
-    (a block made different on purpose, not a varied copy), keeps its own
-    type."""
+    no such neighbor, one whose predicted type has fewer than min_copies
+    blocks and so never votes (its differences could show as no break), or
+    one that agrees with it on fewer squares than floor (a block made
+    different on purpose, not a varied copy), keeps its own type."""
     down, across = period
     size = codes.shape[1]
     positions = np.arange(size)
@@ -159,6 +162,8 @@ def _attach(
             continue
         t = int(np.bincount(known).argmax())
         members = np.flatnonzero((layout.ravel() == t) & ~wild.ravel())
+        if len(members) < min_copies:
+            continue
         weight_sum = np.zeros((n_labels, size))
         count_sum = np.zeros((n_labels, size), dtype=np.int64)
         np.add.at(weight_sum, (codes[members], positions), weights[members])
@@ -327,7 +332,7 @@ def vote(
         wild = copies[layout] == 1
         period = (_period(layout, wild), _period(layout.T, wild.T))
         layout, moved = _attach(
-            layout, wild, period, codes, weights, len(classes), attach_agreement
+            layout, wild, period, codes, weights, len(classes), attach_agreement, min_copies
         )
         types, attached = layout.ravel(), moved.ravel()
     n_types = int(types.max()) + 1
