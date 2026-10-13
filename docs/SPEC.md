@@ -158,13 +158,40 @@ From the confirmed frame and counts, the engine:
 - reads a crop around the confirmed frame that the web cuts at full resolution before the
   resolution cap (#101), area-downsamples it before the perspective warp when it holds more pixels
   than the read needs (B2a), and samples square interiors inset from the seams;
-- clusters fabrics in Lab with L* weighted 0.5 by default, with value-aware handling: fabrics that
-  differ only in lightness stay apart, and a label-aware shading correction applies to both the
-  palette and the assignment;
+- clusters fabrics in float CIELAB with L* weighted 0.5 by default, with value-aware handling:
+  fabrics that differ only in lightness stay apart, and one label-aware shading correction (a
+  quadratic in position for each fabric) applies to both the palette and the assignment. Each
+  border band's side strips join the clustering, weighted by their area in squares, so a border
+  fabric that never appears in the field still gets its own fabric;
+- suggests the fabric count by silhouette over 2 to 12 when you set none, and refuses the quilt as
+  too_many_fabrics when the silhouette is still rising at 12, so its best count is the cap (a
+  scrappy quilt, section 3), never merging fabrics silently. The bridge's request takes a count
+  from 2 to 12 (section 12.1), and the read itself refuses a larger count as too_many_fabrics. With
+  no defined silhouette the palette confidence is 0, never 1;
+- assigns each square and strip to its nearest corrected fabric with confidence (d2 - d1) / d2,
+  from the distances to the nearest and the second-nearest fabric;
 - classifies each square as plain, HST, QST or stitch-and-flip corner, with a fabric per part (B4);
-- votes within the confirmed block period, so a few misread squares cannot flip the method. Every
-  square the vote changes is flagged on Your pattern, so a deliberate variation is never lost
-  silently (B2 and A3 set the tolerance).
+- votes within the confirmed block period, so a few misread squares cannot flip the method. It
+  groups block copies by type, so alternating blocks (the two blocks of a Double Irish Chain) vote
+  within their own type, and it never votes with a 1 x 1 block or with fewer than 3 copies of a
+  type. A square takes its block's majority only when its own confidence is below the vote
+  threshold; every square the vote changes is listed and flagged on Your pattern, and every
+  confident square that disagrees keeps its read and is listed as a repeat break, so a deliberate
+  variation is never lost silently. The repeat it reports is a whole multiple of the confirmed
+  block period.
+
+Every read knob (the L weight, P, the inset, the fabric-count range, the vote threshold and the
+others) sits in qrep/vision/read/knobs.py with its source, provisional until D5 measures it.
+
+A read returns the quilt model and its details: the fabric count used (yours at 1.0, or the
+suggestion with its confidence), a confidence for each palette fabric and each border strip label,
+the repeat in squares, the squares the vote changed and the repeat breaks. The model records your
+corners, counts and border bands as the rectify, grid and border stages at 1.0, and the palette,
+squares and vote as CV stages with their own confidence. A photo has no known scale, so the square
+size is an estimate at an assumed 10 px per inch, snapped to 1/4 in within 3/4 to 4 in, and the
+border widths follow from it; the model records this as a default size basis whose confidence is
+0, until you set a size. A frame, count or pixel problem holds the read with its diagnosis, and
+QREP returns to Confirm; more fabrics than the cap refuses it.
 
 The bridge carries these inputs and outputs (section 12.1).
 
@@ -266,8 +293,8 @@ re-inferring it. Both are optional under schema_version 1, so a model written wi
 unchanged:
 
 - The confirmed block structure: blocks across and down, times squares per block on each axis,
-  recorded as a user fact at confidence 1.0. Construction takes the block period from it (B2a fills
-  it).
+  recorded as a user fact at confidence 1.0. Construction takes the block period from it (the
+  confirmed read fills it).
 - The size basis: its source (typed, preset or default); the requested width and height (a typed
   size gives one or both, a preset both, a default neither); the achieved width and height; and the
   rounding applied, the step the finished square size snaps to; all in eighths. A typed or preset
@@ -295,14 +322,16 @@ doubled area that is not whole; the construction's finished-area check uses it o
 reads the map (A3c).
 
 A test walks the schema and records where every stored field comes from. It asserts that every
-confidence stays in [0, 1] and that the user facts the model records today, the confirmed block
-structure and a typed or preset size, sit at 1.0; the counts and border bands become user facts
-with the confirmed read (B2a). On a hand-built model shaped like a read, it asserts that every CV
-value finds its confidence beside it; until #207 lands, it names the square size and the border
-widths as the values whose scale carries none. Until B4a (#139) writes a unit map, it also names
-the unit values as values a read does not store, and checks every unit's confidence on a hand-built
-read that carries a map instead. The method and its reason follow deterministically from the read
-and carry no confidence of their own.
+confidence stays in [0, 1] and that every user fact sits at 1.0: the confirmed block structure and
+a typed or preset size in their own records, and the rows, columns and border widths a read takes
+from your counts and bands in the grid and border stages, which a read records at 1.0. A CV value
+never takes its confidence from one of those stages. On a hand-built model shaped like a confirmed
+read, it asserts that every CV value finds its confidence beside it, the square size and border
+widths through the default size basis. It keeps two exemptions. A read stores no unit map, so the
+test names the unit values as values a read does not store and checks every unit's confidence on a
+hand-built read that carries a map instead. Settings, authored, derived, format and provenance
+values carry no confidence of their own; the method and its reason are derived, following
+deterministically from the read.
 
 ## 9. Removed surfaces
 
@@ -371,8 +400,9 @@ contract (tickets E1a and E1b) keeps these rules:
   their removal tickets (A7, B6b, C6). Each validates its request first. size_pattern and
   export_pattern load their implementations lazily, from qrep.model.sizing:size_pattern (A10) and
   qrep.export.pattern:build_pattern (A4a to A4d), and return kind not_implemented while that module
-  or function is absent. read_confirmed returns not_implemented until B2b switches it to the real
-  read. Why: the tickets that write the implementations never need the contract lease.
+  or function is absent. read_confirmed runs the confirmed read in qrep/vision/read/, which it
+  imports only when a read runs, so importing the bridge never loads cv2 (section 4). Why: the
+  tickets that write the implementations never need the contract lease.
 - The read request takes the staged photo; the frame, given either as the four corners of the
   pieced field or as the four outer-edge corners plus a list of border bands from the outside in,
   each with one width in squares that need not be whole; the corners in staged-image pixels with
