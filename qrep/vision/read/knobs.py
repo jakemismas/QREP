@@ -26,6 +26,9 @@ L_WEIGHT = 0.5
 # Fabric counts the read tries when the request sets none, and accepts.
 K_MIN = FABRICS_MIN
 K_MAX = FABRICS_MAX
+# A suggested count refuses as too many fabrics when the silhouette at K_MAX
+# comes within this margin of the best.
+COUNT_CAP_MARGIN = 0.044
 # A square takes its block majority only below this confidence.
 VOTE_THRESHOLD = 0.8
 # A block type votes only with at least this many copies.
@@ -87,6 +90,13 @@ KNOBS: dict[str, Knob] = {
     "K_MIN": Knob(K_MIN, "qrep/contract.py FABRICS_MIN: below 2 there is nothing to tell apart"),
     "K_MAX": Knob(
         K_MAX, "qrep/contract.py FABRICS_MAX: the fabric cap of about 12 (SPEC.md section 3)"
+    ),
+    "COUNT_CAP_MARGIN": Knob(
+        COUNT_CAP_MARGIN,
+        "synthetic grids only (#137 comment 6147407435): the best silhouette minus the one at "
+        "12 ran 0 to 0.0372 on 18 grids of 16 to 30 fabrics, 0.0504 to 0.1303 on 8 of 10 and "
+        "11, and 0.3688 or more on 18 of 3; 0.044 sits between. D5 measures how often it "
+        "refuses real quilts of 12 or fewer fabrics (#248)",
     ),
     "VOTE_THRESHOLD": Knob(
         VOTE_THRESHOLD,

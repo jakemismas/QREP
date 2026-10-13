@@ -18,6 +18,7 @@ from typing import Literal, get_args
 import numpy as np
 
 from qrep.vision.read.knobs import (
+    COUNT_CAP_MARGIN,
     K_MAX,
     K_MIN,
     KMEANS_ITERATIONS,
@@ -428,17 +429,19 @@ def suggest(
 ) -> Clusters | Refusal:
     """The clustering at the fabric count with the highest silhouette over
     K_MIN..K_MAX (ties to the smaller count), or too_many_fabrics when the
-    silhouette peaks at K_MAX, still rising there: a quilt of more fabrics
-    than the cap is refused, never merged silently.
+    silhouette at K_MAX comes within COUNT_CAP_MARGIN of the best: a quilt of
+    more fabrics than the cap is refused, never merged silently.
 
-    Past the true count the silhouette runs flat with noise, so a rise from
-    K_MAX - 1 to K_MAX alone says nothing: on 3-fabric grids with Gaussian
-    noise it held in 10 of 12, each peaking at 3 near 0.94 and ending near
-    0.33. Only a peak at the cap is evidence of more fabrics.
+    Past the true count the silhouette falls: splitting one of the quilt's
+    fabrics in two costs its squares their separation. On a quilt of more
+    fabrics than the cap no count splits a fabric, so the silhouette runs
+    flat to K_MAX, and its peak can land just under the cap; a margin, not
+    the peak alone, tells the two apart (tests/test_read_fabrics.py, the
+    scrappy and 11-fabric grids).
     """
     lab = np.asarray(samples, dtype=float).reshape(-1, 3)
     distinct = len(np.unique(lab, axis=0))
-    first = best = None
+    first = best = at_cap = None
     for k in range(K_MIN, min(K_MAX, distinct) + 1):
         result = cluster(
             lab, weights, positions, k, l_weight=l_weight, shading_rounds=shading_rounds
@@ -446,11 +449,13 @@ def suggest(
         first = first or result
         if result.silhouette is not None and (best is None or result.silhouette > best.silhouette):
             best = result
-    if best is not None and best.k == K_MAX:
+        if k == K_MAX:
+            at_cap = result.silhouette
+    if at_cap is not None and best.silhouette - at_cap <= COUNT_CAP_MARGIN:
         return Refusal(
             code="too_many_fabrics",
-            message=f"the fabrics separate best at {K_MAX}, the most the read tells apart, "
-            "so the quilt may hold more",
+            message=f"the fabrics separate about as well at {K_MAX}, the most the read tells "
+            "apart, as at any count, so the quilt may hold more",
         )
     if best is not None:
         return best

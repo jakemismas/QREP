@@ -787,3 +787,68 @@ def test_fabrics_use_numpy_alone():
     assert names <= {"dataclasses", "typing", "numpy", "qrep"}
     assert not any(isinstance(n, ast.Attribute) and n.attr == "random" for n in ast.walk(tree))
     assert math.isclose(GOLDEN, (math.sqrt(5) - 1) / 2)
+
+
+# The 40 x 40 grids of the fabric-count measurement (#137 comment
+# 6147407435), drawn from one numpy default_rng(seed) per grid in this order:
+# each fabric's L* uniform on [20, 90], a* and b* on [-40, 40] (spaced grids
+# redraw a fabric closer than 15 to an earlier one), then each square's
+# fabric uniformly, then Gaussian noise of sd `noise` on every channel.
+def _fabric_color(rng):
+    return np.array([rng.uniform(20, 90), rng.uniform(-40, 40), rng.uniform(-40, 40)])
+
+
+def counted_grid(fabrics, seed, noise, spaced=False):
+    rng = np.random.default_rng(seed)
+    colors = []
+    while len(colors) < fabrics:
+        color = _fabric_color(rng)
+        if not spaced or all(np.linalg.norm(color - c) >= 15.0 for c in colors):
+            colors.append(color)
+    assign = rng.integers(0, fabrics, size=(40, 40)).ravel()
+    lab = np.stack(colors)[assign] + rng.normal(0.0, noise, size=(1600, 3))
+    r, c = np.divmod(np.arange(1600), 40)
+    positions = np.stack([(c + 0.5) / 40, (r + 0.5) / 40], axis=1)
+    return lab, positions
+
+
+@pytest.mark.parametrize(("fabrics", "seed"), [(20, 0), (30, 0), (30, 1), (30, 2)])
+def test_a_scrappy_quilt_is_refused(fabrics, seed):
+    # Source: criterion 2 of #137 (never merge fabrics silently); the
+    #   orchestrator's decision in #137 on the margin rule.
+    # Inputs: counted_grid(fabrics, seed, noise 1.5), more fabrics than the
+    #   cap of 12 by construction. These are the four measured grids whose
+    #   silhouette peaked under 12 (at 11, 11, 10 and 11), which a refusal
+    #   only at a peak of 12 merged; the last is the measurement's closest
+    #   scrappy grid to the margin.
+    # Expected: too_many_fabrics, since the quilt holds more than 12.
+    lab, positions = counted_grid(fabrics, seed, 1.5)
+    result = fabrics_module.suggest(lab, np.ones(len(lab)), positions)
+    assert isinstance(result, Refusal)
+    assert result.code == "too_many_fabrics"
+
+
+@pytest.mark.parametrize("seed", [0, 1, 2, 3])
+def test_a_quilt_of_11_fabrics_keeps_its_count(seed):
+    # Source: criterion 2 of #137: only a quilt of more than 12 fabrics
+    #   refuses.
+    # Inputs: counted_grid(11, seed, noise 1.5, spaced), 11 fabrics at least
+    #   15 apart by construction; the measurement's closest grids to the
+    #   margin from this side, since splitting one of 11 fabrics costs the
+    #   silhouette least.
+    # Expected: no refusal, and the count read is the 11 the grid holds.
+    lab, positions = counted_grid(11, seed, 1.5, spaced=True)
+    result = fabrics_module.suggest(lab, np.ones(len(lab)), positions)
+    assert not isinstance(result, Refusal)
+    assert result.k == 11
+
+
+@pytest.mark.parametrize("seed", [0, 1])
+def test_a_noisy_three_fabric_quilt_is_not_refused(seed):
+    # Source: criterion 2 of #137: a quilt within the cap never refuses.
+    # Inputs: counted_grid(3, seed, noise 4), 3 fabrics by construction.
+    # Expected: no refusal. (The count read may be 2 when two fabrics sit
+    #   close, as on seed 1, 15.3 apart; #248 records that case.)
+    lab, positions = counted_grid(3, seed, 4.0)
+    result = fabrics_module.suggest(lab, np.ones(len(lab)), positions)
+    assert not isinstance(result, Refusal)
