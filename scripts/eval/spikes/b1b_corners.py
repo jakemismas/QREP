@@ -683,14 +683,26 @@ def backdrop_lines(image_bgr: np.ndarray) -> Suggestion | None:
     return _backdrop(image_bgr, lines=True)[0]
 
 
-def tiered(image_bgr: np.ndarray) -> Suggestion | None:
-    """The old detector's quad, with tier 3's full frame as no suggestion. Its confidence is
-    rectify's residual term for tiers 0 and 1 and the GrabCut confidence for tier 2."""
-    quad, residual, tier, grabcut = _detect_tiered(image_bgr)
+def _tiered(image_bgr: np.ndarray) -> tuple[Suggestion | None, str]:
+    try:
+        quad, residual, tier, grabcut = _detect_tiered(image_bgr)
+    except ValueError as error:
+        # Only tier 0's _detect_quad raises on purpose, on a frame of the renderer's #404040
+        # with nothing else in it; any other ValueError is a bug and must not read as "no quilt".
+        if not str(error).startswith("no quilt found"):
+            raise
+        return None, "tier 0 found no quilt"
     if tier == 3:
-        return None
+        return None, "tier 3, the full frame"
     confidence = grabcut if tier == 2 and grabcut is not None else 1.0 - min(residual * 10.0, 1.0)
-    return Suggestion(np.asarray(quad, float), float(confidence), int(tier))
+    return Suggestion(np.asarray(quad, float), float(confidence), int(tier)), "suggested"
+
+
+def tiered(image_bgr: np.ndarray) -> Suggestion | None:
+    """The old detector's quad, with tier 3's full frame and tier 0's empty frame as no
+    suggestion. Its confidence is rectify's residual term for tiers 0 and 1 and the GrabCut
+    confidence for tier 2."""
+    return _tiered(image_bgr)[0]
 
 
 METHODS: dict[str, Callable[[np.ndarray], Suggestion | None]] = {
@@ -703,8 +715,7 @@ METHODS: dict[str, Callable[[np.ndarray], Suggestion | None]] = {
 def explain(method: str, image_bgr: np.ndarray) -> tuple[Suggestion | None, str]:
     """A method's suggestion and, when there is none, why."""
     if method == "tiered":
-        found = tiered(image_bgr)
-        return found, "suggested" if found is not None else "tier 3, the full frame"
+        return _tiered(image_bgr)
     return _backdrop(image_bgr, lines=method == "backdrop_lines")
 
 
@@ -734,6 +745,19 @@ def side_profiles(lab: np.ndarray) -> dict[str, np.ndarray]:
     }
 
 
+def band_window(size: tuple[int, int]) -> int:
+    """The change-point window in pixels for a warped outer edge of size (width, height)."""
+    return max(3, int(round(BAND_WINDOW * min(size))))
+
+
+def searchable(edges: Sequence[float], window: int, square: float) -> list[bool]:
+    """Whether each true band edge (in squares) lies at or past the first depth change_points
+    can propose, window + 1 px: a shallower edge can never be proposed, so it is no evidence
+    about the search."""
+    first = (window + 1) / square
+    return [edge >= first for edge in edges]
+
+
 def change_points(profile: np.ndarray, window: int) -> list[int]:
     """Depths d (pixel edges) where the mean of the window after d differs most from the mean
     of the window before it: local peaks of at least BAND_FLOOR, kept strongest first at least
@@ -743,7 +767,9 @@ def change_points(profile: np.ndarray, window: int) -> list[int]:
     for d in range(window, n - window + 1):
         strength[d] = float(np.linalg.norm(profile[d:d + window].mean(axis=0)
                                            - profile[d - window:d].mean(axis=0)))
-    peaks = [d for d in range(window, n - window + 1)
+    # A peak needs both neighbours measured: at the first and last measured depths one
+    # neighbour is the array's zero fill, so a step just outside the range would pass there.
+    peaks = [d for d in range(window + 1, n - window)
              if strength[d] >= BAND_FLOOR and strength[d] > strength[d - 1]
              and strength[d] >= strength[d + 1]]
     kept: list[int] = []
@@ -764,7 +790,7 @@ def band_proposals(image_bgr: np.ndarray, outer: np.ndarray) -> dict[str, list[i
     # fabrics in BGR, whose Lab is not the mean of their Labs, so a field's row means would
     # alternate with the parity of its square rows and fake a change point at every row.
     lab = _lab(warped, sigma=0.0)
-    window = max(3, int(round(BAND_WINDOW * min(size))))
+    window = band_window(size)
     return {side: change_points(profile, window) for side, profile in side_profiles(lab).items()}
 
 
@@ -809,6 +835,7 @@ class Photo:
     tier: str
     file: str
     sha256: str
+    canvas: tuple[int, int]  # the annotation's (width, height): the pixels its truth is in
     truth: dict[str, dict]  # provenance -> {"outer", "field", "bands", "counts"}
 
 
@@ -855,7 +882,7 @@ def load_photos() -> tuple[list[Photo], list[dict]]:
                            v.blocks_down * v.squares_per_block_down),
             }
         if truth:
-            photos.append(Photo(stem, "museum", row["file"], row["sha256"], truth))
+            photos.append(Photo(stem, "museum", row["file"], row["sha256"], tuple(doc.canvas), truth))
         else:
             skipped.append({"stem": stem, "tier": "museum", "reason": "no frame and counts claims"})
     return photos, skipped
@@ -870,8 +897,23 @@ def stage(image: np.ndarray, cap: int) -> tuple[np.ndarray, tuple[float, float]]
     return staged, (size[0] / w, size[1] / h)
 
 
-def _round(values) -> list:
-    return [None if v is None else round(float(v), 4) for v in values]
+def to_source(corners: np.ndarray, scale: tuple[float, float]) -> np.ndarray:
+    """Staged pixel coordinates to source ones, given scale = staged size / source size per
+    axis. Hull and contour vertices are pixel centres (pixel i centred on i), while INTER_AREA
+    scales pixel-edge coordinates (pixel i spans i to i + 1): a staged centre c is edge
+    coordinate c + 0.5, source edge coordinate (c + 0.5) / s, and source centre
+    (c + 0.5) / s - 0.5."""
+    return (np.asarray(corners, float) + 0.5) / np.asarray(scale, float) - 0.5
+
+
+def to_staged(points: np.ndarray, scale: tuple[float, float]) -> np.ndarray:
+    """Source pixel coordinates to staged ones, the inverse of to_source."""
+    return (np.asarray(points, float) + 0.5) * np.asarray(scale, float) - 0.5
+
+
+def _floats(values) -> list:
+    # Full precision: a value rounded before it is summarized against BAR could cross it.
+    return [None if v is None else float(v) for v in values]
 
 
 def run_photo(job: tuple[Photo, str]) -> tuple[list[dict], list[dict]]:
@@ -880,42 +922,51 @@ def run_photo(job: tuple[Photo, str]) -> tuple[list[dict], list[dict]]:
     image = cv2.imread(str(Path(cache) / Path(photo.file).name), cv2.IMREAD_COLOR)
     if image is None:
         raise FileNotFoundError(f"{photo.stem}: not in the cache")
+    size = (image.shape[1], image.shape[0])
+    if size != tuple(photo.canvas):
+        # The truth is in canvas pixels, so a downsized or rotated copy would score every
+        # suggestion against corners that are not on its quilt.
+        raise ValueError(f"{photo.stem}: the image is {size[0]} x {size[1]} px but its "
+                         f"annotation's canvas is {photo.canvas[0]} x {photo.canvas[1]}")
     corners, bands = [], []
     for cap_name, cap in CAPS.items():
-        staged, (sx, sy) = stage(image, cap)
+        staged, scale = stage(image, cap)
+        sx, sy = scale
         for method in METHODS:
             found, reason = explain(method, staged)
-            ring = ([[round(mad, 2), round(inliers, 3)] for _m, mad, _t, inliers in ring_stats(_lab(staged))]
+            ring = ([[mad, inliers] for _m, mad, _t, inliers in ring_stats(_lab(staged))]
                     if method != "tiered" else None)
-            source = found.corners / [sx, sy] if found is not None else None
+            source = to_source(found.corners, scale) if found is not None else None
             for prov, truth in sorted(photo.truth.items()):
                 square = square_size(truth["outer"], truth["field"], truth["counts"], truth["bands"])
                 errors = corner_errors(source, truth["outer"], square) if source is not None else None
                 corners.append({
                     "photo": photo.stem, "tier": photo.tier, "provenance": prov, "cap": cap_name,
-                    "method": method, "square_px": round(square, 3),
+                    "method": method, "square_px": float(square),
                     "staged_px": [staged.shape[1], staged.shape[0]],
-                    "suggested": source.round(1).tolist() if source is not None else None,
-                    "confidence": round(found.confidence, 4) if found is not None else None,
+                    "suggested": source.tolist() if source is not None else None,
+                    "confidence": float(found.confidence) if found is not None else None,
                     "detector_tier": found.tier if found is not None else None,
                     "reason": reason,
                     "ring_mad_inliers": ring,
-                    "errors": _round(errors) if errors is not None else None,
+                    "errors": _floats(errors) if errors is not None else None,
                 })
         for prov, truth in sorted(photo.truth.items()):
             if not truth["bands"]:
                 continue
-            outer = truth["outer"] * [sx, sy]
-            field = truth["field"] * [sx, sy] if truth["field"] is not None else None
+            outer = to_staged(truth["outer"], (sx, sy))
+            field = to_staged(truth["field"], (sx, sy)) if truth["field"] is not None else None
             square, truth_edges = band_truth(outer, field, truth["counts"], truth["bands"])
             proposals = band_proposals(staged, outer)
+            window = band_window(outer_warp(outer)[0])
             for side in SIDES:
                 bands.append({
                     "photo": photo.stem, "tier": photo.tier, "provenance": prov, "cap": cap_name,
-                    "side": side, "square_px": round(square, 3),
-                    "proposals": _round(np.asarray(proposals[side], float) / square),
-                    "truth": _round(truth_edges[side]),
-                    "errors": _round(band_errors(proposals[side], truth_edges[side], square)),
+                    "side": side, "square_px": float(square), "window_px": window,
+                    "proposals": _floats(np.asarray(proposals[side], float) / square),
+                    "truth": _floats(truth_edges[side]),
+                    "searchable": searchable(truth_edges[side], window, square),
+                    "errors": _floats(band_errors(proposals[side], truth_edges[side], square)),
                 })
     return corners, bands
 
@@ -924,11 +975,15 @@ def run_photo(job: tuple[Photo, str]) -> tuple[list[dict], list[dict]]:
 
 
 def _band_summary(records: list[dict]) -> dict:
-    errors = [e for r in records for e in r["errors"] if e is not None]
-    missing = sum(e is None for r in records for e in r["errors"])
+    """Band-edge numbers over the searchable edges only (an edge too shallow to propose says
+    nothing about the search), with the unsearchable edges counted apart."""
+    pairs = [(e, ok) for r in records for e, ok in zip(r["errors"], r["searchable"], strict=True)]
+    errors = [e for e, ok in pairs if ok and e is not None]
+    missing = sum(ok and e is None for e, ok in pairs)
     within = sum(e <= BAR for e in errors)
     return {
         "edges": len(errors) + missing, "missing": missing,
+        "unsearchable": sum(not ok for _e, ok in pairs),
         "median": _percentile(errors, 50), "p90": _percentile(errors, 90),
         "within": within,
         "proposals_per_side": (sum(len(r["proposals"]) for r in records) / len(records)
@@ -1050,16 +1105,20 @@ def write_markdown(report: dict, path: Path) -> None:
         "",
         "## Band proposals (band-edge error in squares, on the proposed outer edge)",
         "",
-        "| Provenance | Cap | Photos | Band edges | No proposal | Median | P90 | Within 0.22 "
-        "| Proposals per side |",
-        "|---|---|---|---|---|---|---|---|---|",
+        "Band edges counts the searchable edges, those at or past the first depth the search can "
+        "propose (one window plus 1 px in); the columns after it run over those alone. "
+        "Unsearchable counts the shallower edges, which no proposal can reach.",
+        "",
+        "| Provenance | Cap | Photos | Band edges | Unsearchable | No proposal | Median | P90 "
+        "| Within 0.22 | Proposals per side |",
+        "|---|---|---|---|---|---|---|---|---|---|",
     ]
     for g in report["band_groups"]:
         found = g["edges"] - g["missing"]
         lines.append(
-            f"| {g['provenance']} | {g['cap']} | {g['photos']} | {g['edges']} | {g['missing']} "
-            f"| {_fmt(g['median'])} | {_fmt(g['p90'])} | {_share(g['within'], found)} "
-            f"| {_fmt(g['proposals_per_side'])} |")
+            f"| {g['provenance']} | {g['cap']} | {g['photos']} | {g['edges']} | {g['unsearchable']} "
+            f"| {g['missing']} | {_fmt(g['median'])} | {_fmt(g['p90'])} "
+            f"| {_share(g['within'], found)} | {_fmt(g['proposals_per_side'])} |")
     lines += [
         "",
         "## Each photo's band edges (desktop cap): truth and nearest proposal error, per side",
@@ -1169,7 +1228,8 @@ def main(argv: Sequence[str] | None = None) -> int:
               f"none={m['none']} p50={_fmt(m['median'])} p90={_fmt(m['p90'])} "
               f"within={m['within']} go={g['go']}")
     for g in report["band_groups"]:
-        print(f"bands {g['provenance']:11} {g['cap']:7} edges={g['edges']} missing={g['missing']} "
+        print(f"bands {g['provenance']:11} {g['cap']:7} edges={g['edges']} "
+              f"unsearchable={g['unsearchable']} missing={g['missing']} "
               f"p50={_fmt(g['median'])} p90={_fmt(g['p90'])} within={g['within']}")
     return 0
 
