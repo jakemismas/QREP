@@ -1,14 +1,14 @@
 {
  "header": {
-  "date": "2026-10-13T03:59:37-07:00",
+  "date": "2026-10-13T05:07:48-07:00",
   "command": ".venv/Scripts/python.exe scripts/eval/spikes/b1a_counts.py --cache <main checkout>/corpus/private/cache --json docs/sprint-5/evidence/B1a-count-suggestions.json --md docs/sprint-5/evidence/B1a-count-suggestions.md",
   "qrep": "b1a/qrep/__init__.py",
-  "git_sha": "23dcd6745e73d9b09c50b69c41cbef5bb4998490",
+  "git_sha": "f5d2fc0c8d725c87ea16742e1f979263033f07b5",
   "dirty": false,
   "cv2": "5.0.0",
   "numpy": "2.5.1",
   "python": "3.13.3",
-  "inputs": "corpus/manifest.csv rows of eval_set v0 in tiers A and B (0 of them tier B), outside the holdout; 2 holdout rows skipped before any read; read: lacma-54871 (A), lacma-54904 (A), lacma-60126 (A), lacma-63229 (A), lacma-63267 (A), smithsonian-chndm-1973-45-1 (A), smithsonian-saam-1998-149-21 (A), smithsonian-saam-2013-67-17 (A), smithsonian-saam-2013-67-9 (A), smithsonian-saam-2017-24-27 (A), smithsonian-saam-2017-24-5 (A)",
+  "inputs": "corpus/manifest.csv rows of eval_set v0 in tiers A and B: 13 rows, 0 of them tier B; 2 holdout rows skipped before any read; read: lacma-54871 (A), lacma-54904 (A), lacma-60126 (A), lacma-63229 (A), lacma-63267 (A), smithsonian-chndm-1973-45-1 (A), smithsonian-saam-1998-149-21 (A), smithsonian-saam-2013-67-17 (A), smithsonian-saam-2013-67-9 (A), smithsonian-saam-2017-24-27 (A), smithsonian-saam-2017-24-5 (A)",
   "radii_px": [
    0,
    2,
