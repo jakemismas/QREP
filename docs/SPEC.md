@@ -115,8 +115,8 @@ Your pattern. Plan section 2.1 holds the screen-level rules and copy.
   result, and the screen shows no averaged confidence pill and no stage meters. The quilt sits
   beside the photo at 720 px and wider and below it on a phone, and Compare with your photo opens
   the lightbox. On a 390 x 844 phone Download pattern (PDF) shows without scrolling, above the
-  census, and a one-finger drag scrolls the page unless the quilt is zoomed; on a wide screen the
-  quilt stays in view while the side column scrolls. Until the editor goes (C6a), See your
+  census, and a one-finger drag scrolls the page unless the quilt is zoomed; on desktop the quilt
+  stays in view from 720 px while the side column scrolls. Until the editor goes (C6a), See your
   pattern is the results screen's primary action, and Open in the editor and the start screen's
   old demo entry stay as secondary actions.
 
