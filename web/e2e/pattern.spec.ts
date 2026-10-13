@@ -583,6 +583,28 @@ test("See a sample pattern holds every start entry while it loads, then shows th
   );
 });
 
+test("Open the demo quilt instead holds the start entries while it loads, then opens the editor", async ({
+  page,
+}) => {
+  await seedAutosave(page);
+  const held: Route[] = [];
+  await page.route(SAMPLE_FILE, (route) => {
+    held.push(route);
+  });
+  await page.getByTestId("open-demo").click();
+  // The old demo entry loads the same file through the same openDemo, so a
+  // quilt opened meanwhile would be replaced the same way: it holds the same
+  // entries, See a sample pattern among them.
+  for (const id of ["see-sample", ...START_ENTRIES]) {
+    await expect(page.getByTestId(id), id).toBeDisabled();
+  }
+  await expect.poll(() => held.length).toBe(1);
+
+  await held[0].continue();
+  await expect(page.getByTestId("editor")).toBeVisible();
+  await expect(page.getByTestId("your-pattern")).toHaveCount(0);
+});
+
 test("after a failed sample load the button works again and the next open goes to the editor", async ({
   page,
 }) => {

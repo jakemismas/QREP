@@ -68,11 +68,12 @@ export function StartScreen({
   const { openDemo, startBlank, resume, autosaveError, resumeAutosave, yourPattern } =
     useProject();
 
-  // While the sample loads, every entry here that opens or starts something
-  // is disabled: openDemo installs the sample whenever its fetch lands and
-  // cannot tell it was overtaken, so a quilt opened meanwhile would be
-  // replaced by it. The ref also ignores a tap that lands before the disabled
-  // state renders. A failed load enables them all again.
+  // While the demo quilt loads (See a sample pattern or the old demo entry),
+  // every entry here that opens or starts something is disabled: openDemo
+  // installs the quilt whenever its fetch lands and cannot tell it was
+  // overtaken, so a quilt opened meanwhile would be replaced by it. The ref
+  // also ignores a tap that lands before the disabled state renders. A failed
+  // load enables them all again.
   const [loadingSample, setLoadingSample] = useState(false);
   const loadingSampleRef = useRef(false);
   const unlessLoading =
@@ -80,19 +81,20 @@ export function StartScreen({
     (): void => {
       if (!loadingSampleRef.current) action?.();
     };
-  const seeSample = () => {
+  const loadDemo = (onOpened?: () => void) => {
     if (loadingSampleRef.current) return;
     loadingSampleRef.current = true;
     setLoadingSample(true);
     void openDemo().then((opened) => {
       if (opened) {
-        yourPattern.showPattern("sample");
+        onOpened?.();
         return;
       }
       loadingSampleRef.current = false;
       setLoadingSample(false);
     });
   };
+  const seeSample = () => loadDemo(() => yourPattern.showPattern("sample"));
 
   return (
     <div data-testid="start-screen" className="start-screen">
@@ -186,9 +188,7 @@ export function StartScreen({
             data-testid="open-demo"
             className="btn btn--secondary"
             disabled={loadingSample}
-            onClick={unlessLoading(() => {
-              void openDemo();
-            })}
+            onClick={() => loadDemo()}
           >
             Open the demo quilt instead
           </button>
