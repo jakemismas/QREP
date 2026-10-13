@@ -555,10 +555,12 @@ def test_the_shading_correction_keeps_bands_of_rising_lightness(sigma, least, se
 
 
 def test_a_light_that_runs_away_keeps_the_flat_read():
-    # Source: knobs.LIGHT_MAX_RATIO and knobs.SHADING_ROUNDS (PR #251 rounds
-    #   2 and 3; #137 comment 6148562029): with no cap this grid's light runs
-    #   past 8 in 10 rounds and the read keeps 0.56 of squares; the light
-    #   passes 2.0 only in round 4, and 3 rounds read 0.92 (measured on #248).
+    # Source: knobs.LIGHT_MAX_RATIO (PR #251 rounds 2 and 3; #137 comment
+    #   6148562029): with no cap this grid's light runs past 8 in 10 rounds
+    #   and the read keeps 0.56 of squares. At cap 2.0 the light passes the
+    #   cap in round 4 (#248 comment 6149362474). The test fails with no cap
+    #   and with 2 or 3 rounds (0.94 and 0.92); it passes at any cap up to 8,
+    #   which the light passes by round 10.
     # Inputs: bands_of_rising_lightness(5, 0), k = 4, the default rounds.
     # Formula: as the band test above; past the cap the read is k-means'.
     # Arithmetic: sigma 5: P(N > 10 / 5 = 2) = 0.02275; on average (2 x 2 x

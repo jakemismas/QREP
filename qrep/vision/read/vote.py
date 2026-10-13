@@ -282,13 +282,12 @@ def vote(
     with a 1 x 1 block. Beside a voting type, the block of a type of one
     copy joins the type its block period predicts when it agrees with it on
     at least attach_agreement of its squares (_attach); such an attached
-    block takes its type for the layout, the repeat, the breaks and the
-    agreement figure, and does not count toward its type's votes or
-    majority. A
-    square of a voting type that differs from its type majority takes it
-    below threshold and is a Break otherwise, and every differing square of
-    an attached block is a Break. Raises ValueError on any other input.
-    Inputs are never mutated.
+    block takes its type for the layout, the repeat and its confidence (the
+    agreement figure) and the breaks, and does not count toward its type's
+    votes or majority. A square of a voting type that differs from its type
+    majority takes it below threshold and is a Break otherwise, and every
+    differing square of an attached block is a Break. Raises ValueError on
+    any other input. Inputs are never mutated.
     """
     lab = np.asarray(labels)
     conf = np.asarray(confidence, dtype=float)

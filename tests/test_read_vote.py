@@ -595,7 +595,7 @@ def test_an_attached_block_keeps_every_square_and_shows_each_difference():
 
 @pytest.mark.parametrize(
     ("changed", "unsure", "attaches"),
-    [(12, False, True), (13, False, False), (12, True, True)],
+    [(12, False, True), (13, False, False), (13, True, True)],
     ids=["over-the-floor", "under-the-floor", "at-the-floor"],
 )
 def test_the_attach_floor_decides_whether_a_varied_copy_joins(changed, unsure, attaches):
@@ -609,24 +609,26 @@ def test_the_attach_floor_decides_whether_a_varied_copy_joins(changed, unsure, a
         confidence[2, 2] = 0.0
     result = _vote(labels, confidence, 5, 5)
     # Source: knobs.ATTACH_AGREEMENT (0.5, passed as ATTACH); PR #251 round
-    #   2: nothing pinned the floor.
+    #   2: nothing pinned the floor; round 3: nothing pinned that the share
+    #   is weighted by confidence (SPEC.md section 4).
     # Inputs: the fixture at confidence 1.0, with the first `changed`
     #   squares of block (0, 0), an A block, in raster order read 2, a label
-    #   no block holds; at the floor, square (2, 2), the 13th, unchanged, at
+    #   no block holds; at the floor, square (2, 2), the 13th changed, at
     #   confidence 0.
     # Arithmetic: block (0, 0) equals A on 25 - changed squares, 13 / 25 =
-    #   0.52 or 12 / 25 = 0.48, and at the floor on 12 squares of total
-    #   confidence 25 - 1 = 24, 12 / 24 = 0.5; it equals B on at most the 8
-    #   squares A and B share, 8 / 25 = 0.32 or 8 / 24 = 0.333; all under
+    #   0.52 or 12 / 25 = 0.48; at the floor it equals A on the same 12
+    #   squares, of total confidence 25 - 1 = 24, so 12 / 24 = 0.5, where an
+    #   unweighted share would be 12 / 25 = 0.48. It equals B on at most the
+    #   8 squares A and B share, 8 / 25 = 0.32 or 8 / 24 = 0.333; all under
     #   0.75, so it is a type of one copy, wild beside A (49 other copies)
     #   and B (49). As in the varied-copy test, the period is 2 blocks each
     #   way and the blocks an even number of blocks away are A. 0.52 >= 0.5
-    #   and 0.5 >= 0.5 attach; 0.48 < 0.5 does not. Square (2, 2) reads A's
-    #   clean label, so it is no Break, and the agreement figure counts
-    #   squares whatever their confidence.
+    #   and 0.5 >= 0.5 attach; 0.48 < 0.5 does not.
     #   Attached: types (i + j) % 2, repeat (10, 10), each changed square a
-    #   Break (read 2, majority A's clean label, 1.0), no changes, agreement
-    #   (2475 - 12) / 2475. Not attached: block (0, 0) is type 0, B (first at
+    #   Break (read 2, majority A's clean label, at its own confidence: 1.0,
+    #   and 0.0 at (2, 2)), no changes, agreement (2475 - changed) / 2475,
+    #   since the figure counts squares whatever their confidence: 2463 /
+    #   2475 or 2462 / 2475. Not attached: block (0, 0) is type 0, B (first at
     #   (0, 1)) 1 and A (first at (0, 2)) 2; block (0, 0) is in row 0 and
     #   column 0 and no other block has its type, so no row p <= 5 equals
     #   row 0 and no column p <= 4 equals column 0: the repeat is the whole
@@ -639,9 +641,9 @@ def test_the_attach_floor_decides_whether_a_varied_copy_joins(changed, unsure, a
         np.testing.assert_array_equal(result.types, np.indices((11, 9)).sum(axis=0) % 2)
         assert result.repeat == (10, 10)
         assert result.breaks == tuple(
-            Break(r, c, 2, int(clean[r, c]), _approx(1.0)) for r, c in squares
+            Break(r, c, 2, int(clean[r, c]), _approx(confidence[r, c])) for r, c in squares
         )
-        assert result.agreement == _approx(2463 / 2475)
+        assert result.agreement == _approx((2475 - changed) / 2475)
     else:
         types = 2 - np.indices((11, 9)).sum(axis=0) % 2
         types[0, 0] = 0
@@ -952,9 +954,19 @@ def test_a_type_of_two_copies_counts_toward_agreement_without_voting():
 def test_inputs_are_not_mutated():
     labels, confidence = _three_copies_with_misread(read=0, conf=0.3)
     labels_before, confidence_before = labels.copy(), confidence.copy()
-    result = _vote(labels, confidence, 3, 3)
+    result = vote(
+        labels,
+        confidence,
+        3,
+        3,
+        threshold=THRESHOLD,
+        min_copies=MIN_COPIES,
+        type_agreement=AGREEMENT,
+        attach_agreement=ATTACH,
+    )
     # Source: ticket, "inputs are never mutated".
     # Formula, Inputs, Arithmetic: the misread case, which changes (1, 7).
+    #   vote() is called directly, since _vote passes copies of its inputs.
     # Expected: both inputs equal their copies, and the result owns its arrays.
     assert result.changes
     np.testing.assert_array_equal(labels, labels_before)
