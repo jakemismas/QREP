@@ -716,6 +716,18 @@ def test_a_step_too_tall_to_share_a_page_with_its_figure_is_refused():
         render.render_pdf(small_document(Steps([step])))
 
 
+def test_a_later_step_too_tall_to_share_a_page_with_its_figure_is_refused():
+    # G-04. Step 2 has no heading before it, so only the step-and-figure guard can
+    # refuse it. 900 x 25.01 = 22,509 pt of "Sew. " wraps to a 504 pt first line and
+    # 486 pt lines after it: (22,509 - 504) / 486 = 45.28, so 47 lines or more, 611 pt
+    # or more, which alone fits the 666 pt frame. With 3 pt, the 200 pt figure, 3 pt
+    # and the 13 pt caption, the step needs at least 611 + 3 + 200 + 3 + 13 = 830 pt.
+    steps = Steps([Step("Sew."),
+                   Step("Sew. " * 900, figure=FigureRequest("hst_unit", 300, 200, "a figure"))])
+    with pytest.raises(ValueError, match="step 2 and its figure do not fit on one page"):
+        render.render_pdf(small_document(steps))
+
+
 @pytest.mark.parametrize(
     ("before", "page"),
     [((), 2), ((Section(SectionKind.FABRIC_REQUIREMENTS, [Paragraph("Buy 3/4 yd.")]),), 3)],
@@ -761,6 +773,27 @@ def test_a_table_row_never_splits_across_pages(tmp_path):
     assert len(texts) >= 5
     for n in range(1, 41):
         assert page_of(texts, f"Row {n} begins.") == page_of(texts, f"Row {n} ends.")
+
+
+def test_a_table_row_that_reaches_the_page_foot_moves_whole_to_the_next_page(tmp_path):
+    # G-04. The heading (20 pt, 8 pt after) and 25 one-line fillers (13 pt, 6 pt
+    # after) take 20 + 8 + 25 x 13 + 24 x 6 + 6 = 503 pt of the 666 pt frame,
+    # leaving 163 pt. Each row's text is "Row n begins. " (66.14 pt by the Helvetica
+    # widths: R 722, o 556, w 722, b 556, e 556, g 556, i 222, n 556, s 500, d 556,
+    # period 278, space 278, digit 556), 15 sentences of 188.98 pt and "Row n ends." (55.58
+    # pt): 66.14 + 2,834.7 + 55.58 = 2,956.42 pt in a 426 pt column. That needs 7
+    # lines or more (2,956.42 / 426 = 6.94), and since a wrapped line loses less than
+    # its widest word and a space ("begins." 32.24 + 2.78 pt), 8 lines or fewer
+    # (2,956.42 / 391 = 7.56): a row of 88 or 100 pt (12 pt lines, 2 + 2 pt padding).
+    # The 16 pt header and row 1 take 104 or 116 pt, leaving 47 to 59 pt, so row 2
+    # moves whole to page 3, where a split row would leave "Row 2 begins." on page 2.
+    filler = "The long cell keeps going so that it wraps. " * 5
+    rows = [(str(n), f"Row {n} begins. {filler * 3}Row {n} ends.") for n in range(1, 4)]
+    document = small_document(*FILLER[:25], Table(("Row", "Text"), rows, widths=(1, 6)))
+    texts = page_texts(write(tmp_path, document))
+    assert page_of(texts, "Row 1 begins.") == page_of(texts, "Row 1 ends.") == 2
+    assert page_of(texts, "Row 2 begins.") == page_of(texts, "Row 2 ends.") == 3
+    assert page_of(texts, "Row 3 begins.") == page_of(texts, "Row 3 ends.")
 
 
 def test_a_table_word_wider_than_its_column_is_refused():
@@ -1160,6 +1193,9 @@ BANNED = [
     "Cut (4) 2 squares.",  # C-07: a cut square's length carries its mark
     "Cut (4) 2\N{LEFT DOUBLE QUOTATION MARK} squares.",
     "Cut (4) 2'' squares.",  # two apostrophes are not an inch mark either
+    # C-07: a fraction is a length or a yardage, so it carries an inch mark or yd.
+    "Every piecing seam is 1/4.",
+    "Press 1/2 of the seams open.",
 ]
 
 
