@@ -1,0 +1,9368 @@
+{
+ "header": {
+  "date": "2026-10-13T06:21:27-07:00",
+  "command": ".venv/Scripts/python.exe scripts/eval/spikes/b1b_corners.py --cache <main checkout>/corpus/private/cache --json docs/sprint-5/evidence/B1b-corner-suggestions.json --md docs/sprint-5/evidence/B1b-corner-suggestions.md",
+  "qrep": "b1b/qrep/__init__.py",
+  "git_sha": "2b355d5ba6cf09d724668f9daba459b829ed2649",
+  "dirty": false,
+  "cv2": "5.0.0",
+  "numpy": "2.5.1",
+  "python": "3.13.3",
+  "inputs": "museum tier: corpus/manifest.csv rows of eval_set v0 in tier A, 13 rows; 2 holdout rows skipped before any read; read: lacma-54871, lacma-54904, lacma-60126, lacma-63229, lacma-63267, smithsonian-chndm-1973-45-1, smithsonian-saam-1998-149-21, smithsonian-saam-2013-67-17, smithsonian-saam-2013-67-9, smithsonian-saam-2017-24-27, smithsonian-saam-2017-24-5. Screenshot tier: n = 0, no truth on this machine until D3c (#165)",
+  "caps": {
+   "phone": 1400,
+   "desktop": 2000
+  }
+ },
+ "photos": [
+  {
+   "stem": "lacma-54871",
+   "tier": "museum",
+   "provenances": [
+    "proposed-a",
+    "proposed-b"
+   ]
+  },
+  {
+   "stem": "lacma-54904",
+   "tier": "museum",
+   "provenances": [
+    "proposed-a",
+    "proposed-b"
+   ]
+  },
+  {
+   "stem": "lacma-60126",
+   "tier": "museum",
+   "provenances": [
+    "proposed-a",
+    "proposed-b"
+   ]
+  },
+  {
+   "stem": "lacma-63229",
+   "tier": "museum",
+   "provenances": [
+    "proposed-a",
+    "proposed-b"
+   ]
+  },
+  {
+   "stem": "lacma-63267",
+   "tier": "museum",
+   "provenances": [
+    "proposed-a",
+    "proposed-b"
+   ]
+  },
+  {
+   "stem": "smithsonian-chndm-1973-45-1",
+   "tier": "museum",
+   "provenances": [
+    "proposed-a",
+    "proposed-b"
+   ]
+  },
+  {
+   "stem": "smithsonian-saam-1998-149-21",
+   "tier": "museum",
+   "provenances": [
+    "proposed-a",
+    "proposed-b"
+   ]
+  },
+  {
+   "stem": "smithsonian-saam-2013-67-17",
+   "tier": "museum",
+   "provenances": [
+    "proposed-a",
+    "proposed-b"
+   ]
+  },
+  {
+   "stem": "smithsonian-saam-2013-67-9",
+   "tier": "museum",
+   "provenances": [
+    "proposed-a",
+    "proposed-b"
+   ]
+  },
+  {
+   "stem": "smithsonian-saam-2017-24-27",
+   "tier": "museum",
+   "provenances": [
+    "proposed-a",
+    "proposed-b"
+   ]
+  },
+  {
+   "stem": "smithsonian-saam-2017-24-5",
+   "tier": "museum",
+   "provenances": [
+    "proposed-a",
+    "proposed-b"
+   ]
+  }
+ ],
+ "skipped": [
+  {
+   "stem": null,
+   "tier": "museum",
+   "reason": "holdout"
+  },
+  {
+   "stem": null,
+   "tier": "museum",
+   "reason": "holdout"
+  }
+ ],
+ "screenshot_tier": "no truth on this machine: D3c (#165) has not landed it",
+ "groups": [
+  {
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "method": "backdrop_hull",
+   "museum": {
+    "photos": 11,
+    "suggested": 8,
+    "corners": 32,
+    "median": 0.07064999999999999,
+    "p90": 0.18797000000000003,
+    "within": 7,
+    "none": 3,
+    "within_rate": 0.6363636363636364,
+    "none_rate": 0.2727272727272727
+   },
+   "screenshot": {
+    "photos": 0,
+    "suggested": 0,
+    "corners": 0,
+    "median": null,
+    "p90": null,
+    "within": 0,
+    "none": 0,
+    "within_rate": null,
+    "none_rate": null
+   },
+   "go": false
+  },
+  {
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "method": "backdrop_lines",
+   "museum": {
+    "photos": 11,
+    "suggested": 8,
+    "corners": 32,
+    "median": 0.3729,
+    "p90": 0.88554,
+    "within": 0,
+    "none": 3,
+    "within_rate": 0.0,
+    "none_rate": 0.2727272727272727
+   },
+   "screenshot": {
+    "photos": 0,
+    "suggested": 0,
+    "corners": 0,
+    "median": null,
+    "p90": null,
+    "within": 0,
+    "none": 0,
+    "within_rate": null,
+    "none_rate": null
+   },
+   "go": false
+  },
+  {
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "method": "tiered",
+   "museum": {
+    "photos": 11,
+    "suggested": 3,
+    "corners": 12,
+    "median": 4.1125,
+    "p90": 10.395180000000002,
+    "within": 0,
+    "none": 8,
+    "within_rate": 0.0,
+    "none_rate": 0.7272727272727273
+   },
+   "screenshot": {
+    "photos": 0,
+    "suggested": 0,
+    "corners": 0,
+    "median": null,
+    "p90": null,
+    "within": 0,
+    "none": 0,
+    "within_rate": null,
+    "none_rate": null
+   },
+   "go": false
+  },
+  {
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "method": "backdrop_hull",
+   "museum": {
+    "photos": 11,
+    "suggested": 9,
+    "corners": 36,
+    "median": 0.0598,
+    "p90": 0.17875,
+    "within": 8,
+    "none": 2,
+    "within_rate": 0.7272727272727273,
+    "none_rate": 0.18181818181818182
+   },
+   "screenshot": {
+    "photos": 0,
+    "suggested": 0,
+    "corners": 0,
+    "median": null,
+    "p90": null,
+    "within": 0,
+    "none": 0,
+    "within_rate": null,
+    "none_rate": null
+   },
+   "go": false
+  },
+  {
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "method": "backdrop_lines",
+   "museum": {
+    "photos": 11,
+    "suggested": 9,
+    "corners": 36,
+    "median": 0.33515,
+    "p90": 0.88325,
+    "within": 0,
+    "none": 2,
+    "within_rate": 0.0,
+    "none_rate": 0.18181818181818182
+   },
+   "screenshot": {
+    "photos": 0,
+    "suggested": 0,
+    "corners": 0,
+    "median": null,
+    "p90": null,
+    "within": 0,
+    "none": 0,
+    "within_rate": null,
+    "none_rate": null
+   },
+   "go": false
+  },
+  {
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "method": "tiered",
+   "museum": {
+    "photos": 11,
+    "suggested": 3,
+    "corners": 12,
+    "median": 4.1125,
+    "p90": 10.395180000000002,
+    "within": 0,
+    "none": 8,
+    "within_rate": 0.0,
+    "none_rate": 0.7272727272727273
+   },
+   "screenshot": {
+    "photos": 0,
+    "suggested": 0,
+    "corners": 0,
+    "median": null,
+    "p90": null,
+    "within": 0,
+    "none": 0,
+    "within_rate": null,
+    "none_rate": null
+   },
+   "go": false
+  },
+  {
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "method": "backdrop_hull",
+   "museum": {
+    "photos": 11,
+    "suggested": 8,
+    "corners": 32,
+    "median": 0.0732,
+    "p90": 0.18248000000000003,
+    "within": 7,
+    "none": 3,
+    "within_rate": 0.6363636363636364,
+    "none_rate": 0.2727272727272727
+   },
+   "screenshot": {
+    "photos": 0,
+    "suggested": 0,
+    "corners": 0,
+    "median": null,
+    "p90": null,
+    "within": 0,
+    "none": 0,
+    "within_rate": null,
+    "none_rate": null
+   },
+   "go": false
+  },
+  {
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "method": "backdrop_lines",
+   "museum": {
+    "photos": 11,
+    "suggested": 8,
+    "corners": 32,
+    "median": 0.34914999999999996,
+    "p90": 0.86456,
+    "within": 0,
+    "none": 3,
+    "within_rate": 0.0,
+    "none_rate": 0.2727272727272727
+   },
+   "screenshot": {
+    "photos": 0,
+    "suggested": 0,
+    "corners": 0,
+    "median": null,
+    "p90": null,
+    "within": 0,
+    "none": 0,
+    "within_rate": null,
+    "none_rate": null
+   },
+   "go": false
+  },
+  {
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "method": "tiered",
+   "museum": {
+    "photos": 11,
+    "suggested": 3,
+    "corners": 12,
+    "median": 4.1218,
+    "p90": 10.354790000000001,
+    "within": 0,
+    "none": 8,
+    "within_rate": 0.0,
+    "none_rate": 0.7272727272727273
+   },
+   "screenshot": {
+    "photos": 0,
+    "suggested": 0,
+    "corners": 0,
+    "median": null,
+    "p90": null,
+    "within": 0,
+    "none": 0,
+    "within_rate": null,
+    "none_rate": null
+   },
+   "go": false
+  },
+  {
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "method": "backdrop_hull",
+   "museum": {
+    "photos": 11,
+    "suggested": 9,
+    "corners": 36,
+    "median": 0.0562,
+    "p90": 0.17754999999999999,
+    "within": 8,
+    "none": 2,
+    "within_rate": 0.7272727272727273,
+    "none_rate": 0.18181818181818182
+   },
+   "screenshot": {
+    "photos": 0,
+    "suggested": 0,
+    "corners": 0,
+    "median": null,
+    "p90": null,
+    "within": 0,
+    "none": 0,
+    "within_rate": null,
+    "none_rate": null
+   },
+   "go": false
+  },
+  {
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "method": "backdrop_lines",
+   "museum": {
+    "photos": 11,
+    "suggested": 9,
+    "corners": 36,
+    "median": 0.325,
+    "p90": 0.86555,
+    "within": 0,
+    "none": 2,
+    "within_rate": 0.0,
+    "none_rate": 0.18181818181818182
+   },
+   "screenshot": {
+    "photos": 0,
+    "suggested": 0,
+    "corners": 0,
+    "median": null,
+    "p90": null,
+    "within": 0,
+    "none": 0,
+    "within_rate": null,
+    "none_rate": null
+   },
+   "go": false
+  },
+  {
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "method": "tiered",
+   "museum": {
+    "photos": 11,
+    "suggested": 3,
+    "corners": 12,
+    "median": 4.1218,
+    "p90": 10.354790000000001,
+    "within": 0,
+    "none": 8,
+    "within_rate": 0.0,
+    "none_rate": 0.7272727272727273
+   },
+   "screenshot": {
+    "photos": 0,
+    "suggested": 0,
+    "corners": 0,
+    "median": null,
+    "p90": null,
+    "within": 0,
+    "none": 0,
+    "within_rate": null,
+    "none_rate": null
+   },
+   "go": false
+  }
+ ],
+ "band_groups": [
+  {
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "edges": 80,
+   "missing": 0,
+   "median": 0.19440000000000002,
+   "p90": 0.5921400000000003,
+   "within": 43,
+   "proposals_per_side": 3.9722222222222223,
+   "photos": 9
+  },
+  {
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "edges": 80,
+   "missing": 0,
+   "median": 0.19445,
+   "p90": 0.5751600000000001,
+   "within": 42,
+   "proposals_per_side": 3.9722222222222223,
+   "photos": 9
+  },
+  {
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "edges": 80,
+   "missing": 0,
+   "median": 0.19669999999999999,
+   "p90": 0.5868300000000001,
+   "within": 43,
+   "proposals_per_side": 3.9722222222222223,
+   "photos": 9
+  },
+  {
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "edges": 80,
+   "missing": 0,
+   "median": 0.18769999999999998,
+   "p90": 0.5740800000000001,
+   "within": 43,
+   "proposals_per_side": 3.9722222222222223,
+   "photos": 9
+  }
+ ],
+ "corner_records": [
+  {
+   "photo": "lacma-54871",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "method": "backdrop_hull",
+   "square_px": 68.237,
+   "staged_px": [
+    1324,
+    1400
+   ],
+   "suggested": [
+    [
+     23.4,
+     143.4
+    ],
+    [
+     3782.3,
+     140.4
+    ],
+    [
+     3849.6,
+     4008.2
+    ],
+    [
+     87.8,
+     3914.6
+    ]
+   ],
+   "confidence": 0.9902,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     1.86,
+     1.0
+    ],
+    [
+     2.37,
+     1.0
+    ],
+    [
+     3.54,
+     0.71
+    ],
+    [
+     6.05,
+     0.739
+    ]
+   ],
+   "errors": [
+    0.1089,
+    0.1892,
+    0.0397,
+    0.1512
+   ]
+  },
+  {
+   "photo": "lacma-54871",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "method": "backdrop_hull",
+   "square_px": 68.202,
+   "staged_px": [
+    1324,
+    1400
+   ],
+   "suggested": [
+    [
+     23.4,
+     143.4
+    ],
+    [
+     3782.3,
+     140.4
+    ],
+    [
+     3849.6,
+     4008.2
+    ],
+    [
+     87.8,
+     3914.6
+    ]
+   ],
+   "confidence": 0.9902,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     1.86,
+     1.0
+    ],
+    [
+     2.37,
+     1.0
+    ],
+    [
+     3.54,
+     0.71
+    ],
+    [
+     6.05,
+     0.739
+    ]
+   ],
+   "errors": [
+    0.0798,
+    0.1276,
+    0.0397,
+    0.1512
+   ]
+  },
+  {
+   "photo": "lacma-54871",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "method": "backdrop_lines",
+   "square_px": 68.237,
+   "staged_px": [
+    1324,
+    1400
+   ],
+   "suggested": [
+    [
+     23.5,
+     153.5
+    ],
+    [
+     3801.3,
+     161.4
+    ],
+    [
+     3842.0,
+     3988.5
+    ],
+    [
+     80.8,
+     3944.2
+    ]
+   ],
+   "confidence": 0.9942,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     1.86,
+     1.0
+    ],
+    [
+     2.37,
+     1.0
+    ],
+    [
+     3.54,
+     0.71
+    ],
+    [
+     6.05,
+     0.739
+    ]
+   ],
+   "errors": [
+    0.1774,
+    0.3557,
+    0.3099,
+    0.5769
+   ]
+  },
+  {
+   "photo": "lacma-54871",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "method": "backdrop_lines",
+   "square_px": 68.202,
+   "staged_px": [
+    1324,
+    1400
+   ],
+   "suggested": [
+    [
+     23.5,
+     153.5
+    ],
+    [
+     3801.3,
+     161.4
+    ],
+    [
+     3842.0,
+     3988.5
+    ],
+    [
+     80.8,
+     3944.2
+    ]
+   ],
+   "confidence": 0.9942,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     1.86,
+     1.0
+    ],
+    [
+     2.37,
+     1.0
+    ],
+    [
+     3.54,
+     0.71
+    ],
+    [
+     6.05,
+     0.739
+    ]
+   ],
+   "errors": [
+    0.161,
+    0.3357,
+    0.3101,
+    0.5772
+   ]
+  },
+  {
+   "photo": "lacma-54871",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "method": "tiered",
+   "square_px": 68.237,
+   "staged_px": [
+    1324,
+    1400
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "tier 3, the full frame",
+   "ring_mad_inliers": null,
+   "errors": null
+  },
+  {
+   "photo": "lacma-54871",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "method": "tiered",
+   "square_px": 68.202,
+   "staged_px": [
+    1324,
+    1400
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "tier 3, the full frame",
+   "ring_mad_inliers": null,
+   "errors": null
+  },
+  {
+   "photo": "lacma-54871",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "method": "backdrop_hull",
+   "square_px": 68.237,
+   "staged_px": [
+    1891,
+    2000
+   ],
+   "suggested": [
+    [
+     22.5,
+     141.3
+    ],
+    [
+     3782.9,
+     139.3
+    ],
+    [
+     3850.5,
+     4010.0
+    ],
+    [
+     88.1,
+     3915.8
+    ]
+   ],
+   "confidence": 0.99,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     1.88,
+     1.0
+    ],
+    [
+     2.38,
+     1.0
+    ],
+    [
+     3.68,
+     0.698
+    ],
+    [
+     6.24,
+     0.733
+    ]
+   ],
+   "errors": [
+    0.1035,
+    0.1785,
+    0.0529,
+    0.1688
+   ]
+  },
+  {
+   "photo": "lacma-54871",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "method": "backdrop_hull",
+   "square_px": 68.202,
+   "staged_px": [
+    1891,
+    2000
+   ],
+   "suggested": [
+    [
+     22.5,
+     141.3
+    ],
+    [
+     3782.9,
+     139.3
+    ],
+    [
+     3850.5,
+     4010.0
+    ],
+    [
+     88.1,
+     3915.8
+    ]
+   ],
+   "confidence": 0.99,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     1.88,
+     1.0
+    ],
+    [
+     2.38,
+     1.0
+    ],
+    [
+     3.68,
+     0.698
+    ],
+    [
+     6.24,
+     0.733
+    ]
+   ],
+   "errors": [
+    0.0772,
+    0.1217,
+    0.0529,
+    0.1689
+   ]
+  },
+  {
+   "photo": "lacma-54871",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "method": "backdrop_lines",
+   "square_px": 68.237,
+   "staged_px": [
+    1891,
+    2000
+   ],
+   "suggested": [
+    [
+     23.5,
+     153.6
+    ],
+    [
+     3802.1,
+     161.3
+    ],
+    [
+     3841.4,
+     3988.6
+    ],
+    [
+     81.4,
+     3945.2
+    ]
+   ],
+   "confidence": 0.9942,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     1.88,
+     1.0
+    ],
+    [
+     2.38,
+     1.0
+    ],
+    [
+     3.68,
+     0.698
+    ],
+    [
+     6.24,
+     0.733
+    ]
+   ],
+   "errors": [
+    0.1788,
+    0.3568,
+    0.3107,
+    0.5899
+   ]
+  },
+  {
+   "photo": "lacma-54871",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "method": "backdrop_lines",
+   "square_px": 68.202,
+   "staged_px": [
+    1891,
+    2000
+   ],
+   "suggested": [
+    [
+     23.5,
+     153.6
+    ],
+    [
+     3802.1,
+     161.3
+    ],
+    [
+     3841.4,
+     3988.6
+    ],
+    [
+     81.4,
+     3945.2
+    ]
+   ],
+   "confidence": 0.9942,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     1.88,
+     1.0
+    ],
+    [
+     2.38,
+     1.0
+    ],
+    [
+     3.68,
+     0.698
+    ],
+    [
+     6.24,
+     0.733
+    ]
+   ],
+   "errors": [
+    0.1626,
+    0.3392,
+    0.3108,
+    0.5902
+   ]
+  },
+  {
+   "photo": "lacma-54871",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "method": "tiered",
+   "square_px": 68.237,
+   "staged_px": [
+    1891,
+    2000
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "tier 3, the full frame",
+   "ring_mad_inliers": null,
+   "errors": null
+  },
+  {
+   "photo": "lacma-54871",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "method": "tiered",
+   "square_px": 68.202,
+   "staged_px": [
+    1891,
+    2000
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "tier 3, the full frame",
+   "ring_mad_inliers": null,
+   "errors": null
+  },
+  {
+   "photo": "lacma-54904",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "method": "backdrop_hull",
+   "square_px": 35.691,
+   "staged_px": [
+    1352,
+    1400
+   ],
+   "suggested": [
+    [
+     104.2,
+     132.4
+    ],
+    [
+     2189.3,
+     144.8
+    ],
+    [
+     2187.5,
+     2373.1
+    ],
+    [
+     125.4,
+     2366.1
+    ]
+   ],
+   "confidence": 0.9729,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     1.22,
+     1.0
+    ],
+    [
+     1.0,
+     1.0
+    ],
+    [
+     1.07,
+     1.0
+    ],
+    [
+     2.15,
+     1.0
+    ]
+   ],
+   "errors": [
+    0.0895,
+    0.0799,
+    0.1653,
+    0.0844
+   ]
+  },
+  {
+   "photo": "lacma-54904",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "method": "backdrop_hull",
+   "square_px": 35.766,
+   "staged_px": [
+    1352,
+    1400
+   ],
+   "suggested": [
+    [
+     104.2,
+     132.4
+    ],
+    [
+     2189.3,
+     144.8
+    ],
+    [
+     2187.5,
+     2373.1
+    ],
+    [
+     125.4,
+     2366.1
+    ]
+   ],
+   "confidence": 0.9729,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     1.22,
+     1.0
+    ],
+    [
+     1.0,
+     1.0
+    ],
+    [
+     1.07,
+     1.0
+    ],
+    [
+     2.15,
+     1.0
+    ]
+   ],
+   "errors": [
+    0.09,
+    0.0534,
+    0.1145,
+    0.0573
+   ]
+  },
+  {
+   "photo": "lacma-54904",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "method": "backdrop_lines",
+   "square_px": 35.691,
+   "staged_px": [
+    1352,
+    1400
+   ],
+   "suggested": [
+    [
+     116.3,
+     159.4
+    ],
+    [
+     2167.6,
+     157.0
+    ],
+    [
+     2156.0,
+     2371.8
+    ],
+    [
+     147.0,
+     2351.1
+    ]
+   ],
+   "confidence": 0.9893,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     1.22,
+     1.0
+    ],
+    [
+     1.0,
+     1.0
+    ],
+    [
+     1.07,
+     1.0
+    ],
+    [
+     2.15,
+     1.0
+    ]
+   ],
+   "errors": [
+    0.8787,
+    0.7741,
+    1.0371,
+    0.7741
+   ]
+  },
+  {
+   "photo": "lacma-54904",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "method": "backdrop_lines",
+   "square_px": 35.766,
+   "staged_px": [
+    1352,
+    1400
+   ],
+   "suggested": [
+    [
+     116.3,
+     159.4
+    ],
+    [
+     2167.6,
+     157.0
+    ],
+    [
+     2156.0,
+     2371.8
+    ],
+    [
+     147.0,
+     2351.1
+    ]
+   ],
+   "confidence": 0.9893,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     1.22,
+     1.0
+    ],
+    [
+     1.0,
+     1.0
+    ],
+    [
+     1.07,
+     1.0
+    ],
+    [
+     2.15,
+     1.0
+    ]
+   ],
+   "errors": [
+    0.8526,
+    0.748,
+    0.979,
+    0.7547
+   ]
+  },
+  {
+   "photo": "lacma-54904",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "method": "tiered",
+   "square_px": 35.691,
+   "staged_px": [
+    1352,
+    1400
+   ],
+   "suggested": [
+    [
+     243.2,
+     370.8
+    ],
+    [
+     1859.3,
+     383.2
+    ],
+    [
+     2061.3,
+     2138.3
+    ],
+    [
+     416.4,
+     2121.8
+    ]
+   ],
+   "confidence": 0.9219,
+   "detector_tier": 2,
+   "reason": "suggested",
+   "ring_mad_inliers": null,
+   "errors": [
+    7.7877,
+    11.4802,
+    7.492,
+    10.6849
+   ]
+  },
+  {
+   "photo": "lacma-54904",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "method": "tiered",
+   "square_px": 35.766,
+   "staged_px": [
+    1352,
+    1400
+   ],
+   "suggested": [
+    [
+     243.2,
+     370.8
+    ],
+    [
+     1859.3,
+     383.2
+    ],
+    [
+     2061.3,
+     2138.3
+    ],
+    [
+     416.4,
+     2121.8
+    ]
+   ],
+   "confidence": 0.9219,
+   "detector_tier": 2,
+   "reason": "suggested",
+   "ring_mad_inliers": null,
+   "errors": [
+    7.7474,
+    11.4335,
+    7.4489,
+    10.6445
+   ]
+  },
+  {
+   "photo": "lacma-54904",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "method": "backdrop_hull",
+   "square_px": 35.691,
+   "staged_px": [
+    1931,
+    2000
+   ],
+   "suggested": [
+    [
+     105.1,
+     133.5
+    ],
+    [
+     2190.5,
+     145.8
+    ],
+    [
+     2191.7,
+     2373.1
+    ],
+    [
+     126.1,
+     2366.9
+    ]
+   ],
+   "confidence": 0.9726,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     1.23,
+     1.0
+    ],
+    [
+     1.02,
+     1.0
+    ],
+    [
+     1.08,
+     1.0
+    ],
+    [
+     2.18,
+     1.0
+    ]
+   ],
+   "errors": [
+    0.1215,
+    0.0675,
+    0.0698,
+    0.0578
+   ]
+  },
+  {
+   "photo": "lacma-54904",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "method": "backdrop_hull",
+   "square_px": 35.766,
+   "staged_px": [
+    1931,
+    2000
+   ],
+   "suggested": [
+    [
+     105.1,
+     133.5
+    ],
+    [
+     2190.5,
+     145.8
+    ],
+    [
+     2191.7,
+     2373.1
+    ],
+    [
+     126.1,
+     2366.9
+    ]
+   ],
+   "confidence": 0.9726,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     1.23,
+     1.0
+    ],
+    [
+     1.02,
+     1.0
+    ],
+    [
+     1.08,
+     1.0
+    ],
+    [
+     2.18,
+     1.0
+    ]
+   ],
+   "errors": [
+    0.1147,
+    0.0539,
+    0.0623,
+    0.0297
+   ]
+  },
+  {
+   "photo": "lacma-54904",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "method": "backdrop_lines",
+   "square_px": 35.691,
+   "staged_px": [
+    1931,
+    2000
+   ],
+   "suggested": [
+    [
+     116.6,
+     159.4
+    ],
+    [
+     2169.3,
+     159.5
+    ],
+    [
+     2157.6,
+     2373.7
+    ],
+    [
+     149.0,
+     2352.4
+    ]
+   ],
+   "confidence": 0.9892,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     1.23,
+     1.0
+    ],
+    [
+     1.02,
+     1.0
+    ],
+    [
+     1.08,
+     1.0
+    ],
+    [
+     2.18,
+     1.0
+    ]
+   ],
+   "errors": [
+    0.8825,
+    0.7701,
+    0.9944,
+    0.796
+   ]
+  },
+  {
+   "photo": "lacma-54904",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "method": "backdrop_lines",
+   "square_px": 35.766,
+   "staged_px": [
+    1931,
+    2000
+   ],
+   "suggested": [
+    [
+     116.6,
+     159.4
+    ],
+    [
+     2169.3,
+     159.5
+    ],
+    [
+     2157.6,
+     2373.7
+    ],
+    [
+     149.0,
+     2352.4
+    ]
+   ],
+   "confidence": 0.9892,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     1.23,
+     1.0
+    ],
+    [
+     1.02,
+     1.0
+    ],
+    [
+     1.08,
+     1.0
+    ],
+    [
+     2.18,
+     1.0
+    ]
+   ],
+   "errors": [
+    0.8565,
+    0.7456,
+    0.9366,
+    0.7784
+   ]
+  },
+  {
+   "photo": "lacma-54904",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "method": "tiered",
+   "square_px": 35.691,
+   "staged_px": [
+    1931,
+    2000
+   ],
+   "suggested": [
+    [
+     243.2,
+     370.8
+    ],
+    [
+     1859.3,
+     383.2
+    ],
+    [
+     2061.3,
+     2138.3
+    ],
+    [
+     416.4,
+     2121.8
+    ]
+   ],
+   "confidence": 0.8283,
+   "detector_tier": 2,
+   "reason": "suggested",
+   "ring_mad_inliers": null,
+   "errors": [
+    7.7877,
+    11.4802,
+    7.492,
+    10.6849
+   ]
+  },
+  {
+   "photo": "lacma-54904",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "method": "tiered",
+   "square_px": 35.766,
+   "staged_px": [
+    1931,
+    2000
+   ],
+   "suggested": [
+    [
+     243.2,
+     370.8
+    ],
+    [
+     1859.3,
+     383.2
+    ],
+    [
+     2061.3,
+     2138.3
+    ],
+    [
+     416.4,
+     2121.8
+    ]
+   ],
+   "confidence": 0.8283,
+   "detector_tier": 2,
+   "reason": "suggested",
+   "ring_mad_inliers": null,
+   "errors": [
+    7.7474,
+    11.4335,
+    7.4489,
+    10.6445
+   ]
+  },
+  {
+   "photo": "lacma-60126",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "method": "backdrop_hull",
+   "square_px": 128.651,
+   "staged_px": [
+    1131,
+    1400
+   ],
+   "suggested": [
+    [
+     108.2,
+     64.4
+    ],
+    [
+     3237.8,
+     102.4
+    ],
+    [
+     3240.7,
+     4011.2
+    ],
+    [
+     117.0,
+     4008.2
+    ]
+   ],
+   "confidence": 0.9805,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     0.17,
+     0.988
+    ],
+    [
+     0.35,
+     1.0
+    ],
+    [
+     0.35,
+     0.991
+    ],
+    [
+     0.17,
+     0.945
+    ]
+   ],
+   "errors": [
+    0.1582,
+    0.0592,
+    0.0557,
+    0.0624
+   ]
+  },
+  {
+   "photo": "lacma-60126",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "method": "backdrop_hull",
+   "square_px": 128.446,
+   "staged_px": [
+    1131,
+    1400
+   ],
+   "suggested": [
+    [
+     108.2,
+     64.4
+    ],
+    [
+     3237.8,
+     102.4
+    ],
+    [
+     3240.7,
+     4011.2
+    ],
+    [
+     117.0,
+     4008.2
+    ]
+   ],
+   "confidence": 0.9805,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     0.17,
+     0.988
+    ],
+    [
+     0.35,
+     1.0
+    ],
+    [
+     0.35,
+     0.991
+    ],
+    [
+     0.17,
+     0.945
+    ]
+   ],
+   "errors": [
+    0.0666,
+    0.1175,
+    0.048,
+    0.1012
+   ]
+  },
+  {
+   "photo": "lacma-60126",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "method": "backdrop_lines",
+   "square_px": 128.651,
+   "staged_px": [
+    1131,
+    1400
+   ],
+   "suggested": [
+    [
+     81.8,
+     75.7
+    ],
+    [
+     3225.4,
+     135.6
+    ],
+    [
+     3246.9,
+     4000.4
+    ],
+    [
+     82.2,
+     4009.0
+    ]
+   ],
+   "confidence": 0.9895,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     0.17,
+     0.988
+    ],
+    [
+     0.35,
+     1.0
+    ],
+    [
+     0.35,
+     0.991
+    ],
+    [
+     0.17,
+     0.945
+    ]
+   ],
+   "errors": [
+    0.1168,
+    0.3261,
+    0.054,
+    0.2087
+   ]
+  },
+  {
+   "photo": "lacma-60126",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "method": "backdrop_lines",
+   "square_px": 128.446,
+   "staged_px": [
+    1131,
+    1400
+   ],
+   "suggested": [
+    [
+     81.8,
+     75.7
+    ],
+    [
+     3225.4,
+     135.6
+    ],
+    [
+     3246.9,
+     4000.4
+    ],
+    [
+     82.2,
+     4009.0
+    ]
+   ],
+   "confidence": 0.9895,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     0.17,
+     0.988
+    ],
+    [
+     0.35,
+     1.0
+    ],
+    [
+     0.35,
+     0.991
+    ],
+    [
+     0.17,
+     0.945
+    ]
+   ],
+   "errors": [
+    0.1774,
+    0.3316,
+    0.0585,
+    0.1702
+   ]
+  },
+  {
+   "photo": "lacma-60126",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "method": "tiered",
+   "square_px": 128.651,
+   "staged_px": [
+    1131,
+    1400
+   ],
+   "suggested": [
+    [
+     313.7,
+     218.5
+    ],
+    [
+     3117.0,
+     218.5
+    ],
+    [
+     3117.0,
+     3884.4
+    ],
+    [
+     313.7,
+     3884.4
+    ]
+   ],
+   "confidence": 0.8628,
+   "detector_tier": 2,
+   "reason": "suggested",
+   "ring_mad_inliers": null,
+   "errors": [
+    2.135,
+    1.3327,
+    1.3391,
+    1.8631
+   ]
+  },
+  {
+   "photo": "lacma-60126",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "method": "tiered",
+   "square_px": 128.446,
+   "staged_px": [
+    1131,
+    1400
+   ],
+   "suggested": [
+    [
+     313.7,
+     218.5
+    ],
+    [
+     3117.0,
+     218.5
+    ],
+    [
+     3117.0,
+     3884.4
+    ],
+    [
+     313.7,
+     3884.4
+    ]
+   ],
+   "confidence": 0.8628,
+   "detector_tier": 2,
+   "reason": "suggested",
+   "ring_mad_inliers": null,
+   "errors": [
+    2.0623,
+    1.2937,
+    1.3467,
+    1.8955
+   ]
+  },
+  {
+   "photo": "lacma-60126",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "method": "backdrop_hull",
+   "square_px": 128.651,
+   "staged_px": [
+    1615,
+    2000
+   ],
+   "suggested": [
+    [
+     108.6,
+     63.5
+    ],
+    [
+     3236.3,
+     100.4
+    ],
+    [
+     3238.4,
+     4012.0
+    ],
+    [
+     118.8,
+     4010.0
+    ]
+   ],
+   "confidence": 0.9796,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     0.17,
+     0.991
+    ],
+    [
+     0.35,
+     1.0
+    ],
+    [
+     0.35,
+     0.994
+    ],
+    [
+     0.17,
+     0.963
+    ]
+   ],
+   "errors": [
+    0.1602,
+    0.0417,
+    0.0657,
+    0.0766
+   ]
+  },
+  {
+   "photo": "lacma-60126",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "method": "backdrop_hull",
+   "square_px": 128.446,
+   "staged_px": [
+    1615,
+    2000
+   ],
+   "suggested": [
+    [
+     108.6,
+     63.5
+    ],
+    [
+     3236.3,
+     100.4
+    ],
+    [
+     3238.4,
+     4012.0
+    ],
+    [
+     118.8,
+     4010.0
+    ]
+   ],
+   "confidence": 0.9796,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     0.17,
+     0.991
+    ],
+    [
+     0.35,
+     1.0
+    ],
+    [
+     0.35,
+     0.994
+    ],
+    [
+     0.17,
+     0.963
+    ]
+   ],
+   "errors": [
+    0.0676,
+    0.0986,
+    0.0585,
+    0.1163
+   ]
+  },
+  {
+   "photo": "lacma-60126",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "method": "backdrop_lines",
+   "square_px": 128.651,
+   "staged_px": [
+    1615,
+    2000
+   ],
+   "suggested": [
+    [
+     81.8,
+     74.8
+    ],
+    [
+     3226.6,
+     137.2
+    ],
+    [
+     3245.3,
+     4000.2
+    ],
+    [
+     82.6,
+     4007.6
+    ]
+   ],
+   "confidence": 0.9895,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     0.17,
+     0.991
+    ],
+    [
+     0.35,
+     1.0
+    ],
+    [
+     0.35,
+     0.994
+    ],
+    [
+     0.17,
+     0.963
+    ]
+   ],
+   "errors": [
+    0.1102,
+    0.3358,
+    0.0447,
+    0.2058
+   ]
+  },
+  {
+   "photo": "lacma-60126",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "method": "backdrop_lines",
+   "square_px": 128.446,
+   "staged_px": [
+    1615,
+    2000
+   ],
+   "suggested": [
+    [
+     81.8,
+     74.8
+    ],
+    [
+     3226.6,
+     137.2
+    ],
+    [
+     3245.3,
+     4000.2
+    ],
+    [
+     82.6,
+     4007.6
+    ]
+   ],
+   "confidence": 0.9895,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     0.17,
+     0.991
+    ],
+    [
+     0.35,
+     1.0
+    ],
+    [
+     0.35,
+     0.994
+    ],
+    [
+     0.17,
+     0.963
+    ]
+   ],
+   "errors": [
+    0.1728,
+    0.3439,
+    0.0502,
+    0.167
+   ]
+  },
+  {
+   "photo": "lacma-60126",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "method": "tiered",
+   "square_px": 128.651,
+   "staged_px": [
+    1615,
+    2000
+   ],
+   "suggested": [
+    [
+     314.4,
+     218.5
+    ],
+    [
+     3116.6,
+     218.5
+    ],
+    [
+     3116.6,
+     3884.4
+    ],
+    [
+     314.4,
+     3884.4
+    ]
+   ],
+   "confidence": 0.8759,
+   "detector_tier": 2,
+   "reason": "suggested",
+   "ring_mad_inliers": null,
+   "errors": [
+    2.1391,
+    1.3348,
+    1.3413,
+    1.8675
+   ]
+  },
+  {
+   "photo": "lacma-60126",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "method": "tiered",
+   "square_px": 128.446,
+   "staged_px": [
+    1615,
+    2000
+   ],
+   "suggested": [
+    [
+     314.4,
+     218.5
+    ],
+    [
+     3116.6,
+     218.5
+    ],
+    [
+     3116.6,
+     3884.4
+    ],
+    [
+     314.4,
+     3884.4
+    ]
+   ],
+   "confidence": 0.8759,
+   "detector_tier": 2,
+   "reason": "suggested",
+   "ring_mad_inliers": null,
+   "errors": [
+    2.0663,
+    1.2958,
+    1.3489,
+    1.8999
+   ]
+  },
+  {
+   "photo": "lacma-63229",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "method": "backdrop_hull",
+   "square_px": 130.833,
+   "staged_px": [
+    1400,
+    1312
+   ],
+   "suggested": [
+    [
+     194.0,
+     42.8
+    ],
+    [
+     3814.3,
+     68.5
+    ],
+    [
+     3762.9,
+     3672.7
+    ],
+    [
+     136.9,
+     3684.1
+    ]
+   ],
+   "confidence": 0.9684,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     0.0,
+     0.948
+    ],
+    [
+     0.0,
+     0.944
+    ],
+    [
+     0.0,
+     1.0
+    ],
+    [
+     0.0,
+     1.0
+    ]
+   ],
+   "errors": [
+    0.0246,
+    0.0424,
+    0.0237,
+    0.0007
+   ]
+  },
+  {
+   "photo": "lacma-63229",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "method": "backdrop_hull",
+   "square_px": 130.714,
+   "staged_px": [
+    1400,
+    1312
+   ],
+   "suggested": [
+    [
+     194.0,
+     42.8
+    ],
+    [
+     3814.3,
+     68.5
+    ],
+    [
+     3762.9,
+     3672.7
+    ],
+    [
+     136.9,
+     3684.1
+    ]
+   ],
+   "confidence": 0.9684,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     0.0,
+     0.948
+    ],
+    [
+     0.0,
+     0.944
+    ],
+    [
+     0.0,
+     1.0
+    ],
+    [
+     0.0,
+     1.0
+    ]
+   ],
+   "errors": [
+    0.0454,
+    0.0344,
+    0.039,
+    0.0108
+   ]
+  },
+  {
+   "photo": "lacma-63229",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "method": "backdrop_lines",
+   "square_px": 130.833,
+   "staged_px": [
+    1400,
+    1312
+   ],
+   "suggested": [
+    [
+     199.3,
+     94.4
+    ],
+    [
+     3923.0,
+     94.0
+    ],
+    [
+     3794.3,
+     3663.3
+    ],
+    [
+     87.3,
+     3666.9
+    ]
+   ],
+   "confidence": 0.9841,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     0.0,
+     0.948
+    ],
+    [
+     0.0,
+     0.944
+    ],
+    [
+     0.0,
+     1.0
+    ],
+    [
+     0.0,
+     1.0
+    ]
+   ],
+   "errors": [
+    0.3901,
+    0.8863,
+    0.2289,
+    0.4018
+   ]
+  },
+  {
+   "photo": "lacma-63229",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "method": "backdrop_lines",
+   "square_px": 130.714,
+   "staged_px": [
+    1400,
+    1312
+   ],
+   "suggested": [
+    [
+     199.3,
+     94.4
+    ],
+    [
+     3923.0,
+     94.0
+    ],
+    [
+     3794.3,
+     3663.3
+    ],
+    [
+     87.3,
+     3666.9
+    ]
+   ],
+   "confidence": 0.9841,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     0.0,
+     0.948
+    ],
+    [
+     0.0,
+     0.944
+    ],
+    [
+     0.0,
+     1.0
+    ],
+    [
+     0.0,
+     1.0
+    ]
+   ],
+   "errors": [
+    0.3782,
+    0.8649,
+    0.2147,
+    0.4119
+   ]
+  },
+  {
+   "photo": "lacma-63229",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "method": "tiered",
+   "square_px": 130.833,
+   "staged_px": [
+    1400,
+    1312
+   ],
+   "suggested": [
+    [
+     579.1,
+     439.7
+    ],
+    [
+     3468.1,
+     459.7
+    ],
+    [
+     3374.9,
+     3297.7
+    ],
+    [
+     512.6,
+     3304.3
+    ]
+   ],
+   "confidence": 0.9626,
+   "detector_tier": 2,
+   "reason": "suggested",
+   "ring_mad_inliers": null,
+   "errors": [
+    4.2365,
+    4.0018,
+    4.1431,
+    4.0819
+   ]
+  },
+  {
+   "photo": "lacma-63229",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "method": "tiered",
+   "square_px": 130.714,
+   "staged_px": [
+    1400,
+    1312
+   ],
+   "suggested": [
+    [
+     579.1,
+     439.7
+    ],
+    [
+     3468.1,
+     459.7
+    ],
+    [
+     3374.9,
+     3297.7
+    ],
+    [
+     512.6,
+     3304.3
+    ]
+   ],
+   "confidence": 0.9626,
+   "detector_tier": 2,
+   "reason": "suggested",
+   "ring_mad_inliers": null,
+   "errors": [
+    4.2401,
+    4.0205,
+    4.1579,
+    4.0857
+   ]
+  },
+  {
+   "photo": "lacma-63229",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "method": "backdrop_hull",
+   "square_px": 130.833,
+   "staged_px": [
+    2000,
+    1875
+   ],
+   "suggested": [
+    [
+     191.7,
+     45.9
+    ],
+    [
+     3812.3,
+     65.9
+    ],
+    [
+     3762.3,
+     3674.1
+    ],
+    [
+     135.8,
+     3682.1
+    ]
+   ],
+   "confidence": 0.9681,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     0.0,
+     0.946
+    ],
+    [
+     0.0,
+     0.939
+    ],
+    [
+     0.0,
+     1.0
+    ],
+    [
+     0.0,
+     1.0
+    ]
+   ],
+   "errors": [
+    0.0157,
+    0.0174,
+    0.0292,
+    0.0172
+   ]
+  },
+  {
+   "photo": "lacma-63229",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "method": "backdrop_hull",
+   "square_px": 130.714,
+   "staged_px": [
+    2000,
+    1875
+   ],
+   "suggested": [
+    [
+     191.7,
+     45.9
+    ],
+    [
+     3812.3,
+     65.9
+    ],
+    [
+     3762.3,
+     3674.1
+    ],
+    [
+     135.8,
+     3682.1
+    ]
+   ],
+   "confidence": 0.9681,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     0.0,
+     0.946
+    ],
+    [
+     0.0,
+     0.939
+    ],
+    [
+     0.0,
+     1.0
+    ],
+    [
+     0.0,
+     1.0
+    ]
+   ],
+   "errors": [
+    0.0208,
+    0.0196,
+    0.0441,
+    0.0279
+   ]
+  },
+  {
+   "photo": "lacma-63229",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "method": "backdrop_lines",
+   "square_px": 130.833,
+   "staged_px": [
+    2000,
+    1875
+   ],
+   "suggested": [
+    [
+     200.0,
+     97.4
+    ],
+    [
+     3923.2,
+     91.9
+    ],
+    [
+     3794.3,
+     3663.2
+    ],
+    [
+     87.1,
+     3667.2
+    ]
+   ],
+   "confidence": 0.984,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     0.0,
+     0.946
+    ],
+    [
+     0.0,
+     0.939
+    ],
+    [
+     0.0,
+     1.0
+    ],
+    [
+     0.0,
+     1.0
+    ]
+   ],
+   "errors": [
+    0.4141,
+    0.884,
+    0.2287,
+    0.4025
+   ]
+  },
+  {
+   "photo": "lacma-63229",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "method": "backdrop_lines",
+   "square_px": 130.714,
+   "staged_px": [
+    2000,
+    1875
+   ],
+   "suggested": [
+    [
+     200.0,
+     97.4
+    ],
+    [
+     3923.2,
+     91.9
+    ],
+    [
+     3794.3,
+     3663.2
+    ],
+    [
+     87.1,
+     3667.2
+    ]
+   ],
+   "confidence": 0.984,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     0.0,
+     0.946
+    ],
+    [
+     0.0,
+     0.939
+    ],
+    [
+     0.0,
+     1.0
+    ],
+    [
+     0.0,
+     1.0
+    ]
+   ],
+   "errors": [
+    0.4023,
+    0.8625,
+    0.2145,
+    0.4126
+   ]
+  },
+  {
+   "photo": "lacma-63229",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "method": "tiered",
+   "square_px": 130.833,
+   "staged_px": [
+    2000,
+    1875
+   ],
+   "suggested": [
+    [
+     579.1,
+     439.7
+    ],
+    [
+     3468.1,
+     459.7
+    ],
+    [
+     3374.9,
+     3297.7
+    ],
+    [
+     512.6,
+     3304.3
+    ]
+   ],
+   "confidence": 0.9635,
+   "detector_tier": 2,
+   "reason": "suggested",
+   "ring_mad_inliers": null,
+   "errors": [
+    4.2365,
+    4.0018,
+    4.1431,
+    4.0819
+   ]
+  },
+  {
+   "photo": "lacma-63229",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "method": "tiered",
+   "square_px": 130.714,
+   "staged_px": [
+    2000,
+    1875
+   ],
+   "suggested": [
+    [
+     579.1,
+     439.7
+    ],
+    [
+     3468.1,
+     459.7
+    ],
+    [
+     3374.9,
+     3297.7
+    ],
+    [
+     512.6,
+     3304.3
+    ]
+   ],
+   "confidence": 0.9635,
+   "detector_tier": 2,
+   "reason": "suggested",
+   "ring_mad_inliers": null,
+   "errors": [
+    4.2401,
+    4.0205,
+    4.1579,
+    4.0857
+   ]
+  },
+  {
+   "photo": "lacma-63267",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "method": "backdrop_hull",
+   "square_px": 166.598,
+   "staged_px": [
+    1162,
+    1400
+   ],
+   "suggested": [
+    [
+     93.6,
+     146.3
+    ],
+    [
+     3337.6,
+     134.6
+    ],
+    [
+     3311.2,
+     3926.3
+    ],
+    [
+     81.9,
+     3938.0
+    ]
+   ],
+   "confidence": 0.9824,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     0.34,
+     1.0
+    ],
+    [
+     0.17,
+     1.0
+    ],
+    [
+     0.69,
+     0.937
+    ],
+    [
+     0.52,
+     0.965
+    ]
+   ],
+   "errors": [
+    0.1368,
+    0.0532,
+    0.1769,
+    0.0531
+   ]
+  },
+  {
+   "photo": "lacma-63267",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "method": "backdrop_hull",
+   "square_px": 166.6,
+   "staged_px": [
+    1162,
+    1400
+   ],
+   "suggested": [
+    [
+     93.6,
+     146.3
+    ],
+    [
+     3337.6,
+     134.6
+    ],
+    [
+     3311.2,
+     3926.3
+    ],
+    [
+     81.9,
+     3938.0
+    ]
+   ],
+   "confidence": 0.9824,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     0.34,
+     1.0
+    ],
+    [
+     0.17,
+     1.0
+    ],
+    [
+     0.69,
+     0.937
+    ],
+    [
+     0.52,
+     0.965
+    ]
+   ],
+   "errors": [
+    0.1697,
+    0.0503,
+    0.1839,
+    0.1195
+   ]
+  },
+  {
+   "photo": "lacma-63267",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "method": "backdrop_lines",
+   "square_px": 166.598,
+   "staged_px": [
+    1162,
+    1400
+   ],
+   "suggested": [
+    [
+     43.6,
+     143.6
+    ],
+    [
+     3336.4,
+     116.9
+    ],
+    [
+     3314.5,
+     3965.9
+    ],
+    [
+     115.3,
+     3947.9
+    ]
+   ],
+   "confidence": 0.9896,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     0.34,
+     1.0
+    ],
+    [
+     0.17,
+     1.0
+    ],
+    [
+     0.69,
+     0.937
+    ],
+    [
+     0.52,
+     0.965
+    ]
+   ],
+   "errors": [
+    0.2378,
+    0.0641,
+    0.0684,
+    0.2502
+   ]
+  },
+  {
+   "photo": "lacma-63267",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "method": "backdrop_lines",
+   "square_px": 166.6,
+   "staged_px": [
+    1162,
+    1400
+   ],
+   "suggested": [
+    [
+     43.6,
+     143.6
+    ],
+    [
+     3336.4,
+     116.9
+    ],
+    [
+     3314.5,
+     3965.9
+    ],
+    [
+     115.3,
+     3947.9
+    ]
+   ],
+   "confidence": 0.9896,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     0.34,
+     1.0
+    ],
+    [
+     0.17,
+     1.0
+    ],
+    [
+     0.69,
+     0.937
+    ],
+    [
+     0.52,
+     0.965
+    ]
+   ],
+   "errors": [
+    0.2191,
+    0.0625,
+    0.0791,
+    0.296
+   ]
+  },
+  {
+   "photo": "lacma-63267",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "method": "tiered",
+   "square_px": 166.598,
+   "staged_px": [
+    1162,
+    1400
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "tier 3, the full frame",
+   "ring_mad_inliers": null,
+   "errors": null
+  },
+  {
+   "photo": "lacma-63267",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "method": "tiered",
+   "square_px": 166.6,
+   "staged_px": [
+    1162,
+    1400
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "tier 3, the full frame",
+   "ring_mad_inliers": null,
+   "errors": null
+  },
+  {
+   "photo": "lacma-63267",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "method": "backdrop_hull",
+   "square_px": 166.598,
+   "staged_px": [
+    1660,
+    2000
+   ],
+   "suggested": [
+    [
+     94.2,
+     145.4
+    ],
+    [
+     3333.5,
+     131.1
+    ],
+    [
+     3311.0,
+     3926.0
+    ],
+    [
+     86.0,
+     3940.4
+    ]
+   ],
+   "confidence": 0.9829,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     0.35,
+     1.0
+    ],
+    [
+     0.17,
+     1.0
+    ],
+    [
+     0.69,
+     0.939
+    ],
+    [
+     0.52,
+     0.965
+    ]
+   ],
+   "errors": [
+    0.1348,
+    0.0246,
+    0.179,
+    0.0727
+   ]
+  },
+  {
+   "photo": "lacma-63267",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "method": "backdrop_hull",
+   "square_px": 166.6,
+   "staged_px": [
+    1660,
+    2000
+   ],
+   "suggested": [
+    [
+     94.2,
+     145.4
+    ],
+    [
+     3333.5,
+     131.1
+    ],
+    [
+     3311.0,
+     3926.0
+    ],
+    [
+     86.0,
+     3940.4
+    ]
+   ],
+   "confidence": 0.9829,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     0.35,
+     1.0
+    ],
+    [
+     0.17,
+     1.0
+    ],
+    [
+     0.69,
+     0.939
+    ],
+    [
+     0.52,
+     0.965
+    ]
+   ],
+   "errors": [
+    0.1681,
+    0.0246,
+    0.1862,
+    0.1333
+   ]
+  },
+  {
+   "photo": "lacma-63267",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "method": "backdrop_lines",
+   "square_px": 166.598,
+   "staged_px": [
+    1660,
+    2000
+   ],
+   "suggested": [
+    [
+     44.0,
+     143.8
+    ],
+    [
+     3335.3,
+     116.9
+    ],
+    [
+     3313.1,
+     3965.1
+    ],
+    [
+     115.6,
+     3947.2
+    ]
+   ],
+   "confidence": 0.9896,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     0.35,
+     1.0
+    ],
+    [
+     0.17,
+     1.0
+    ],
+    [
+     0.69,
+     0.939
+    ],
+    [
+     0.52,
+     0.965
+    ]
+   ],
+   "errors": [
+    0.236,
+    0.0621,
+    0.0674,
+    0.2514
+   ]
+  },
+  {
+   "photo": "lacma-63267",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "method": "backdrop_lines",
+   "square_px": 166.6,
+   "staged_px": [
+    1660,
+    2000
+   ],
+   "suggested": [
+    [
+     44.0,
+     143.8
+    ],
+    [
+     3335.3,
+     116.9
+    ],
+    [
+     3313.1,
+     3965.1
+    ],
+    [
+     115.6,
+     3947.2
+    ]
+   ],
+   "confidence": 0.9896,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     0.35,
+     1.0
+    ],
+    [
+     0.17,
+     1.0
+    ],
+    [
+     0.69,
+     0.939
+    ],
+    [
+     0.52,
+     0.965
+    ]
+   ],
+   "errors": [
+    0.2176,
+    0.061,
+    0.0808,
+    0.298
+   ]
+  },
+  {
+   "photo": "lacma-63267",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "method": "tiered",
+   "square_px": 166.598,
+   "staged_px": [
+    1660,
+    2000
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "tier 3, the full frame",
+   "ring_mad_inliers": null,
+   "errors": null
+  },
+  {
+   "photo": "lacma-63267",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "method": "tiered",
+   "square_px": 166.6,
+   "staged_px": [
+    1660,
+    2000
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "tier 3, the full frame",
+   "ring_mad_inliers": null,
+   "errors": null
+  },
+  {
+   "photo": "smithsonian-chndm-1973-45-1",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "method": "backdrop_hull",
+   "square_px": 154.639,
+   "staged_px": [
+    1262,
+    1400
+   ],
+   "suggested": [
+    [
+     301.7,
+     415.8
+    ],
+    [
+     9957.6,
+     358.8
+    ],
+    [
+     9916.9,
+     10876.9
+    ],
+    [
+     367.0,
+     11186.7
+    ]
+   ],
+   "confidence": 0.9745,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     0.26,
+     1.0
+    ],
+    [
+     0.52,
+     1.0
+    ],
+    [
+     0.37,
+     1.0
+    ],
+    [
+     0.35,
+     1.0
+    ]
+   ],
+   "errors": [
+    0.5352,
+    0.2328,
+    0.9529,
+    0.1172
+   ]
+  },
+  {
+   "photo": "smithsonian-chndm-1973-45-1",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "method": "backdrop_hull",
+   "square_px": 154.62,
+   "staged_px": [
+    1262,
+    1400
+   ],
+   "suggested": [
+    [
+     301.7,
+     415.8
+    ],
+    [
+     9957.6,
+     358.8
+    ],
+    [
+     9916.9,
+     10876.9
+    ],
+    [
+     367.0,
+     11186.7
+    ]
+   ],
+   "confidence": 0.9745,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     0.26,
+     1.0
+    ],
+    [
+     0.52,
+     1.0
+    ],
+    [
+     0.37,
+     1.0
+    ],
+    [
+     0.35,
+     1.0
+    ]
+   ],
+   "errors": [
+    0.6124,
+    0.2658,
+    1.0171,
+    0.1426
+   ]
+  },
+  {
+   "photo": "smithsonian-chndm-1973-45-1",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "method": "backdrop_lines",
+   "square_px": 154.639,
+   "staged_px": [
+    1262,
+    1400
+   ],
+   "suggested": [
+    [
+     347.9,
+     300.4
+    ],
+    [
+     9972.1,
+     244.9
+    ],
+    [
+     9996.3,
+     11073.8
+    ],
+    [
+     406.2,
+     11163.2
+    ]
+   ],
+   "confidence": 0.9926,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     0.26,
+     1.0
+    ],
+    [
+     0.52,
+     1.0
+    ],
+    [
+     0.37,
+     1.0
+    ],
+    [
+     0.35,
+     1.0
+    ]
+   ],
+   "errors": [
+    0.4701,
+    0.6451,
+    0.4258,
+    0.4113
+   ]
+  },
+  {
+   "photo": "smithsonian-chndm-1973-45-1",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "method": "backdrop_lines",
+   "square_px": 154.62,
+   "staged_px": [
+    1262,
+    1400
+   ],
+   "suggested": [
+    [
+     347.9,
+     300.4
+    ],
+    [
+     9972.1,
+     244.9
+    ],
+    [
+     9996.3,
+     11073.8
+    ],
+    [
+     406.2,
+     11163.2
+    ]
+   ],
+   "confidence": 0.9926,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     0.26,
+     1.0
+    ],
+    [
+     0.52,
+     1.0
+    ],
+    [
+     0.37,
+     1.0
+    ],
+    [
+     0.35,
+     1.0
+    ]
+   ],
+   "errors": [
+    0.4978,
+    0.559,
+    0.36,
+    0.4201
+   ]
+  },
+  {
+   "photo": "smithsonian-chndm-1973-45-1",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "method": "tiered",
+   "square_px": 154.639,
+   "staged_px": [
+    1262,
+    1400
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "tier 3, the full frame",
+   "ring_mad_inliers": null,
+   "errors": null
+  },
+  {
+   "photo": "smithsonian-chndm-1973-45-1",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "method": "tiered",
+   "square_px": 154.62,
+   "staged_px": [
+    1262,
+    1400
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "tier 3, the full frame",
+   "ring_mad_inliers": null,
+   "errors": null
+  },
+  {
+   "photo": "smithsonian-chndm-1973-45-1",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "method": "backdrop_hull",
+   "square_px": 154.639,
+   "staged_px": [
+    1803,
+    2000
+   ],
+   "suggested": [
+    [
+     296.8,
+     410.9
+    ],
+    [
+     9966.6,
+     365.3
+    ],
+    [
+     9903.8,
+     10872.8
+    ],
+    [
+     365.3,
+     11181.0
+    ]
+   ],
+   "confidence": 0.9748,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     0.26,
+     1.0
+    ],
+    [
+     0.54,
+     1.0
+    ],
+    [
+     0.39,
+     1.0
+    ],
+    [
+     0.32,
+     1.0
+    ]
+   ],
+   "errors": [
+    0.498,
+    0.2088,
+    1.0148,
+    0.1259
+   ]
+  },
+  {
+   "photo": "smithsonian-chndm-1973-45-1",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "method": "backdrop_hull",
+   "square_px": 154.62,
+   "staged_px": [
+    1803,
+    2000
+   ],
+   "suggested": [
+    [
+     296.8,
+     410.9
+    ],
+    [
+     9966.6,
+     365.3
+    ],
+    [
+     9903.8,
+     10872.8
+    ],
+    [
+     365.3,
+     11181.0
+    ]
+   ],
+   "confidence": 0.9748,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     0.26,
+     1.0
+    ],
+    [
+     0.54,
+     1.0
+    ],
+    [
+     0.39,
+     1.0
+    ],
+    [
+     0.32,
+     1.0
+    ]
+   ],
+   "errors": [
+    0.5735,
+    0.2635,
+    1.078,
+    0.134
+   ]
+  },
+  {
+   "photo": "smithsonian-chndm-1973-45-1",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "method": "backdrop_lines",
+   "square_px": 154.639,
+   "staged_px": [
+    1803,
+    2000
+   ],
+   "suggested": [
+    [
+     342.2,
+     296.4
+    ],
+    [
+     9964.1,
+     233.3
+    ],
+    [
+     9990.6,
+     11063.8
+    ],
+    [
+     400.2,
+     11155.3
+    ]
+   ],
+   "confidence": 0.9926,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     0.26,
+     1.0
+    ],
+    [
+     0.54,
+     1.0
+    ],
+    [
+     0.39,
+     1.0
+    ],
+    [
+     0.32,
+     1.0
+    ]
+   ],
+   "errors": [
+    0.4516,
+    0.7288,
+    0.3544,
+    0.4059
+   ]
+  },
+  {
+   "photo": "smithsonian-chndm-1973-45-1",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "method": "backdrop_lines",
+   "square_px": 154.62,
+   "staged_px": [
+    1803,
+    2000
+   ],
+   "suggested": [
+    [
+     342.2,
+     296.4
+    ],
+    [
+     9964.1,
+     233.3
+    ],
+    [
+     9990.6,
+     11063.8
+    ],
+    [
+     400.2,
+     11155.3
+    ]
+   ],
+   "confidence": 0.9926,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     0.26,
+     1.0
+    ],
+    [
+     0.54,
+     1.0
+    ],
+    [
+     0.39,
+     1.0
+    ],
+    [
+     0.32,
+     1.0
+    ]
+   ],
+   "errors": [
+    0.4724,
+    0.6426,
+    0.2885,
+    0.4052
+   ]
+  },
+  {
+   "photo": "smithsonian-chndm-1973-45-1",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "method": "tiered",
+   "square_px": 154.639,
+   "staged_px": [
+    1803,
+    2000
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "tier 3, the full frame",
+   "ring_mad_inliers": null,
+   "errors": null
+  },
+  {
+   "photo": "smithsonian-chndm-1973-45-1",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "method": "tiered",
+   "square_px": 154.62,
+   "staged_px": [
+    1803,
+    2000
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "tier 3, the full frame",
+   "ring_mad_inliers": null,
+   "errors": null
+  },
+  {
+   "photo": "smithsonian-saam-1998-149-21",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "method": "backdrop_hull",
+   "square_px": 112.674,
+   "staged_px": [
+    1400,
+    1264
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "no backdrop: under 2 uniform ring sides",
+   "ring_mad_inliers": [
+    [
+     0.0,
+     0.801
+    ],
+    [
+     0.0,
+     0.943
+    ],
+    [
+     0.0,
+     0.899
+    ],
+    [
+     0.0,
+     0.851
+    ]
+   ],
+   "errors": null
+  },
+  {
+   "photo": "smithsonian-saam-1998-149-21",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "method": "backdrop_hull",
+   "square_px": 112.865,
+   "staged_px": [
+    1400,
+    1264
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "no backdrop: under 2 uniform ring sides",
+   "ring_mad_inliers": [
+    [
+     0.0,
+     0.801
+    ],
+    [
+     0.0,
+     0.943
+    ],
+    [
+     0.0,
+     0.899
+    ],
+    [
+     0.0,
+     0.851
+    ]
+   ],
+   "errors": null
+  },
+  {
+   "photo": "smithsonian-saam-1998-149-21",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "method": "backdrop_lines",
+   "square_px": 112.674,
+   "staged_px": [
+    1400,
+    1264
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "no backdrop: under 2 uniform ring sides",
+   "ring_mad_inliers": [
+    [
+     0.0,
+     0.801
+    ],
+    [
+     0.0,
+     0.943
+    ],
+    [
+     0.0,
+     0.899
+    ],
+    [
+     0.0,
+     0.851
+    ]
+   ],
+   "errors": null
+  },
+  {
+   "photo": "smithsonian-saam-1998-149-21",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "method": "backdrop_lines",
+   "square_px": 112.865,
+   "staged_px": [
+    1400,
+    1264
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "no backdrop: under 2 uniform ring sides",
+   "ring_mad_inliers": [
+    [
+     0.0,
+     0.801
+    ],
+    [
+     0.0,
+     0.943
+    ],
+    [
+     0.0,
+     0.899
+    ],
+    [
+     0.0,
+     0.851
+    ]
+   ],
+   "errors": null
+  },
+  {
+   "photo": "smithsonian-saam-1998-149-21",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "method": "tiered",
+   "square_px": 112.674,
+   "staged_px": [
+    1400,
+    1264
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "tier 3, the full frame",
+   "ring_mad_inliers": null,
+   "errors": null
+  },
+  {
+   "photo": "smithsonian-saam-1998-149-21",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "method": "tiered",
+   "square_px": 112.865,
+   "staged_px": [
+    1400,
+    1264
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "tier 3, the full frame",
+   "ring_mad_inliers": null,
+   "errors": null
+  },
+  {
+   "photo": "smithsonian-saam-1998-149-21",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "method": "backdrop_hull",
+   "square_px": 112.674,
+   "staged_px": [
+    2000,
+    1806
+   ],
+   "suggested": [
+    [
+     54.0,
+     27.0
+    ],
+    [
+     2974.5,
+     58.5
+    ],
+    [
+     2946.0,
+     2661.0
+    ],
+    [
+     22.5,
+     2629.5
+    ]
+   ],
+   "confidence": 0.9879,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     0.0,
+     0.804
+    ],
+    [
+     0.0,
+     0.944
+    ],
+    [
+     0.0,
+     0.9
+    ],
+    [
+     0.0,
+     0.854
+    ]
+   ],
+   "errors": [
+    0.0089,
+    0.0314,
+    0.0444,
+    0.0618
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-1998-149-21",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "method": "backdrop_hull",
+   "square_px": 112.865,
+   "staged_px": [
+    2000,
+    1806
+   ],
+   "suggested": [
+    [
+     54.0,
+     27.0
+    ],
+    [
+     2974.5,
+     58.5
+    ],
+    [
+     2946.0,
+     2661.0
+    ],
+    [
+     22.5,
+     2629.5
+    ]
+   ],
+   "confidence": 0.9879,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     0.0,
+     0.804
+    ],
+    [
+     0.0,
+     0.944
+    ],
+    [
+     0.0,
+     0.9
+    ],
+    [
+     0.0,
+     0.854
+    ]
+   ],
+   "errors": [
+    0.0089,
+    0.0188,
+    0.0443,
+    0.0258
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-1998-149-21",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "method": "backdrop_lines",
+   "square_px": 112.674,
+   "staged_px": [
+    2000,
+    1806
+   ],
+   "suggested": [
+    [
+     81.0,
+     26.4
+    ],
+    [
+     2970.3,
+     63.3
+    ],
+    [
+     2926.8,
+     2665.2
+    ],
+    [
+     35.6,
+     2627.3
+    ]
+   ],
+   "confidence": 0.9944,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     0.0,
+     0.804
+    ],
+    [
+     0.0,
+     0.944
+    ],
+    [
+     0.0,
+     0.9
+    ],
+    [
+     0.0,
+     0.854
+    ]
+   ],
+   "errors": [
+    0.2309,
+    0.0254,
+    0.1613,
+    0.1017
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-1998-149-21",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "method": "backdrop_lines",
+   "square_px": 112.865,
+   "staged_px": [
+    2000,
+    1806
+   ],
+   "suggested": [
+    [
+     81.0,
+     26.4
+    ],
+    [
+     2970.3,
+     63.3
+    ],
+    [
+     2926.8,
+     2665.2
+    ],
+    [
+     35.6,
+     2627.3
+    ]
+   ],
+   "confidence": 0.9944,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     0.0,
+     0.804
+    ],
+    [
+     0.0,
+     0.944
+    ],
+    [
+     0.0,
+     0.9
+    ],
+    [
+     0.0,
+     0.854
+    ]
+   ],
+   "errors": [
+    0.2305,
+    0.0608,
+    0.1436,
+    0.0998
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-1998-149-21",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "method": "tiered",
+   "square_px": 112.674,
+   "staged_px": [
+    2000,
+    1806
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "tier 3, the full frame",
+   "ring_mad_inliers": null,
+   "errors": null
+  },
+  {
+   "photo": "smithsonian-saam-1998-149-21",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "method": "tiered",
+   "square_px": 112.865,
+   "staged_px": [
+    2000,
+    1806
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "tier 3, the full frame",
+   "ring_mad_inliers": null,
+   "errors": null
+  },
+  {
+   "photo": "smithsonian-saam-2013-67-17",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "method": "backdrop_hull",
+   "square_px": 135.77,
+   "staged_px": [
+    1252,
+    1400
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "no backdrop: under 2 uniform ring sides",
+   "ring_mad_inliers": [
+    [
+     0.72,
+     0.896
+    ],
+    [
+     4.61,
+     0.637
+    ],
+    [
+     2.6,
+     0.729
+    ],
+    [
+     3.0,
+     0.716
+    ]
+   ],
+   "errors": null
+  },
+  {
+   "photo": "smithsonian-saam-2013-67-17",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "method": "backdrop_hull",
+   "square_px": 135.823,
+   "staged_px": [
+    1252,
+    1400
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "no backdrop: under 2 uniform ring sides",
+   "ring_mad_inliers": [
+    [
+     0.72,
+     0.896
+    ],
+    [
+     4.61,
+     0.637
+    ],
+    [
+     2.6,
+     0.729
+    ],
+    [
+     3.0,
+     0.716
+    ]
+   ],
+   "errors": null
+  },
+  {
+   "photo": "smithsonian-saam-2013-67-17",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "method": "backdrop_lines",
+   "square_px": 135.77,
+   "staged_px": [
+    1252,
+    1400
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "no backdrop: under 2 uniform ring sides",
+   "ring_mad_inliers": [
+    [
+     0.72,
+     0.896
+    ],
+    [
+     4.61,
+     0.637
+    ],
+    [
+     2.6,
+     0.729
+    ],
+    [
+     3.0,
+     0.716
+    ]
+   ],
+   "errors": null
+  },
+  {
+   "photo": "smithsonian-saam-2013-67-17",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "method": "backdrop_lines",
+   "square_px": 135.823,
+   "staged_px": [
+    1252,
+    1400
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "no backdrop: under 2 uniform ring sides",
+   "ring_mad_inliers": [
+    [
+     0.72,
+     0.896
+    ],
+    [
+     4.61,
+     0.637
+    ],
+    [
+     2.6,
+     0.729
+    ],
+    [
+     3.0,
+     0.716
+    ]
+   ],
+   "errors": null
+  },
+  {
+   "photo": "smithsonian-saam-2013-67-17",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "method": "tiered",
+   "square_px": 135.77,
+   "staged_px": [
+    1252,
+    1400
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "tier 3, the full frame",
+   "ring_mad_inliers": null,
+   "errors": null
+  },
+  {
+   "photo": "smithsonian-saam-2013-67-17",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "method": "tiered",
+   "square_px": 135.823,
+   "staged_px": [
+    1252,
+    1400
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "tier 3, the full frame",
+   "ring_mad_inliers": null,
+   "errors": null
+  },
+  {
+   "photo": "smithsonian-saam-2013-67-17",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "method": "backdrop_hull",
+   "square_px": 135.77,
+   "staged_px": [
+    1789,
+    2000
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "no backdrop: under 2 uniform ring sides",
+   "ring_mad_inliers": [
+    [
+     0.76,
+     0.897
+    ],
+    [
+     4.59,
+     0.636
+    ],
+    [
+     2.63,
+     0.733
+    ],
+    [
+     2.97,
+     0.716
+    ]
+   ],
+   "errors": null
+  },
+  {
+   "photo": "smithsonian-saam-2013-67-17",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "method": "backdrop_hull",
+   "square_px": 135.823,
+   "staged_px": [
+    1789,
+    2000
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "no backdrop: under 2 uniform ring sides",
+   "ring_mad_inliers": [
+    [
+     0.76,
+     0.897
+    ],
+    [
+     4.59,
+     0.636
+    ],
+    [
+     2.63,
+     0.733
+    ],
+    [
+     2.97,
+     0.716
+    ]
+   ],
+   "errors": null
+  },
+  {
+   "photo": "smithsonian-saam-2013-67-17",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "method": "backdrop_lines",
+   "square_px": 135.77,
+   "staged_px": [
+    1789,
+    2000
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "no backdrop: under 2 uniform ring sides",
+   "ring_mad_inliers": [
+    [
+     0.76,
+     0.897
+    ],
+    [
+     4.59,
+     0.636
+    ],
+    [
+     2.63,
+     0.733
+    ],
+    [
+     2.97,
+     0.716
+    ]
+   ],
+   "errors": null
+  },
+  {
+   "photo": "smithsonian-saam-2013-67-17",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "method": "backdrop_lines",
+   "square_px": 135.823,
+   "staged_px": [
+    1789,
+    2000
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "no backdrop: under 2 uniform ring sides",
+   "ring_mad_inliers": [
+    [
+     0.76,
+     0.897
+    ],
+    [
+     4.59,
+     0.636
+    ],
+    [
+     2.63,
+     0.733
+    ],
+    [
+     2.97,
+     0.716
+    ]
+   ],
+   "errors": null
+  },
+  {
+   "photo": "smithsonian-saam-2013-67-17",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "method": "tiered",
+   "square_px": 135.77,
+   "staged_px": [
+    1789,
+    2000
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "tier 3, the full frame",
+   "ring_mad_inliers": null,
+   "errors": null
+  },
+  {
+   "photo": "smithsonian-saam-2013-67-17",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "method": "tiered",
+   "square_px": 135.823,
+   "staged_px": [
+    1789,
+    2000
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "tier 3, the full frame",
+   "ring_mad_inliers": null,
+   "errors": null
+  },
+  {
+   "photo": "smithsonian-saam-2013-67-9",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "method": "backdrop_hull",
+   "square_px": 124.929,
+   "staged_px": [
+    1400,
+    1140
+   ],
+   "suggested": [
+    [
+     64.3,
+     23.6
+    ],
+    [
+     2856.4,
+     32.1
+    ],
+    [
+     2950.7,
+     2400.1
+    ],
+    [
+     75.0,
+     2383.0
+    ]
+   ],
+   "confidence": 0.9781,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     1.01,
+     0.924
+    ],
+    [
+     2.35,
+     0.746
+    ],
+    [
+     1.82,
+     0.999
+    ],
+    [
+     1.64,
+     0.988
+    ]
+   ],
+   "errors": [
+    0.0214,
+    0.0217,
+    0.0104,
+    0.0253
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-2013-67-9",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "method": "backdrop_hull",
+   "square_px": 125.028,
+   "staged_px": [
+    1400,
+    1140
+   ],
+   "suggested": [
+    [
+     64.3,
+     23.6
+    ],
+    [
+     2856.4,
+     32.1
+    ],
+    [
+     2950.7,
+     2400.1
+    ],
+    [
+     75.0,
+     2383.0
+    ]
+   ],
+   "confidence": 0.9781,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     1.01,
+     0.924
+    ],
+    [
+     2.35,
+     0.746
+    ],
+    [
+     1.82,
+     0.999
+    ],
+    [
+     1.64,
+     0.988
+    ]
+   ],
+   "errors": [
+    0.0214,
+    0.0206,
+    0.0297,
+    0.0288
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-2013-67-9",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "method": "backdrop_lines",
+   "square_px": 124.929,
+   "staged_px": [
+    1400,
+    1140
+   ],
+   "suggested": [
+    [
+     64.5,
+     45.9
+    ],
+    [
+     2842.5,
+     71.0
+    ],
+    [
+     2961.5,
+     2423.7
+    ],
+    [
+     80.9,
+     2394.4
+    ]
+   ],
+   "confidence": 0.9906,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     1.01,
+     0.924
+    ],
+    [
+     2.35,
+     0.746
+    ],
+    [
+     1.82,
+     0.999
+    ],
+    [
+     1.64,
+     0.988
+    ]
+   ],
+   "errors": [
+    0.199,
+    0.3312,
+    0.2042,
+    0.1223
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-2013-67-9",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "method": "backdrop_lines",
+   "square_px": 125.028,
+   "staged_px": [
+    1400,
+    1140
+   ],
+   "suggested": [
+    [
+     64.5,
+     45.9
+    ],
+    [
+     2842.5,
+     71.0
+    ],
+    [
+     2961.5,
+     2423.7
+    ],
+    [
+     80.9,
+     2394.4
+    ]
+   ],
+   "confidence": 0.9906,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     1.01,
+     0.924
+    ],
+    [
+     2.35,
+     0.746
+    ],
+    [
+     1.82,
+     0.999
+    ],
+    [
+     1.64,
+     0.988
+    ]
+   ],
+   "errors": [
+    0.1988,
+    0.3383,
+    0.2221,
+    0.1315
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-2013-67-9",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "method": "tiered",
+   "square_px": 124.929,
+   "staged_px": [
+    1400,
+    1140
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "tier 3, the full frame",
+   "ring_mad_inliers": null,
+   "errors": null
+  },
+  {
+   "photo": "smithsonian-saam-2013-67-9",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "method": "tiered",
+   "square_px": 125.028,
+   "staged_px": [
+    1400,
+    1140
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "tier 3, the full frame",
+   "ring_mad_inliers": null,
+   "errors": null
+  },
+  {
+   "photo": "smithsonian-saam-2013-67-9",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "method": "backdrop_hull",
+   "square_px": 124.929,
+   "staged_px": [
+    2000,
+    1629
+   ],
+   "suggested": [
+    [
+     66.0,
+     21.0
+    ],
+    [
+     2857.5,
+     33.0
+    ],
+    [
+     2949.0,
+     2401.0
+    ],
+    [
+     73.5,
+     2381.5
+    ]
+   ],
+   "confidence": 0.9779,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     1.11,
+     0.928
+    ],
+    [
+     2.46,
+     0.755
+    ],
+    [
+     1.93,
+     0.998
+    ],
+    [
+     1.71,
+     0.989
+    ]
+   ],
+   "errors": [
+    0.008,
+    0.012,
+    0.0253,
+    0.0126
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-2013-67-9",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "method": "backdrop_hull",
+   "square_px": 125.028,
+   "staged_px": [
+    2000,
+    1629
+   ],
+   "suggested": [
+    [
+     66.0,
+     21.0
+    ],
+    [
+     2857.5,
+     33.0
+    ],
+    [
+     2949.0,
+     2401.0
+    ],
+    [
+     73.5,
+     2381.5
+    ]
+   ],
+   "confidence": 0.9779,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     1.11,
+     0.928
+    ],
+    [
+     2.46,
+     0.755
+    ],
+    [
+     1.93,
+     0.998
+    ],
+    [
+     1.71,
+     0.989
+    ]
+   ],
+   "errors": [
+    0.008,
+    0.0144,
+    0.0179,
+    0.0127
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-2013-67-9",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "method": "backdrop_lines",
+   "square_px": 124.929,
+   "staged_px": [
+    2000,
+    1629
+   ],
+   "suggested": [
+    [
+     64.2,
+     46.4
+    ],
+    [
+     2841.1,
+     70.8
+    ],
+    [
+     2961.0,
+     2423.1
+    ],
+    [
+     80.7,
+     2393.1
+    ]
+   ],
+   "confidence": 0.9906,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     1.11,
+     0.928
+    ],
+    [
+     2.46,
+     0.755
+    ],
+    [
+     1.93,
+     0.998
+    ],
+    [
+     1.71,
+     0.989
+    ]
+   ],
+   "errors": [
+    0.2037,
+    0.3345,
+    0.1982,
+    0.1125
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-2013-67-9",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "method": "backdrop_lines",
+   "square_px": 125.028,
+   "staged_px": [
+    2000,
+    1629
+   ],
+   "suggested": [
+    [
+     64.2,
+     46.4
+    ],
+    [
+     2841.1,
+     70.8
+    ],
+    [
+     2961.0,
+     2423.1
+    ],
+    [
+     80.7,
+     2393.1
+    ]
+   ],
+   "confidence": 0.9906,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     1.11,
+     0.928
+    ],
+    [
+     2.46,
+     0.755
+    ],
+    [
+     1.93,
+     0.998
+    ],
+    [
+     1.71,
+     0.989
+    ]
+   ],
+   "errors": [
+    0.2035,
+    0.3415,
+    0.2157,
+    0.1211
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-2013-67-9",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "method": "tiered",
+   "square_px": 124.929,
+   "staged_px": [
+    2000,
+    1629
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "tier 3, the full frame",
+   "ring_mad_inliers": null,
+   "errors": null
+  },
+  {
+   "photo": "smithsonian-saam-2013-67-9",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "method": "tiered",
+   "square_px": 125.028,
+   "staged_px": [
+    2000,
+    1629
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "tier 3, the full frame",
+   "ring_mad_inliers": null,
+   "errors": null
+  },
+  {
+   "photo": "smithsonian-saam-2017-24-27",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "method": "backdrop_hull",
+   "square_px": 113.157,
+   "staged_px": [
+    1400,
+    1386
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "no backdrop: under 2 uniform ring sides",
+   "ring_mad_inliers": [
+    [
+     0.0,
+     0.824
+    ],
+    [
+     0.0,
+     0.744
+    ],
+    [
+     0.0,
+     0.774
+    ],
+    [
+     0.0,
+     0.884
+    ]
+   ],
+   "errors": null
+  },
+  {
+   "photo": "smithsonian-saam-2017-24-27",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "method": "backdrop_hull",
+   "square_px": 113.169,
+   "staged_px": [
+    1400,
+    1386
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "no backdrop: under 2 uniform ring sides",
+   "ring_mad_inliers": [
+    [
+     0.0,
+     0.824
+    ],
+    [
+     0.0,
+     0.744
+    ],
+    [
+     0.0,
+     0.774
+    ],
+    [
+     0.0,
+     0.884
+    ]
+   ],
+   "errors": null
+  },
+  {
+   "photo": "smithsonian-saam-2017-24-27",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "method": "backdrop_lines",
+   "square_px": 113.157,
+   "staged_px": [
+    1400,
+    1386
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "no backdrop: under 2 uniform ring sides",
+   "ring_mad_inliers": [
+    [
+     0.0,
+     0.824
+    ],
+    [
+     0.0,
+     0.744
+    ],
+    [
+     0.0,
+     0.774
+    ],
+    [
+     0.0,
+     0.884
+    ]
+   ],
+   "errors": null
+  },
+  {
+   "photo": "smithsonian-saam-2017-24-27",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "method": "backdrop_lines",
+   "square_px": 113.169,
+   "staged_px": [
+    1400,
+    1386
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "no backdrop: under 2 uniform ring sides",
+   "ring_mad_inliers": [
+    [
+     0.0,
+     0.824
+    ],
+    [
+     0.0,
+     0.744
+    ],
+    [
+     0.0,
+     0.774
+    ],
+    [
+     0.0,
+     0.884
+    ]
+   ],
+   "errors": null
+  },
+  {
+   "photo": "smithsonian-saam-2017-24-27",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "method": "tiered",
+   "square_px": 113.157,
+   "staged_px": [
+    1400,
+    1386
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "tier 3, the full frame",
+   "ring_mad_inliers": null,
+   "errors": null
+  },
+  {
+   "photo": "smithsonian-saam-2017-24-27",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "method": "tiered",
+   "square_px": 113.169,
+   "staged_px": [
+    1400,
+    1386
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "tier 3, the full frame",
+   "ring_mad_inliers": null,
+   "errors": null
+  },
+  {
+   "photo": "smithsonian-saam-2017-24-27",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "method": "backdrop_hull",
+   "square_px": 113.157,
+   "staged_px": [
+    2000,
+    1981
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "no backdrop: under 2 uniform ring sides",
+   "ring_mad_inliers": [
+    [
+     0.0,
+     0.831
+    ],
+    [
+     0.0,
+     0.754
+    ],
+    [
+     0.0,
+     0.785
+    ],
+    [
+     0.0,
+     0.889
+    ]
+   ],
+   "errors": null
+  },
+  {
+   "photo": "smithsonian-saam-2017-24-27",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "method": "backdrop_hull",
+   "square_px": 113.169,
+   "staged_px": [
+    2000,
+    1981
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "no backdrop: under 2 uniform ring sides",
+   "ring_mad_inliers": [
+    [
+     0.0,
+     0.831
+    ],
+    [
+     0.0,
+     0.754
+    ],
+    [
+     0.0,
+     0.785
+    ],
+    [
+     0.0,
+     0.889
+    ]
+   ],
+   "errors": null
+  },
+  {
+   "photo": "smithsonian-saam-2017-24-27",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "method": "backdrop_lines",
+   "square_px": 113.157,
+   "staged_px": [
+    2000,
+    1981
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "no backdrop: under 2 uniform ring sides",
+   "ring_mad_inliers": [
+    [
+     0.0,
+     0.831
+    ],
+    [
+     0.0,
+     0.754
+    ],
+    [
+     0.0,
+     0.785
+    ],
+    [
+     0.0,
+     0.889
+    ]
+   ],
+   "errors": null
+  },
+  {
+   "photo": "smithsonian-saam-2017-24-27",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "method": "backdrop_lines",
+   "square_px": 113.169,
+   "staged_px": [
+    2000,
+    1981
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "no backdrop: under 2 uniform ring sides",
+   "ring_mad_inliers": [
+    [
+     0.0,
+     0.831
+    ],
+    [
+     0.0,
+     0.754
+    ],
+    [
+     0.0,
+     0.785
+    ],
+    [
+     0.0,
+     0.889
+    ]
+   ],
+   "errors": null
+  },
+  {
+   "photo": "smithsonian-saam-2017-24-27",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "method": "tiered",
+   "square_px": 113.157,
+   "staged_px": [
+    2000,
+    1981
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "tier 3, the full frame",
+   "ring_mad_inliers": null,
+   "errors": null
+  },
+  {
+   "photo": "smithsonian-saam-2017-24-27",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "method": "tiered",
+   "square_px": 113.169,
+   "staged_px": [
+    2000,
+    1981
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "tier 3, the full frame",
+   "ring_mad_inliers": null,
+   "errors": null
+  },
+  {
+   "photo": "smithsonian-saam-2017-24-5",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "method": "backdrop_hull",
+   "square_px": 53.609,
+   "staged_px": [
+    1181,
+    1400
+   ],
+   "suggested": [
+    [
+     38.6,
+     32.1
+    ],
+    [
+     2425.0,
+     30.0
+    ],
+    [
+     2497.9,
+     2860.7
+    ],
+    [
+     40.7,
+     2967.9
+    ]
+   ],
+   "confidence": 0.9561,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     0.0,
+     0.796
+    ],
+    [
+     0.0,
+     0.973
+    ],
+    [
+     0.0,
+     0.958
+    ],
+    [
+     0.0,
+     0.99
+    ]
+   ],
+   "errors": [
+    0.0494,
+    0.0006,
+    0.0789,
+    0.1139
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-2017-24-5",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "method": "backdrop_hull",
+   "square_px": 53.637,
+   "staged_px": [
+    1181,
+    1400
+   ],
+   "suggested": [
+    [
+     38.6,
+     32.1
+    ],
+    [
+     2425.0,
+     30.0
+    ],
+    [
+     2497.9,
+     2860.7
+    ],
+    [
+     40.7,
+     2967.9
+    ]
+   ],
+   "confidence": 0.9561,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     0.0,
+     0.796
+    ],
+    [
+     0.0,
+     0.973
+    ],
+    [
+     0.0,
+     0.958
+    ],
+    [
+     0.0,
+     0.99
+    ]
+   ],
+   "errors": [
+    0.0494,
+    0.0378,
+    0.1482,
+    0.0872
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-2017-24-5",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "method": "backdrop_lines",
+   "square_px": 53.609,
+   "staged_px": [
+    1181,
+    1400
+   ],
+   "suggested": [
+    [
+     81.6,
+     42.1
+    ],
+    [
+     2347.0,
+     44.1
+    ],
+    [
+     2422.5,
+     2867.1
+    ],
+    [
+     65.3,
+     2951.0
+    ]
+   ],
+   "confidence": 0.982,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     0.0,
+     0.796
+    ],
+    [
+     0.0,
+     0.973
+    ],
+    [
+     0.0,
+     0.958
+    ],
+    [
+     0.0,
+     0.99
+    ]
+   ],
+   "errors": [
+    0.862,
+    1.4786,
+    1.3429,
+    0.5734
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-2017-24-5",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "method": "backdrop_lines",
+   "square_px": 53.637,
+   "staged_px": [
+    1181,
+    1400
+   ],
+   "suggested": [
+    [
+     81.6,
+     42.1
+    ],
+    [
+     2347.0,
+     44.1
+    ],
+    [
+     2422.5,
+     2867.1
+    ],
+    [
+     65.3,
+     2951.0
+    ]
+   ],
+   "confidence": 0.982,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     0.0,
+     0.796
+    ],
+    [
+     0.0,
+     0.973
+    ],
+    [
+     0.0,
+     0.958
+    ],
+    [
+     0.0,
+     0.99
+    ]
+   ],
+   "errors": [
+    0.8615,
+    1.4411,
+    1.315,
+    0.5886
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-2017-24-5",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "method": "tiered",
+   "square_px": 53.609,
+   "staged_px": [
+    1181,
+    1400
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "tier 3, the full frame",
+   "ring_mad_inliers": null,
+   "errors": null
+  },
+  {
+   "photo": "smithsonian-saam-2017-24-5",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "method": "tiered",
+   "square_px": 53.637,
+   "staged_px": [
+    1181,
+    1400
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "tier 3, the full frame",
+   "ring_mad_inliers": null,
+   "errors": null
+  },
+  {
+   "photo": "smithsonian-saam-2017-24-5",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "method": "backdrop_hull",
+   "square_px": 53.609,
+   "staged_px": [
+    1687,
+    2000
+   ],
+   "suggested": [
+    [
+     39.0,
+     31.5
+    ],
+    [
+     2426.5,
+     31.5
+    ],
+    [
+     2495.5,
+     2863.5
+    ],
+    [
+     37.5,
+     2964.0
+    ]
+   ],
+   "confidence": 0.956,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     0.0,
+     0.809
+    ],
+    [
+     0.0,
+     0.975
+    ],
+    [
+     0.0,
+     0.96
+    ],
+    [
+     0.0,
+     0.991
+    ]
+   ],
+   "errors": [
+    0.0465,
+    0.0398,
+    0.0885,
+    0.0208
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-2017-24-5",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "method": "backdrop_hull",
+   "square_px": 53.637,
+   "staged_px": [
+    1687,
+    2000
+   ],
+   "suggested": [
+    [
+     39.0,
+     31.5
+    ],
+    [
+     2426.5,
+     31.5
+    ],
+    [
+     2495.5,
+     2863.5
+    ],
+    [
+     37.5,
+     2964.0
+    ]
+   ],
+   "confidence": 0.956,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     0.0,
+     0.809
+    ],
+    [
+     0.0,
+     0.975
+    ],
+    [
+     0.0,
+     0.96
+    ],
+    [
+     0.0,
+     0.991
+    ]
+   ],
+   "errors": [
+    0.0465,
+    0.0713,
+    0.0803,
+    0.0208
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-2017-24-5",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "method": "backdrop_lines",
+   "square_px": 53.609,
+   "staged_px": [
+    1687,
+    2000
+   ],
+   "suggested": [
+    [
+     82.2,
+     41.2
+    ],
+    [
+     2344.7,
+     45.0
+    ],
+    [
+     2423.1,
+     2867.3
+    ],
+    [
+     64.3,
+     2950.5
+    ]
+   ],
+   "confidence": 0.9819,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     0.0,
+     0.809
+    ],
+    [
+     0.0,
+     0.975
+    ],
+    [
+     0.0,
+     0.96
+    ],
+    [
+     0.0,
+     0.991
+    ]
+   ],
+   "errors": [
+    0.8691,
+    1.523,
+    1.3314,
+    0.5605
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-2017-24-5",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "method": "backdrop_lines",
+   "square_px": 53.637,
+   "staged_px": [
+    1687,
+    2000
+   ],
+   "suggested": [
+    [
+     82.2,
+     41.2
+    ],
+    [
+     2344.7,
+     45.0
+    ],
+    [
+     2423.1,
+     2867.3
+    ],
+    [
+     64.3,
+     2950.5
+    ]
+   ],
+   "confidence": 0.9819,
+   "detector_tier": null,
+   "reason": "suggested",
+   "ring_mad_inliers": [
+    [
+     0.0,
+     0.809
+    ],
+    [
+     0.0,
+     0.975
+    ],
+    [
+     0.0,
+     0.96
+    ],
+    [
+     0.0,
+     0.991
+    ]
+   ],
+   "errors": [
+    0.8686,
+    1.4855,
+    1.303,
+    0.5767
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-2017-24-5",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "method": "tiered",
+   "square_px": 53.609,
+   "staged_px": [
+    1687,
+    2000
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "tier 3, the full frame",
+   "ring_mad_inliers": null,
+   "errors": null
+  },
+  {
+   "photo": "smithsonian-saam-2017-24-5",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "method": "tiered",
+   "square_px": 53.637,
+   "staged_px": [
+    1687,
+    2000
+   ],
+   "suggested": null,
+   "confidence": null,
+   "detector_tier": null,
+   "reason": "tier 3, the full frame",
+   "ring_mad_inliers": null,
+   "errors": null
+  }
+ ],
+ "band_records": [
+  {
+   "photo": "lacma-54871",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "side": "top",
+   "square_px": 23.319,
+   "proposals": [
+    0.5575,
+    2.1441,
+    3.4735,
+    4.2883
+   ],
+   "truth": [
+    0.1,
+    2.3,
+    2.8304
+   ],
+   "errors": [
+    0.4575,
+    0.1559,
+    0.6432
+   ]
+  },
+  {
+   "photo": "lacma-54871",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "side": "right",
+   "square_px": 23.319,
+   "proposals": [
+    0.729,
+    1.6724,
+    2.9589,
+    4.8029
+   ],
+   "truth": [
+    0.1,
+    2.3,
+    2.6877
+   ],
+   "errors": [
+    0.629,
+    0.6276,
+    0.2712
+   ]
+  },
+  {
+   "photo": "lacma-54871",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "side": "bottom",
+   "square_px": 23.319,
+   "proposals": [
+    0.729,
+    1.8011,
+    3.0876,
+    5.0602
+   ],
+   "truth": [
+    0.1,
+    2.3,
+    2.78
+   ],
+   "errors": [
+    0.629,
+    0.4989,
+    0.3076
+   ]
+  },
+  {
+   "photo": "lacma-54871",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "side": "left",
+   "square_px": 23.319,
+   "proposals": [
+    0.729,
+    1.8868,
+    3.2591,
+    4.2454
+   ],
+   "truth": [
+    0.1,
+    2.3,
+    2.8979
+   ],
+   "errors": [
+    0.629,
+    0.4132,
+    0.3612
+   ]
+  },
+  {
+   "photo": "lacma-54871",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "side": "top",
+   "square_px": 23.312,
+   "proposals": [
+    0.5577,
+    2.1019,
+    3.4746,
+    4.2896
+   ],
+   "truth": [
+    0.1,
+    2.25,
+    2.8799
+   ],
+   "errors": [
+    0.4577,
+    0.1481,
+    0.5947
+   ]
+  },
+  {
+   "photo": "lacma-54871",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "side": "right",
+   "square_px": 23.312,
+   "proposals": [
+    0.6863,
+    1.673,
+    2.917,
+    4.8044
+   ],
+   "truth": [
+    0.1,
+    2.25,
+    2.663
+   ],
+   "errors": [
+    0.5863,
+    0.577,
+    0.254
+   ]
+  },
+  {
+   "photo": "lacma-54871",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "side": "bottom",
+   "square_px": 23.312,
+   "proposals": [
+    0.7292,
+    1.8016,
+    3.0885,
+    5.0618
+   ],
+   "truth": [
+    0.1,
+    2.25,
+    2.7633
+   ],
+   "errors": [
+    0.6292,
+    0.4484,
+    0.3253
+   ]
+  },
+  {
+   "photo": "lacma-54871",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "side": "left",
+   "square_px": 23.312,
+   "proposals": [
+    0.7292,
+    1.8874,
+    3.2601,
+    4.2467
+   ],
+   "truth": [
+    0.1,
+    2.25,
+    2.8818
+   ],
+   "errors": [
+    0.6292,
+    0.3626,
+    0.3783
+   ]
+  },
+  {
+   "photo": "lacma-54871",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "side": "top",
+   "square_px": 33.329,
+   "proposals": [
+    0.5401,
+    2.1303,
+    3.4805,
+    4.2906
+   ],
+   "truth": [
+    0.1,
+    2.3,
+    2.8308
+   ],
+   "errors": [
+    0.4401,
+    0.1697,
+    0.6497
+   ]
+  },
+  {
+   "photo": "lacma-54871",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "side": "right",
+   "square_px": 33.329,
+   "proposals": [
+    0.6901,
+    1.6802,
+    2.9704,
+    4.8307
+   ],
+   "truth": [
+    0.1,
+    2.3,
+    2.6873
+   ],
+   "errors": [
+    0.5901,
+    0.6198,
+    0.2831
+   ]
+  },
+  {
+   "photo": "lacma-54871",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "side": "bottom",
+   "square_px": 33.329,
+   "proposals": [
+    0.7201,
+    1.8303,
+    3.0904,
+    5.0707
+   ],
+   "truth": [
+    0.1,
+    2.3,
+    2.7804
+   ],
+   "errors": [
+    0.6201,
+    0.4697,
+    0.31
+   ]
+  },
+  {
+   "photo": "lacma-54871",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "side": "left",
+   "square_px": 33.329,
+   "proposals": [
+    0.7201,
+    1.9203,
+    3.2404,
+    4.2606
+   ],
+   "truth": [
+    0.1,
+    2.3,
+    2.8975
+   ],
+   "errors": [
+    0.6201,
+    0.3797,
+    0.343
+   ]
+  },
+  {
+   "photo": "lacma-54871",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "side": "top",
+   "square_px": 33.304,
+   "proposals": [
+    0.5405,
+    2.1319,
+    3.453,
+    4.2938
+   ],
+   "truth": [
+    0.1,
+    2.25,
+    2.88
+   ],
+   "errors": [
+    0.4405,
+    0.1181,
+    0.5731
+   ]
+  },
+  {
+   "photo": "lacma-54871",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "side": "right",
+   "square_px": 33.304,
+   "proposals": [
+    0.6606,
+    1.6514,
+    2.9426,
+    4.8042
+   ],
+   "truth": [
+    0.1,
+    2.25,
+    2.6629
+   ],
+   "errors": [
+    0.5606,
+    0.5986,
+    0.2797
+   ]
+  },
+  {
+   "photo": "lacma-54871",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "side": "bottom",
+   "square_px": 33.304,
+   "proposals": [
+    0.7206,
+    1.8316,
+    3.0927,
+    5.0744
+   ],
+   "truth": [
+    0.1,
+    2.25,
+    2.7634
+   ],
+   "errors": [
+    0.6206,
+    0.4184,
+    0.3293
+   ]
+  },
+  {
+   "photo": "lacma-54871",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "side": "left",
+   "square_px": 33.304,
+   "proposals": [
+    0.6906,
+    1.8917,
+    3.2428,
+    4.2337
+   ],
+   "truth": [
+    0.1,
+    2.25,
+    2.8817
+   ],
+   "errors": [
+    0.5906,
+    0.3583,
+    0.3611
+   ]
+  },
+  {
+   "photo": "lacma-54904",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "side": "top",
+   "square_px": 20.218,
+   "proposals": [
+    0.9892,
+    6.6773,
+    9.645,
+    13.602
+   ],
+   "truth": [
+    0.5,
+    6.6124
+   ],
+   "errors": [
+    0.4892,
+    0.065
+   ]
+  },
+  {
+   "photo": "lacma-54904",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "side": "right",
+   "square_px": 20.218,
+   "proposals": [
+    0.7419,
+    1.4344,
+    4.3526,
+    6.3311
+   ],
+   "truth": [
+    0.5,
+    3.7703
+   ],
+   "errors": [
+    0.2419,
+    0.5823
+   ]
+  },
+  {
+   "photo": "lacma-54904",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "side": "bottom",
+   "square_px": 20.218,
+   "proposals": [
+    0.7419,
+    6.6773,
+    9.645,
+    13.602
+   ],
+   "truth": [
+    0.5,
+    6.6927
+   ],
+   "errors": [
+    0.2419,
+    0.0154
+   ]
+  },
+  {
+   "photo": "lacma-54904",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "side": "left",
+   "square_px": 20.218,
+   "proposals": [
+    1.0882,
+    3.9569,
+    5.9354,
+    10.931
+   ],
+   "truth": [
+    0.5,
+    3.7118
+   ],
+   "errors": [
+    0.5882,
+    0.2451
+   ]
+  },
+  {
+   "photo": "lacma-54904",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "side": "top",
+   "square_px": 20.264,
+   "proposals": [
+    0.9376,
+    6.6622,
+    9.5738,
+    13.5711
+   ],
+   "truth": [
+    0.4,
+    6.528
+   ],
+   "errors": [
+    0.5376,
+    0.1342
+   ]
+  },
+  {
+   "photo": "lacma-54904",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "side": "right",
+   "square_px": 20.264,
+   "proposals": [
+    0.6909,
+    1.3818,
+    4.2934,
+    6.2674
+   ],
+   "truth": [
+    0.4,
+    3.7018
+   ],
+   "errors": [
+    0.2909,
+    0.5916
+   ]
+  },
+  {
+   "photo": "lacma-54904",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "side": "bottom",
+   "square_px": 20.264,
+   "proposals": [
+    0.6909,
+    6.6622,
+    9.6231,
+    13.5711
+   ],
+   "truth": [
+    0.4,
+    6.5989
+   ],
+   "errors": [
+    0.2909,
+    0.0632
+   ]
+  },
+  {
+   "photo": "lacma-54904",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "side": "left",
+   "square_px": 20.264,
+   "proposals": [
+    1.0857,
+    3.948,
+    5.9219,
+    10.9062
+   ],
+   "truth": [
+    0.4,
+    3.6354
+   ],
+   "errors": [
+    0.6857,
+    0.3126
+   ]
+  },
+  {
+   "photo": "lacma-54904",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "side": "top",
+   "square_px": 28.877,
+   "proposals": [
+    0.9696,
+    6.6835,
+    9.627,
+    13.6094
+   ],
+   "truth": [
+    0.5,
+    6.6146
+   ],
+   "errors": [
+    0.4696,
+    0.0689
+   ]
+  },
+  {
+   "photo": "lacma-54904",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "side": "right",
+   "square_px": 28.877,
+   "proposals": [
+    0.7618,
+    1.4198,
+    4.3287,
+    6.3026
+   ],
+   "truth": [
+    0.5,
+    3.769
+   ],
+   "errors": [
+    0.2618,
+    0.5596
+   ]
+  },
+  {
+   "photo": "lacma-54904",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "side": "bottom",
+   "square_px": 28.877,
+   "proposals": [
+    0.7272,
+    6.6835,
+    8.692,
+    9.6616
+   ],
+   "truth": [
+    0.5,
+    6.695
+   ],
+   "errors": [
+    0.2272,
+    0.0115
+   ]
+  },
+  {
+   "photo": "lacma-54904",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "side": "left",
+   "square_px": 28.877,
+   "proposals": [
+    1.0735,
+    3.9824,
+    5.9563,
+    10.9083
+   ],
+   "truth": [
+    0.5,
+    3.7106
+   ],
+   "errors": [
+    0.5735,
+    0.2718
+   ]
+  },
+  {
+   "photo": "lacma-54904",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "side": "top",
+   "square_px": 28.939,
+   "proposals": [
+    0.9676,
+    6.6693,
+    9.6065,
+    13.5459
+   ],
+   "truth": [
+    0.4,
+    6.5275
+   ],
+   "errors": [
+    0.5676,
+    0.1417
+   ]
+  },
+  {
+   "photo": "lacma-54904",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "side": "right",
+   "square_px": 28.939,
+   "proposals": [
+    0.7257,
+    1.3477,
+    4.2849,
+    6.2546
+   ],
+   "truth": [
+    0.4,
+    3.702
+   ],
+   "errors": [
+    0.3257,
+    0.5829
+   ]
+  },
+  {
+   "photo": "lacma-54904",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "side": "bottom",
+   "square_px": 28.939,
+   "proposals": [
+    0.6911,
+    6.6693,
+    9.6065,
+    13.5804
+   ],
+   "truth": [
+    0.4,
+    6.5985
+   ],
+   "errors": [
+    0.2911,
+    0.0708
+   ]
+  },
+  {
+   "photo": "lacma-54904",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "side": "left",
+   "square_px": 28.939,
+   "proposals": [
+    1.0712,
+    3.9739,
+    5.9436,
+    10.8851
+   ],
+   "truth": [
+    0.4,
+    3.6356
+   ],
+   "errors": [
+    0.6712,
+    0.3383
+   ]
+  },
+  {
+   "photo": "lacma-60126",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "side": "top",
+   "square_px": 43.994,
+   "proposals": [
+    0.2955,
+    1.2502,
+    2.1139,
+    3.9551
+   ],
+   "truth": [
+    0.1,
+    1.0,
+    1.9839
+   ],
+   "errors": [
+    0.1955,
+    0.2502,
+    0.13
+   ]
+  },
+  {
+   "photo": "lacma-60126",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "side": "right",
+   "square_px": 43.994,
+   "proposals": [
+    0.25,
+    1.1365,
+    2.2048,
+    5.8417
+   ],
+   "truth": [
+    0.1,
+    1.0,
+    1.9572
+   ],
+   "errors": [
+    0.15,
+    0.1365,
+    0.2477
+   ]
+  },
+  {
+   "photo": "lacma-60126",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "side": "bottom",
+   "square_px": 43.994,
+   "proposals": [
+    0.25,
+    1.0456,
+    1.9548,
+    3.705
+   ],
+   "truth": [
+    0.1,
+    1.0,
+    1.9404
+   ],
+   "errors": [
+    0.15,
+    0.0456,
+    0.0144
+   ]
+  },
+  {
+   "photo": "lacma-60126",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "side": "left",
+   "square_px": 43.994,
+   "proposals": [
+    0.9092,
+    1.8866,
+    2.9322,
+    4.6597
+   ],
+   "truth": [
+    0.1,
+    1.0,
+    1.9418
+   ],
+   "errors": [
+    0.8092,
+    0.0908,
+    0.0551
+   ]
+  },
+  {
+   "photo": "lacma-60126",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "side": "top",
+   "square_px": 43.916,
+   "proposals": [
+    0.296,
+    1.2752,
+    2.1405,
+    4.0077
+   ],
+   "truth": [
+    0.1,
+    1.0,
+    1.9917
+   ],
+   "errors": [
+    0.196,
+    0.2752,
+    0.1488
+   ]
+  },
+  {
+   "photo": "lacma-60126",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "side": "right",
+   "square_px": 43.916,
+   "proposals": [
+    0.2505,
+    1.1158,
+    2.1632,
+    5.8294
+   ],
+   "truth": [
+    0.1,
+    1.0,
+    2.0175
+   ],
+   "errors": [
+    0.1505,
+    0.1158,
+    0.1458
+   ]
+  },
+  {
+   "photo": "lacma-60126",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "side": "bottom",
+   "square_px": 43.916,
+   "proposals": [
+    0.2505,
+    1.0475,
+    1.9583,
+    3.6889
+   ],
+   "truth": [
+    0.1,
+    1.0,
+    1.924
+   ],
+   "errors": [
+    0.1505,
+    0.0475,
+    0.0343
+   ]
+  },
+  {
+   "photo": "lacma-60126",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "side": "left",
+   "square_px": 43.916,
+   "proposals": [
+    0.8881,
+    1.8444,
+    2.9375,
+    4.6453
+   ],
+   "truth": [
+    0.1,
+    1.0,
+    1.9082
+   ],
+   "errors": [
+    0.7881,
+    0.1119,
+    0.0637
+   ]
+  },
+  {
+   "photo": "lacma-60126",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "side": "top",
+   "square_px": 62.814,
+   "proposals": [
+    0.2866,
+    1.2577,
+    2.1174,
+    3.9641
+   ],
+   "truth": [
+    0.1,
+    1.0,
+    1.9844
+   ],
+   "errors": [
+    0.1866,
+    0.2577,
+    0.1329
+   ]
+  },
+  {
+   "photo": "lacma-60126",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "side": "right",
+   "square_px": 62.814,
+   "proposals": [
+    0.2388,
+    1.1463,
+    2.197,
+    5.8586
+   ],
+   "truth": [
+    0.1,
+    1.0,
+    1.9566
+   ],
+   "errors": [
+    0.1388,
+    0.1463,
+    0.2403
+   ]
+  },
+  {
+   "photo": "lacma-60126",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "side": "bottom",
+   "square_px": 62.814,
+   "proposals": [
+    0.2388,
+    1.0507,
+    1.9582,
+    3.7094
+   ],
+   "truth": [
+    0.1,
+    1.0,
+    1.9409
+   ],
+   "errors": [
+    0.1388,
+    0.0507,
+    0.0173
+   ]
+  },
+  {
+   "photo": "lacma-60126",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "side": "left",
+   "square_px": 62.814,
+   "proposals": [
+    0.9234,
+    1.8786,
+    2.9293,
+    4.6646
+   ],
+   "truth": [
+    0.1,
+    1.0,
+    1.9412
+   ],
+   "errors": [
+    0.8234,
+    0.0766,
+    0.0626
+   ]
+  },
+  {
+   "photo": "lacma-60126",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "side": "top",
+   "square_px": 62.707,
+   "proposals": [
+    0.303,
+    1.2758,
+    2.1529,
+    4.0027
+   ],
+   "truth": [
+    0.1,
+    1.0,
+    1.9921
+   ],
+   "errors": [
+    0.203,
+    0.2758,
+    0.1608
+   ]
+  },
+  {
+   "photo": "lacma-60126",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "side": "right",
+   "square_px": 62.707,
+   "proposals": [
+    0.2392,
+    1.1004,
+    2.1529,
+    5.8207
+   ],
+   "truth": [
+    0.1,
+    1.0,
+    2.0171
+   ],
+   "errors": [
+    0.1392,
+    0.1004,
+    0.1358
+   ]
+  },
+  {
+   "photo": "lacma-60126",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "side": "bottom",
+   "square_px": 62.707,
+   "proposals": [
+    0.2392,
+    1.0366,
+    1.9456,
+    3.6838
+   ],
+   "truth": [
+    0.1,
+    1.0,
+    1.9243
+   ],
+   "errors": [
+    0.1392,
+    0.0366,
+    0.0213
+   ]
+  },
+  {
+   "photo": "lacma-60126",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "side": "left",
+   "square_px": 62.707,
+   "proposals": [
+    0.893,
+    1.8339,
+    2.9343,
+    4.6406
+   ],
+   "truth": [
+    0.1,
+    1.0,
+    1.9078
+   ],
+   "errors": [
+    0.793,
+    0.107,
+    0.0739
+   ]
+  },
+  {
+   "photo": "lacma-63229",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "side": "top",
+   "square_px": 45.837,
+   "proposals": [
+    0.3927,
+    3.2724,
+    3.5997,
+    4.9087
+   ],
+   "truth": [
+    3.0058
+   ],
+   "errors": [
+    0.2666
+   ]
+  },
+  {
+   "photo": "lacma-63229",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "side": "right",
+   "square_px": 45.837,
+   "proposals": [
+    2.3562,
+    2.6834,
+    4.2324,
+    4.6469
+   ],
+   "truth": [
+    2.7489
+   ],
+   "errors": [
+    0.0655
+   ]
+  },
+  {
+   "photo": "lacma-63229",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "side": "bottom",
+   "square_px": 45.837,
+   "proposals": [
+    0.2836,
+    2.9452,
+    3.3161,
+    4.3196
+   ],
+   "truth": [
+    2.8341
+   ],
+   "errors": [
+    0.1111
+   ]
+  },
+  {
+   "photo": "lacma-63229",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "side": "left",
+   "square_px": 45.837,
+   "proposals": [
+    2.7052,
+    4.5378,
+    4.9523,
+    6.5885
+   ],
+   "truth": [
+    2.827
+   ],
+   "errors": [
+    0.1218
+   ]
+  },
+  {
+   "photo": "lacma-63229",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "side": "top",
+   "square_px": 45.818,
+   "proposals": [
+    0.371,
+    3.252,
+    3.5794,
+    4.9107
+   ],
+   "truth": [
+    3.0238
+   ],
+   "errors": [
+    0.2282
+   ]
+  },
+  {
+   "photo": "lacma-63229",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "side": "right",
+   "square_px": 45.818,
+   "proposals": [
+    2.379,
+    2.7063,
+    4.2559,
+    4.6706
+   ],
+   "truth": [
+    2.7131
+   ],
+   "errors": [
+    0.0067
+   ]
+  },
+  {
+   "photo": "lacma-63229",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "side": "bottom",
+   "square_px": 45.818,
+   "proposals": [
+    0.2837,
+    2.9464,
+    3.3175,
+    4.3214
+   ],
+   "truth": [
+    2.8994
+   ],
+   "errors": [
+    0.0471
+   ]
+  },
+  {
+   "photo": "lacma-63229",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "side": "left",
+   "square_px": 45.818,
+   "proposals": [
+    2.7063,
+    4.5397,
+    4.9762,
+    6.5913
+   ],
+   "truth": [
+    2.8455
+   ],
+   "errors": [
+    0.1392
+   ]
+  },
+  {
+   "photo": "lacma-63229",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "side": "top",
+   "square_px": 65.508,
+   "proposals": [
+    0.3816,
+    3.2668,
+    3.5874,
+    3.8621
+   ],
+   "truth": [
+    3.0058
+   ],
+   "errors": [
+    0.2609
+   ]
+  },
+  {
+   "photo": "lacma-63229",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "side": "right",
+   "square_px": 65.508,
+   "proposals": [
+    2.3509,
+    2.6867,
+    4.2285,
+    4.6254
+   ],
+   "truth": [
+    2.7489
+   ],
+   "errors": [
+    0.0622
+   ]
+  },
+  {
+   "photo": "lacma-63229",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "side": "bottom",
+   "square_px": 65.508,
+   "proposals": [
+    0.2748,
+    2.9462,
+    3.3126,
+    4.3201
+   ],
+   "truth": [
+    2.8341
+   ],
+   "errors": [
+    0.1121
+   ]
+  },
+  {
+   "photo": "lacma-63229",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "side": "left",
+   "square_px": 65.508,
+   "proposals": [
+    2.702,
+    4.5644,
+    4.946,
+    6.5794
+   ],
+   "truth": [
+    2.827
+   ],
+   "errors": [
+    0.125
+   ]
+  },
+  {
+   "photo": "lacma-63229",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "side": "top",
+   "square_px": 65.447,
+   "proposals": [
+    0.382,
+    3.2698,
+    3.5907,
+    3.8657
+   ],
+   "truth": [
+    3.0253
+   ],
+   "errors": [
+    0.2445
+   ]
+  },
+  {
+   "photo": "lacma-63229",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "side": "right",
+   "square_px": 65.447,
+   "proposals": [
+    2.3683,
+    2.7045,
+    4.263,
+    4.6603
+   ],
+   "truth": [
+    2.7117
+   ],
+   "errors": [
+    0.0072
+   ]
+  },
+  {
+   "photo": "lacma-63229",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "side": "bottom",
+   "square_px": 65.447,
+   "proposals": [
+    0.275,
+    2.949,
+    3.331,
+    4.3241
+   ],
+   "truth": [
+    2.9009
+   ],
+   "errors": [
+    0.0481
+   ]
+  },
+  {
+   "photo": "lacma-63229",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "side": "left",
+   "square_px": 65.447,
+   "proposals": [
+    2.7045,
+    4.5686,
+    4.9506,
+    6.6008
+   ],
+   "truth": [
+    2.8441
+   ],
+   "errors": [
+    0.1396
+   ]
+  },
+  {
+   "photo": "lacma-63267",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "side": "top",
+   "square_px": 56.96,
+   "proposals": [
+    0.1931,
+    1.9663,
+    2.9143,
+    3.9501
+   ],
+   "truth": [
+    0.1227
+   ],
+   "errors": [
+    0.0704
+   ]
+  },
+  {
+   "photo": "lacma-63267",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "side": "right",
+   "square_px": 56.96,
+   "proposals": [
+    1.3167,
+    2.1945,
+    3.3006,
+    4.2837
+   ],
+   "truth": [
+    0.1346
+   ],
+   "errors": [
+    1.1821
+   ]
+  },
+  {
+   "photo": "lacma-63267",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "side": "bottom",
+   "square_px": 56.96,
+   "proposals": [
+    0.1931,
+    0.9831,
+    2.0365,
+    3.0197
+   ],
+   "truth": [
+    0.1263
+   ],
+   "errors": [
+    0.0668
+   ]
+  },
+  {
+   "photo": "lacma-63267",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "side": "left",
+   "square_px": 56.96,
+   "proposals": [
+    0.1931,
+    1.106,
+    3.1601,
+    4.1081
+   ],
+   "truth": [
+    0.1055
+   ],
+   "errors": [
+    0.0876
+   ]
+  },
+  {
+   "photo": "lacma-63267",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "side": "top",
+   "square_px": 56.961,
+   "proposals": [
+    0.1931,
+    1.9838,
+    2.9318,
+    3.9501
+   ],
+   "truth": [
+    0.1349
+   ],
+   "errors": [
+    0.0582
+   ]
+  },
+  {
+   "photo": "lacma-63267",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "side": "right",
+   "square_px": 56.961,
+   "proposals": [
+    1.3342,
+    2.2472,
+    3.3181,
+    4.3012
+   ],
+   "truth": [
+    0.135
+   ],
+   "errors": [
+    1.1992
+   ]
+  },
+  {
+   "photo": "lacma-63267",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "side": "bottom",
+   "square_px": 56.961,
+   "proposals": [
+    0.1931,
+    1.0007,
+    2.054,
+    3.0372
+   ],
+   "truth": [
+    0.1502
+   ],
+   "errors": [
+    0.0429
+   ]
+  },
+  {
+   "photo": "lacma-63267",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "side": "left",
+   "square_px": 56.961,
+   "proposals": [
+    0.1931,
+    1.1411,
+    3.1952,
+    4.1432
+   ],
+   "truth": [
+    0.1562
+   ],
+   "errors": [
+    0.0369
+   ]
+  },
+  {
+   "photo": "lacma-63267",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "side": "top",
+   "square_px": 81.374,
+   "proposals": [
+    0.1966,
+    1.9662,
+    2.9248,
+    3.9448
+   ],
+   "truth": [
+    0.1227
+   ],
+   "errors": [
+    0.0739
+   ]
+  },
+  {
+   "photo": "lacma-63267",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "side": "right",
+   "square_px": 81.374,
+   "proposals": [
+    1.3149,
+    2.1874,
+    3.3057,
+    4.2888
+   ],
+   "truth": [
+    0.1346
+   ],
+   "errors": [
+    1.1803
+   ]
+  },
+  {
+   "photo": "lacma-63267",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "side": "bottom",
+   "square_px": 81.374,
+   "proposals": [
+    0.1966,
+    0.9831,
+    2.04,
+    3.0231
+   ],
+   "truth": [
+    0.1263
+   ],
+   "errors": [
+    0.0703
+   ]
+  },
+  {
+   "photo": "lacma-63267",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "side": "left",
+   "square_px": 81.374,
+   "proposals": [
+    0.1966,
+    1.0937,
+    3.1583,
+    4.1168
+   ],
+   "truth": [
+    0.1055
+   ],
+   "errors": [
+    0.0912
+   ]
+  },
+  {
+   "photo": "lacma-63267",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "side": "top",
+   "square_px": 81.349,
+   "proposals": [
+    0.1967,
+    1.9791,
+    2.9379,
+    3.9582
+   ],
+   "truth": [
+    0.1349
+   ],
+   "errors": [
+    0.0618
+   ]
+  },
+  {
+   "photo": "lacma-63267",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "side": "right",
+   "square_px": 81.349,
+   "proposals": [
+    1.3276,
+    2.2496,
+    3.3313,
+    4.3147
+   ],
+   "truth": [
+    0.135
+   ],
+   "errors": [
+    1.1926
+   ]
+  },
+  {
+   "photo": "lacma-63267",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "side": "bottom",
+   "square_px": 81.349,
+   "proposals": [
+    0.1967,
+    1.008,
+    2.0529,
+    3.0486
+   ],
+   "truth": [
+    0.1502
+   ],
+   "errors": [
+    0.0465
+   ]
+  },
+  {
+   "photo": "lacma-63267",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "side": "left",
+   "square_px": 81.349,
+   "proposals": [
+    0.1967,
+    1.1309,
+    3.1961,
+    4.1426
+   ],
+   "truth": [
+    0.1562
+   ],
+   "errors": [
+    0.0405
+   ]
+  },
+  {
+   "photo": "smithsonian-chndm-1973-45-1",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "side": "top",
+   "square_px": 18.967,
+   "proposals": [
+    1.1599,
+    2.5307,
+    3.8488,
+    6.8013
+   ],
+   "truth": [
+    0.25,
+    1.55,
+    3.05,
+    4.2625
+   ],
+   "errors": [
+    0.9099,
+    0.3901,
+    0.5193,
+    0.4136
+   ]
+  },
+  {
+   "photo": "smithsonian-chndm-1973-45-1",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "side": "right",
+   "square_px": 18.967,
+   "proposals": [
+    0.6327,
+    1.6344,
+    3.058,
+    4.3233
+   ],
+   "truth": [
+    0.25,
+    1.55,
+    3.05,
+    4.3072
+   ],
+   "errors": [
+    0.3827,
+    0.0844,
+    0.008,
+    0.0161
+   ]
+  },
+  {
+   "photo": "smithsonian-chndm-1973-45-1",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "side": "bottom",
+   "square_px": 18.967,
+   "proposals": [
+    0.6327,
+    1.5817,
+    2.9525,
+    4.1652
+   ],
+   "truth": [
+    0.25,
+    1.55,
+    3.05,
+    4.3563
+   ],
+   "errors": [
+    0.3827,
+    0.0317,
+    0.0975,
+    0.1911
+   ]
+  },
+  {
+   "photo": "smithsonian-chndm-1973-45-1",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "side": "left",
+   "square_px": 18.967,
+   "proposals": [
+    0.6327,
+    1.898,
+    3.2689,
+    4.5342
+   ],
+   "truth": [
+    0.25,
+    1.55,
+    3.05,
+    4.1184
+   ],
+   "errors": [
+    0.3827,
+    0.348,
+    0.2189,
+    0.4158
+   ]
+  },
+  {
+   "photo": "smithsonian-chndm-1973-45-1",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "side": "top",
+   "square_px": 18.962,
+   "proposals": [
+    1.2129,
+    2.5841,
+    3.9552,
+    6.9085
+   ],
+   "truth": [
+    0.3,
+    1.65,
+    3.1,
+    4.3394
+   ],
+   "errors": [
+    0.9129,
+    0.4371,
+    0.5159,
+    0.3842
+   ]
+  },
+  {
+   "photo": "smithsonian-chndm-1973-45-1",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "side": "right",
+   "square_px": 18.962,
+   "proposals": [
+    0.6328,
+    1.6348,
+    3.0587,
+    4.3244
+   ],
+   "truth": [
+    0.3,
+    1.65,
+    3.1,
+    4.2811
+   ],
+   "errors": [
+    0.3328,
+    0.0152,
+    0.0413,
+    0.0433
+   ]
+  },
+  {
+   "photo": "smithsonian-chndm-1973-45-1",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "side": "bottom",
+   "square_px": 18.962,
+   "proposals": [
+    0.6328,
+    1.5821,
+    2.9005,
+    4.1662
+   ],
+   "truth": [
+    0.3,
+    1.65,
+    3.1,
+    4.3644
+   ],
+   "errors": [
+    0.3328,
+    0.0679,
+    0.1995,
+    0.1982
+   ]
+  },
+  {
+   "photo": "smithsonian-chndm-1973-45-1",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "side": "left",
+   "square_px": 18.962,
+   "proposals": [
+    0.6856,
+    1.9513,
+    3.3224,
+    4.5881
+   ],
+   "truth": [
+    0.3,
+    1.65,
+    3.1,
+    4.1941
+   ],
+   "errors": [
+    0.3856,
+    0.3013,
+    0.2224,
+    0.3939
+   ]
+  },
+  {
+   "photo": "smithsonian-chndm-1973-45-1",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "side": "top",
+   "square_px": 27.095,
+   "proposals": [
+    1.1441,
+    2.5466,
+    3.8383,
+    6.7908
+   ],
+   "truth": [
+    0.25,
+    1.55,
+    3.05,
+    4.2631
+   ],
+   "errors": [
+    0.8941,
+    0.4059,
+    0.5034,
+    0.4248
+   ]
+  },
+  {
+   "photo": "smithsonian-chndm-1973-45-1",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "side": "right",
+   "square_px": 27.095,
+   "proposals": [
+    0.6274,
+    1.6608,
+    3.0633,
+    4.355
+   ],
+   "truth": [
+    0.25,
+    1.55,
+    3.05,
+    4.3065
+   ],
+   "errors": [
+    0.3774,
+    0.1108,
+    0.0133,
+    0.0485
+   ]
+  },
+  {
+   "photo": "smithsonian-chndm-1973-45-1",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "side": "bottom",
+   "square_px": 27.095,
+   "proposals": [
+    0.6274,
+    1.5501,
+    2.9156,
+    4.1705
+   ],
+   "truth": [
+    0.25,
+    1.55,
+    3.05,
+    4.3569
+   ],
+   "errors": [
+    0.3774,
+    0.0001,
+    0.1344,
+    0.1865
+   ]
+  },
+  {
+   "photo": "smithsonian-chndm-1973-45-1",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "side": "left",
+   "square_px": 27.095,
+   "proposals": [
+    0.6643,
+    1.9191,
+    3.2847,
+    4.5395
+   ],
+   "truth": [
+    0.25,
+    1.55,
+    3.05,
+    4.1177
+   ],
+   "errors": [
+    0.4143,
+    0.3691,
+    0.2347,
+    0.4218
+   ]
+  },
+  {
+   "photo": "smithsonian-chndm-1973-45-1",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "side": "top",
+   "square_px": 27.09,
+   "proposals": [
+    1.2181,
+    2.6209,
+    3.9128,
+    6.8659
+   ],
+   "truth": [
+    0.3,
+    1.65,
+    3.1,
+    4.3379
+   ],
+   "errors": [
+    0.9181,
+    0.4319,
+    0.4791,
+    0.425
+   ]
+  },
+  {
+   "photo": "smithsonian-chndm-1973-45-1",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "side": "right",
+   "square_px": 27.09,
+   "proposals": [
+    0.6275,
+    1.6611,
+    3.0269,
+    4.3189
+   ],
+   "truth": [
+    0.3,
+    1.65,
+    3.1,
+    4.2827
+   ],
+   "errors": [
+    0.3275,
+    0.0111,
+    0.0731,
+    0.0362
+   ]
+  },
+  {
+   "photo": "smithsonian-chndm-1973-45-1",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "side": "bottom",
+   "square_px": 27.09,
+   "proposals": [
+    0.6275,
+    1.5504,
+    2.9162,
+    4.1712
+   ],
+   "truth": [
+    0.3,
+    1.65,
+    3.1,
+    4.3628
+   ],
+   "errors": [
+    0.3275,
+    0.0996,
+    0.1838,
+    0.1916
+   ]
+  },
+  {
+   "photo": "smithsonian-chndm-1973-45-1",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "side": "left",
+   "square_px": 27.09,
+   "proposals": [
+    0.7014,
+    1.9564,
+    3.3222,
+    4.6142
+   ],
+   "truth": [
+    0.3,
+    1.65,
+    3.1,
+    4.1957
+   ],
+   "errors": [
+    0.4014,
+    0.3064,
+    0.2222,
+    0.4185
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-1998-149-21",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "side": "top",
+   "square_px": 52.578,
+   "proposals": [
+    0.2282,
+    0.4565,
+    0.8178,
+    1.0651
+   ],
+   "truth": [
+    1.4108
+   ],
+   "errors": [
+    0.3457
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-1998-149-21",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "side": "right",
+   "square_px": 52.578,
+   "proposals": [
+    0.5135,
+    0.7798,
+    1.1031,
+    1.5786
+   ],
+   "truth": [
+    1.5009
+   ],
+   "errors": [
+    0.0777
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-1998-149-21",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "side": "bottom",
+   "square_px": 52.578,
+   "proposals": [
+    0.3804,
+    0.7037,
+    1.0651,
+    1.3313
+   ],
+   "truth": [
+    1.4195
+   ],
+   "errors": [
+    0.0882
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-1998-149-21",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "side": "left",
+   "square_px": 52.578,
+   "proposals": [
+    0.3614,
+    0.6847,
+    1.0461,
+    1.3123
+   ],
+   "truth": [
+    1.5674
+   ],
+   "errors": [
+    0.2551
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-1998-149-21",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "side": "top",
+   "square_px": 52.669,
+   "proposals": [
+    0.2278,
+    0.4747,
+    0.8354,
+    1.0822
+   ],
+   "truth": [
+    1.4305
+   ],
+   "errors": [
+    0.3483
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-1998-149-21",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "side": "right",
+   "square_px": 52.669,
+   "proposals": [
+    0.5126,
+    0.7784,
+    1.1202,
+    1.5759
+   ],
+   "truth": [
+    1.5001
+   ],
+   "errors": [
+    0.0758
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-1998-149-21",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "side": "bottom",
+   "square_px": 52.669,
+   "proposals": [
+    0.4557,
+    0.7784,
+    1.1392,
+    1.405
+   ],
+   "truth": [
+    1.4135
+   ],
+   "errors": [
+    0.0085
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-1998-149-21",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "side": "left",
+   "square_px": 52.669,
+   "proposals": [
+    0.3607,
+    0.6835,
+    1.0442,
+    1.3101
+   ],
+   "truth": [
+    1.5667
+   ],
+   "errors": [
+    0.2567
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-1998-149-21",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "side": "top",
+   "square_px": 75.118,
+   "proposals": [
+    0.2263,
+    0.4659,
+    0.8121,
+    1.0783
+   ],
+   "truth": [
+    1.4115
+   ],
+   "errors": [
+    0.3332
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-1998-149-21",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "side": "right",
+   "square_px": 75.118,
+   "proposals": [
+    0.5059,
+    0.7854,
+    1.1049,
+    1.5709
+   ],
+   "truth": [
+    1.5003
+   ],
+   "errors": [
+    0.0706
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-1998-149-21",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "side": "bottom",
+   "square_px": 75.118,
+   "proposals": [
+    0.3861,
+    0.7056,
+    1.065,
+    1.3312
+   ],
+   "truth": [
+    1.4202
+   ],
+   "errors": [
+    0.089
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-1998-149-21",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "side": "left",
+   "square_px": 75.118,
+   "proposals": [
+    0.3594,
+    0.6789,
+    1.0384,
+    1.3046
+   ],
+   "truth": [
+    1.5667
+   ],
+   "errors": [
+    0.2621
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-1998-149-21",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "side": "top",
+   "square_px": 75.225,
+   "proposals": [
+    0.226,
+    0.4786,
+    0.8242,
+    1.0901
+   ],
+   "truth": [
+    1.4308
+   ],
+   "errors": [
+    0.3407
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-1998-149-21",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "side": "right",
+   "square_px": 75.225,
+   "proposals": [
+    0.5052,
+    0.7843,
+    1.1167,
+    1.5686
+   ],
+   "truth": [
+    1.4999
+   ],
+   "errors": [
+    0.0688
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-1998-149-21",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "side": "bottom",
+   "square_px": 75.225,
+   "proposals": [
+    0.452,
+    0.771,
+    1.1299,
+    1.3958
+   ],
+   "truth": [
+    1.4137
+   ],
+   "errors": [
+    0.0178
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-1998-149-21",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "side": "left",
+   "square_px": 75.225,
+   "proposals": [
+    0.3589,
+    0.678,
+    1.0502,
+    1.3028
+   ],
+   "truth": [
+    1.5665
+   ],
+   "errors": [
+    0.2637
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-2013-67-9",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "side": "top",
+   "square_px": 58.293,
+   "proposals": [
+    0.2916,
+    2.8991,
+    3.6711,
+    4.3916
+   ],
+   "truth": [
+    2.5,
+    3.3,
+    4.2368
+   ],
+   "errors": [
+    0.3991,
+    0.3711,
+    0.1548
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-2013-67-9",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "side": "right",
+   "square_px": 58.293,
+   "proposals": [
+    0.1887,
+    2.6933,
+    3.5167,
+    4.3744
+   ],
+   "truth": [
+    2.5,
+    3.3,
+    4.2465
+   ],
+   "errors": [
+    0.1933,
+    0.2167,
+    0.128
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-2013-67-9",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "side": "bottom",
+   "square_px": 58.293,
+   "proposals": [
+    2.3673,
+    3.1564,
+    3.8769
+   ],
+   "truth": [
+    2.5,
+    3.3,
+    3.9187
+   ],
+   "errors": [
+    0.1327,
+    0.1436,
+    0.0417
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-2013-67-9",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "side": "left",
+   "square_px": 58.293,
+   "proposals": [
+    0.1887,
+    2.659,
+    3.4824,
+    4.2372
+   ],
+   "truth": [
+    2.5,
+    3.3,
+    4.1907
+   ],
+   "errors": [
+    0.159,
+    0.1824,
+    0.0465
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-2013-67-9",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "side": "top",
+   "square_px": 58.33,
+   "proposals": [
+    0.3086,
+    2.8802,
+    3.6688,
+    4.3889
+   ],
+   "truth": [
+    2.5,
+    3.3,
+    4.2283
+   ],
+   "errors": [
+    0.3802,
+    0.3688,
+    0.1605
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-2013-67-9",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "side": "right",
+   "square_px": 58.33,
+   "proposals": [
+    0.1886,
+    2.6745,
+    3.4974,
+    4.3546
+   ],
+   "truth": [
+    2.5,
+    3.3,
+    4.2005
+   ],
+   "errors": [
+    0.1745,
+    0.1974,
+    0.154
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-2013-67-9",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "side": "bottom",
+   "square_px": 58.33,
+   "proposals": [
+    2.3659,
+    3.1545,
+    3.8745
+   ],
+   "truth": [
+    2.5,
+    3.3,
+    3.9045
+   ],
+   "errors": [
+    0.1341,
+    0.1455,
+    0.03
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-2013-67-9",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "side": "left",
+   "square_px": 58.33,
+   "proposals": [
+    0.1886,
+    2.6573,
+    3.4802,
+    4.2346
+   ],
+   "truth": [
+    2.5,
+    3.3,
+    4.1974
+   ],
+   "errors": [
+    0.1573,
+    0.1802,
+    0.0372
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-2013-67-9",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "side": "top",
+   "square_px": 83.263,
+   "proposals": [
+    0.3003,
+    2.8944,
+    3.6751,
+    4.3957
+   ],
+   "truth": [
+    2.5,
+    3.3,
+    4.2371
+   ],
+   "errors": [
+    0.3944,
+    0.3751,
+    0.1586
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-2013-67-9",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "side": "right",
+   "square_px": 83.263,
+   "proposals": [
+    0.1922,
+    2.7023,
+    3.519,
+    4.3717
+   ],
+   "truth": [
+    2.5,
+    3.3,
+    4.2462
+   ],
+   "errors": [
+    0.2023,
+    0.219,
+    0.1255
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-2013-67-9",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "side": "bottom",
+   "square_px": 83.263,
+   "proposals": [
+    2.366,
+    3.1587,
+    3.8793
+   ],
+   "truth": [
+    2.5,
+    3.3,
+    3.9189
+   ],
+   "errors": [
+    0.134,
+    0.1413,
+    0.0397
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-2013-67-9",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "side": "left",
+   "square_px": 83.263,
+   "proposals": [
+    0.1922,
+    2.6662,
+    3.4829,
+    4.2276
+   ],
+   "truth": [
+    2.5,
+    3.3,
+    4.1904
+   ],
+   "errors": [
+    0.1662,
+    0.1829,
+    0.0372
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-2013-67-9",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "side": "top",
+   "square_px": 83.339,
+   "proposals": [
+    0.3,
+    2.8918,
+    3.6718,
+    4.3917
+   ],
+   "truth": [
+    2.5,
+    3.3,
+    4.2312
+   ],
+   "errors": [
+    0.3918,
+    0.3718,
+    0.1605
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-2013-67-9",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "side": "right",
+   "square_px": 83.339,
+   "proposals": [
+    0.192,
+    2.6758,
+    3.4918,
+    4.3557
+   ],
+   "truth": [
+    2.5,
+    3.3,
+    4.1978
+   ],
+   "errors": [
+    0.1758,
+    0.1918,
+    0.1579
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-2013-67-9",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "side": "bottom",
+   "square_px": 83.339,
+   "proposals": [
+    2.3638,
+    3.1558,
+    3.8757
+   ],
+   "truth": [
+    2.5,
+    3.3,
+    3.9072
+   ],
+   "errors": [
+    0.1362,
+    0.1442,
+    0.0315
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-2013-67-9",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "side": "left",
+   "square_px": 83.339,
+   "proposals": [
+    0.192,
+    2.6638,
+    3.4798,
+    4.2237
+   ],
+   "truth": [
+    2.5,
+    3.3,
+    4.1946
+   ],
+   "errors": [
+    0.1638,
+    0.1798,
+    0.0291
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-2017-24-27",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "side": "top",
+   "square_px": 52.802,
+   "proposals": [
+    0.2462,
+    0.9848,
+    2.2158,
+    3.2006
+   ],
+   "truth": [
+    1.05,
+    2.2057
+   ],
+   "errors": [
+    0.0652,
+    0.0101
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-2017-24-27",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "side": "right",
+   "square_px": 52.802,
+   "proposals": [
+    0.2651,
+    1.3257,
+    2.5188,
+    5.3975
+   ],
+   "truth": [
+    1.05,
+    2.3494
+   ],
+   "errors": [
+    0.2757,
+    0.1695
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-2017-24-27",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "side": "bottom",
+   "square_px": 52.802,
+   "proposals": [
+    0.9659,
+    2.1969,
+    3.1817,
+    6.0604
+   ],
+   "truth": [
+    1.05,
+    2.1899
+   ],
+   "errors": [
+    0.0841,
+    0.007
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-2017-24-27",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "phone",
+   "side": "left",
+   "square_px": 52.802,
+   "proposals": [
+    0.2462,
+    1.3446,
+    2.462,
+    5.3407
+   ],
+   "truth": [
+    1.05,
+    2.3708
+   ],
+   "errors": [
+    0.2946,
+    0.0912
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-2017-24-27",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "side": "top",
+   "square_px": 52.796,
+   "proposals": [
+    0.2462,
+    0.9849,
+    2.1971,
+    3.1821
+   ],
+   "truth": [
+    1.1,
+    2.1973
+   ],
+   "errors": [
+    0.1151,
+    0.0001
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-2017-24-27",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "side": "right",
+   "square_px": 52.796,
+   "proposals": [
+    0.2841,
+    1.3259,
+    2.5002,
+    5.3981
+   ],
+   "truth": [
+    1.1,
+    2.3463
+   ],
+   "errors": [
+    0.2259,
+    0.1539
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-2017-24-27",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "side": "bottom",
+   "square_px": 52.796,
+   "proposals": [
+    1.0228,
+    2.254,
+    3.2199,
+    4.2238
+   ],
+   "truth": [
+    1.1,
+    2.2465
+   ],
+   "errors": [
+    0.0772,
+    0.0074
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-2017-24-27",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "phone",
+   "side": "left",
+   "square_px": 52.796,
+   "proposals": [
+    0.2462,
+    1.3448,
+    2.4812,
+    5.3602
+   ],
+   "truth": [
+    1.1,
+    2.3694
+   ],
+   "errors": [
+    0.2448,
+    0.1118
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-2017-24-27",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "side": "top",
+   "square_px": 75.457,
+   "proposals": [
+    0.2518,
+    0.9939,
+    2.2132,
+    3.1939
+   ],
+   "truth": [
+    1.05,
+    2.2065
+   ],
+   "errors": [
+    0.0561,
+    0.0067
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-2017-24-27",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "side": "right",
+   "square_px": 75.457,
+   "proposals": [
+    0.2783,
+    1.3253,
+    2.5048,
+    5.4071
+   ],
+   "truth": [
+    1.05,
+    2.3486
+   ],
+   "errors": [
+    0.2753,
+    0.1562
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-2017-24-27",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "side": "bottom",
+   "square_px": 75.457,
+   "proposals": [
+    0.9674,
+    2.1999,
+    3.1806,
+    6.0565
+   ],
+   "truth": [
+    1.05,
+    2.1906
+   ],
+   "errors": [
+    0.0826,
+    0.0093
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-2017-24-27",
+   "tier": "museum",
+   "provenance": "proposed-a",
+   "cap": "desktop",
+   "side": "left",
+   "square_px": 75.457,
+   "proposals": [
+    0.2518,
+    1.3385,
+    2.465,
+    5.3408
+   ],
+   "truth": [
+    1.05,
+    2.37
+   ],
+   "errors": [
+    0.2885,
+    0.095
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-2017-24-27",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "side": "top",
+   "square_px": 75.451,
+   "proposals": [
+    0.2518,
+    0.9808,
+    2.2001,
+    3.1809
+   ],
+   "truth": [
+    1.1,
+    2.1981
+   ],
+   "errors": [
+    0.1192,
+    0.002
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-2017-24-27",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "side": "right",
+   "square_px": 75.451,
+   "proposals": [
+    0.2783,
+    1.3254,
+    2.5049,
+    5.381
+   ],
+   "truth": [
+    1.1,
+    2.3454
+   ],
+   "errors": [
+    0.2254,
+    0.1595
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-2017-24-27",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "side": "bottom",
+   "square_px": 75.451,
+   "proposals": [
+    1.0205,
+    2.2531,
+    3.2206,
+    4.2412
+   ],
+   "truth": [
+    1.1,
+    2.2474
+   ],
+   "errors": [
+    0.0795,
+    0.0057
+   ]
+  },
+  {
+   "photo": "smithsonian-saam-2017-24-27",
+   "tier": "museum",
+   "provenance": "proposed-b",
+   "cap": "desktop",
+   "side": "left",
+   "square_px": 75.451,
+   "proposals": [
+    0.2518,
+    1.3519,
+    2.4784,
+    5.3545
+   ],
+   "truth": [
+    1.1,
+    2.3685
+   ],
+   "errors": [
+    0.2519,
+    0.1099
+   ]
+  }
+ ]
+}
