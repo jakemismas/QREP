@@ -109,8 +109,10 @@ class Paragraph:
     figure: FigureRequest | None = None
 
     def __post_init__(self) -> None:
-        if self.indent < 0:
-            raise ValueError("indent cannot be negative")
+        # Three levels (54 pt) is deeper than any section nests, and each level
+        # narrows the column the text wraps in.
+        if not 0 <= self.indent <= 3:
+            raise ValueError(f"indent is 0 to 3 levels, got {self.indent}")
 
 
 @dataclass(frozen=True)
@@ -127,14 +129,18 @@ class Step:
 
 @dataclass(frozen=True)
 class Steps:
-    """Steps numbered from 1 (G-04 restarts the count under each subheading)."""
+    """Numbered steps. G-04 restarts the count at 1 under each subheading; start
+    continues a list that a note interrupts under the same subheading."""
 
     items: tuple[Step, ...]
+    start: int = 1
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "items", tuple(self.items))
         if not self.items:
             raise ValueError("a step list needs at least one step")
+        if not isinstance(self.start, int) or isinstance(self.start, bool) or self.start < 1:
+            raise ValueError(f"a step list starts at 1 or later, got {self.start!r}")
 
 
 @dataclass(frozen=True)
@@ -216,6 +222,7 @@ class PatternDocument:
         object.__setattr__(self, "sections", tuple(self.sections))
         if not self.name.strip() or "\n" in self.name:
             raise ValueError("a pattern needs a one-line name")
+        check_printable(self.name)
         # The name prints in every footer, where no date may appear (G-02, PS-03).
         if _DATE.search(self.name):
             raise PatternTextError(f"the pattern name {self.name!r} holds a date")
@@ -304,28 +311,49 @@ class PatternTextError(ValueError):
     """Text the pattern must never print (PS-05, PS-06, G-02)."""
 
 
+_MONTH = (
+    r"(?:January|February|March|April|May|June|July|August|September|October|November|"
+    r"December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sept?|Oct|Nov|Dec)\.?"
+)
 _DATE = re.compile(
     r"\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2}/\d{1,2}/\d{2,4}\b|"
-    r"\b(?:January|February|March|April|May|June|July|August|September|October|"
-    r"November|December) \d{1,2}\b"
+    rf"\b{_MONTH} \d{{1,2}}\b|\b\d{{1,2}} {_MONTH}(?![a-z])"
 )
 _BANNED = [
     (re.compile(r"\b(?:historical|modern|strip strategy|difficulty|minutes|heuristic)\b",
                 re.IGNORECASE), "a strategy name, difficulty or time word"),
     (re.compile(r"\b(?:total pieces|pieces total|piece total|piece count|pieces in all)\b|"
-                r"\b(?:has|have|totals?|of) [\d,]+ pieces\b|\b[\d,]+ pieces (?:to cut|in all)\b",
+                r"\b(?:has|have|totals?|of) [\d,]+ pieces\b|\b[\d,]+ pieces (?:to cut|in all)\b|"
+                # No step cuts 100 loose pieces; cutting lines count in parentheses (S4).
+                r"\bpieces?: ?[\d,]+|\b(?:\d{3,}|\d{1,3}(?:,\d{3})+) pieces\b",
                 re.IGNORECASE), "a piece total"),
     (re.compile(r"\bf\d+\b"), "an internal fabric id"),
     (_HEX, "a hex color"),
-    (re.compile(r"\d\.\d"), "a decimal number"),
-    (re.compile(r"\b\d+-\d+/\d+\b"), "a hyphenated fraction"),
-    (re.compile("[¼-¾⅐-⅞⁄]"), "a fraction glyph"),
+    (re.compile(r"\.\d"), "a decimal number"),
+    # A hyphen or any Unicode dash between the whole number and the fraction.
+    (re.compile(r"\b\d+[-‐-―]\d+/\d+\b"), "a hyphenated fraction"),
+    (re.compile("[¼-¾⅐-⅞⁄∕]"), "a fraction glyph"),
     (_DATE, "a date"),
 ]
 _FRACTION = re.compile(r"\b(\d+)/(\d+)\b")
 # A fraction is only ever a length or a yardage, so it carries its unit (C-07).
 _BARE_FRACTION = re.compile(r'\b\d+/\d+\b(?!"| yd\b)')
 _SEPARATOR = re.compile(r"\d( ?)([xX×])( ?)(?=\d|WOF)")
+_BY = re.compile(r"\d by \d")
+
+
+def check_printable(text: str) -> None:
+    """Raise PatternTextError for a character built-in Helvetica cannot print.
+
+    The standard fonts carry the WinAnsi encoding, which is cp1252; any other
+    character prints as an empty box and extracts as nothing useful (PS-41).
+    """
+    try:
+        text.encode("cp1252")
+    except UnicodeEncodeError as bad:
+        raise PatternTextError(
+            f"{text[bad.start]!r} in {text!r} is outside the characters Helvetica prints"
+        ) from None
 
 
 def check_text(text: str, name: str = "") -> None:
@@ -335,6 +363,7 @@ def check_text(text: str, name: str = "") -> None:
     double quotes dropped, so '2"x8"' is caught as "2x8". The pattern name is
     left out, as the PS-05 check leaves it out.
     """
+    check_printable(text)
     plain = re.sub(r"\s+", " ", text.replace('"', ""))
     if name:
         plain = plain.replace(re.sub(r"\s+", " ", name.replace('"', "")), " ")
@@ -352,3 +381,6 @@ def check_text(text: str, name: str = "") -> None:
     for found in _SEPARATOR.finditer(plain):
         if found.group(1, 2, 3) != (" ", "x", " "):
             raise PatternTextError(f"dimension {found.group(0)!r} needs ' x ' in {text!r}")
+    found = _BY.search(plain)
+    if found:
+        raise PatternTextError(f"dimension {found.group(0)!r} needs ' x ' in {text!r}")

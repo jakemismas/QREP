@@ -24,7 +24,9 @@ import pypdf
 import pytest
 from reportlab import rl_config
 from reportlab.graphics.shapes import Drawing, Group, Rect, String
+from reportlab.graphics.widgetbase import Widget
 from reportlab.lib.colors import HexColor
+from reportlab.platypus import Spacer
 
 import pattern_checks as pc
 import qrep
@@ -296,6 +298,20 @@ def test_a_name_too_wide_for_one_footer_line_is_refused():
         render.render_pdf(full_document(name="Lantern " * 18 + "Rows"))
 
 
+def test_a_long_one_word_title_shrinks_until_the_word_fits_the_line(tmp_path):
+    # By the Helvetica-Bold widths per 1000 em (L 611, a 556, n 611, t 333, e 556,
+    # r 389, o 611, w 778, s 556, l 278, q 611, u 611, i 278), "Lanternrows" is 6001,
+    # "lanternrows" 6001 - 611 + 278 = 5668 and "quilt" 2111, so this one word is
+    # 6001 + 2 x 5668 + 2111 = 19448. At 28 pt it is 544.5 pt and at 26 pt 505.6 pt,
+    # both past the 504 pt line; at 24 pt it is 466.8 pt, so the title prints at
+    # 24 pt in one piece instead of breaking mid-word. The footer holds it at 10 pt.
+    name = "Lanternrowslanternrowslanternrowsquilt"
+    path = write(tmp_path, small_document(name=name))
+    assert page_texts(path)[0].count(name) == 2
+    assert {round(run.size, 2) for run in pc.read_pdf(path)[0].runs if run.text == name} == {
+        24, 10}
+
+
 def test_a_name_holding_a_date_is_refused():
     # G-02: no page shows a date, and the name prints in every footer.
     with pytest.raises(PatternTextError, match="date"):
@@ -442,6 +458,28 @@ def test_renders_ignore_the_clock_and_leave_invariant_mode_as_found(monkeypatch)
     assert rl_config.invariant == 0
 
 
+@pytest.mark.parametrize("epoch", ["1000000000", "x"])
+def test_source_date_epoch_neither_changes_the_bytes_nor_breaks_a_render(monkeypatch, epoch):
+    # reportlab stamps SOURCE_DATE_EPOCH into the PDF even in invariant mode, and
+    # a value that is not a number makes it raise. A render ignores the variable
+    # and leaves it as it found it.
+    document = full_document()
+    monkeypatch.delenv("SOURCE_DATE_EPOCH", raising=False)
+    plain = render.render_pdf(document)
+    monkeypatch.setenv("SOURCE_DATE_EPOCH", epoch)
+    assert render.render_pdf(document) == plain
+    assert os.environ["SOURCE_DATE_EPOCH"] == epoch
+
+
+def test_the_process_page_compression_setting_does_not_change_the_bytes(monkeypatch):
+    # RL_pageCompression=0 in the environment sets rl_config.pageCompression to 0,
+    # which would write the page streams uncompressed.
+    document = full_document()
+    plain = render.render_pdf(document)
+    monkeypatch.setattr(rl_config, "pageCompression", 0)
+    assert render.render_pdf(document) == plain
+
+
 # ---------------------------------------------------------------- section order (PS-02, G-04)
 
 
@@ -496,6 +534,31 @@ def test_sections_out_of_order_twice_or_without_the_cover_first_are_refused(kind
         PatternDocument(NAME, [Section(kind) for kind in kinds])
 
 
+def test_paragraph_indent_is_zero_to_three_levels():
+    Paragraph("Press.", indent=3)
+    for bad in (-1, 4):
+        with pytest.raises(ValueError):
+            Paragraph("Press.", indent=bad)
+
+
+def test_a_step_list_may_continue_its_numbering(tmp_path):
+    # G-04 restarts the count at 1 under each subheading, so a list that a note
+    # interrupts under one subheading continues from 3.
+    document = small_document(
+        Subheading("HST unit 1"),
+        Steps([Step("Draw the line."), Step("Sew both sides.")]),
+        Paragraph("Press toward the darker fabric."),
+        Steps([Step("Cut on the line."), Step("Trim the units.")], start=3),
+    )
+    text = page_texts(write(tmp_path, document))[1]
+    for n, words in enumerate(
+        ["Draw the line.", "Sew both sides.", "Cut on the line.", "Trim the units."], start=1
+    ):
+        assert f"{n}. {words}" in text
+    with pytest.raises(ValueError):
+        Steps([Step("Sew.")], start=0)
+
+
 def test_a_cover_that_overflows_page_1_is_refused():
     # The cover is alone on page 1 (G-09, X-08), so a cover that needs a second page
     # is a builder error, never a cover that spills onto page 2. At 13 pt per line,
@@ -506,6 +569,63 @@ def test_a_cover_that_overflows_page_1_is_refused():
     )
     with pytest.raises(ValueError, match="page 1"):
         render.render_pdf(document)
+
+
+def test_a_document_of_only_a_cover_is_one_page_or_refused(tmp_path):
+    # With no section after it, the cover is every page: 3 lines fit on one page,
+    # and 80 lines (over 1,000 pt) do not.
+    def cover_only(lines):
+        return PatternDocument(NAME, [Section(SectionKind.COVER,
+                                              [Paragraph(f"Cover line {n}.") for n in range(lines)])])
+
+    assert len(page_texts(write(tmp_path, cover_only(3)))) == 1
+    with pytest.raises(ValueError, match="page 1"):
+        render.render_pdf(cover_only(80))
+
+
+def test_a_cover_that_exactly_fills_page_1_is_accepted_and_one_point_more_is_refused():
+    # The title is one 34 pt line with 18 pt after it, so 34 + 18 = 52 pt, and a
+    # 614 pt cover figure fills the 666 pt frame exactly (52 + 614 = 666). That cover
+    # is alone on page 1. A 615 pt figure needs 667 pt, so it moves to page 2.
+    def cover(height):
+        figure = Figure(FigureRequest("cover_render", 300, height, "the whole quilt top"))
+        return PatternDocument(NAME, [Section(SectionKind.COVER, [figure]),
+                                      Section(SectionKind.FABRIC_REQUIREMENTS)])
+
+    render.render_pdf(cover(614))
+    with pytest.raises(ValueError, match="page 1"):
+        render.render_pdf(cover(615))
+
+
+FILLER = [Paragraph(f"Filler line {n}.") for n in range(1, 30)]
+
+
+@pytest.mark.parametrize(
+    ("blocks", "last"),
+    [
+        # The heading is one 20 pt line with 8 pt after it and each filler paragraph
+        # one 13 pt line with 6 pt after it, so 2 fillers end 28 + 2 x 19 = 66 pt down
+        # the 666 pt frame, leaving 600 pt. 37 one-line rows of 12 pt leading and
+        # 2 + 2 pt padding take 37 x 16 = 592 pt and end 8 pt above the frame foot.
+        ((*FILLER[:2], Table((), [(f"Row {n}", "(4) squares") for n in range(1, 38)])),
+         "Row 37"),
+        # A 595 pt figure in the same 600 pt fits with 5 pt to spare.
+        ((*FILLER[:2], Figure(FigureRequest("layout_chart", 400, 595, "rows 1 to 20"))),
+         "rows 1 to 20"),
+        # 29 fillers end 28 + 29 x 19 = 579 pt down; the square's row is 72 pt with
+        # 3 + 3 pt default padding, so it ends at 579 + 78 = 657 pt, 9 pt from the foot.
+        ((*FILLER[:29], PrintScaleSquare("The square measures 1 inch on each side.")),
+         "measures 1 inch"),
+    ],
+)
+def test_space_after_a_last_block_never_starts_a_blank_page(tmp_path, blocks, last):
+    # Each block ends 10 pt or less above the frame foot, where 10 pt of trailing
+    # space no longer fits. Space after a block is dropped at a page end, so the
+    # document stays two pages and the block is on page 2 (PS-41: no page without
+    # instruction text).
+    texts = page_texts(write(tmp_path, small_document(*blocks)))
+    assert len(texts) == 2
+    assert page_of(texts, last) == 2
 
 
 def test_each_step_stays_on_the_page_of_its_figure(tmp_path):
@@ -612,6 +732,24 @@ def test_a_kind_the_module_lacks_gets_a_labeled_placeholder_the_checker_reports(
     assert len(frames) == 1
 
 
+def test_a_small_placeholder_grows_to_hold_its_words_whole(tmp_path):
+    # A 36 x 30 pt request is narrower than the word "placeholder:" at 10 pt and
+    # shorter than one 13 pt line with the frame's padding above and below. The
+    # frame grows to hold its text, so the checker reads "placeholder" as a whole
+    # word and every run of the text lies inside the frame's outline.
+    request = FigureRequest("hst_unit", 36, 30, "HST unit 1")
+    path = write(tmp_path, small_document(Paragraph("Trim the unit.", figure=request)))
+    assert pc.placeholder_frames(path, MODEL) == [2]
+    page = pc.read_pdf(path)[1]
+    (frame,) = [s for s in page.shapes if s.fill is None]
+    assert frame.w >= 36 and frame.h >= 30
+    inside = [run for run in page.runs if frame.y0 < run.y < frame.y1]
+    assert normalize(" ".join(run.text for run in inside)) == (
+        "Figure placeholder: HST unit 1 (half-square triangle unit figure)")
+    for run in inside:
+        assert frame.x0 <= run.x and run.x + run.width <= frame.x1, run.text
+
+
 def test_without_the_figures_module_every_figure_is_a_placeholder(tmp_path):
     # full_document requests 7 figures: cover render, symbol legend, two HST steps,
     # assembly, layout chart and coloring page.
@@ -647,6 +785,70 @@ def test_a_drawing_larger_than_its_request_is_refused(monkeypatch, extra_width, 
     document = small_document(Paragraph("Join.", figure=FigureRequest("block", 90, 90, "Block 1")))
     with pytest.raises(ValueError, match="larger"):
         render.render_pdf(document)
+
+
+@pytest.mark.parametrize(
+    "draw",
+    [
+        lambda request: Spacer(request.width, request.height),
+        lambda request: [navy_block(request), Spacer(10, 10)],
+    ],
+)
+def test_a_drawer_must_return_reportlab_drawings(monkeypatch, draw):
+    # A flowable that is not a Drawing hides its labels from the L-10 and PS-05
+    # checks, so the renderer refuses it.
+    install_figures(monkeypatch, {"block": draw})
+    document = small_document(Figure(FigureRequest("block", 90, 90, "Block 1")))
+    with pytest.raises(TypeError, match="Drawing"):
+        render.render_pdf(document)
+
+
+class SmallLabel(Widget):
+    """A widget whose label exists only once the widget draws itself."""
+
+    def draw(self):
+        return Group(String(5, 5, "B3", fontName="Helvetica", fontSize=6))
+
+
+def test_a_label_inside_a_widget_is_checked_too(monkeypatch):
+    # L-10: a 6 pt label is below the 7 pt floor wherever it sits in the drawing.
+    def draw(request):
+        drawing = navy_block(request)
+        drawing.add(SmallLabel())
+        return drawing
+
+    install_figures(monkeypatch, {"block": draw})
+    document = small_document(Paragraph("Join.", figure=FigureRequest("block", 90, 90, "Block 1")))
+    with pytest.raises(ValueError, match="7 pt"):
+        render.render_pdf(document)
+
+
+@pytest.mark.parametrize("font", [None, "Times-Roman", "Courier-Bold"])
+def test_a_drawer_label_outside_the_helvetica_family_is_refused(monkeypatch, font):
+    # G-03: one sans-serif family. A String with no fontName is Times-Roman in
+    # reportlab, so a drawer that forgets the font breaks the rule.
+    def draw(request):
+        drawing = navy_block(request)
+        drawing.add(String(10, 40, "B2", fontSize=8, **({"fontName": font} if font else {})))
+        return drawing
+
+    install_figures(monkeypatch, {"block": draw})
+    document = small_document(Paragraph("Join.", figure=FigureRequest("block", 90, 90, "Block 1")))
+    with pytest.raises(ValueError, match="Helvetica"):
+        render.render_pdf(document)
+
+
+def test_bold_and_oblique_helvetica_labels_are_allowed(tmp_path, monkeypatch):
+    def draw(request):
+        drawing = navy_block(request)
+        for n, font in enumerate(["Helvetica-Bold", "Helvetica-Oblique", "Helvetica-BoldOblique"]):
+            drawing.add(String(10, 25 + 15 * n, f"B{n + 2}", fontName=font, fontSize=8))
+        return drawing
+
+    install_figures(monkeypatch, {"block": draw})
+    path = write(tmp_path, small_document(
+        Paragraph("Join.", figure=FigureRequest("block", 90, 90, "Block 1"))))
+    assert all(label in page_texts(path)[1] for label in ["B2", "B3", "B4"])
 
 
 def chart_parts(request):
@@ -796,6 +998,17 @@ BANNED = [
     'Cut 2" × 8" rectangles.',  # a multiplication sign is not C-10's x
     "Cut (6) 2 1/2 x WOF strips.",  # C-07: a length without its inch mark
     "Trim to 6 1/2 square.",
+    'Cut .5" strips.',  # a decimal with no leading digit
+    "Printed 13 October 2026.",
+    "Printed Oct 13, 2026.",
+    "Pieces: 2479",
+    "The quilt uses 2,479 pieces.",  # a total of 100 pieces or more is a piece total
+    "Cut 120 pieces from the strips.",
+    'Cut 1∕2" strips.',  # the division slash is a fraction glyph
+    'Cut 1–1/2" squares.',  # an en dash between whole and fraction
+    'Cut 1—1/2" squares.',  # an em dash
+    'Cut 2" by 8" rectangles.',  # C-10: a dimension uses " x "
+    "Cut 2 by 8 rectangles.",
 ]
 
 
@@ -830,7 +1043,8 @@ def test_allowed_text_passes_and_the_name_is_exempt(tmp_path):
     # PS-05 reads the text with the pattern name left out, so a name may hold a
     # word the body may not.
     for text in ['Cut (6) 2 1/2" x WOF strips.', "Sew in rows 1 to 4.", '6 1/2" x 8 3/4"',
-                 "Buy 3/4 yd."]:
+                 "Buy 3/4 yd.", 'Cut (120) 2 1/2" squares.', "Press the seam (Fig. 2). 3 rows",
+                 "Make 40 pieces.", "Sew the rows one by one."]:
         check_text(text)
     path = write(tmp_path, small_document(Paragraph("Lay out the Modern Lanterns blocks."),
                                           name="Modern Lanterns"))
@@ -838,6 +1052,25 @@ def test_allowed_text_passes_and_the_name_is_exempt(tmp_path):
     assert "Lay out the Modern Lanterns blocks." in page_texts(path)[1]
     with pytest.raises(PatternTextError):
         check_text("Lay out the Modern Lanterns blocks.")
+
+
+def test_text_helvetica_cannot_print_is_refused():
+    # Built-in Helvetica prints the WinAnsi (cp1252) characters only; others print
+    # as empty boxes. L and a with ogonek are outside it, in the text or the name.
+    with pytest.raises(PatternTextError, match="Helvetica"):
+        check_text("Łąka green")
+    with pytest.raises(PatternTextError):
+        render.render_pdf(small_document(Paragraph("Łąka green")))
+    with pytest.raises(PatternTextError):
+        full_document(name="Łąka Rows")
+
+
+def test_an_accented_name_prints_and_extracts_intact(tmp_path):
+    # e with acute is in cp1252, so the name prints in the title and every footer.
+    name = "Café Lantern Rows"
+    texts = page_texts(write(tmp_path, full_document(name=name)))
+    assert texts[0].count(name) == 2
+    assert all(name in text for text in texts)
 
 
 def test_a_table_may_have_no_header_row(tmp_path):

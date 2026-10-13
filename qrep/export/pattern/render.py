@@ -9,9 +9,10 @@ same bytes for the same document on every run (G-11, PS-04).
 
 Figures come from qrep.export.figures (A5a, A5b). Its DRAWERS mapping takes a
 figure kind to a function that receives the FigureRequest and returns a
-reportlab Drawing no larger than the request. A kind it does not provide, or
-the module's absence, gets a labeled placeholder frame, which the A11 checker
-counts (tests/pattern_checks.py:placeholder_frames).
+reportlab Drawing no larger than the request, or a list of them for a figure
+that spans pages. Its labels are Helvetica at 7 pt or more. A kind it does not
+provide, or the module's absence, gets a labeled placeholder frame, which the
+A11 checker counts (tests/pattern_checks.py:placeholder_frames).
 """
 
 from __future__ import annotations
@@ -20,12 +21,13 @@ import importlib
 import io
 import itertools
 import math
+import os
 from collections.abc import Callable, Iterator, Mapping
 from functools import partial
 from xml.sax.saxutils import escape
 
 from reportlab import rl_config
-from reportlab.graphics.shapes import Drawing, String
+from reportlab.graphics.shapes import Drawing, String, UserNode
 from reportlab.lib.colors import HexColor, black
 from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.styles import ParagraphStyle
@@ -40,7 +42,6 @@ from reportlab.platypus import (
     KeepTogether,
     PageBreak,
     PageTemplate,
-    Spacer,
     TableStyle,
 )
 from reportlab.platypus import Paragraph as TextFlowable
@@ -72,6 +73,9 @@ FRAME_HEIGHT = PAGE_HEIGHT - TOP_MARGIN - BOTTOM_MARGIN
 
 FONT = "Helvetica"
 BOLD = "Helvetica-Bold"
+# G-03: one sans-serif family, in any of its built-in weights and slants.
+LABEL_FONTS = frozenset({FONT, BOLD, "Helvetica-Oblique", "Helvetica-BoldOblique"})
+TITLE_SIZE = 28
 BODY_SIZE = 10
 # Tables print at the body size, above L-10's 9 pt floor: A11's PS-42 reads a
 # wrapped cell's lone line as body text, which needs 10 pt.
@@ -82,6 +86,11 @@ LABEL_MIN = 7
 FOOTER_SIZE = 10
 LEADING = 13
 INDENT = 18
+# Space after a table, a figure or the test square. It is spaceAfter, never a
+# trailing Spacer: reportlab drops spaceAfter at a page end, but a Spacer that no
+# longer fits starts a page of its own, blank but for the footer.
+BLOCK_GAP = 10
+PLACEHOLDER_PAD = 6
 # A figure leaves room on its page for one line of text and its caption.
 MAX_FIGURE_HEIGHT = FRAME_HEIGHT - 3 * LEADING
 
@@ -91,7 +100,8 @@ _OUTLINE = HexColor("#333333")
 _FRAME = HexColor("#808080")
 
 _BODY = ParagraphStyle("body", fontName=FONT, fontSize=BODY_SIZE, leading=LEADING, spaceAfter=6)
-_TITLE = ParagraphStyle("title", fontName=BOLD, fontSize=28, leading=34, spaceAfter=18)
+_TITLE = ParagraphStyle("title", fontName=BOLD, fontSize=TITLE_SIZE, leading=TITLE_SIZE + 6,
+                        spaceAfter=18)
 _HEADING = ParagraphStyle(
     "heading", fontName=BOLD, fontSize=16, leading=20, spaceBefore=14, spaceAfter=8, keepWithNext=1
 )
@@ -105,9 +115,11 @@ _DETAIL = ParagraphStyle("detail", parent=_BODY, leftIndent=2 * INDENT, spaceAft
 _CELL = ParagraphStyle("cell", fontName=FONT, fontSize=TABLE_SIZE, leading=12)
 _CELL_HEAD = ParagraphStyle("cellhead", parent=_CELL, fontName=BOLD)
 _CAPTION = ParagraphStyle("caption", parent=_BODY, alignment=TA_CENTER, spaceBefore=3, spaceAfter=10)
-_PLACEHOLDER = ParagraphStyle("placeholder", parent=_BODY, alignment=TA_CENTER, spaceAfter=0)
+# splitLongWords=0 keeps "placeholder" whole for the checker; the frame grows to fit.
+_PLACEHOLDER = ParagraphStyle("placeholder", parent=_BODY, alignment=TA_CENTER, spaceAfter=0,
+                              splitLongWords=0)
 
-Drawer = Callable[[FigureRequest], Flowable]
+Drawer = Callable[[FigureRequest], "Drawing | list[Drawing]"]
 
 
 def render_pdf(document: PatternDocument) -> bytes:
@@ -130,6 +142,8 @@ def render_pdf(document: PatternDocument) -> bytes:
         author="QREP",
         creator="QREP",
         invariant=1,
+        # Explicit, so RL_pageCompression in the environment cannot change the bytes.
+        pageCompression=1,
     )
     frame = Frame(
         SIDE_MARGIN, BOTTOM_MARGIN, CONTENT_WIDTH, FRAME_HEIGHT,
@@ -139,13 +153,21 @@ def render_pdf(document: PatternDocument) -> bytes:
     # The canvas takes invariant=1 from the template, which fixes the timestamp
     # and the document id. renderPDF orders a drawing's state changes only under
     # the module setting (renderPDF.py:213), so that is pinned for the build too.
+    # reportlab stamps SOURCE_DATE_EPOCH even in invariant mode, and fails on a
+    # value that is not a number (lib/utils.py:1270), so the build runs without it.
     previous = rl_config.invariant
+    epoch = os.environ.pop("SOURCE_DATE_EPOCH", None)
     rl_config.invariant = 1
     try:
         template.build(story, canvasmaker=partial(_FooterCanvas, pattern_name=document.name))
     finally:
         rl_config.invariant = previous
-    if probe.page != 1:
+        if epoch is not None:
+            os.environ["SOURCE_DATE_EPOCH"] = epoch
+    # The probe opens the page after the cover, so the cover took one page less
+    # than the probe's page number; with no page after it, the cover is all pages.
+    cover_pages = probe.page - 1 if len(document.sections) > 1 else template.page
+    if cover_pages != 1:
         raise ValueError("the cover does not fit on page 1, which it must have to itself")
     return out.getvalue()
 
@@ -170,17 +192,29 @@ class _Group(list):
 def _story(document: PatternDocument, drawers: Mapping[str, Drawer], probe: Flowable) -> list:
     numbers = itertools.count(1)
     cover, *rest = document.sections
-    items = [TextFlowable(escape(document.name), _TITLE)]
+    items = [_title(document.name)]
     for block in cover.blocks:
         items += _block(block, numbers, drawers, document.name)
-    items.append(probe)
     if rest:
-        items.append(PageBreak())
+        items += [PageBreak(), probe]
     for section in rest:
         items.append(TextFlowable(escape(section.kind.value), _HEADING))
         for block in section.blocks:
             items += _block(block, numbers, drawers, document.name)
     return items
+
+
+def _title(name: str) -> TextFlowable:
+    """The cover title at 28 pt, smaller in 2 pt steps until its longest word fits
+    the line, so no word of the name breaks mid-word."""
+    longest = max(name.split(), key=lambda word: stringWidth(word, BOLD, 1))
+    size = TITLE_SIZE
+    while size > BODY_SIZE and stringWidth(longest, BOLD, size) > CONTENT_WIDTH:
+        size -= 2
+    if stringWidth(longest, BOLD, size) > CONTENT_WIDTH:
+        raise ValueError(f"the word {longest!r} is too wide for the cover title at {size} pt")
+    style = ParagraphStyle(f"title{size}", parent=_TITLE, fontSize=size, leading=size + 6)
+    return TextFlowable(escape(name), style)
 
 
 def _keep_headings(items: list) -> list:
@@ -230,7 +264,7 @@ def _block(block: Block, numbers: Iterator[int], drawers: Mapping[str, Drawer], 
         return [_with_figure(parts, block.figure, number, drawers, name, "the paragraph")]
     if isinstance(block, Steps):
         groups = []
-        for n, step in enumerate(block.items, start=1):
+        for n, step in enumerate(block.items, start=block.start):
             number = next(numbers) if step.figure is not None else None
             parts = [TextFlowable(f"{n}. {escape(_cite(step.text, number))}", _STEP)]
             parts += [TextFlowable(escape(detail), _DETAIL) for detail in step.details]
@@ -240,12 +274,11 @@ def _block(block: Block, numbers: Iterator[int], drawers: Mapping[str, Drawer], 
                 groups.append(_with_figure(parts, step.figure, number, drawers, name, f"step {n}"))
         return groups
     if isinstance(block, Table):
-        return [_table(block), Spacer(1, 10)]
+        return [_table(block)]
     if isinstance(block, Figure):
-        return [_Group([part, Spacer(1, 10)])
-                for part in _figure_parts(block.request, drawers, name)]
+        return [_Group([_Spaced(part)]) for part in _figure_parts(block.request, drawers, name)]
     if isinstance(block, PrintScaleSquare):
-        return [_print_scale_square(block), Spacer(1, 10)]
+        return [_print_scale_square(block)]
     raise TypeError(f"no layout for block {block!r}")
 
 
@@ -297,42 +330,55 @@ def _figure_parts(request: FigureRequest, drawers: Mapping[str, Drawer], name: s
     if not parts:
         raise ValueError(f"the {request.kind} drawer returned nothing for {request.label!r}")
     for part in parts:
+        # Only a Drawing exposes its labels to the L-10, G-03 and PS-05 checks below.
+        if not isinstance(part, Drawing):
+            raise TypeError(
+                f"the {request.kind} drawer returned {type(part).__name__} for "
+                f"{request.label!r}; it must return a reportlab Drawing"
+            )
         _check_drawing(part, request, name)
         part.hAlign = "CENTER"
     return parts
 
 
-def _check_drawing(drawing: Flowable, request: FigureRequest, name: str) -> None:
+def _check_drawing(drawing: Drawing, request: FigureRequest, name: str) -> None:
     width, height = drawing.wrap(CONTENT_WIDTH, FRAME_HEIGHT)
     if width > request.width + 0.5 or height > request.height + 0.5:
         raise ValueError(
             f"the {request.kind} drawer returned {width:g} x {height:g} pt, larger than the "
             f"{request.width:g} x {request.height:g} pt requested for {request.label!r}"
         )
-    if isinstance(drawing, Drawing):
-        # A shape past the drawing's own box prints past the size it declared,
-        # into the margins or over the text beside it.
-        bounds = drawing.getBounds()
-        if bounds is not None and (
-            bounds[0] < -0.5 or bounds[1] < -0.5
-            or bounds[2] > drawing.width + 0.5 or bounds[3] > drawing.height + 0.5
-        ):
-            raise ValueError(
-                f"the {request.kind} drawer draws outside its {drawing.width:g} x "
-                f"{drawing.height:g} pt drawing for {request.label!r}"
-            )
+    # A shape past the drawing's own box prints past the size it declared, into
+    # the margins or over the text beside it.
+    bounds = drawing.getBounds()
+    if bounds is not None and (
+        bounds[0] < -0.5 or bounds[1] < -0.5
+        or bounds[2] > drawing.width + 0.5 or bounds[3] > drawing.height + 0.5
+    ):
+        raise ValueError(
+            f"the {request.kind} drawer draws outside its {drawing.width:g} x "
+            f"{drawing.height:g} pt drawing for {request.label!r}"
+        )
     for label, size in _labels(drawing):
         if size < LABEL_MIN - 0.01:
             raise ValueError(
                 f"figure label {label.text!r} in {request.label!r} prints at {size:g} pt; "
                 f"L-10 needs at least {LABEL_MIN} pt"
             )
+        if label.fontName not in LABEL_FONTS:
+            raise ValueError(
+                f"figure label {label.text!r} in {request.label!r} is set in "
+                f"{label.fontName}; G-03 allows Helvetica only"
+            )
         check_text(label.text, name)
 
 
 def _labels(node, scale: float = 1.0) -> Iterator[tuple[String, float]]:
     """Every string in a drawing with the size it prints at, through each
-    group's transform and the drawing's render scale."""
+    group's transform and the drawing's render scale. A widget's strings exist
+    only once it draws itself, so each widget is expanded as the renderer would."""
+    if isinstance(node, UserNode):
+        node = node.provideNode()
     a, b, c, d = (getattr(node, "transform", None) or (1, 0, 0, 1))[:4]
     scale *= math.sqrt(abs(a * d - b * c)) * getattr(node, "renderScale", 1.0)
     if isinstance(node, String):
@@ -342,13 +388,24 @@ def _labels(node, scale: float = 1.0) -> Iterator[tuple[String, float]]:
 
 
 class _Placeholder(Flowable):
-    """A frame the size of the requested figure that says which figure is missing."""
+    """A frame that says which figure is missing: the requested size, or larger
+    when its words need more room, so each word prints whole inside it."""
 
     def __init__(self, request: FigureRequest):
         super().__init__()
-        self.width, self.height = request.width, request.height
         self.text = f"Figure placeholder: {request.label} ({FIGURE_KINDS[request.kind]})"
+        widest = max(stringWidth(word, FONT, BODY_SIZE) for word in self.text.split())
+        self.width = max(request.width, widest + 2 * PLACEHOLDER_PAD)
+        if self.width > CONTENT_WIDTH:
+            raise ValueError(f"the figure label {request.label!r} has a word too wide for a page")
+        _, text_height = self._paragraph().wrap(self.width - 2 * PLACEHOLDER_PAD, PAGE_HEIGHT)
+        self.height = max(request.height, text_height + 2 * PLACEHOLDER_PAD)
+        if self.height > MAX_FIGURE_HEIGHT:
+            raise ValueError(f"the placeholder for {request.label!r} is too tall for a page")
         self.hAlign = "CENTER"
+
+    def _paragraph(self) -> TextFlowable:
+        return TextFlowable(escape(self.text), _PLACEHOLDER)
 
     def wrap(self, available_width, available_height):
         return self.width, self.height
@@ -359,10 +416,27 @@ class _Placeholder(Flowable):
         canv.setStrokeColor(_FRAME)
         canv.setLineWidth(0.75)
         canv.rect(0, 0, self.width, self.height, stroke=1, fill=0)
-        text = TextFlowable(escape(self.text), _PLACEHOLDER)
-        _, height = text.wrap(max(self.width - 12, 1), self.height)
-        text.drawOn(canv, 6, max((self.height - height) / 2, 0))
+        text = self._paragraph()
+        _, height = text.wrap(self.width - 2 * PLACEHOLDER_PAD, self.height)
+        text.drawOn(canv, PLACEHOLDER_PAD, (self.height - height) / 2)
         canv.restoreState()
+
+
+class _Spaced(Flowable):
+    """A figure part with BLOCK_GAP after it; a Drawing refuses a spaceAfter of its own."""
+
+    def __init__(self, part: Flowable):
+        super().__init__()
+        self.part = part
+        self.spaceAfter = BLOCK_GAP
+        self.hAlign = "CENTER"
+
+    def wrap(self, available_width, available_height):
+        self.width, self.height = self.part.wrap(available_width, available_height)
+        return self.width, self.height
+
+    def draw(self):
+        self.part.drawOn(self.canv, 0, 0)
 
 
 # ---------------------------------------------------------------- tables, swatches, test square
@@ -415,7 +489,8 @@ def _table(block: Table) -> TableFlowable:
     widths = [CONTENT_WIDTH * w / sum(weights) for w in weights]
     # Split between rows only, never inside one (G-04), repeating the header row
     # on each page the table continues on.
-    table = TableFlowable(data, colWidths=widths, repeatRows=head, splitByRow=1, splitInRow=0)
+    table = TableFlowable(data, colWidths=widths, repeatRows=head, splitByRow=1, splitInRow=0,
+                          spaceAfter=BLOCK_GAP)
     table.setStyle(TableStyle(style))
     return table
 
@@ -454,6 +529,7 @@ def _print_scale_square(block: PrintScaleSquare) -> Flowable:
     row = TableFlowable(
         [[_Square(), TextFlowable(escape(block.note), _BODY)]],
         colWidths=[84, CONTENT_WIDTH - 84],
+        spaceAfter=BLOCK_GAP,
     )
     row.setStyle(TableStyle([
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
@@ -467,7 +543,7 @@ def _print_scale_square(block: PrintScaleSquare) -> Flowable:
 
 
 class _PageProbe(Flowable):
-    """Records the page it lands on; it sits after the cover's last block."""
+    """Records the page it lands on; it opens the first page after the cover."""
 
     def __init__(self):
         super().__init__()
