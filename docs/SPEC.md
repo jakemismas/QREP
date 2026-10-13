@@ -106,6 +106,19 @@ Your pattern. Plan section 2.1 holds the screen-level rules and copy.
   and color names that match the PDF, the finished size (section 6.3), the method with its
   one-sentence reason, flagged regions with the region re-read tool (section 5), a way back to
   Confirm that keeps the corners, counts and bands, and one Download pattern (PDF) button.
+  Download pattern (PDF) calls export_pattern with no strategy, shows a busy state and ignores
+  repeat clicks while the export runs, names the file from the pattern name in kebab case plus
+  .pdf, and turns an engine failure into a plain sentence with Retry, never an endless spinner.
+  The census and the method line read the summary of the same call: its fabric letters and names
+  beside the census counts, and only the method's reason sentence, with no strategy cards,
+  difficulty, minutes or piece totals. The flagged-square count and outlines come from the read
+  result, and the screen shows no averaged confidence pill and no stage meters. The quilt sits
+  beside the photo at 720 px and wider and below it on a phone, and Compare with your photo opens
+  the lightbox. On a 390 x 844 phone Download pattern (PDF) shows without scrolling, above the
+  census, and a one-finger drag scrolls the page unless the quilt is zoomed; on a wide screen the
+  quilt stays in view while the side column scrolls. Until the editor goes (C6a), See your
+  pattern is the results screen's primary action, and Open in the editor and the start screen's
+  old demo entry stay as secondary actions.
 
 Unchanged rules that carry forward: photos never leave the device
 (docs/sprint-2/qrep-web-design-doc.md, Persistence policy); the photo is session-only
