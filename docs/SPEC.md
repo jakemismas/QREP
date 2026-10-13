@@ -91,9 +91,10 @@ Your pattern. Plan section 2.1 holds the screen-level rules and copy.
   (plan section 5.C, decision 2). The file is decoded when it is picked or dropped, with its EXIF
   orientation applied. A file the browser cannot decode (a text file, a truncated JPEG or PNG) shows
   a plain error on this screen and never opens Confirm. The picker accepts JPG and PNG, the formats
-  its copy names; Jake's phone pass checks a HEIC photo from the iPhone picker (plan section 9,
-  item 8). Capture tips sit beside the picker: the whole quilt flat and square-on with a margin, even light without glare,
-  and for a screenshot, the quilt zoomed to fill the screen first.
+  its copy names; C3b asks Jake's phone pass (plan section 9, item 8) to add one HEIC photo from the
+  iPhone picker. Capture tips sit beside the picker, and below it under 820 px: the whole quilt
+  flat and square-on with a margin, even light without glare, and for a screenshot, the quilt
+  zoomed to fill the screen first.
 - **Scope picker.** Right after the photo, QREP-drawn diagrams show quilts QREP works with and
   quilts it does not work with yet (section 3). A Not yet pick ends at the refusal screen, so an
   out-of-scope quilt is turned away before the user confirms anything. The pick travels with the
@@ -108,9 +109,10 @@ Your pattern. Plan section 2.1 holds the screen-level rules and copy.
   its longest side at every window width. The read gets the crop, the corners in the crop's pixels
   and the crop's offset in the photo, so the same photo and pins give the same crop on a phone and
   a desktop (#101). A new photo, Back or Cancel clears the staged photo first, and each read is
-  bound to its photo, so a result for an earlier photo is dropped. Until C3c switches to the
-  confirmed read, Continue sends the corners to the existing read, the counts ride along unused,
-  and the size block stays on this screen.
+  bound to its photo, so a result for an earlier photo is dropped. The counts set the square that
+  sizes the crop's margin. Until C3c switches to the confirmed read, Continue sends the corners and
+  the crop offset to the existing read, which does not take the counts, and the size block stays
+  on this screen.
 - **Reading.** One progress line while the engine reads fabrics and units and checks the grid fit
   (sections 4 and 5). A failed fit returns to Confirm with the pins and counts kept, and too few
   pixels per square returns there with advice for a closer photo (sections 3 and 5).
