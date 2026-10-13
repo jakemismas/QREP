@@ -250,14 +250,16 @@ bridge's own resize copies leave with A7:
   value, an unknown preset, a default on a size you set and a corner leg no offered square keeps
   whole.
 - `apply_finished_size` serves the crop-screen size and the editor's size edit. Both pass a size
-  you entered, so it records a typed basis with the step it applied, and it refuses a size below
-  1/8 in. Its default one-eighth step is the sprint 3 reconcile: the exact square rounded half-up on
-  each side you set, the smaller of the two, with the 14 in border cap the only change. It refuses
-  a reconciled square that would break a corner leg instead of rounding the leg.
+  you entered, so it records a typed basis with the step it applied; a preset chip there arrives
+  as a width and height and is recorded as typed until #244. Its default one-eighth step is the
+  sprint 3 reconcile: the exact square rounded half-up on each side you set, the smaller of the
+  two. It differs from sprint 3 in three ways: it caps borders at 14 in, it refuses a size below
+  1/8 in, and it refuses a reconciled square that would break a corner leg instead of rounding the
+  leg.
 - A square size and borders you choose (`size_at`) record no basis yet, because the basis has no
-  source for a chosen square, and the editor's resize calls keep a basis they make stale; #240
-  tracks both. Size the read's model each time, because sizing a sized model again rounds its
-  borders again.
+  source for a chosen square, so a later default request on that model records a default, at 0.0
+  on a read. The editor's resize calls keep a basis they make stale. #240 tracks both. Size the
+  read's model each time, because sizing a sized model again rounds its borders again.
 
 ## 7. Math defaults and conventions
 
