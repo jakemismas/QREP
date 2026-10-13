@@ -21,6 +21,7 @@ const fakes = vi.hoisted(() => ({
   model: null as unknown,
   photo: null as unknown,
   pattern: null as unknown,
+  engineStatus: { phase: "ready" } as unknown,
 }));
 
 vi.mock("../viewer", async () => {
@@ -37,7 +38,7 @@ vi.mock("../viewer", async () => {
 vi.mock("../state/model", () => ({ useModel: () => fakes.model }));
 vi.mock("../state/photo", () => ({ usePhoto: () => fakes.photo }));
 vi.mock("../state/pattern", () => ({ useYourPattern: () => fakes.pattern }));
-vi.mock("../engine/engineStatus", () => ({ useEngineStatus: () => ({ phase: "ready" }) }));
+vi.mock("../engine/engineStatus", () => ({ useEngineStatus: () => fakes.engineStatus }));
 
 /** A 2 x 2 quilt in two fabrics with the given cell confidences. */
 function quilt(confidence: number[][]): QuiltModel {
@@ -79,6 +80,7 @@ const EDITOR_CONFIDENCE = [
 
 function setUp(source: "photo" | "sample"): void {
   fakes.canvas = [];
+  fakes.engineStatus = { phase: "ready" };
   fakes.model = { model: quilt(EDITOR_CONFIDENCE), summary: null, censusFailed: false };
   fakes.photo = {
     photoUrl: "blob:read-photo",
@@ -131,21 +133,35 @@ describe("YourPatternScreen's quilt canvas", () => {
   });
 });
 
+const READY_SUMMARY = {
+  status: "ready",
+  summary: {
+    method: "strip",
+    method_reason: "Blocks repeat.",
+    fabrics: [
+      { fabric_id: "f0", letter: "f0", name: "Fabric 1" },
+      { fabric_id: "f1", letter: "f1", name: "Fabric 2" },
+    ],
+  },
+};
+
 describe("YourPatternScreen's error line", () => {
+  it("asks for an engine Retry while only the census waits on a failed engine", () => {
+    setUp("sample");
+    fakes.engineStatus = { phase: "failed", message: "the engine files did not load" };
+    (fakes.pattern as { summary: unknown }).summary = READY_SUMMARY;
+    const html = renderToString(<YourPatternScreen />);
+
+    // The census is null and has not failed, so it is still to land.
+    expect(html).toContain("The pattern engine did not start, so your pattern is not ready yet.");
+    expect(html).toContain('data-testid="pattern-retry"');
+    expect(html).toContain("counting squares");
+  });
+
   it("shows a failed census with its Retry, and the census rows as not counted", () => {
     setUp("sample");
     fakes.model = { model: quilt(EDITOR_CONFIDENCE), summary: null, censusFailed: true };
-    (fakes.pattern as { summary: unknown }).summary = {
-      status: "ready",
-      summary: {
-        method: "strip",
-        method_reason: "Blocks repeat.",
-        fabrics: [
-          { fabric_id: "f0", letter: "f0", name: "Fabric 1" },
-          { fabric_id: "f1", letter: "f1", name: "Fabric 2" },
-        ],
-      },
-    };
+    (fakes.pattern as { summary: unknown }).summary = READY_SUMMARY;
     const html = renderToString(<YourPatternScreen />);
 
     expect(html).toContain("Your fabrics could not be counted this time. Try again.");

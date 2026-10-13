@@ -65,21 +65,32 @@ describe("patternError", () => {
 
   it("keeps Retry for a census that failed, after the PDF's and the summary's lines", () => {
     // Alone, the census failure shows its own sentence and Retry.
-    expect(patternError(false, READY, IDLE_PDF, true)).toEqual({
+    expect(patternError(false, READY, IDLE_PDF, "failed")).toEqual({
       message: CENSUS_FAILED_SENTENCE,
       retry: "census",
     });
     // Beside a failed summary the summary's line shows; its Retry sends the
     // census again too (retryPattern), so one Retry covers both.
-    expect(patternError(false, { status: "failed", message: FAILED_SENTENCE }, IDLE_PDF, true)).toEqual({
+    expect(patternError(false, { status: "failed", message: FAILED_SENTENCE }, IDLE_PDF, "failed")).toEqual({
       message: FAILED_SENTENCE,
       retry: "summary",
     });
-    expect(patternError(false, READY, { status: "failed", message: FAILED_SENTENCE }, true)).toEqual({
+    expect(patternError(false, READY, { status: "failed", message: FAILED_SENTENCE }, "failed")).toEqual({
       message: FAILED_SENTENCE,
       retry: "pdf",
     });
-    expect(patternError(false, READY, IDLE_PDF, false)).toBeNull();
+    expect(patternError(false, READY, IDLE_PDF, "ready")).toBeNull();
+  });
+
+  it("asks for an engine Retry while only the census waits on a failed boot", () => {
+    // A census Retry restarted the engine and the new boot failed: the
+    // summary is ready and the PDF idle, but the census is still queued.
+    expect(patternError(true, READY, IDLE_PDF, "waiting")).toEqual({
+      message: ENGINE_DOWN_SENTENCE,
+      retry: "engine",
+    });
+    // While the engine boots or runs, a waiting census is no error.
+    expect(patternError(false, READY, IDLE_PDF, "waiting")).toBeNull();
   });
 
   it("shows a refusal's reason with no Retry", () => {

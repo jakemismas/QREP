@@ -48,8 +48,9 @@ export interface CensusOptions {
   validate: (modelJson: string) => Promise<ModelSummary>;
   onSummary: (summary: ModelSummary) => void;
   onError: (message: string) => void;
-  /** Called whenever `failed` may have changed. */
-  onFailedChange?: (failed: boolean) => void;
+  /** Called whenever `failed` may have changed. Required, so the screen that
+   * shows a failed census cannot be left unwired. */
+  onFailedChange: (failed: boolean) => void;
 }
 
 /**
@@ -107,7 +108,7 @@ export class CensusQueue implements CensusTarget {
 
   private setFailure(failure: CensusQueue["failure"]): void {
     this.failure = failure;
-    this.options.onFailedChange?.(this.failed);
+    this.options.onFailedChange(this.failed);
   }
 
   private drain(): void {

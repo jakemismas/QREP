@@ -108,7 +108,10 @@ export function YourPatternScreen() {
   const showFlagged = flags.model !== null;
   const { summary, pdf } = pattern;
 
-  const error = patternError(engineStatus.phase === "failed", summary, pdf, censusFailed);
+  // Your pattern opens a quilt fresh, which drops the old census, so a null
+  // census that has not failed is one still to land.
+  const censusState = censusFailed ? "failed" : census === null ? "waiting" : "ready";
+  const error = patternError(engineStatus.phase === "failed", summary, pdf, censusState);
   const retryAction = error?.retry ?? null;
   const retry = retryAction !== null ? () => pattern.retry(retryAction) : null;
 
