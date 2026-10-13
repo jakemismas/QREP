@@ -282,7 +282,9 @@ def vote(
     with a 1 x 1 block. Beside a voting type, the block of a type of one
     copy joins the type its block period predicts when it agrees with it on
     at least attach_agreement of its squares (_attach); such an attached
-    block takes its type for the layout, the repeat and the breaks only. A
+    block takes its type for the layout, the repeat, the breaks and the
+    agreement figure, and does not count toward its type's votes or
+    majority. A
     square of a voting type that differs from its type majority takes it
     below threshold and is a Break otherwise, and every differing square of
     an attached block is a Break. Raises ValueError on any other input.
@@ -339,7 +341,7 @@ def vote(
 
     # Typing found an attached block too different from its type to be a
     # copy, so its squares are no evidence of what the type holds or of a
-    # misread: they neither move the majority nor count as a copy, and the
+    # misread: they do not count toward the type's votes or majority, and the
     # vote never changes them. A block different by design that the layout
     # attaches keeps its design, and its differences show as breaks.
     own = ~attached

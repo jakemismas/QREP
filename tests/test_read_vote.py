@@ -15,10 +15,10 @@ the rules qrep/vision/read/vote.py states for it:
     type's majority on at least the attach share of its squares; the period
     is the one below, taken over the blocks that are not wild, with at least
     one such pair at the shift in every column (rows) or row (columns)
-  an attached block takes its type for the layout, the repeat and the breaks
-    only: it does not move the majority or count as a copy, and each of its
-    squares that differs from the majority is a Break, whatever its
-    confidence
+  an attached block takes its type for the layout, the repeat, the breaks
+    and the agreement figure: it does not count toward its type's votes or
+    majority, and each of its squares that differs from the majority is a
+    Break, whatever its confidence
   repeat: the smallest row and column periods of the type layout, each at
     most half the layout (two whole copies), else the whole layout, times the
     block size; the whole field for a 1 x 1 block, which confirms no repeat
@@ -593,25 +593,37 @@ def test_an_attached_block_keeps_every_square_and_shows_each_difference():
     assert result.agreement == _approx(382 / 400)
 
 
-@pytest.mark.parametrize(("changed", "attaches"), [(12, True), (13, False)])
-def test_the_attach_floor_decides_whether_a_varied_copy_joins(changed, attaches):
+@pytest.mark.parametrize(
+    ("changed", "unsure", "attaches"),
+    [(12, False, True), (13, False, False), (12, True, True)],
+    ids=["over-the-floor", "under-the-floor", "at-the-floor"],
+)
+def test_the_attach_floor_decides_whether_a_varied_copy_joins(changed, unsure, attaches):
     clean = _fixture_labels()
     labels = clean.copy()
     squares = [(n // 5, n % 5) for n in range(changed)]
     for r, c in squares:
         labels[r, c] = 2
-    result = _vote(labels, np.ones(labels.shape), 5, 5)
+    confidence = np.ones(labels.shape)
+    if unsure:
+        confidence[2, 2] = 0.0
+    result = _vote(labels, confidence, 5, 5)
     # Source: knobs.ATTACH_AGREEMENT (0.5, passed as ATTACH); PR #251 round
     #   2: nothing pinned the floor.
     # Inputs: the fixture at confidence 1.0, with the first `changed`
     #   squares of block (0, 0), an A block, in raster order read 2, a label
-    #   no block holds.
+    #   no block holds; at the floor, square (2, 2), the 13th, unchanged, at
+    #   confidence 0.
     # Arithmetic: block (0, 0) equals A on 25 - changed squares, 13 / 25 =
-    #   0.52 or 12 / 25 = 0.48, and B on at most the 8 squares A and B share,
-    #   8 / 25 = 0.32; all under 0.75, so it is a type of one copy, wild
-    #   beside A (49 other copies) and B (49). As in the varied-copy test,
-    #   the period is 2 blocks each way and the blocks an even number of
-    #   blocks away are A. 0.52 >= 0.5 attaches; 0.48 < 0.5 does not.
+    #   0.52 or 12 / 25 = 0.48, and at the floor on 12 squares of total
+    #   confidence 25 - 1 = 24, 12 / 24 = 0.5; it equals B on at most the 8
+    #   squares A and B share, 8 / 25 = 0.32 or 8 / 24 = 0.333; all under
+    #   0.75, so it is a type of one copy, wild beside A (49 other copies)
+    #   and B (49). As in the varied-copy test, the period is 2 blocks each
+    #   way and the blocks an even number of blocks away are A. 0.52 >= 0.5
+    #   and 0.5 >= 0.5 attach; 0.48 < 0.5 does not. Square (2, 2) reads A's
+    #   clean label, so it is no Break, and the agreement figure counts
+    #   squares whatever their confidence.
     #   Attached: types (i + j) % 2, repeat (10, 10), each changed square a
     #   Break (read 2, majority A's clean label, 1.0), no changes, agreement
     #   (2475 - 12) / 2475. Not attached: block (0, 0) is type 0, B (first at
@@ -940,7 +952,7 @@ def test_a_type_of_two_copies_counts_toward_agreement_without_voting():
 def test_inputs_are_not_mutated():
     labels, confidence = _three_copies_with_misread(read=0, conf=0.3)
     labels_before, confidence_before = labels.copy(), confidence.copy()
-    result = vote(labels, confidence, 3, 3)
+    result = _vote(labels, confidence, 3, 3)
     # Source: ticket, "inputs are never mutated".
     # Formula, Inputs, Arithmetic: the misread case, which changes (1, 7).
     # Expected: both inputs equal their copies, and the result owns its arrays.
