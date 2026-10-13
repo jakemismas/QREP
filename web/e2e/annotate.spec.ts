@@ -15,6 +15,14 @@
  * page as real touch pointers, so the one-finger drag and the two-finger
  * pinch take the same path as on a phone.
  *
+ * Reads after a drop poll: React renders a pointermove's update at a lower
+ * priority than the drop's, so a read straight after the input call can see
+ * an earlier frame (PR #247 review of 0b7e9a3, major 5).
+ *
+ * The lacma tests open a copy of corpus/annotations/lacma-54871.json with
+ * every verified-jake claim taken out, so verifying that photo on this page
+ * and committing the result leaves these tests as they are.
+ *
  * Against the deployed site (SPIKE_BASE_URL) the page is absent by design,
  * so only the check that it stays unpublished is registered there.
  */
@@ -163,8 +171,28 @@ function expectValidAnnotation(file: string) {
   expect(status, `${python} refused ${file}: ${stderr}`).toBe(0);
 }
 
+/** The committed lacma-54871 annotation with every verified-jake claim taken out. */
 function readAnnotation(): Json {
-  return JSON.parse(readFileSync(lacmaAnnotation, "utf8")) as Json;
+  const committed = JSON.parse(readFileSync(lacmaAnnotation, "utf8")) as Json;
+  const stripped: Json = {};
+  for (const [field, value] of Object.entries(committed)) {
+    if (IDENTITY_FIELDS.includes(field)) {
+      stripped[field] = value;
+      continue;
+    }
+    const claims = (value as Claim[]).filter((claim) => claim.provenance !== "verified-jake");
+    if (claims.length) stripped[field] = claims;
+  }
+  return stripped;
+}
+
+/** The stripped copy as a file the page can open. */
+function lacmaAnnotationFile() {
+  return {
+    name: "lacma-54871.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify(readAnnotation(), null, 2)),
+  };
 }
 
 function claimBy(claims: unknown, provenance: string): Claim {
@@ -173,16 +201,19 @@ function claimBy(claims: unknown, provenance: string): Claim {
   return found;
 }
 
-/** Draws the generated quilt on a canvas in the page and returns its PNG bytes. */
-async function drawQuilt(page: Page): Promise<Buffer> {
+/**
+ * Draws the generated quilt on a canvas in the page and returns its PNG
+ * bytes; another background gives another photo of the same size.
+ */
+async function drawQuilt(page: Page, background = "#808080"): Promise<Buffer> {
   const dataUrl = await page.evaluate(
-    ({ size, outer, field, cols, rows, square }) => {
+    ({ size, outer, field, cols, rows, square, background }) => {
       const canvas = document.createElement("canvas");
       canvas.width = size.width;
       canvas.height = size.height;
       const ctx = canvas.getContext("2d");
       if (!ctx) throw new Error("this browser has no 2d canvas");
-      ctx.fillStyle = "#808080";
+      ctx.fillStyle = background;
       ctx.fillRect(0, 0, size.width, size.height);
       // The band fills the whole outer edge; the field covers all but its outer square.
       ctx.fillStyle = "#1f3a93";
@@ -202,9 +233,64 @@ async function drawQuilt(page: Page): Promise<Buffer> {
       cols: 10,
       rows: 6,
       square: 50,
+      background,
     },
   );
   return Buffer.from(dataUrl.slice(dataUrl.indexOf(",") + 1), "base64");
+}
+
+// The generated quilt's colors as RGB: the band #1f3a93 and the field's top
+// left square #b03a2e, (row + col) % 2 = 0.
+const BAND_RGB = [0x1f, 0x3a, 0x93];
+const RED_SQUARE_RGB = [0xb0, 0x3a, 0x2e];
+
+// The turned photo: 800 x 600 stored, one color a quadrant, so a view turned
+// by its EXIF tag puts other colors under the same point.
+const QUADRANT_RGB = {
+  top_left: [220, 40, 40],
+  top_right: [40, 40, 220],
+  bottom_left: [40, 180, 40],
+  bottom_right: [230, 220, 40],
+};
+
+/** An 800 x 600 JPEG with one color in each quadrant, as stored (no EXIF). */
+async function drawQuadrants(page: Page): Promise<Buffer> {
+  const dataUrl = await page.evaluate((colors) => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 800;
+    canvas.height = 600;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("this browser has no 2d canvas");
+    const fill = (rgb: number[], x: number, y: number) => {
+      ctx.fillStyle = `rgb(${rgb.join(", ")})`;
+      ctx.fillRect(x, y, 400, 300);
+    };
+    fill(colors.top_left, 0, 0);
+    fill(colors.top_right, 400, 0);
+    fill(colors.bottom_left, 0, 300);
+    fill(colors.bottom_right, 400, 300);
+    return canvas.toDataURL("image/jpeg", 0.95);
+  }, QUADRANT_RGB);
+  return Buffer.from(dataUrl.slice(dataUrl.indexOf(",") + 1), "base64");
+}
+
+/**
+ * The JPEG with an EXIF APP1 segment right after its SOI marker, built by
+ * hand as in src/dev/annotate/orientation.test.ts: FF E1, length 0x22 = 2 +
+ * 6 ("Exif" 00 00) + 8 (TIFF header MM 00 2A, IFD0 at 8) + 2 (one entry) + 12
+ * (tag 0x0112 Orientation, type 3 SHORT, count 1, the value) + 4 (no next IFD)
+ * = 34.
+ */
+function withExifOrientation(jpeg: Buffer, orientation: number): Buffer {
+  expect([jpeg[0], jpeg[1]], "a JPEG starts with FF D8").toEqual([0xff, 0xd8]);
+  const app1 = Buffer.from([
+    0xff, 0xe1, 0x00, 0x22, 0x45, 0x78, 0x69, 0x66, 0x00, 0x00,
+    0x4d, 0x4d, 0x00, 0x2a, 0x00, 0x00, 0x00, 0x08,
+    0x00, 0x01,
+    0x01, 0x12, 0x00, 0x03, 0x00, 0x00, 0x00, 0x01, 0x00, orientation, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+  ]);
+  return Buffer.concat([jpeg.subarray(0, 2), app1, jpeg.subarray(2)]);
 }
 
 /** Opens the generated quilt in the page and waits for its hash. */
@@ -226,7 +312,7 @@ async function openQuilt(page: Page): Promise<{ png: Buffer; sha: string }> {
 async function openLacma(page: Page) {
   await page.goto("annotate.html");
   await page.getByTestId("photo-input").setInputFiles(lacmaImage);
-  await page.getByTestId("annotation-input").setInputFiles(lacmaAnnotation);
+  await page.getByTestId("annotation-input").setInputFiles(lacmaAnnotationFile());
   await expect(page.getByTestId("identity")).toContainText("Canvas 3873 x 4096");
   await expect(page.getByTestId("pin-outer.top_left")).toBeVisible();
 }
@@ -284,15 +370,25 @@ async function expectReachable(page: Page, p: Point, what: string) {
 
 const between = (a: Point, b: Point, t: number): Point => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
 
+/** One screen pixel spans canvas.width / box.width source pixels, and snapping to whole pixels adds up to 0.5 more. */
+const screenPixel = (box: Box, canvas: Size) => canvas.width / box.width + 0.5;
+
 /**
- * A drop lands within one screen pixel of its target: one screen pixel spans
- * canvas.width / box.width source pixels, and snapping to whole pixels adds
- * up to 0.5 more. This proves the pointer maps through the image rect.
+ * A drop lands within one screen pixel of its target, which proves the
+ * pointer maps through the image rect. Polled, then returned.
  */
-function expectWithinScreenPixel(at: Point, target: Point, box: Box, canvas: Size, what: string) {
-  const tolerance = canvas.width / box.width + 0.5;
-  expect(Math.abs(at.x - target.x), `${what}: x ${at.x} vs ${target.x}`).toBeLessThanOrEqual(tolerance);
-  expect(Math.abs(at.y - target.y), `${what}: y ${at.y} vs ${target.y}`).toBeLessThanOrEqual(tolerance);
+async function expectDropNear(page: Page, id: string, target: Point, box: Box, canvas: Size, what: string): Promise<Point> {
+  const tolerance = screenPixel(box, canvas);
+  await expect
+    .poll(
+      async () => {
+        const at = await pinPoint(page, id);
+        return Math.max(Math.abs(at.x - target.x), Math.abs(at.y - target.y));
+      },
+      { message: `${what}: within ${tolerance.toFixed(2)} source px of (${target.x}, ${target.y})` },
+    )
+    .toBeLessThanOrEqual(tolerance);
+  return pinPoint(page, id);
 }
 
 /** The view's pan, from pin-view's own transform: translate(x px, y px) scale(s). */
@@ -311,7 +407,93 @@ async function expectPinHitAreas(page: Page, ids: string[], when: string) {
   }
 }
 
-async function mouseDrag(page: Page, id: string, target: Point, canvas: Size): Promise<Box> {
+/**
+ * The pin's whole box takes a touch: the point 1 px inside each corner of it,
+ * and its center, hit that pin. boundingBox alone ignores clipping, so a box
+ * the stage cuts in half still measures 44 x 44 (PR #247 review of 0b7e9a3,
+ * major 1).
+ */
+async function expectWholeHitArea(page: Page, id: string, when: string) {
+  const box = await boxOf(page, `pin-${id}`);
+  expect(box.width, `${id} width ${when}`).toBeGreaterThanOrEqual(PIN_HIT_PX - LAYOUT_UNIT_PX);
+  expect(box.height, `${id} height ${when}`).toBeGreaterThanOrEqual(PIN_HIT_PX - LAYOUT_UNIT_PX);
+  const probes = [
+    { x: box.x + 1, y: box.y + 1 },
+    { x: box.x + box.width - 1, y: box.y + 1 },
+    { x: box.x + 1, y: box.y + box.height - 1 },
+    { x: box.x + box.width - 1, y: box.y + box.height - 1 },
+    { x: box.x + box.width / 2, y: box.y + box.height / 2 },
+  ];
+  const hits = await page.evaluate(
+    (points) =>
+      points.map((p) => document.elementFromPoint(p.x, p.y)?.closest("[data-pin-id]")?.getAttribute("data-pin-id") ?? null),
+    probes,
+  );
+  expect(hits, `${id}: each corner and the center of its box ${when}`).toEqual(probes.map(() => id));
+}
+
+/** A mouse drag that starts on the stage's middle, where no test puts a pin. */
+async function panBy(page: Page, dx: number, dy: number) {
+  const stage = await boxOf(page, "pin-stage");
+  const grab = { x: Math.round(stage.x + stage.width / 2), y: Math.round(stage.y + stage.height / 2) };
+  await expectReachable(page, { x: grab.x + dx, y: grab.y + dy }, "the pan's end");
+  await page.mouse.move(grab.x, grab.y);
+  await page.mouse.down();
+  await page.mouse.move(grab.x + dx, grab.y + dy, { steps: 4 });
+  await page.mouse.up();
+}
+
+/** The loupe's RGB at points given as fractions of its size. */
+async function loupePixels(page: Page, at: Point[]): Promise<number[][]> {
+  return page.getByTestId("loupe").evaluate((el, points) => {
+    const canvas = el as HTMLCanvasElement;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("the loupe has no 2d context");
+    return points.map((p) =>
+      Array.from(ctx.getImageData(Math.floor(p.x * canvas.width), Math.floor(p.y * canvas.height), 1, 1).data.slice(0, 3)),
+    );
+  }, at);
+}
+
+interface LoupeProbe {
+  name: string;
+  /** Fractions of the loupe's size. */
+  at: Point;
+  rgb: number[];
+}
+
+/** The loupe draws the photo under the pin: each probe shows its color within tolerance per channel. Polled, since it draws after a render. */
+async function expectLoupeShows(page: Page, probes: LoupeProbe[], tolerance: number, what: string) {
+  await expect
+    .poll(
+      async () => {
+        const got = await loupePixels(page, probes.map((p) => p.at));
+        return probes
+          .map((p, i) => ({ p, rgb: got[i] }))
+          .filter(({ p, rgb }) => rgb.some((value, k) => Math.abs(value - p.rgb[k]) > tolerance))
+          .map(({ p, rgb }) => `${p.name}: ${rgb.join(", ")} for ${p.rgb.join(", ")}`);
+      },
+      { message: `${what}: the loupe shows the photo under the pin` },
+    )
+    .toEqual([]);
+}
+
+/**
+ * The loupe spans LOUPE_CSS_PX / (shown x LOUPE_MAGNIFICATION) source pixels,
+ * 128 / (shown x 3), where shown is box.width / canvas.width screen pixels a
+ * source pixel (src/confirm/Loupe.tsx). A probe a quarter of the way in from
+ * an edge sits a quarter span from the pin.
+ */
+const loupeQuarterSpan = (box: Box, canvas: Size) => 128 / ((box.width / canvas.width) * 3) / 4;
+
+interface DragOptions {
+  /** The loupe's side at the drop: right while the pin shows in the stage's top left quarter. */
+  side?: "left" | "right";
+  /** Runs at the drop, before the pointer lifts. */
+  atDrop?: () => Promise<void>;
+}
+
+async function mouseDrag(page: Page, id: string, target: Point, canvas: Size, options: DragOptions = {}): Promise<Box> {
   const box = await showPhoto(page);
   const from = toScreen(box, canvas, await pinPoint(page, id));
   const to = toScreen(box, canvas, target);
@@ -323,6 +505,8 @@ async function mouseDrag(page: Page, id: string, target: Point, canvas: Size): P
   await page.mouse.move(mid.x, mid.y, { steps: 4 });
   await expect(page.getByTestId("loupe"), `${id}: loupe while dragging`).toBeVisible();
   await page.mouse.move(to.x, to.y, { steps: 4 });
+  if (options.side) await expect(page.getByTestId("loupe"), `${id}: loupe side`).toHaveAttribute("data-side", options.side);
+  if (options.atDrop) await options.atDrop();
   await page.mouse.up();
   await expect(page.getByTestId("loupe"), `${id}: loupe after the drop`).toBeHidden();
   return box;
@@ -348,7 +532,8 @@ async function touchDrag(page: Page, cdp: CDPSession, id: string, target: Point,
   for (const t of [0.75, 1]) await touch(cdp, "touchMove", [between(from, to, t)]);
   // A finger rests on its spot before it lifts. CDP moves arrive all at once,
   // so lifting straight away reads as a flick, and Chromium then swallows the
-  // click of the next tap (seen as a Fit tap that delivered no click).
+  // click of the next tap (seen as a Fit tap that delivered no click). The
+  // wait is a floor on the rest, so a loaded machine only makes it longer.
   await page.waitForTimeout(100);
   await touch(cdp, "touchEnd", []);
   await expect(page.getByTestId("loupe"), `${id}: loupe after the drop`).toBeHidden();
@@ -367,10 +552,33 @@ async function nudgeTo(page: Page, id: string, target: Point) {
 }
 
 /** A mouse drop, checked against one screen pixel, then nudged onto target exactly. */
-async function placeByMouse(page: Page, id: string, target: Point, canvas: Size) {
-  const box = await mouseDrag(page, id, target, canvas);
-  expectWithinScreenPixel(await pinPoint(page, id), target, box, canvas, `${id} drop`);
+async function placeByMouse(page: Page, id: string, target: Point, canvas: Size, options: DragOptions = {}) {
+  const box = await mouseDrag(page, id, target, canvas, options);
+  await expectDropNear(page, id, target, box, canvas, `${id} drop`);
   await nudgeTo(page, id, target);
+}
+
+/** Presses key on the pin times times. */
+async function pressOn(page: Page, id: string, key: string, times: number) {
+  await pin(page, id).focus();
+  for (let i = 0; i < times; i++) await page.keyboard.press(key);
+}
+
+/** The band's width in squares, from its label: "1.0244 squares" or "1 square, 1 1/2 in". */
+async function bandWidth(page: Page, band: number): Promise<number> {
+  return Number.parseFloat((await page.getByTestId(`band-${band}-width`).textContent()) ?? "");
+}
+
+// The page rounds a width to four decimals (bands.ts roundWidth), so a bound
+// on it rounds outward the same way.
+const roundDown4 = (value: number) => Math.floor(value * 1e4) / 1e4;
+const roundUp4 = (value: number) => Math.ceil(value * 1e4) / 1e4;
+
+/** The band's width is within tolerance of expected squares. Polled. */
+async function expectBandWidth(page: Page, band: number, expected: number, tolerance: number, what: string) {
+  await expect
+    .poll(async () => Math.abs((await bandWidth(page, band)) - expected), { message: `${what}: band ${band} width near ${expected}` })
+    .toBeLessThanOrEqual(tolerance);
 }
 
 /** A drop can land on its target exactly and need no nudge, so the keys get pressed here regardless. */
@@ -434,6 +642,18 @@ if (process.env.SPIKE_BASE_URL) {
       const view = page.getByTestId("pin-view");
       await expect(view).toHaveAttribute("data-scale", "1.000");
 
+      // A right button press on a pin drags nothing: it opens the browser's
+      // menu and may never send pointerup (PinLayer's primary-button guard).
+      const fitBox = await showPhoto(page);
+      const rightStart = toScreen(fitBox, QUILT, QUILT_INSET.top_right);
+      await page.mouse.move(rightStart.x, rightStart.y);
+      await page.mouse.down({ button: "right" });
+      await page.mouse.move(rightStart.x - 40, rightStart.y + 40, { steps: 4 });
+      await expect(page.getByTestId("loupe"), "no loupe on a right-button drag").toHaveCount(0);
+      await page.mouse.up({ button: "right" });
+      await page.keyboard.press("Escape");
+      await expectPinAt(page, "outer.top_right", QUILT_INSET.top_right);
+
       // The hit area holds at fit and, through the pins' counter-scale, after a zoom.
       await expectPinHitAreas(page, outerIds, "at fit");
       await page.getByRole("button", { name: "Zoom in", exact: true }).click();
@@ -464,7 +684,12 @@ if (process.env.SPIKE_BASE_URL) {
       await expect(view).toHaveAttribute("data-scale", "1.000");
       expect(await viewTranslate(page)).toEqual({ x: 0, y: 0 });
 
-      for (const name of CORNERS) await placeByMouse(page, `outer.${name}`, OUTER[name], QUILT);
+      // The loupe sits in the stage's top left corner, so it moves right while
+      // the pin shows in the stage's top left quarter: only top_left's target,
+      // (100, 100) of 800 x 600, is in that quarter.
+      for (const name of CORNERS) {
+        await placeByMouse(page, `outer.${name}`, OUTER[name], QUILT, { side: name === "top_left" ? "right" : "left" });
+      }
       await expectKeySteps(page, "outer.top_left", OUTER.top_left);
 
       // No square size yet, so inches are off, and no band exists.
@@ -485,8 +710,36 @@ if (process.env.SPIKE_BASE_URL) {
       await expectPinAt(page, "square.a", { x: 370, y: 280 });
       await expectPinAt(page, "square.b", { x: 430, y: 320 });
       // The field's top left square: (150, 150) to (150 + 50, 150 + 50) = (200, 200).
-      await placeByMouse(page, "square.a", { x: 150, y: 150 }, QUILT);
-      await placeByMouse(page, "square.b", { x: 200, y: 200 }, QUILT);
+      // Held at (150, 150), the field's corner, the loupe's four quarters show
+      // what lies around it: the band up and to the left, the red top left
+      // square down and to the right. A probe a quarter of the loupe in from
+      // its corner sits a quarter span from the pin; that must clear the
+      // drop's error and stay inside the 50 px square, or the probes would
+      // straddle an edge.
+      const fieldCorner = { x: 150, y: 150 };
+      await placeByMouse(page, "square.a", fieldCorner, QUILT, {
+        side: "right",
+        atDrop: async () => {
+          const box = await boxOf(page, "pin-image");
+          const quarter = loupeQuarterSpan(box, QUILT);
+          const slack = screenPixel(box, QUILT);
+          expect(quarter, "a quarter span clears the drop's error").toBeGreaterThan(slack);
+          expect(quarter + slack, "a quarter span stays inside one square").toBeLessThan(50);
+          await expectLoupeShows(
+            page,
+            [
+              { name: "up and left", at: { x: 0.25, y: 0.25 }, rgb: BAND_RGB },
+              { name: "up and right", at: { x: 0.75, y: 0.25 }, rgb: BAND_RGB },
+              { name: "down and left", at: { x: 0.25, y: 0.75 }, rgb: BAND_RGB },
+              { name: "down and right", at: { x: 0.75, y: 0.75 }, rgb: RED_SQUARE_RGB },
+            ],
+            // A lossless PNG drawn unsmoothed: only color management can move a channel, and not by 8.
+            8,
+            "square.a at the field's corner",
+          );
+        },
+      });
+      await placeByMouse(page, "square.b", { x: 200, y: 200 }, QUILT, { side: "right" });
       await page.getByTestId("square-use").click();
       await expect(pin(page, "square.a")).toHaveCount(0);
       // The square spans 50 / 600 of the outer edge across, so 600 / 50 = 12
@@ -528,8 +781,8 @@ if (process.env.SPIKE_BASE_URL) {
       for (const [a] of verticals) expect(a.x, "no square line left of the field").toBeGreaterThanOrEqual(150 - 1e-6);
 
       await page.getByTestId("band-1-inc").click();
-      // 1 + 0.25 = 1.25 squares.
-      await expect(page.getByTestId("band-1-width")).toHaveText("1.25 squares");
+      // Steppers move whole squares: 1 + 1 = 2 squares.
+      await expect(page.getByTestId("band-1-width")).toHaveText("2 squares");
       await expect(page.getByTestId("band-1-inches")).toBeDisabled();
 
       // Adding a band selects it (BandsControl's band-add), and band-1-select
@@ -541,30 +794,59 @@ if (process.env.SPIKE_BASE_URL) {
       await expect(pin(page, "band.left")).toHaveCount(0);
       await select.click();
       await expect(select).toHaveAttribute("aria-pressed", "true");
-      // Band 1's inner line at 1.25 squares sits 1.25 / (10 + 2 x 1.25) = 1.25 /
-      // 12.5 = 0.1 of the way in, so the left handle is at x = 100 + 600 x 0.1 =
-      // 160, y = 100 + 400 x 0.5 = 300.
+      // Band 1's inner line at 2 squares sits 2 / (10 + 2 x 2) = 1/7 of the way
+      // in, so the left handle is at x = 100 + 600 / 7 = 185.714, y = 100 + 400
+      // x 0.5 = 300.
       const handle = await pinPoint(page, "band.left");
-      expect(handle.x).toBeCloseTo(160, 6);
+      expect(handle.x).toBeCloseTo(100 + 600 / 7, 6);
       expect(handle.y).toBeCloseTo(300, 6);
 
-      const handleTarget = { x: 150, y: 300 };
-      const box = await mouseDrag(page, "band.left", handleTarget, QUILT);
-      // f = (150 - 100) / 600 = 1/12; w = (f x 10) / (1 - 2f) = (10/12) / (10/12)
-      // = 1.0 square. The drop is within one screen pixel (800 / box.width, about
-      // 1.05 source px at this width, then snapped): x = 151 gives f = 51/600 =
-      // 0.085 and w = 0.85 / 0.83 = 1.024, x = 149 gives f = 49/600 and w = 0.8167
-      // / 0.8367 = 0.976, both within 0.05.
-      const widthText = (await page.getByTestId("band-1-width").textContent()) ?? "";
-      expect(widthText).toMatch(/^\d+(\.\d+)? squares?$/);
-      expect(Math.abs(Number.parseFloat(widthText) - 1), `band width from "${widthText}"`).toBeLessThanOrEqual(0.05);
-      // The handle follows the band's new inner line, at the drop.
-      expectWithinScreenPixel(await pinPoint(page, "band.left"), handleTarget, box, QUILT, "band.left drop");
+      // Each handle, dragged on its own axis, sets the one band's width. With
+      // one band, bands.ts widthFromDepth gives w = f N / (1 - 2f) for a line
+      // at depth f on an axis of N squares: N = 10 across for left and right,
+      // 6 down for top and bottom. Each drop lands within one screen pixel,
+      // which snaps to the target or a whole pixel either side (800 /
+      // box.width + 0.5 is under 2 at this width), so each width is checked
+      // at the target, within the band the two neighbouring pixels give.
+      //   left to x 150: f = 50 / 600 = 1/12, w = (10/12) / (10/12) = 1;
+      //     x 149: f = 49/600, w = 0.8167 / 0.8367 = 0.976; x 151: 0.85 / 0.83 = 1.024.
+      //   top to y 180: f = 80 / 400 = 0.2, w = 1.2 / 0.6 = 2;
+      //     y 179: f = 0.1975, w = 1.185 / 0.605 = 1.959; y 181: 1.215 / 0.595 = 2.042.
+      //   right to x 640: f = 60 / 600 = 0.1, w = 1 / 0.8 = 1.25;
+      //     x 641: f = 59/600, w = 0.9833 / 0.8033 = 1.224; x 639: 1.0167 / 0.7967 = 1.276.
+      //   bottom to y 460: f = 40 / 400 = 0.1, w = 0.6 / 0.8 = 0.75;
+      //     y 461: f = 0.0975, w = 0.585 / 0.805 = 0.727; y 459: 0.615 / 0.795 = 0.774.
+      // Every neighbour is within 0.05 of its target width.
+      const handleDrags: { side: string; target: Point; width: number }[] = [
+        { side: "left", target: { x: 150, y: 300 }, width: 1 },
+        { side: "top", target: { x: 400, y: 180 }, width: 2 },
+        { side: "right", target: { x: 640, y: 300 }, width: 1.25 },
+        { side: "bottom", target: { x: 400, y: 460 }, width: 0.75 },
+      ];
+      for (const { side, target, width } of handleDrags) {
+        const id = `band.${side}`;
+        const box = await mouseDrag(page, id, target, QUILT);
+        expect(screenPixel(box, QUILT), "a drop lands on its target or a whole pixel either side").toBeLessThan(2);
+        await expectBandWidth(page, 1, width, 0.05, `${id} drop`);
+        // The handle follows the band's new inner line, at the drop.
+        await expectDropNear(page, id, target, box, QUILT, `${id} drop`);
+      }
+      const widthLabel = page.getByTestId("band-1-width");
+      await expect(widthLabel).toHaveText(/^\d+(\.\d+)? squares?$/);
 
       await page.getByTestId("square-size").selectOption("12");
       await expect(page.getByTestId("bands-inches-off")).toHaveCount(0);
       const inches = page.getByTestId("band-1-inches");
       await expect(inches).toBeEnabled();
+      // Leaving the field without typing keeps the dragged width: rounding the
+      // shown inches to 1/4 in would move it (0.75 squares x 1.5 in = 1.125 in
+      // rounds to 1.25 in, 0.8333 squares).
+      const dragged = (await widthLabel.textContent()) ?? "";
+      expect(dragged).toMatch(/ in$/);
+      await inches.focus();
+      await page.keyboard.press("Tab");
+      await expect(inches).not.toBeFocused();
+      await expect(widthLabel).toHaveText(dragged);
       await inches.fill("1.5");
       await inches.press("Enter");
       // "12" is 12 eighths = 1 1/2 in a square; 1.5 in (already a quarter inch)
@@ -621,6 +903,95 @@ if (process.env.SPIKE_BASE_URL) {
       await expectNoHorizontalOverflow(page, "annotate-loaded");
     });
 
+    test("a pin on the photo's edge keeps its whole hit area at fit and zoomed with the view at that edge", async ({
+      page,
+    }) => {
+      await openQuilt(page);
+      // Keys take two pins onto the photo's corners. From the inset (120, 90):
+      // 12 Shift+Left presses of 10 px give 120 - 120 = 0, 9 Shift+Up give 90 -
+      // 90 = 0. From (680, 510): 12 Shift+Right give 680 + 120 = 800 and 9
+      // Shift+Down give 510 + 90 = 600, the far edges, where snapToPixel stops.
+      await pressOn(page, "outer.top_left", "Shift+ArrowLeft", 12);
+      await pressOn(page, "outer.top_left", "Shift+ArrowUp", 9);
+      await pressOn(page, "outer.bottom_right", "Shift+ArrowRight", 12);
+      await pressOn(page, "outer.bottom_right", "Shift+ArrowDown", 9);
+      await expectPinAt(page, "outer.top_left", { x: 0, y: 0 });
+      await expectPinAt(page, "outer.bottom_right", { x: 800, y: 600 });
+
+      const fit = await showPhoto(page);
+      await expectWholeHitArea(page, "outer.top_left", "at fit");
+      await expectWholeHitArea(page, "outer.bottom_right", "at fit");
+
+      const view = page.getByTestId("pin-view");
+      await page.getByRole("button", { name: "Zoom in", exact: true }).click();
+      await expect(view).toHaveAttribute("data-scale", "1.500");
+      // The zoom about the middle put the view at (-w/4, -h/4), w and h the
+      // photo's fit size (about -180 and -135 here). A pan of (+300, +250) runs
+      // past the clamp, which stops at (0, 0): the photo's top left corner a
+      // gutter inside the stage's.
+      await panBy(page, 300, 250);
+      await expect.poll(async () => viewTranslate(page), { message: "panned to the top left" }).toEqual({ x: 0, y: 0 });
+      await expectWholeHitArea(page, "outer.top_left", "at 1.5, the view at the top left");
+      // Two pans of (-250, -200) run past the other clamp, at w (1 - 1.5) =
+      // -w / 2 and -h / 2: the photo's bottom right corner a gutter inside.
+      await panBy(page, -250, -200);
+      await panBy(page, -250, -200);
+      await expect.poll(async () => (await viewTranslate(page)).x, { message: "panned to the right" }).toBeCloseTo(-fit.width / 2, 1);
+      await expect.poll(async () => (await viewTranslate(page)).y, { message: "panned to the bottom" }).toBeCloseTo(-fit.height / 2, 1);
+      await expectWholeHitArea(page, "outer.bottom_right", "at 1.5, the view at the bottom right");
+    });
+
+    test("a JPEG tagged EXIF orientation 6 opens as stored: the canvas, the pins and the loupe index the stored pixels", async ({
+      page,
+    }) => {
+      await page.goto("annotate.html");
+      const tagged = withExifOrientation(await drawQuadrants(page), 6);
+      // The fixture works as a test only if this browser turns it: shown as a
+      // plain image, orientation 6 (a quarter turn clockwise) swaps 800 x 600
+      // to 600 x 800.
+      const turned = await page.evaluate(async (base64) => {
+        const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+        const img = new Image();
+        img.src = URL.createObjectURL(new Blob([bytes], { type: "image/jpeg" }));
+        await img.decode();
+        return { width: img.naturalWidth, height: img.naturalHeight };
+      }, tagged.toString("base64"));
+      expect(turned, "this browser turns the tagged JPEG").toEqual({ width: 600, height: 800 });
+
+      await page.getByTestId("photo-input").setInputFiles({ name: "turned.jpg", mimeType: "image/jpeg", buffer: tagged });
+      // The page hashes the file as it is, tag and all.
+      const sha = createHash("sha256").update(tagged).digest("hex");
+      await expect(page.getByTestId("identity")).toHaveText(`Canvas 800 x 600 px; sha256 ${sha}`);
+      for (const name of CORNERS) await expectPinAt(page, `outer.${name}`, QUILT_INSET[name]);
+      const box = await showPhoto(page);
+      // Shown as stored: 800 / 600 = 1.333 wide for 1 high.
+      expect(box.width / box.height).toBeCloseTo(800 / 600, 2);
+
+      // The loupe draws the stored pixels too. Held at (200, 150), the middle of
+      // the stored top left quadrant, it shows that quadrant's red; a view
+      // turned by the tag would put the stored point (150, 399), in the green
+      // bottom left quadrant, under the same coordinates. Then (600, 450), the
+      // middle of the bottom right, shows yellow. A probe a quarter span from
+      // the pin stays inside a 400 x 300 quadrant's middle 100 px.
+      const quadrantProbes = (rgb: number[]): LoupeProbe[] => [
+        { name: "up and left", at: { x: 0.25, y: 0.25 }, rgb },
+        { name: "down and right", at: { x: 0.75, y: 0.75 }, rgb },
+      ];
+      expect(loupeQuarterSpan(box, QUILT) + screenPixel(box, QUILT)).toBeLessThan(100);
+      // JPEG at quality 0.95 shifts a flat color by a few levels; 30 still
+      // tells red, blue, green and yellow apart by far.
+      for (const [target, rgb, side] of [
+        [{ x: 200, y: 150 }, QUADRANT_RGB.top_left, "right"],
+        [{ x: 600, y: 450 }, QUADRANT_RGB.bottom_right, "left"],
+      ] as const) {
+        const dragBox = await mouseDrag(page, "outer.top_left", target, QUILT, {
+          side,
+          atDrop: () => expectLoupeShows(page, quadrantProbes([...rgb]), 30, `held at (${target.x}, ${target.y})`),
+        });
+        await expectDropNear(page, "outer.top_left", target, dragBox, QUILT, "outer.top_left drop");
+      }
+    });
+
     test("a field-corner frame saves with no border and reopens in field mode", async ({ page }) => {
       const { png, sha } = await openQuilt(page);
       await page.getByTestId("frame-mode").selectOption("field");
@@ -665,6 +1036,20 @@ if (process.env.SPIKE_BASE_URL) {
       await expect(page.getByTestId("frame-mode")).toHaveValue("field");
       await expect(pin(page, "outer.top_left")).toHaveCount(0);
       for (const name of CORNERS) await expectPinAt(page, `field.${name}`, FIELD[name]);
+
+      // Another photo of the canvas's size under the same name keeps the
+      // annotation by its stem, but its sha256 is not the annotation's, so the
+      // page refuses it instead of saving its pins under the first photo's
+      // identity (PR #247 review of 0b7e9a3, AnnotatePage.tsx:173).
+      const other = await drawQuilt(page, "#5a5a5a");
+      const otherSha = createHash("sha256").update(other).digest("hex");
+      expect(otherSha).not.toBe(sha);
+      await page.getByTestId("photo-input").setInputFiles({ name: QUILT_NAME, mimeType: "image/png", buffer: other });
+      await expect(page.getByTestId("sha-error")).toHaveText(
+        `This photo's sha256 is ${otherSha}, but the annotation names ${sha}: it is another photo. Open the photo the annotation names.`,
+      );
+      await expect(page.locator("[data-pin-id]")).toHaveCount(0);
+      await expect(page.getByTestId("save")).toHaveCount(0);
     });
 
     test("a photo with another stem closes the annotation, and an annotation for another photo is refused", async ({
@@ -687,11 +1072,7 @@ if (process.env.SPIKE_BASE_URL) {
 
       // A fresh copy of the file: the input still holds the one opened above, and
       // choosing an unchanged selection again fires no change event (the next test).
-      await page.getByTestId("annotation-input").setInputFiles({
-        name: "lacma-54871.json",
-        mimeType: "application/json",
-        buffer: readFileSync(lacmaAnnotation),
-      });
+      await page.getByTestId("annotation-input").setInputFiles(lacmaAnnotationFile());
       await expect(page.getByTestId("error")).toHaveText(
         `This annotation names ${LACMA_PHOTO}, but the open photo is ${QUILT_NAME}. Open the photo it names first.`,
       );
@@ -713,18 +1094,18 @@ if (process.env.SPIKE_BASE_URL) {
       // annotation, chosen from the same file inputs as before.
       await page.getByTestId("photo-input").setInputFiles(lacmaImage);
       await expect(page.getByTestId("photo-path")).toHaveValue("lacma-54871.jpg");
-      await page.getByTestId("annotation-input").setInputFiles(lacmaAnnotation);
+      await page.getByTestId("annotation-input").setInputFiles(lacmaAnnotationFile());
       await expect(page.getByTestId("identity")).toContainText("Canvas 3873 x 4096");
       await expect(page.getByTestId("mode")).toHaveText("Verifying, starting from proposed-a");
       for (const name of CORNERS) await expectPinAt(page, `outer.${name}`, start.outer_edge.corners[name]);
     });
 
-    test("the committed lacma-54871 copy opens on proposed-a and saves one verified claim beside every original", async ({
+    test("lacma-54871 with no verified claim opens on proposed-a and saves one verified claim beside every original", async ({
       page,
     }) => {
       const original = readAnnotation();
-      // The page opens on the verified claim, else proposed-a's: this file has no
-      // verified-jake claim in any field, so it opens on proposed-a's.
+      // The page opens on the verified claim, else proposed-a's: the stripped
+      // copy has no verified-jake claim in any field, so it opens on proposed-a's.
       const provenances = Object.entries(original)
         .filter(([field]) => !IDENTITY_FIELDS.includes(field))
         .flatMap(([, claims]) => (claims as Claim[]).map((claim) => claim.provenance));
@@ -758,13 +1139,20 @@ if (process.env.SPIKE_BASE_URL) {
       expectValidAnnotation(saved.file);
     });
 
-    test("the pin drill starts at the neutral inset and records a drag, a nudge and a count in order", async ({
+    test("the pin drill starts at the neutral inset, records drags, nudges, counts and bands in order, and gives back the verify edits", async ({
       page,
     }) => {
       const original = readAnnotation();
       const start = claimBy(original.frame, "proposed-a").value as FrameValue;
       await openLacma(page);
       for (const name of CORNERS) await expectPinAt(page, `outer.${name}`, start.outer_edge.corners[name]);
+      // An unsaved verify edit before the drill: one ArrowDown, y + 1.
+      const edited: Corners = {
+        ...start.outer_edge.corners,
+        bottom_right: { x: start.outer_edge.corners.bottom_right.x, y: start.outer_edge.corners.bottom_right.y + 1 },
+      };
+      await pressOn(page, "outer.bottom_right", "ArrowDown", 1);
+      await expectPinAt(page, "outer.bottom_right", edited.bottom_right);
 
       await page.getByTestId("drill-start").click();
       await expect(page.getByTestId("mode")).toHaveText("Pin drill: the annotation is hidden; 0 records");
@@ -774,13 +1162,25 @@ if (process.env.SPIKE_BASE_URL) {
       const id = "outer.top_left";
       const target = { x: 400, y: 450 };
       const box = await mouseDrag(page, id, target, LACMA_CANVAS);
-      const dropped = await pinPoint(page, id);
-      expectWithinScreenPixel(dropped, target, box, LACMA_CANVAS, `${id} drop`);
+      const dropped = await expectDropNear(page, id, target, box, LACMA_CANVAS, `${id} drop`);
       await pin(page, id).focus();
       await page.keyboard.press("ArrowRight");
       await expectPinAt(page, id, { x: dropped.x + 1, y: dropped.y });
       await page.getByTestId("counts-across-blocks-inc").click();
       await expect(page.getByTestId("mode")).toHaveText("Pin drill: the annotation is hidden; 3 records");
+      // Typed "24" key by key is one entry once the field is left: "2" and then
+      // "24" both parse, so a record a keystroke would make two.
+      const downSquares = page.getByTestId("counts-down-squares");
+      await downSquares.selectText();
+      await downSquares.pressSequentially("24");
+      await expect(page.getByTestId("counts-down-total")).toHaveText("1 block x 24 squares = 24 squares");
+      await expect(page.getByTestId("mode")).toHaveText("Pin drill: the annotation is hidden; 3 records");
+      await page.keyboard.press("Tab");
+      await expect(page.getByTestId("mode")).toHaveText("Pin drill: the annotation is hidden; 4 records");
+      // A band added starts 1 square wide; one step makes 1 + 1 = 2.
+      await page.getByTestId("band-add").click();
+      await page.getByTestId("band-1-inc").click();
+      await expect(page.getByTestId("mode")).toHaveText("Pin drill: the annotation is hidden; 6 records");
 
       await expect(page.getByTestId("save")).toHaveText("Save drill records");
       const saved = await saveJson(page, "lacma-54871.drill.json", "drill");
@@ -807,25 +1207,36 @@ if (process.env.SPIKE_BASE_URL) {
           kind: "counts",
           counts: { blocks_across: 2, blocks_down: 1, squares_per_block_across: 1, squares_per_block_down: 1 },
         },
+        // The typed 24 squares down, once.
+        {
+          seq: 4,
+          t_ms: expect.any(Number),
+          kind: "counts",
+          counts: { blocks_across: 2, blocks_down: 1, squares_per_block_across: 1, squares_per_block_down: 24 },
+        },
+        { seq: 5, t_ms: expect.any(Number), kind: "bands", bands: [{ width_squares: 1 }] },
+        { seq: 6, t_ms: expect.any(Number), kind: "bands", bands: [{ width_squares: 2 }] },
       ]);
       expect(records[0].t_ms).toBeGreaterThanOrEqual(0);
       for (let i = 1; i < records.length; i++) {
         expect(records[i].t_ms, `record ${i + 1} t_ms`).toBeGreaterThanOrEqual(records[i - 1].t_ms);
       }
 
+      // Ending the drill gives back the verify draft, the unsaved edit included.
       await page.getByTestId("drill-stop").click();
       await expect(page.getByTestId("mode")).toHaveText("Verifying, starting from proposed-a");
-      for (const name of CORNERS) await expectPinAt(page, `outer.${name}`, start.outer_edge.corners[name]);
+      for (const name of CORNERS) await expectPinAt(page, `outer.${name}`, edited[name]);
+      await expect(page.getByTestId("counts-across-blocks")).toHaveValue(String((claimBy(original.counts, "proposed-a").value as Json).blocks_across));
     });
   });
 
   test.describe("annotate page with touch on an iPhone 13", { tag: "@phone" }, () => {
     test.use(IPHONE_OPTIONS);
 
-    test("one finger drags every pin, a drag off the pins moves nothing, two fingers pinch and pan, and a zoomed drag maps", async ({
+    test("one finger drags every pin and a band, two fingers pinch and pan, a zoomed drag maps, and the saved JSON is the hand geometry", async ({
       page,
     }) => {
-      await openQuilt(page);
+      const { sha } = await openQuilt(page);
       // Records each pointerdown's type, so the test shows its input arrived as touch, not as a mouse.
       await page.evaluate(() => {
         const types: string[] = [];
@@ -842,7 +1253,7 @@ if (process.env.SPIKE_BASE_URL) {
       for (const name of CORNERS) {
         const id = `outer.${name}`;
         const box = await touchDrag(page, cdp, id, OUTER[name], QUILT);
-        expectWithinScreenPixel(await pinPoint(page, id), OUTER[name], box, QUILT, `${id} drop`);
+        await expectDropNear(page, id, OUTER[name], box, QUILT, `${id} drop`);
         await nudgeTo(page, id, OUTER[name]);
       }
       await expectKeySteps(page, "outer.top_left", OUTER.top_left);
@@ -873,20 +1284,23 @@ if (process.env.SPIKE_BASE_URL) {
       await touch(cdp, "touchStart", fingers(60));
       for (const apart of [90, 120, 150, 180]) await touch(cdp, "touchMove", fingers(apart));
       await expect(view).toHaveAttribute("data-scale", "3.000");
-      // Both fingers then move together by (20, 15): at a fixed spread the
+      // Both fingers then move together by (-20, -15): at a fixed spread the
       // scale holds at 3 and the content under the first midpoint follows the
-      // midpoint, so the view moves by (20, 15). The pinch put the view at
-      // about -2 x (20, 12) from the held finger's place on the stage, so (+20,
-      // +15) keeps it inside the clamp of (0, 0).
+      // midpoint, so the view moves by (-20, -15). The pinch left the view at
+      // -2 times the held finger's place in the photo's box, near its top left
+      // corner, so close to the clamp at (0, 0); a move left and up heads for
+      // the far clamp at w (1 - 3) = -2w and -2h instead, which it stays inside.
       const pinched = await viewTranslate(page);
-      for (const t of [0.5, 1]) await touch(cdp, "touchMove", fingers(180, { x: 20 * t, y: 15 * t }));
+      expect(pinched.x - 20, "the pan stays inside the far x clamp").toBeGreaterThan(-2 * fit.width);
+      expect(pinched.y - 15, "the pan stays inside the far y clamp").toBeGreaterThan(-2 * fit.height);
+      for (const t of [0.5, 1]) await touch(cdp, "touchMove", fingers(180, { x: -20 * t, y: -15 * t }));
       // React renders a pointermove after the input call returns, so the pan is polled.
       await expect
         .poll(async () => (await viewTranslate(page)).x - pinched.x, { message: "two-finger pan x" })
-        .toBeCloseTo(20, 2);
+        .toBeCloseTo(-20, 2);
       await expect
         .poll(async () => (await viewTranslate(page)).y - pinched.y, { message: "two-finger pan y" })
-        .toBeCloseTo(15, 2);
+        .toBeCloseTo(-15, 2);
       await touch(cdp, "touchEnd", []);
       await expect(view).toHaveAttribute("data-scale", "3.000");
       // The page zoomed its own view, not the browser's.
@@ -898,19 +1312,103 @@ if (process.env.SPIKE_BASE_URL) {
       const zoomedTarget = { x: 130, y: 120 };
       const zoomed = await touchDrag(page, cdp, "outer.top_left", zoomedTarget, QUILT);
       expect(zoomed.width).toBeCloseTo(3 * fit.width, 3);
-      expectWithinScreenPixel(await pinPoint(page, "outer.top_left"), zoomedTarget, zoomed, QUILT, "zoomed drop");
+      await expectDropNear(page, "outer.top_left", zoomedTarget, zoomed, QUILT, "zoomed drop");
       await nudgeTo(page, "outer.top_left", zoomedTarget);
       // Four corner drags, one off the pins, two fingers for the pinch, one zoomed drag.
       expect(await pointerTypes()).toEqual(["touch", "touch", "touch", "touch", "touch", "touch", "touch", "touch"]);
       await page.getByRole("button", { name: "Fit", exact: true }).tap();
       await expect(view).toHaveAttribute("data-scale", "1.000");
 
-      // Across blocks by stepper, 1 + 1 = 2; down squares typed, 3.
+      // Back onto the quilt's corner by keys: (130, 120) less 30 and 20 is (100, 100).
+      await nudgeTo(page, "outer.top_left", OUTER.top_left);
+
+      // The quilt's counts: blocks by stepper, 1 + 1 = 2 on each axis; squares
+      // a block typed, 5 across and 3 down.
       await page.getByTestId("counts-across-blocks-inc").tap();
+      await page.getByTestId("counts-down-blocks-inc").tap();
+      await page.getByTestId("counts-across-squares").fill("5");
       await page.getByTestId("counts-down-squares").fill("3");
-      // 2 blocks x 1 square = 2 squares across; 1 block x 3 squares = 3 down.
-      await expect(page.getByTestId("counts-across-total")).toHaveText("2 blocks x 1 square = 2 squares");
-      await expect(page.getByTestId("counts-down-total")).toHaveText("1 block x 3 squares = 3 squares");
+      // 2 x 5 = 10 squares across; 2 x 3 = 6 down.
+      await expect(page.getByTestId("counts-across-total")).toHaveText("2 blocks x 5 squares = 10 squares");
+      await expect(page.getByTestId("counts-down-total")).toHaveText("2 blocks x 3 squares = 6 squares");
+
+      // A band by touch. It starts 1 square wide, so its inner line is 1 / (10
+      // + 2) = 1/12 in and the left handle at x = 100 + 600 / 12 = 150, y = 300.
+      // Dragged to x 175: f = 75 / 600 = 0.125, w = 10 x 0.125 / (1 - 0.25) =
+      // 1.6667 squares. The drop lands within one screen pixel, s source px, of
+      // the target, and w grows with x, so the width lies between w at 175 - s
+      // and at 175 + s, by that same formula.
+      await page.getByTestId("band-add").tap();
+      await expect(page.getByTestId("band-1-width")).toHaveText("1 square");
+      await showPhoto(page);
+      const bandHandle = await pinPoint(page, "band.left");
+      expect(bandHandle.x).toBeCloseTo(150, 6);
+      expect(bandHandle.y).toBeCloseTo(300, 6);
+      const bandTarget = { x: 175, y: 300 };
+      const bandBox = await touchDrag(page, cdp, "band.left", bandTarget, QUILT);
+      const s = screenPixel(bandBox, QUILT);
+      const widthAtX = (x: number) => {
+        const f = (x - 100) / 600;
+        return (10 * f) / (1 - 2 * f);
+      };
+      await expect
+        .poll(async () => bandWidth(page, 1), { message: "band.left touch drop" })
+        .toBeGreaterThanOrEqual(roundDown4(widthAtX(bandTarget.x - s)));
+      expect(await bandWidth(page, 1)).toBeLessThanOrEqual(roundUp4(widthAtX(bandTarget.x + s)));
+      await expectDropNear(page, "band.left", bandTarget, bandBox, QUILT, "band.left touch drop");
+      // Typed, it is exact: 1.5 in on a 1 1/2 in square (12 eighths) is 1 square.
+      await page.getByTestId("square-size").selectOption("12");
+      await page.getByTestId("band-1-inches").fill("1.5");
+      await page.getByTestId("band-1-inches").press("Enter");
+      await expect(page.getByTestId("band-1-width")).toHaveText("1 square, 1 1/2 in");
+
+      await page.getByTestId("construction-class").selectOption("squares");
+      const saved = await saveJson(page, "generated-quilt.json", "touch");
+      expect(saved.data).toEqual({
+        schema_version: 1,
+        photo: QUILT_NAME,
+        sha256: sha,
+        canvas: [800, 600],
+        frame: [
+          {
+            provenance: "verified-jake",
+            value: { outer_edge: { kind: "outer_edge", corners: OUTER, bands: [{ width_squares: 1 }] }, field: null },
+          },
+        ],
+        counts: [
+          {
+            provenance: "verified-jake",
+            value: { blocks_across: 2, blocks_down: 2, squares_per_block_across: 5, squares_per_block_down: 3 },
+          },
+        ],
+        construction_class: [{ provenance: "verified-jake", value: "squares" }],
+      });
+      expectValidAnnotation(saved.file);
+
+      // On the phone too, a pin on the photo's corner keeps its whole hit area:
+      // from (100, 100), 10 Shift+Left and 10 Shift+Up presses of 10 px reach (0, 0).
+      await pressOn(page, "outer.top_left", "Shift+ArrowLeft", 10);
+      await pressOn(page, "outer.top_left", "Shift+ArrowUp", 10);
+      await expectPinAt(page, "outer.top_left", { x: 0, y: 0 });
+      await showPhoto(page);
+      await expectWholeHitArea(page, "outer.top_left", "on the phone at fit");
+
+      // A drag the browser cancels still moved the pin on screen, so the drill
+      // records it as a placement (PinLayer's pointercancel).
+      await page.getByTestId("drill-start").tap();
+      await expect(page.getByTestId("mode")).toHaveText("Pin drill: the annotation is hidden; 0 records");
+      await showPhoto(page);
+      const drillBox = await boxOf(page, "pin-image");
+      const cancelFrom = toScreen(drillBox, QUILT, QUILT_INSET.top_left);
+      const cancelTo = toScreen(drillBox, QUILT, { x: 200, y: 200 });
+      await touch(cdp, "touchStart", [cancelFrom]);
+      for (const t of [0.5, 1]) await touch(cdp, "touchMove", [between(cancelFrom, cancelTo, t)]);
+      await expect(page.getByTestId("loupe")).toBeVisible();
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchCancel", touchPoints: [] });
+      await expect(page.getByTestId("loupe")).toBeHidden();
+      await expect(page.getByTestId("mode")).toHaveText("Pin drill: the annotation is hidden; 1 records");
+      await page.getByTestId("drill-stop").tap();
+      await expectPinAt(page, "outer.top_left", { x: 0, y: 0 });
 
       await expectNoHorizontalOverflow(page, "annotate-phone");
     });
