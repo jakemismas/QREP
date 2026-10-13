@@ -135,10 +135,13 @@ KNOBS: dict[str, Knob] = {
     ),
     "SHADING_ROUNDS": Knob(
         SHADING_ROUNDS,
-        "synthetic grids only (PR #251 round 3): the cap catches a runaway light only once it "
-        "passes it, which on 6 gray bands (L* 25 + 12i, noise 3) comes in rounds 4 to 10, "
-        "round 10 on seed 6; 9 rounds leave seed 6 at 0.888 of squares right and 8 rounds "
-        "seeds 1, 2, 4 and 6 at 0.874 to 0.900, against 0.952 to 0.968 at 10",
+        "synthetic grids only (PR #251 round 3, #248 comment 6149362474), kept by the "
+        "ruling in #137 comment 6149649689: the cap catches a runaway light only once it "
+        "passes it, which on 6 gray bands (L* 25 + 12i, noise 3) comes in rounds 4 to 10 on "
+        "seeds 0 to 7 (9 rounds leave seed 6 at 0.888 of squares right and 8 rounds seeds "
+        "1, 2, 4 and 6 at 0.874 to 0.900, against 0.952 to 0.968 at 10), but only in rounds "
+        "11 to 31 on seeds 10, 11, 12, 34, 42 and 45, which read 0.875 to 0.938 at 10 "
+        "rounds; a count fitted to those seeds is not ruled (#261)",
     ),
     "LIGHT_CONFIDENCE_POWER": Knob(
         LIGHT_CONFIDENCE_POWER,
@@ -148,15 +151,21 @@ KNOBS: dict[str, Knob] = {
     ),
     "LIGHT_MAX_RATIO": Knob(
         LIGHT_MAX_RATIO,
-        "the orchestrator's ruling (#137 comment 6149208104): the light correction never "
-        "reads a quilt worse than the uncorrected read, and past the cap the read is the "
-        "uncorrected read. Synthetic grids only (PR #251 rounds 1 to 3, #248): the "
-        "criterion's 30 percent falloff (a light of 1 / 0.7 = 1.43) fits at 1.43 and a 50 "
-        "percent falloff at 1.98, both read every square; 65 to 85 percent falloffs pass "
-        "the cap and keep the uncorrected read, 0.50 to 0.59 of squares right. Cap 6 read "
-        "those falloffs right but read 6 gray bands (L* 25 + 12i, noise 3) at 0.625 to "
-        "0.952 against 0.952 to 0.968 here, and no amplitude cap separates the two cases "
-        "(#261). On 4 bands at noise 5 seed 0 the light passes 2.0 in round 4, at 2.016",
+        "the orchestrator's rulings (#137 comments 6149208104 and 6149649689): past the cap "
+        "the read is the uncorrected read, and on 40 seeds of 6 gray bands (L* 25 + 12i, "
+        "56 x 44, noise 3) cap 6 is never better than 2.0. Synthetic grids only (PR #251 "
+        "rounds 1 to 3, #248): the criterion's 30 percent falloff (a light of 1 / 0.7 = "
+        "1.43) fits at 1.43 and reads every square; a 50 percent falloff fits at 1.98 and "
+        "reads every square noise-free, but with noise passes the cap on 3 of 10 "
+        "checkerboard seeds at noise 0.5 and 6 of 10 at 1.0; 65 to 85 percent falloffs pass "
+        "it and keep the uncorrected read, 0.50 to 0.59 right. Cap 6 reads 50 to 75 percent "
+        "falloffs at 0.961 or better and 85 percent at 0.875 or better, but the 6 bands at "
+        "0.550 to 0.961 where 2.0 reads 0.875 to 0.968. The correction is not never-worse: "
+        "8 of those 40 seeds read worse with it at 2.0 (0.875 to 0.961 against 0.959 to "
+        "0.967), and 4 bands (L* 25 + 20i) at noise 3, 4 and 5 on 3, 10 and 12 of 20 seeds "
+        "(by up to 0.0008, 0.0024 and 0.048); no amplitude cap separates falloffs from "
+        "value ramps (#261). On 4 bands at noise 5 seed 0 the light passes 2.0 in round 4, "
+        "at 2.016",
     ),
     "KMEANS_ITERATIONS": Knob(KMEANS_ITERATIONS, "not measured: a compute bound"),
     "KMEANS_SEEDINGS": Knob(

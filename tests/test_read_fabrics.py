@@ -588,30 +588,43 @@ def value_ramp(seed):
     return lab, positions, truth
 
 
-@pytest.mark.parametrize("seed", range(8))
-def test_a_value_ramp_reads_no_worse_with_the_light_than_without(seed):
-    # Source: the ruling in #137 comment 6149208104: the light correction
-    #   never reads a quilt worse than the uncorrected read. At cap 6 these
-    #   grids read 0.625 to 0.952 against 0.952 to 0.968 uncorrected (#261).
-    # Inputs: value_ramp(seed), k = 6, the default rounds and cap, and the
-    #   same grid with shading_rounds 0.
-    # Formula: every band has a* = b* = 0, so only dL decides: under flat
-    #   light a square reads its own band unless its L* noise passes the
-    #   midpoint 12 / 2 = 6 away, |n| > 6.
-    # Arithmetic: P(N > 6 / 3 = 2) = 0.02275. The outer bands (10 + 9 = 19
-    #   rows) misread on one side, the inner four (9 + 9 + 10 + 9 = 37 rows)
-    #   on both: 44 x 0.02275 x (19 + 2 x 37) = 44 x 0.02275 x 93 = 93.1
-    #   misreads expected of 2464, so an exact flat read gets 1 - 93.1 / 2464
-    #   = 0.9622 right, with sd sqrt(2464 x 0.0378 x 0.9622) = 9.5 squares;
-    #   0.94 leaves 147.8 misreads, 5.8 sd past the 93.1 expected.
-    # Expected: the corrected read gets at least the uncorrected read's
-    #   share right, and at least 0.94.
+@pytest.mark.parametrize("seed", [*range(8), 10, 11, 12, 15, 21, 34, 35, 36, 42, 45])
+def test_a_value_ramp_reads_no_worse_at_the_cap_than_at_6(seed, monkeypatch):
+    # Source: the rulings in #137 comments 6149208104 and 6149649689: cap
+    #   2.0 rests on value ramps, where cap 6 is never better on 40 seeds;
+    #   the seeds are 0 to 7 and every seed known to read worse with the
+    #   light than without it. knobs.LIGHT_MAX_RATIO's pin in
+    #   test_read_confidence.py catches a change to the cap itself.
+    # Inputs: value_ramp(seed), k = 6, the default rounds, at the default
+    #   cap 2.0 and at 6.0.
+    # Formula: the cap is the only difference between the two reads, so
+    #   they fit the same light, round for round, until it passes 2.0.
+    #   Then the read at 2.0 drops the correction and returns the k-means
+    #   read, while the read at 6 keeps fitting. If the light never passes
+    #   2.0 within the rounds, the two reads are the same.
+    # Arithmetic: no hand bound on either read exists, since the light's
+    #   path is the fit's; the expected relation is the one the rulings
+    #   measured. Disclosed (#248 comment 6149362474 and #137 comment
+    #   6149611481), squares right of 2464 at 2.0 / 6 / uncorrected:
+    #   seeds 0 to 7: 2345 / 2345 / 2345, 2364 / 1833 / 2364, 2370 / 2016 /
+    #   2370, 2384 / 1975 / 2384, 2357 / 1897 / 2357, 2371 / 1871 / 2371,
+    #   2360 / 2138 / 2360, 2371 / 1541 / 2371. Seeds whose light passes
+    #   2.0 only after round 10 read worse than uncorrected, the same at
+    #   both caps: 10: 2310 / 2369, 11: 2230 / 2363, 12: 2157 / 2376, 34:
+    #   2242 / 2383, 42: 2166 / 2384, 45: 2297 / 2366. Seeds whose light
+    #   settles under 2.0 (1.07 to 1.27) read slightly worse, the same at
+    #   both: 15: 2349 / 2379, 21: 2365 / 2372, 35: 2369 / 2375, 36: 2354 /
+    #   2367. An exact flat read gets 1 - 93.1 / 2464 = 0.9622 right on
+    #   average (P(N > 6 / 3) = 0.02275 over 44 x (19 + 2 x 37) band edges);
+    #   the never-worse property is a criterion of #261.
+    # Expected: the read at 2.0 gets at least as many squares right as the
+    #   read at 6.
     lab, positions, truth = value_ramp(seed)
     weights = np.ones(len(lab))
-    corrected = share_right(cluster(lab, weights, positions, 6).labels, truth)
-    plain = share_right(cluster(lab, weights, positions, 6, shading_rounds=0).labels, truth)
-    assert corrected >= plain
-    assert corrected >= 0.94
+    capped = share_right(cluster(lab, weights, positions, 6).labels, truth)
+    monkeypatch.setattr(fabrics_module, "LIGHT_MAX_RATIO", 6.0)
+    loose = share_right(cluster(lab, weights, positions, 6).labels, truth)
+    assert capped >= loose
 
 
 def test_a_light_past_the_cap_keeps_the_plain_read(monkeypatch):

@@ -45,9 +45,9 @@ def test_knob_values_match_their_sources():
     # square bounds are literals B8 and B9 (6 and 32 eighths). The vote's
     # threshold 0.8 is the old vote's VOTE_HIGH_MARGIN (qrep/vision/repeats.py),
     # and 0.8, 0.75 and 0.5 are the values the hand computations in
-    # tests/test_read_vote.py use. The light cap 2.0 is the ruling in #137
-    # comment 6149208104, and 10 shading rounds the count at which the 6-band
-    # ramp's light passes that cap on every seed (knobs.SHADING_ROUNDS).
+    # tests/test_read_vote.py use. The light cap 2.0 and the 10 shading
+    # rounds are the rulings in #137 comments 6149208104 and 6149649689
+    # (knobs.LIGHT_MAX_RATIO and knobs.SHADING_ROUNDS).
     expected = {
         "L_WEIGHT": 0.5,
         "P": 32,
