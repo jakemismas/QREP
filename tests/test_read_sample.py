@@ -19,6 +19,8 @@ inner pixels of a 32 px square are 6..25 (centers 6.5 to 25.5, inside
 """
 
 import ast
+import dataclasses
+import math
 from pathlib import Path
 
 import numpy as np
@@ -30,6 +32,7 @@ from qrep.vision.read.diagnosis import Diagnosis
 from qrep.vision.read.geometry import confirm
 from qrep.vision.read.sample import (
     INSET,
+    MAX_SQUARES,
     MIN_PX_PER_SQUARE,
     P,
     Squares,
@@ -159,8 +162,11 @@ def four_by_three_image():
 
 def test_the_knobs_are_the_plan_values():
     # Plan B2a: P = 32 and inset 0.2 (the prototype values, provisional);
-    # the floor 7 px per square (exp3, provisional).
+    # the floor 7 px per square (exp3, provisional). The cap: plan C3b stages
+    # at most 2000 px on a crop's longest side, so a crop holds at most
+    # floor(2000 / 7) = 285 squares a side at the floor, 285 x 285 = 81,225.
     assert (P, INSET, MIN_PX_PER_SQUARE) == (32, 0.2, 7)
+    assert MAX_SQUARES == 81_225
 
 
 def test_to_lab_follows_the_formulas():
@@ -183,15 +189,17 @@ def test_to_lab_follows_the_formulas():
 
 def test_each_solid_square_samples_its_own_fill_exactly():
     # Source: plan B2a, the synthetic 4 x 3 grid of solid 40 px squares.
-    # 40 px per square is under 2P = 64, so no downsample; the warp makes
-    # each square 32 px, and its inner pixels 6..25 read source x =
-    # (i + 0.5) x 40/32 - 0.5, so 7.625..31.375: pixels 7..32 of the square's
-    # 0..39, all one fill.
+    # 40 px per square is under 2P = 64, so no downsample: one output pixel
+    # steps 40/32 = 1.25 source px, and ceil(1.25 / 2) = 1 on both axes. The
+    # warp makes each square 32 px, and its inner pixels 6..25 read source
+    # x = (i + 0.5) x 40/32 - 0.5, so 7.625..31.375: pixels 7..32 of the
+    # square's 0..39, all one fill.
     result = sample(four_by_three_image(), rect_field(10, 20, 170, 140), counts(4, 3))
     assert isinstance(result, Squares)
     assert result.lab.shape == (3, 4, 3)
     assert result.spread.shape == (3, 4, 3)
-    assert result.downsample == (1.0, 1.0)
+    assert result.downsample.shape == (3, 4, 2)
+    assert np.all(result.downsample == 1)
     assert result.field_bgr.shape == (3 * 32, 4 * 32, 3)
     for r, row in enumerate(FILLS):
         for c, fill in enumerate(row):
@@ -287,9 +295,12 @@ def test_the_sample_is_a_median_not_a_mean():
 def test_a_large_field_is_area_downsampled_before_the_warp():
     # Source: plan B2a criterion 5 (exp0: warpPerspective ignores INTER_AREA).
     # Two 256 px squares whose columns repeat black, white, white, black.
-    # Every square side is 256 px, over 2P = 64, so the read first scales by
-    # 64 / 256 = 0.25 with INTER_AREA: each output pixel averages a 4 x 4
-    # block holding one period, two black and two white columns, so
+    # Every square side is 256 px, over 2P = 64: one output pixel steps
+    # 256/32 = 8 source px on each axis, so each square takes the factor
+    # ceil(8 / 2) = 4 on both, and the read first scales its region (the
+    # whole 512 x 256 image) by 1/4 with INTER_AREA: each output pixel
+    # averages a 4 x 4 block holding one period, two black and two white
+    # columns, so
     # (2 x 0 + 2 x 255) / 4 = 127.5, stored as 128. The 2x warp of that
     # uniform gray keeps 128: L 53.5850. Other paths read otherwise:
     #   INTER_LINEAR at 0.25 samples x = 4k + 1.5, between the white columns
@@ -301,26 +312,27 @@ def test_a_large_field_is_area_downsampled_before_the_warp():
     image[:, 1::4] = 255
     image[:, 2::4] = 255
     result = sample(image, rect_field(0, 0, 512, 256), counts(2, 1))
-    assert result.downsample == (0.25, 0.25)
+    assert np.all(result.downsample == 4)
     for c in range(2):
         assert_lab(result.lab[0, c], gray(128))
 
 
 def test_each_axis_downsamples_on_its_own():
     # A 2 x 2 grid over 256 x 32 px: squares 128 px wide and 16 px tall, as
-    # a field seen at a grazing angle. Along x the largest square is 128 px,
-    # so 64 / 128 = 0.5 (and P / 128 = 0.25 is smaller); along y it is 16 px,
-    # under 2P, so 1. One scale for both axes would cut the squares to 8 px
-    # tall. After the halving each square is 64 x 16 px of one fill, and the
-    # warp reads inner x = 2i + 0.5 (12.5..50.5) and y = 0.5j - 0.25
-    # (2.75..12.25 in square row 0), inside each fill.
+    # a field seen at a grazing angle. One output pixel steps 128/32 = 4 px
+    # on x, so ceil(4 / 2) = 2, and 16/32 = 0.5 px on y, so 1. Both factors
+    # keep every side's step at least min(its length, 1): 4 / 2 = 2 and 0.5.
+    # One factor of 2 for both axes would cut the squares to 8 px tall.
+    # After the halving each square is 64 x 16 px of one fill, and the warp
+    # reads inner x = 2i + 0.5 (12.5..50.5) and y = 0.5j - 0.25 (2.75..12.25
+    # in square row 0), inside each fill.
     image = np.zeros((32, 256, 3), dtype=np.uint8)
     image[:16, :128] = 32
     image[:16, 128:] = 96
     image[16:, :128] = 160
     image[16:, 128:] = 224
     result = sample(image, rect_field(0, 0, 256, 32), counts(2, 2))
-    assert result.downsample == (0.5, 1.0)
+    assert np.all(result.downsample == (2, 1))
     assert_lab(result.lab[0, 0], gray(32))
     assert_lab(result.lab[0, 1], gray(96))
     assert_lab(result.lab[1, 0], gray(160))
@@ -451,14 +463,23 @@ def test_the_floor_itself_reads():
     assert_lab(result.lab[19, 19], gray(128))
 
 
-def test_an_image_that_does_not_match_the_geometry_is_refused():
+@pytest.mark.parametrize(
+    "image",
+    [
+        np.zeros((40, 32, 3), dtype=np.uint8),
+        np.zeros((32, 32), dtype=np.uint8),
+        np.zeros((32, 32, 3), dtype=np.float32),
+    ],
+)
+def test_an_image_that_does_not_match_the_geometry_returns_bad_image(image):
+    # Plan B2a criterion 8: the geometry is for a 32 x 32 BGR uint8 image, and
+    # a taller one, a single-channel one or a float one is a typed refusal.
     geometry = confirm(
         rect_field(0, 0, 32, 32), counts(1, 1), (32, 32), Point(x=0, y=0), corners_source="user"
     )
-    with pytest.raises(ValueError, match="image"):
-        read_squares(np.zeros((40, 32, 3), dtype=np.uint8), geometry)
-    with pytest.raises(ValueError, match="image"):
-        read_squares(np.zeros((32, 32), dtype=np.uint8), geometry)
+    diagnosis = read_squares(image, geometry)
+    assert isinstance(diagnosis, Diagnosis)
+    assert diagnosis.code == "bad_image"
 
 
 def test_the_read_imports_cv2_only_inside_functions():
@@ -493,44 +514,270 @@ def polygon(image, quad, fill):
     cv2.fillConvexPoly(image, vertices, fill, shift=4)
 
 
-def test_the_smallest_square_keeps_p_pixels_when_an_axis_downsamples():
+def test_a_factor_never_shortens_a_side_under_p():
     # Two squares receding along x: x = 400u / (1 + 1.5u), y = 64v / (1 + 1.5u)
     # for u in 0..2, v in 0..1, so corners (0, 0), (800/4 = 200, 0), (200,
-    # 64/4 = 16), (0, 64). Vertex x: 0, 400/2.5 = 160, 200, so the squares are
-    # 160 and 40 px wide: x scales by max(64/160, 32/40) = 0.8, the P term
-    # binding (without it, 0.4 would cut the far square to 16 px). Heights at
-    # u = 0, 1, 2 are 64, 25.6 and 16, so the bounding heights are 64 and
-    # 25.6 and y keeps max(64/64, 32/25.6) capped at 1. Every scaled side stays
-    # at least min(its length, 32): top 128 and 32, bottom (128, -38.4) 133.6
-    # and (32, -9.6) 33.4, vertical sides unscaled.
+    # 64/4 = 16), (0, 64). Vertex x: 0, 400/2.5 = 160, 200; heights at u = 0,
+    # 1, 2: 64, 25.6, 16. Steps of one output pixel (side / 32), square 0:
+    #   top (5, 0), bottom (160, -38.4)/32 = (5, -1.2), left (0, 2),
+    #   right (0, 0.8)
+    # The footprint is 5 + 0 = 5 px on x and 1.2 + 2 = 3.2 on y, so the least
+    # factors are ceil(2.5) = 3 and ceil(1.6) = 2. A y factor of 2 would cut
+    # the right side's step to 0.4, under its own 0.8 (a 25.6 px side under
+    # P), so y keeps 1. Of x = 1, 2, 3 with y = 1 the largest residual
+    # footprint is max(5/x, 3.2): 5, 3.2 and 3.2; the tie goes to the smaller
+    # other residual, 5/3 against 5/2, so square 0 takes (3, 1).
+    # Square 1: top (1.25, 0), bottom (40, -9.6)/32 = (1.25, -0.3), left
+    # (0, 0.8), right (0, 0.5): footprints 1.25 and 1.1, so (1, 1).
     image = np.zeros((64, 200, 3), dtype=np.uint8)
     polygon(image, [(0, 0), (160, 0), (160, 25.6), (0, 64)], (64, 64, 64))
     polygon(image, [(160, 0), (200, 0), (200, 16), (160, 25.6)], (192, 192, 192))
     frame = FieldFrame(kind="field", corners=corners((0, 0), (200, 0), (200, 16), (0, 64)))
     result = sample(image, frame, counts(2, 1))
-    # round(200 x 0.8) = 160 px, so x scales by exactly 160/200.
-    assert result.downsample == (0.8, 1.0)
+    assert result.downsample.tolist() == [[[3, 1], [1, 1]]]
     assert_lab(result.lab[0, 0], gray(64))
     assert_lab(result.lab[0, 1], gray(192))
 
 
-def test_a_sheared_grid_downsamples_both_axes_alike():
+def test_a_sheared_square_keeps_its_short_side():
     # Two sheared squares, x = 100u + 300v, y = 100v for u in 0..2, v in 0..1:
-    # corners (0, 0), (200, 0), (500, 100), (300, 100). Top and bottom sides
-    # are 100 px, the slanted ones sqrt(300^2 + 100^2) = 316.228. Each
-    # bounding box is 400 x 100 px, so the axis rules would scale x by
-    # max(64/400, 32/400) = 0.16 and y by 0.64, cutting the 100 px sides to
-    # 16 px, under P. Both axes then take min(1, max(64/316.228, 32/100)) =
-    # 0.32, which keeps the shortest side at 32 px: round(500 x 0.32) = 160
-    # and round(100 x 0.32) = 32 px.
+    # corners (0, 0), (200, 0), (500, 100), (300, 100). Steps of one output
+    # pixel: top and bottom (100, 0)/32 = (3.125, 0), left and right
+    # (300, 100)/32 = (9.375, 3.125). The footprint is 3.125 + 9.375 = 12.5 px
+    # on x and 0 + 3.125 on y: least factors ceil(6.25) = 7 and
+    # ceil(1.5625) = 2. An x factor over 3 cuts the top step under 1 px
+    # (3.125 / 4 = 0.78), so x takes at most 3, where the residual footprint
+    # is 12.5 / 3 = 4.17 whatever y is; the tie goes to the smaller y
+    # residual, 3.125 / 2 = 1.56, so (3, 2). The slanted step stays
+    # (3.125, 1.5625), 3.49 px long.
     image = np.zeros((100, 500, 3), dtype=np.uint8)
     polygon(image, [(0, 0), (100, 0), (400, 100), (300, 100)], (64, 64, 64))
     polygon(image, [(100, 0), (200, 0), (500, 100), (400, 100)], (192, 192, 192))
     frame = FieldFrame(kind="field", corners=corners((0, 0), (200, 0), (500, 100), (300, 100)))
     result = sample(image, frame, counts(2, 1))
-    assert result.downsample == pytest.approx((0.32, 0.32))
+    assert result.downsample.tolist() == [[[3, 2], [3, 2]]]
     assert_lab(result.lab[0, 0], gray(64))
     assert_lab(result.lab[0, 1], gray(192))
+
+
+def test_each_square_of_a_receding_grid_area_downsamples_on_its_own():
+    # Source: plan B2a criterion 5 under perspective (PR #233 round-1 review).
+    # Four squares receding along x through x = 384u / (2 + u),
+    # y = 192v / (2 + u) for u in 0..4, v in 0..1: corners (0, 0), (256, 0),
+    # (256, 192/6 = 32), (0, 96). Vertex x: 0, 128, 192, 1152/5 = 230.4, 256;
+    # heights at u = 0..4: 96, 64, 48, 38.4, 32. Squares 128, 64, 38.4 and
+    # 25.6 px wide: only the near one holds over 2P = 64.
+    # Steps of one output pixel (side / 32):
+    #   square 0: top (4, 0), bottom (128, -32)/32 = (4, -1), left (0, 3),
+    #     right (0, 2). Footprints 4 + 0 = 4 on x and 1 + 3 = 4 on y, so
+    #     ceil(4 / 2) = 2 on both; halved, the steps are 2, 2.06, 1.5 and 1,
+    #     none under 1: (2, 2).
+    #   square 1: top (2, 0), bottom (2, -0.5), left (0, 2), right (0, 1.5).
+    #     Footprints 2 and 2.5, least factors 1 and 2; y = 2 cuts the right
+    #     step to 0.75, under 1, so (1, 1).
+    #   squares 2 and 3: footprints 1.2 and 0.3 + 1.5 = 1.8; 0.8 and
+    #     0.2 + 1.2 = 1.4: (1, 1).
+    # The print is a 1 px stripe: even columns black, odd ones white, under
+    # squares 1 to 3 drawn in solid grays. Square 0's region is its corners'
+    # box plus 2 x 2 px: x 0..132 and y 0..96 (clamped), halved to 66 x 48 px,
+    # so each pixel averages two columns and two rows: (2 x 0 + 2 x 255) / 4 =
+    # 127.5, stored as 128. Square 0's inner pixels read u from 6.5/32 to
+    # 25.5/32, x = 384u / (2 + u) from 35.4 to 109.4, halved 17.7 to 54.7: all
+    # inside the uniform 128 (columns 0..63), so L 53.5850 and spread 0. The
+    # field-wide scale this replaces left x at 1, because square 3 is under P,
+    # and square 0 then decimated by 4 in the warp, reading the stripes.
+
+    def point(u, v):
+        return (384 * u / (2 + u), 192 * v / (2 + u))
+
+    image = np.zeros((96, 256, 3), dtype=np.uint8)
+    image[:, 1::2] = 255
+    for c, level in ((1, 32), (2, 160), (3, 224)):
+        quad = [point(c, 0), point(c + 1, 0), point(c + 1, 1), point(c, 1)]
+        polygon(image, quad, (level, level, level))
+    frame = FieldFrame(kind="field", corners=corners((0, 0), (256, 0), (256, 32), (0, 96)))
+    result = sample(image, frame, counts(4, 1))
+    assert result.downsample.tolist() == [[[2, 2], [1, 1], [1, 1], [1, 1]]]
+    assert_lab(result.lab[0, 0], gray(128))
+    assert_lab(result.spread[0, 0], (0.0, 0.0, 0.0))
+    for c, level in ((1, 32), (2, 160), (3, 224)):
+        assert_lab(result.lab[0, c], gray(level))
+        assert_lab(result.spread[0, c], (0.0, 0.0, 0.0))
+
+
+def test_a_square_keeps_its_own_factors_inside_another_groups_box():
+    # A 2 x 2 grid receding toward its bottom right: x = 1280u / (8 + u + v),
+    # y = 1280v / (8 + u + v) for u, v in 0..2. Vertices: (1, 0) at 1280/9 =
+    # 142.222, (2, 0) at 2560/10 = 256, (1, 1) at (128, 128), (2, 1) at
+    # (2560/11, 1280/11) = (232.727, 116.364), (2, 2) at 2560/12 = 213.333 on
+    # both axes, and (0, 1), (0, 2), (1, 2) mirrored. Steps (side / 32):
+    #   square (0, 0): top (4.444, 0), bottom (128, -14.222)/32 = (4, -0.444),
+    #     left (0, 4.444), right (-0.444, 4): footprints 4.444 + 0.444 =
+    #     4.889 on both axes, ceil(2.444) = 3; thirds of the steps stay over
+    #     1 px: (3, 3).
+    #   square (0, 1): top (3.556, 0), bottom (104.727, -11.636)/32 =
+    #     (3.273, -0.364), left (-0.444, 4), right (-23.273, 116.364)/32 =
+    #     (-0.727, 3.636): footprints 3.556 + 0.727 = 4.283 and
+    #     0.364 + 4 = 4.364, both ceil to 3; thirds stay over 1 px: (3, 3).
+    #     Square (1, 0) mirrors it.
+    #   square (1, 1): top (3.273, -0.364), bottom (96.970, -19.394)/32 =
+    #     (3.030, -0.606), left (-0.364, 3.273), right (-0.606, 3.030):
+    #     footprints 3.273 + 0.606 = 3.879, ceil(1.94) = 2: (2, 2).
+    # The (3, 3) squares form an L whose box holds square (1, 1). The print
+    # is a 1 px stripe under the three near squares drawn in solid grays.
+    # Square (1, 1)'s region: x from floor(116.364) - 4 = 112 to
+    # ceil(232.727) + 4 = 237, 125 px, grown to 126 so it halves exactly, and
+    # y the same: 63 x 63 px, each pixel two columns and two rows of stripe,
+    # (2 x 0 + 2 x 255) / 4 = 127.5, stored as 128, so square (1, 1) reads
+    # L 53.5850 with spread 0. Thirds would mix the stripes as 85 and 170.
+    def point(u, v):
+        return (1280 * u / (8 + u + v), 1280 * v / (8 + u + v))
+
+    image = np.zeros((256, 256, 3), dtype=np.uint8)
+    image[:, 1::2] = 255
+    for (r, c), level in (((0, 0), 32), ((0, 1), 160), ((1, 0), 224)):
+        quad = [point(c, r), point(c + 1, r), point(c + 1, r + 1), point(c, r + 1)]
+        polygon(image, quad, (level, level, level))
+    frame = FieldFrame(kind="field", corners=corners((0, 0), (256, 0), point(2, 2), (0, 256)))
+    result = sample(image, frame, counts(2, 2))
+    assert result.downsample.tolist() == [[[3, 3], [3, 3]], [[3, 3], [2, 2]]]
+    assert_lab(result.lab[1, 1], gray(128))
+    assert_lab(result.spread[1, 1], (0.0, 0.0, 0.0))
+    for (r, c), level in (((0, 0), 32), ((0, 1), 160), ((1, 0), 224)):
+        assert_lab(result.lab[r, c], gray(level))
+
+
+def test_a_band_strip_is_area_downsampled_before_the_warp():
+    # Plan B2a criterion 5 for the band strips. One band of 1 square around
+    # a 1 x 1 field over 288 x 288 px: 96 px per square, under a 1 px stripe
+    # (even columns black, odd ones white). Every strip, like the field,
+    # steps 96/32 = 3 px per output pixel on its length and on its width:
+    # footprint 3, factor ceil(1.5) = 2, and halved steps of 1.5 px: (2, 2).
+    # The top strip's region is x 96 - 4 = 92 to 192 + 4 = 196 (104 px) and
+    # y 0 to 100, halved: each pixel averages one black and one white column,
+    # 127.5, stored as 128, so L 53.5850 and spread 0. A direct warp would
+    # read every third column (source x = 97 + 3i), white and black in turn:
+    # median (0 + 100) / 2 = 50, spread 50.
+    image = np.zeros((288, 288, 3), dtype=np.uint8)
+    image[:, 1::2] = 255
+    result = sample(image, outer_frame(288, 288, 1.0), counts(1, 1))
+    assert result.downsample.tolist() == [[[2, 2]]]
+    assert_lab(result.lab[0, 0], gray(128))
+    assert len(result.strips) == 4
+    for strip in result.strips:
+        assert_lab(strip.lab, gray(128))
+        assert_lab(strip.spread, (0.0, 0.0, 0.0))
+
+
+def test_the_field_edge_reads_the_photo_beyond_it():
+    # A 2 x 2 field of white 16 px squares at x and y 40..72 in a black
+    # 112 x 112 image. One output pixel steps 0.5 px: factor 1, no resize.
+    # Output column 0 reads source center (0 + 0.5) x 0.5 + 40 - 0.5 = 39.75,
+    # three quarters of the way from black column 39 to white column 40:
+    # OpenCV's fixed-point bilinear gives (24576 x 255 + 16384) >> 15 = 191.
+    # Column 63 reads 71.25, a quarter of the way to black column 72: 191.
+    # Rows match, and a corner pixel weighs white by 0.75 x 0.75 = 0.5625:
+    # (18432 x 255 + 16384) >> 15 = 143. Inner pixels read only white. The
+    # warp's region keeps two pixels of photo past the field, so the edge
+    # reads the photo there rather than a copy of the field's own edge.
+    image = np.zeros((112, 112, 3), dtype=np.uint8)
+    image[40:72, 40:72] = 255
+    result = sample(image, rect_field(40, 40, 72, 72), counts(2, 2))
+    field = result.field_bgr
+    assert field.shape == (64, 64, 3)
+    for edge in (field[1:-1, 0], field[1:-1, -1], field[0, 1:-1], field[-1, 1:-1]):
+        assert np.all(edge == 191)
+    for corner in (field[0, 0], field[0, -1], field[-1, 0], field[-1, -1]):
+        assert np.all(corner == 143)
+    assert np.all(field[1:-1, 1:-1] == 255)
+
+
+def test_the_warp_matrix_composes_an_offset_an_origin_and_a_scale():
+    # The 40 px square warped to 32 px, for an output tile whose top-left
+    # pixel is (16, 8), read from a region that starts at source (8, 4) and
+    # was scaled by 0.5 on x and 0.25 on y. Output center i of the tile is
+    # output edge 16 + i + 0.5, source edge 1.25 (16.5 + i) = 20.625 + 1.25i,
+    # region edge (20.625 + 1.25i - 8) x 0.5 = 6.3125 + 0.625i, region center
+    # 5.8125 + 0.625i. On y: 1.25 (8.5 + j) = 10.625 + 1.25j, then
+    # (10.625 + 1.25j - 4) x 0.25 = 1.65625 + 0.3125j, center 1.15625 + 0.3125j.
+    m = warp_matrix(
+        ((0, 0), (40, 0), (40, 40), (0, 40)),
+        32,
+        32,
+        offset=(16, 8),
+        origin=(8, 4),
+        scale=(0.5, 0.25),
+    )
+    assert m == pytest.approx(np.array([[0.625, 0, 5.8125], [0, 0.3125, 1.15625], [0, 0, 1]]))
+
+
+def test_the_floor_absorbs_float_noise_and_no_more():
+    # An exact 7 px side can compute a hair under 7 when the corners sit
+    # between pixels, and the homography solve differs between the native and
+    # Pyodide LAPACK builds. 7 - 1e-12 px reads; 6.999 px does not.
+    image = np.full((140, 140, 3), 128, dtype=np.uint8)
+    geometry = confirm(
+        rect_field(0, 0, 140, 140),
+        counts(20, 20),
+        (140, 140),
+        Point(x=0, y=0),
+        corners_source="user",
+    )
+    noisy = dataclasses.replace(geometry, pixels_per_square_min=7 - 1e-12)
+    assert isinstance(read_squares(image, noisy), Squares)
+    short = read_squares(image, dataclasses.replace(geometry, pixels_per_square_min=6.999))
+    assert short.code == "too_few_pixels"
+    assert short.pixels_per_square == 6.999
+
+
+def test_a_field_over_the_cap_returns_too_many_squares():
+    # MAX_SQUARES = 285 x 285 = 81,225 (see the knobs test). 286 across by
+    # 285 down is 81,510 squares, over it; 285 x 285 is not, so that one goes
+    # on to the floor, which refuses it at 100 / 285 = 0.35 px a side. The cap
+    # is checked first, so no oversized field is ever warped.
+    image = np.full((100, 100, 3), 128, dtype=np.uint8)
+    over = sample(image, rect_field(0, 0, 100, 100), counts(286, 285))
+    assert isinstance(over, Diagnosis)
+    assert over.code == "too_many_squares"
+    at_cap = sample(image, rect_field(0, 0, 100, 100), counts(285, 285))
+    assert at_cap.code == "too_few_pixels"
+
+
+def test_a_field_of_many_rows_samples_across_chunks():
+    # 64 across by 70 down at 8 px per square (512 x 560 px). The field
+    # converts in chunks of floor(2^21 / (64 x 32 x 32)) = 32 square rows, so
+    # rows 0..31, 32..63 and 64..69, and its warp runs in the same row
+    # chunks. Square (r, c) is the gray at index (3r + c) mod 10 of the
+    # hand-worked table, so every square differs from the ones above and
+    # below it. One output pixel steps 8/32 = 0.25 px: factor 1. Inner pixels
+    # read x = (i + 0.5) x 8/32 - 0.5 = 1.125..5.875 of each square's 0..7.
+    levels = sorted(GRAY_L)
+    image = np.zeros((560, 512, 3), dtype=np.uint8)
+    for r in range(70):
+        for c in range(64):
+            image[8 * r : 8 * r + 8, 8 * c : 8 * c + 8] = levels[(3 * r + c) % 10]
+    result = sample(image, rect_field(0, 0, 512, 560), counts(64, 70))
+    assert result.lab.shape == (70, 64, 3)
+    expected = np.array([[gray(levels[(3 * r + c) % 10]) for c in range(64)] for r in range(70)])
+    assert np.abs(result.lab - expected).max() < TOL
+    assert np.abs(result.spread).max() < TOL
+
+
+def test_the_floor_sees_the_side_not_the_bounding_box():
+    # A 4 x 4 grid of 6 px squares turned 45 degrees: each side steps
+    # (3 sqrt 2, 3 sqrt 2) or (-3 sqrt 2, 3 sqrt 2), 6 px long, while each
+    # square's bounding box is 6 sqrt 2 = 8.485 px a side, over the floor of 7.
+    # TL (20, 4); TR = TL + 4 (3 sqrt 2, 3 sqrt 2) = (20 + a, 4 + a) with
+    # a = 12 sqrt 2 = 16.9706; BR = (20, 4 + 2a); BL = (20 - a, 4 + a).
+    a = 12 * math.sqrt(2)
+    image = np.full((40, 40, 3), 128, dtype=np.uint8)
+    frame = FieldFrame(
+        kind="field", corners=corners((20, 4), (20 + a, 4 + a), (20, 4 + 2 * a), (20 - a, 4 + a))
+    )
+    result = sample(image, frame, counts(4, 4))
+    assert isinstance(result, Diagnosis)
+    assert result.code == "too_few_pixels"
+    assert result.pixels_per_square == pytest.approx(6.0)
 
 
 def test_the_floor_sees_a_short_vertical_side():

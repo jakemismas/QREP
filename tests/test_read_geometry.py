@@ -81,9 +81,11 @@ def test_the_result_records_who_set_the_corners(source):
     assert read(GRID_40, source=source).corners_source == source
 
 
-def test_an_unknown_corner_source_is_refused():
-    with pytest.raises(ValueError, match="corners_source"):
-        read(GRID_40, source="guess")
+def test_an_unknown_corner_source_returns_bad_corners_source():
+    # Plan B2a criterion 8: a refusal is a typed value, never exception text.
+    diagnosis = read(GRID_40, source="guess")
+    assert isinstance(diagnosis, Diagnosis)
+    assert diagnosis.code == "bad_corners_source"
 
 
 def test_square_centers_follow_the_homography_of_an_axis_aligned_field():
@@ -131,14 +133,8 @@ def test_pixels_per_square_are_the_shortest_and_longest_square_sides():
     geometry = read(field((8, 8), (128, 8), (128, 68), (8, 128)))
     assert geometry.pixels_per_square_min == pytest.approx(120 / 7)
     assert geometry.pixels_per_square_max == pytest.approx(math.sqrt(2880))
-    # Bounding boxes: square (r, c) is x(c + 1) - x(c) wide, from 48 (c = 0)
-    # down to 120/7 (c = 3), and 160(r + 1)/(4 + c) - 160r/(5 + c) tall, from
-    # 160/7 = 22.857143 (square (0, 3)) to 120 - 64 = 56 (square (2, 0)).
-    assert geometry.square_span_x == pytest.approx((120 / 7, 48))
-    assert geometry.square_span_y == pytest.approx((160 / 7, 56))
     grid = read(GRID_40)
     assert (grid.pixels_per_square_min, grid.pixels_per_square_max) == pytest.approx((40, 40))
-    assert grid.square_span_x == pytest.approx((40, 40))
 
 
 def test_a_field_frame_is_its_own_outer_edge_and_has_no_bands():
@@ -229,11 +225,14 @@ def test_unequal_bands_keep_their_order_and_widths():
     assert (second.side("left").length_squares, second.side("left").width_squares) == (3, 1.5)
 
 
-def test_a_negative_crop_offset_is_refused():
-    # The contract refuses it in ReadRequest; a caller that builds the parts
-    # itself gets the same refusal, never a field placed outside the photo.
-    with pytest.raises(ValueError, match="crop_offset"):
-        read(GRID_40, offset=Point.model_construct(x=-1.0, y=0.0))
+@pytest.mark.parametrize(("x", "y"), [(-1.0, 0.0), (0.0, -1.0), (math.nan, 0.0), (0.0, math.inf)])
+def test_a_negative_or_unbounded_crop_offset_returns_bad_crop_offset(x, y):
+    # The contract refuses a negative offset in ReadRequest and a non-finite
+    # one in Point; a caller that builds the parts past them gets the same
+    # refusal as a typed value, never a field placed outside the photo.
+    diagnosis = read(GRID_40, offset=Point.model_construct(x=x, y=y))
+    assert isinstance(diagnosis, Diagnosis)
+    assert diagnosis.code == "bad_crop_offset"
 
 
 def test_a_fractional_band_width_is_kept():
@@ -291,6 +290,18 @@ def test_a_corner_on_the_image_edge_is_inside():
         ("not_convex", ((10, 20), (170, 20), (10, 140), (170, 140))),
         # An arrowhead: BR pulled inside; turns (6400, -2000, 10800, 19200).
         ("not_convex", ((10, 20), (170, 20), (100, 60), (10, 140))),
+        # TR 0.05 px above the line y = 20 through TL and BR: convex and
+        # clockwise (the turn at TR is 80 x 0.05 + 0.05 x 80 = 8 > 0), but
+        # under the 1 px a corner can be placed to, so collinear.
+        ("degenerate_quad", ((10, 20), (90, 19.95), (170, 20), (10, 140))),
+        # TL and TR 0.5 px apart: TR lies 0.3 px from the line through TL and
+        # BR (direction (160, 120) / 200, offset (0.5, 0): 0.5 x 120 / 200).
+        ("degenerate_quad", ((10, 20), (10.5, 20), (170, 140), (10, 140))),
+        # BR 0.45 px from TL, so TR's two neighbors nearly coincide: the
+        # diagonal TL to BR is sqrt(0.4^2 + 0.2^2) = 0.447 px, under 1. Read
+        # by its turns alone this quad is not_convex (at TR the turn is
+        # 160 x 0.2 = 32 > 0, at BR -159.6 x 119.8 + 0.08 < 0).
+        ("degenerate_quad", ((10, 20), (170, 20), (10.4, 20.2), (10, 140))),
     ],
 )
 def test_a_bad_quad_returns_its_typed_diagnosis(code, quad):
@@ -298,6 +309,21 @@ def test_a_bad_quad_returns_its_typed_diagnosis(code, quad):
     assert isinstance(diagnosis, Diagnosis)
     assert diagnosis.code == code
     assert diagnosis.corner is None
+
+
+def test_a_corner_two_pixels_off_its_neighbors_line_is_a_quad():
+    # TR 2 px above the line y = 20 through TL and BR. Each corner's distance
+    # from the line through its two neighbors, |cross| / |diagonal|:
+    #   TR: 2 (the line is y = 20)
+    #   BR from TR (90, 18) to BL (10, 140), direction (-80, 122), length
+    #     sqrt(6400 + 14884) = 145.89: |(-80)(2) - (122)(80)| / 145.89 =
+    #     9920 / 145.89 = 68.0
+    #   BL from y = 20: 120; TL from BL to TR, direction (80, -122):
+    #     |80 x (-120) - (-122) x 0| / 145.89 = 9600 / 145.89 = 65.8
+    # Every one is at least 1 px and every edge longer than 1 px, so the
+    # frame is a quad, however near straight its top edge runs.
+    geometry = read(field((10, 20), (90, 18), (170, 20), (10, 140)))
+    assert isinstance(geometry, Geometry)
 
 
 def test_a_count_below_one_returns_bad_counts():
@@ -328,8 +354,3 @@ def test_every_code_is_named_once():
         Diagnosis(code="corner_outside_image", message="x")
     with pytest.raises(ValueError, match="pixels_per_square"):
         Diagnosis(code="too_few_pixels", message="x")
-
-
-def test_a_negative_crop_offset_on_y_is_refused():
-    with pytest.raises(ValueError, match="crop_offset"):
-        read(GRID_40, offset=Point.model_construct(x=0.0, y=-1.0))

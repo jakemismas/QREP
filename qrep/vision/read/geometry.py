@@ -27,9 +27,11 @@ SIDE_NAMES = ("top", "right", "bottom", "left")
 CornersSource = Literal["user", "suggestion"]
 Quad = tuple[tuple[float, float], ...]
 
-# A turn smaller than this share of its two edges' lengths counts as
-# straight, so three collinear corners read as degenerate despite float noise.
-_COLLINEAR = 1e-9
+# Corners are placed to a pixel at best (dragged on screen and mapped to the
+# image's pixels), so two corners closer than this, or a corner closer than
+# this to the line through its two neighbors, cannot be told from coinciding
+# or collinear corners at the image's resolution.
+_PLACEMENT_PX = 1.0
 
 
 @dataclass(frozen=True)
@@ -79,8 +81,6 @@ class Geometry:
     pixels_per_square_min and pixels_per_square_max are the shortest and
     longest side of any square, in source pixels: the shortest sets the pixel
     floor, because under perspective its square is the worst resolved.
-    square_span_x and square_span_y are the (smallest, largest) width and
-    height of the squares' bounding boxes, which set the downsample per axis.
     """
 
     frame: FieldFrame | OuterEdgeFrame
@@ -100,8 +100,6 @@ class Geometry:
     crop_offset: tuple[float, float]
     pixels_per_square_min: float
     pixels_per_square_max: float
-    square_span_x: tuple[float, float]
-    square_span_y: tuple[float, float]
     confidence: float = 1.0
 
     def __post_init__(self):
@@ -155,16 +153,24 @@ def _quad(h: np.ndarray, u0: float, v0: float, u1: float, v1: float) -> Quad:
 
 def _shape(quad: Quad) -> Diagnosis | None:
     """None for a convex quad whose corners run clockwise on screen (y down)."""
+    degenerate = Diagnosis(
+        code="degenerate_quad",
+        message=f"two corners lie within {_PLACEMENT_PX:g} px of each other, or a corner "
+        f"within {_PLACEMENT_PX:g} px of the line through its neighbors",
+    )
     turns = []
     for i in range(4):
-        (x0, y0), (x1, y1), (x2, y2) = quad[i], quad[(i + 1) % 4], quad[(i + 2) % 4]
-        ex1, ey1, ex2, ey2 = x1 - x0, y1 - y0, x2 - x1, y2 - y1
-        cross = ex1 * ey2 - ey1 * ex2
-        if abs(cross) <= _COLLINEAR * math.hypot(ex1, ey1) * math.hypot(ex2, ey2):
-            return Diagnosis(
-                code="degenerate_quad",
-                message="two corners coincide or three lie on one line",
-            )
+        (x0, y0), (x1, y1), (x2, y2) = quad[i - 1], quad[i], quad[(i + 1) % 4]
+        # The two corners beside corner i, which lie opposite each other.
+        diagonal = math.hypot(x2 - x0, y2 - y0)
+        if diagonal < _PLACEMENT_PX:
+            return degenerate
+        # The turn at corner i. Over the diagonal it is the corner's distance
+        # from the line through its two neighbors, never more than its
+        # distance from either, so it also catches two adjacent corners.
+        cross = (x1 - x0) * (y2 - y1) - (y1 - y0) * (x2 - x1)
+        if abs(cross) < _PLACEMENT_PX * diagonal:
+            return degenerate
         turns.append(cross > 0)
     if all(turns):
         return None
@@ -201,23 +207,11 @@ def square_sides(vertices: np.ndarray) -> np.ndarray:
     return np.concatenate([across.reshape(-1, 2), down.reshape(-1, 2)])
 
 
-def _square_sizes(field: Quad, rows: int, cols: int):
-    """The shortest and longest square side, and the (min, max) width and
-    height of the squares' bounding boxes, from every grid vertex mapped into
-    the image, so a foreshortened far square counts at its own size."""
-    vertices = _grid_vertices(field, rows, cols)
-    lengths = np.linalg.norm(square_sides(vertices), axis=-1)
-    corners = np.stack(
-        [vertices[:-1, :-1], vertices[:-1, 1:], vertices[1:, 1:], vertices[1:, :-1]], axis=-1
-    )
-    spans = corners.max(axis=-1) - corners.min(axis=-1)
-    span_x, span_y = spans[..., 0], spans[..., 1]
-    return (
-        float(lengths.min()),
-        float(lengths.max()),
-        (float(span_x.min()), float(span_x.max())),
-        (float(span_y.min()), float(span_y.max())),
-    )
+def _square_sizes(field: Quad, rows: int, cols: int) -> tuple[float, float]:
+    """The shortest and longest square side, from every grid vertex mapped
+    into the image, so a foreshortened far square counts at its own size."""
+    lengths = np.linalg.norm(square_sides(_grid_vertices(field, rows, cols)), axis=-1)
+    return float(lengths.min()), float(lengths.max())
 
 
 def confirm(
@@ -237,10 +231,15 @@ def confirm(
     names it.
     """
     if corners_source not in ("user", "suggestion"):
-        raise ValueError(f"corners_source must be 'user' or 'suggestion', got {corners_source!r}")
-    if crop_offset.x < 0 or crop_offset.y < 0:
-        raise ValueError(
-            f"crop_offset must not be negative, got ({crop_offset.x}, {crop_offset.y})"
+        return Diagnosis(
+            code="bad_corners_source",
+            message=f"corners_source must be 'user' or 'suggestion', got {corners_source!r}",
+        )
+    if not all(math.isfinite(v) and v >= 0 for v in (crop_offset.x, crop_offset.y)):
+        return Diagnosis(
+            code="bad_crop_offset",
+            message="the crop offset must be finite and not negative, "
+            f"got ({crop_offset.x}, {crop_offset.y})",
         )
     numbers = (
         counts.blocks_across,
@@ -295,7 +294,7 @@ def confirm(
         )
         inset += w
     field = _quad(h, total, total, total + cols, total + rows) if bands else outer
-    shortest, longest, span_x, span_y = _square_sizes(field, rows, cols)
+    shortest, longest = _square_sizes(field, rows, cols)
     return Geometry(
         frame=frame,
         counts=counts,
@@ -314,6 +313,4 @@ def confirm(
         crop_offset=(crop_offset.x, crop_offset.y),
         pixels_per_square_min=shortest,
         pixels_per_square_max=longest,
-        square_span_x=span_x,
-        square_span_y=span_y,
     )

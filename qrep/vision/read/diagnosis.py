@@ -23,6 +23,14 @@ Code = Literal[
     "bad_counts",
     # A border band whose width is not a positive number.
     "no_field",
+    # The corner source is neither "user" nor "suggestion".
+    "bad_corners_source",
+    # The crop offset is negative or not finite.
+    "bad_crop_offset",
+    # The image is not a BGR uint8 image of the geometry's size.
+    "bad_image",
+    # The field holds more squares than the read warps.
+    "too_many_squares",
     # The field holds fewer source pixels per square than the floor.
     "too_few_pixels",
 ]
