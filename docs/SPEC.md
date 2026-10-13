@@ -162,8 +162,9 @@ From the confirmed frame and counts, the engine:
   fabrics that differ only in lightness stay apart, and one label-aware shading correction applies
   to both the palette and the assignment: one light shared by every fabric, whose logarithm is
   quadratic in position, fitted with a level for each fabric, and each fabric's color is its own
-  squares' color under that light. A light that varies more than a provisional cap across the
-  field is taken for a change between fabrics, not shading, and the read keeps no correction. Each
+  squares' color under that light. A light that varies more than a provisional cap (2.0 in
+  luminance) across the field may be a change between fabrics, not shading, which its size alone
+  cannot tell (#261), so the read keeps no correction and reads as it would without one. Each
   border band's side strips join the clustering, weighted by their area in squares, so a border
   fabric that never appears in the field still gets its own fabric;
 - suggests the fabric count by silhouette over 2 to 12 when you set none, and refuses the quilt as
@@ -182,8 +183,9 @@ From the confirmed frame and counts, the engine:
   threshold; every square the vote changes is listed and flagged on Your pattern, and every
   confident square that disagrees keeps its read and is listed as a repeat break, so a deliberate
   variation is never lost silently. A block too different from every type to be a copy joins the
-  type its block period predicts when it agrees with that type on at least half its squares, and
-  only for the repeat and the breaks: the vote never changes its squares, and every square of it
+  type its block period predicts when it agrees with that type on at least half its squares,
+  weighted by confidence, and that type has at least 3 copies of its own. It joins only for the
+  repeat and the breaks: the vote never changes its squares, and every square of it
   that disagrees is listed as a repeat break. The repeat it reports is a whole multiple of the
   confirmed block period.
 
