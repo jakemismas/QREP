@@ -171,8 +171,13 @@ export function AnnotatePage() {
   const rows = draft ? draft.down.blocks * draft.down.squaresPerBlock : 1;
   const bands = draft && frameMode === "outer_edge" ? draft.bands : [];
 
-  const derivedField = (d: Draft): Corners =>
-    homography && frameMode === "outer_edge" ? quadToCorners(fieldQuad(homography, cols, rows, d.bands)) : d.outer;
+  // Snapped like every pin, so a derived corner saves as a whole pixel.
+  const derivedField = (d: Draft): Corners => {
+    if (!homography || frameMode !== "outer_edge" || !canvas) return d.outer;
+    const size = { width: canvas[0], height: canvas[1] };
+    const [tl, tr, br, bl] = fieldQuad(homography, cols, rows, d.bands).map((p) => snapToPixel(p, size));
+    return quadToCorners([tl, tr, br, bl]);
+  };
 
   const elapsed = () => Math.round(performance.now() - drillStartMs.current);
 
