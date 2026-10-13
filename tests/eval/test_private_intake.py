@@ -366,20 +366,19 @@ def test_thumbnail_inside_the_jfif_segment_is_dropped():
 def test_adobe_padding_is_dropped_and_its_color_transform_kept():
     data = plain_jpeg()
     end = 4 + int.from_bytes(data[4:6], "big")
-    # Without a JFIF APP0, a 3-component JPEG's color space comes from Adobe's transform byte:
-    # 0 reads the scans as RGB, while a decoder with no APP14 reads them as YCbCr. So the
-    # transform byte changes the decoded pixels, and dropping the segment would show.
+    # Without a JFIF APP0, a 3-component JPEG's color space comes from Adobe's transform byte,
+    # 0 meaning RGB rather than the default YCbCr. Whether a decoder honors it differs between
+    # Pillow builds (native 12.3 does, Pyodide's 11.3 does not), so the bytes are checked.
     bare = data[:2] + data[end:]
     # Adobe APP14: version 100, flags 0 and 0, transform 0 (RGB), then 11 bytes of padding.
     app14 = b"Adobe\x00\x64\x00\x00\x00\x00\x00" + b"ADOBENEEDLE"
     source = bare[:2] + segment(0xEE, app14) + bare[2:]
-    assert decoded(source) != decoded(bare)
     assert any("JPEG segments" in trace for trace in pi.location_traces(source))
 
     stored = pi.clean_copy(source)
     assert b"ADOBENEEDLE" not in stored
-    # Its first 12 payload bytes stay, through the transform byte: a length field of 14.
-    assert stored[2:6] == b"\xff\xee\x00\x0e"
+    # Its first 12 payload bytes stay, through the transform byte 0: a length field of 14.
+    assert stored[2:18] == b"\xff\xee\x00\x0e" + b"Adobe\x00\x64\x00\x00\x00\x00\x00"
     assert pi.location_traces(stored) == []
     assert decoded(stored) == decoded(source)
 
