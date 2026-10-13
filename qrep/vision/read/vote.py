@@ -18,7 +18,7 @@ from qrep.vision.read.knobs import ATTACH_AGREEMENT, TYPE_AGREEMENT, VOTE_MIN_CO
 
 # Weighted sums that tie in exact arithmetic can differ in the last bits
 # with the order numpy sums in, which differs between the native and the
-# Pyodide builds, so ties and the type_agreement bound allow this much.
+# Pyodide builds, so ties and the agreement floors allow this much.
 _EPS = 1e-9
 # Typing compares a run of blocks with every type at once; runs hold at most
 # this many square comparisons, so each step's temporaries stay a few MB.
@@ -108,6 +108,12 @@ def _agreement(
     return np.where(weighted[:, None], matched, same.mean(axis=2))
 
 
+def _share(codes: np.ndarray, patterns: np.ndarray) -> np.ndarray:
+    """Each block's share of squares equal to each pattern, shape (blocks,
+    patterns), whatever their confidence."""
+    return (codes[:, None, :] == patterns[None, :, :]).mean(axis=2)
+
+
 def _best(agreement: np.ndarray) -> np.ndarray:
     """Each row's highest agreement's column, ties to the lower type id."""
     return (agreement >= agreement.max(axis=1, keepdims=True) - _EPS).argmax(axis=1)
@@ -193,6 +199,12 @@ def _type_blocks(
     one, then one refinement against the pass's final majorities, numbered
     by first appearance. codes and weights have shape (blocks, squares).
 
+    A block joins a type on its plain share of equal squares (_share), and
+    confidence weighs only the majorities. A square's confidence says how
+    sure its color read is, not whether its block is a copy: weighted
+    agreement let a distinct block whose design read uncertain join a type,
+    and the vote then rewrote that design to the type's (PR #251 round 3).
+
     A block that joins a type whose majority it equals cannot move that
     majority: at every position the majority label gains weight and a count,
     and it stays ahead under each tie rule. So the raster pass decides runs
@@ -203,7 +215,6 @@ def _type_blocks(
     per block; a field may hold geometry.MAX_SQUARES, 285 x 285 squares.
     """
     n_blocks, size = codes.shape
-    totals = weights.sum(axis=1)
     positions = np.arange(size)
     patterns = np.empty((n_blocks, size), dtype=np.intp)
     weight_sums: list[np.ndarray] = []
@@ -215,9 +226,7 @@ def _type_blocks(
         n_types = len(weight_sums)
         stop = min(n_blocks, b + run, b + max(1, _CHUNK // (max(1, n_types) * size)))
         if n_types:
-            agreement = _agreement(
-                codes[b:stop], weights[b:stop], totals[b:stop], patterns[:n_types]
-            )
+            agreement = _share(codes[b:stop], patterns[:n_types])
             best = _best(agreement)
             joins = agreement[np.arange(stop - b), best] >= type_agreement - _EPS
             quiet = joins & np.all(codes[b:stop] == patterns[best], axis=1)
@@ -252,7 +261,7 @@ def _type_blocks(
     step = max(1, _CHUNK // (n_types * size))
     for b in range(0, n_blocks, step):
         stop = min(n_blocks, b + step)
-        agreement = _agreement(codes[b:stop], weights[b:stop], totals[b:stop], patterns[:n_types])
+        agreement = _share(codes[b:stop], patterns[:n_types])
         best = _best(agreement)
         joins = agreement[np.arange(stop - b), best] >= type_agreement - _EPS
         refined[b:stop][joins] = best[joins]
@@ -321,10 +330,10 @@ def vote(
     codes, weights = to_blocks(field_codes), to_blocks(conf)
     types = _type_blocks(codes, weights, len(classes), type_agreement)
     layout = types.reshape(down, across)
-    # A copy with many squares confidently changed agrees with its type on
-    # too few squares to join it, so typing starts a type of one copy that
-    # never votes: its squares never reach the breaks, and the repeat would
-    # move with where it sits. Beside a type that votes, such a block is wild
+    # A copy with many squares changed agrees with its type on too few
+    # squares to join it, so typing starts a type of one copy that never
+    # votes: its squares never reach the breaks, and the repeat would move
+    # with where it sits. Beside a type that votes, such a block is wild
     # for the period that predicts its type; once attached it repeats like
     # its type, while a block that stays its own type is part of the layout.
     copies = np.bincount(types)

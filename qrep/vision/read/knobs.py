@@ -33,8 +33,8 @@ COUNT_CAP_MARGIN = 0.044
 VOTE_THRESHOLD = 0.8
 # A block type votes only with at least this many copies.
 VOTE_MIN_COPIES = 3
-# Two blocks are copies of one type when their confidence-weighted agreement
-# reaches this share of squares.
+# Two blocks are copies of one type when they agree on at least this share
+# of their squares, counted whatever the squares' confidence.
 TYPE_AGREEMENT = 0.75
 # A block of a type of one copy joins the type its block period predicts
 # when it agrees with that type on at least this share of squares.
