@@ -3,6 +3,12 @@
  * size entry and the uncertainty overlay. The two editor entries in PhotoApi
  * (openInEditor, startInEditorFromFailure) are editing actions, so
  * project.tsx supplies them when it composes the photo context.
+ *
+ * C3b (issue #101): a dropped file is decoded before the confirm screen opens,
+ * the confirm screen's pins, frame, bands and counts live in ConfirmFlow
+ * (confirm/confirmFlow.ts), and Continue stages one crop of the decoded photo
+ * at full resolution (confirm/stagePhoto.ts). PhotoFlowMachine stays the
+ * screen router only; detect_quad is never called.
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useEngine } from "../engine/useEngine";
@@ -10,8 +16,17 @@ import type { Engine } from "../engine/useEngine";
 import { useEngineStatus } from "../engine/engineStatus";
 import { EngineError } from "../engine/rpc";
 import type { VisionState } from "../engine/rpc";
+import { parseSizeResult } from "../engine/contract";
+import type { BorderBand, Corners, Point } from "../engine/contract";
+import { ConfirmFlow } from "../confirm/confirmFlow";
+import type { ConfirmStatus } from "../confirm/confirmFlow";
+import type { AxisCount } from "../confirm/counts";
+import { CORNER_NAMES } from "../confirm/frame";
+import type { CornerName, FrameMode } from "../confirm/frame";
+import type { Size } from "../confirm/geometry";
+import { decodePhoto, frameSquares, squarePx, stagePhoto } from "../confirm/stagePhoto";
+import type { CropPlan } from "../confirm/stagePhoto";
 import type { QuiltModel } from "../model/types";
-import { classifyDevice, targetSize } from "../model/downscale";
 import { SizeEntryState } from "../model/sizeEntry";
 import type { SizeSource, SizeUnit } from "../model/sizeEntry";
 import { useToast } from "../ui";
@@ -35,19 +50,6 @@ const STAGE_NAME_MAP: Record<string, string> = {
 /** PARITY item 6: a square is uncertain below this per-cell confidence. */
 const UNCERTAIN_THRESHOLD = 0.9;
 
-/** detect_quad's bridge result (S2, issue #68). */
-interface DetectQuadResult {
-  quad: [number, number][];
-  tier: number | null;
-  confidence: number;
-  predicted_size: {
-    width_px: number;
-    height_px: number;
-    aspect: number | null;
-    preset: string | null;
-  };
-}
-
 function mapStageConfidence(raw: Record<string, number> | undefined): Record<string, number> {
   const out: Record<string, number> = {};
   if (!raw) return out;
@@ -62,19 +64,6 @@ function countUncertain(confidence: number[][] | null | undefined): number {
     for (const value of row) if (value < UNCERTAIN_THRESHOLD) count += 1;
   }
   return count;
-}
-
-/** Encode a canvas to PNG bytes (worker stages these into MEMFS). */
-function canvasToPngBytes(canvas: HTMLCanvasElement): Promise<Uint8Array> {
-  return new Promise((resolve, reject) => {
-    canvas.toBlob((blob) => {
-      if (!blob) {
-        reject(new Error("could not encode the photo"));
-        return;
-      }
-      blob.arrayBuffer().then((buffer) => resolve(new Uint8Array(buffer)), reject);
-    }, "image/png");
-  });
 }
 
 /** One reverse_photo run, with its wall time. */
@@ -101,13 +90,38 @@ export interface PhotoResult {
   sizeAchieved?: { width: number; height: number } | null;
 }
 
+/** The confirm screen's state and gestures (C3b, issue #101): a snapshot of
+ * ConfirmFlow taken after every change. Corners are in decoded-photo pixels. */
+export interface ConfirmApi {
+  status: ConfirmStatus;
+  /** Why the last photo could not be opened, in plain words. */
+  error: string | null;
+  /** The decoded photo's size, EXIF orientation applied. */
+  size: Size | null;
+  mode: FrameMode;
+  corners: Corners | null;
+  bands: BorderBand[];
+  across: AxisCount;
+  down: AxisCount;
+  /** Continue is cutting the crop. */
+  staging: boolean;
+  /** The finished square size in eighths for typed band widths, or null. */
+  squareEighths: number | null;
+  /** Why Continue is off, or null. */
+  blocked: string | null;
+  canContinue: boolean;
+  setCorner: (name: CornerName, point: Point) => void;
+  setMode: (mode: FrameMode) => void;
+  setBands: (bands: BorderBand[]) => void;
+  setCounts: (across: AxisCount, down: AxisCount) => void;
+}
+
 /** The photo-reverse flow API (owned by the state layer; PhotoFlow consumes it).
  *
- * S2 (issue #68): the flow is idle -> crop -> progress -> results. start()
- * split into stage() (file in, photo shown immediately, detect_quad kicked
- * off) and analyze() (reverse with the user's pins when they moved one).
- * The post-results corners screen is retired; toCrop() re-enters the crop
- * screen seeded with the confirmed quad. */
+ * The flow is idle (the dropzone) -> crop (the confirm screen) -> progress ->
+ * results. stage() decodes the file and opens the confirm screen; analyze()
+ * (Continue) stages the confirmed crop and reverses it with the corners.
+ * toCrop() re-enters the confirm screen with the confirmed frame kept. */
 export interface PhotoApi {
   /** True from the dropzone entry until the recovered model opens in the editor. */
   active: boolean;
@@ -116,10 +130,17 @@ export interface PhotoApi {
   result: PhotoResult | null;
   visionState: VisionState;
   visionBytes: number | null;
+  /** Legacy (C6b removes it with the crop machine): the old normalized crop
+   * pins, no longer shown or sent; the confirm screen reads confirm.corners. */
   corners: [number, number][];
+  /** Legacy (C6b): always null, detect_quad is never called. */
   detectedQuad: [number, number][] | null;
+  /** Legacy (C6b): always false, detect_quad is never called. */
   detectPending: boolean;
+  /** Legacy (C6b): the old crop machine's pin source. */
   quadSource: QuadSource;
+  /** C3b: the confirm screen. */
+  confirm: ConfirmApi;
   stage: (file: File) => Promise<void>;
   analyze: () => Promise<void>;
   /** S7 (issue #73): the size block state + gestures (UI-SPEC section 2). */
@@ -140,7 +161,9 @@ export interface PhotoApi {
   startSample: () => Promise<void>;
   cancel: () => void;
   toCrop: () => void;
+  /** Legacy (C6b): moves the old crop machine's pins only. */
   setCorner: (index: number, xy: [number, number]) => void;
+  /** Legacy (C6b): the confirm screen has no Reset to auto (criteria U3-4). */
   resetToAuto: () => void;
   backFromCrop: () => void;
   openInEditor: () => void;
@@ -175,6 +198,41 @@ function readSizeView(entry: SizeEntryState): SizeView {
   };
 }
 
+type ConfirmView = Omit<ConfirmApi, "setCorner" | "setMode" | "setBands" | "setCounts">;
+
+const copyPoint = (p: Point): Point => ({ x: p.x, y: p.y });
+
+// Copies, so a flow that edits its objects in place still hands React new
+// values and every memo on them recomputes.
+function readConfirmView(flow: ConfirmFlow): ConfirmView {
+  const c = flow.corners;
+  return {
+    status: flow.status,
+    error: flow.error,
+    size: flow.size ? { width: flow.size.width, height: flow.size.height } : null,
+    mode: flow.mode,
+    corners: c
+      ? {
+          top_left: copyPoint(c.top_left),
+          top_right: copyPoint(c.top_right),
+          bottom_right: copyPoint(c.bottom_right),
+          bottom_left: copyPoint(c.bottom_left),
+        }
+      : null,
+    bands: flow.bands.map((band) => ({ width_squares: band.width_squares })),
+    across: { ...flow.across },
+    down: { ...flow.down },
+    staging: flow.staging,
+    squareEighths: flow.squareEighths,
+    blocked: flow.blocked,
+    canContinue: flow.canContinue,
+  };
+}
+
+function closeBitmap(bitmap: ImageBitmap | null): void {
+  if (bitmap && typeof bitmap.close === "function") bitmap.close();
+}
+
 export interface PhotoSurface {
   photo: PhotoApi;
   uncertainty: UncertaintyApi;
@@ -203,6 +261,7 @@ export function usePhotoState(model: QuiltModel | null): PhotoFlowState {
 
   // ---- S6/S2 photo reverse state ------------------------------------------
   const machineRef = useRef<PhotoFlowMachine>(new PhotoFlowMachine());
+  const confirmRef = useRef<ConfirmFlow>(new ConfirmFlow());
   const sizeRef = useRef<SizeEntryState>(new SizeEntryState());
   const [photoActive, setPhotoActive] = useState(false);
   const [photoState, setPhotoState] = useState<PhotoScreen>("idle");
@@ -217,6 +276,13 @@ export function usePhotoState(model: QuiltModel | null): PhotoFlowState {
   const [showUncertain, setShowUncertain] = useState(false);
 
   const [sizeView, setSizeView] = useState<SizeView>(() => readSizeView(sizeRef.current));
+  const [confirmView, setConfirmView] = useState<ConfirmView>(() => readConfirmView(confirmRef.current));
+
+  // A pin drag syncs on every pointer move, so it refreshes the confirm
+  // snapshot alone rather than every mirrored value.
+  const syncConfirm = useCallback(() => {
+    setConfirmView(readConfirmView(confirmRef.current));
+  }, []);
 
   // mirror the pure machines into React state after every transition
   const syncPhoto = useCallback(() => {
@@ -227,10 +293,13 @@ export function usePhotoState(model: QuiltModel | null): PhotoFlowState {
     setDetectPending(m.detectPending);
     setQuadSource(m.quadSource);
     setSizeView(readSizeView(sizeRef.current));
+    setConfirmView(readConfirmView(confirmRef.current));
   }, []);
 
   const photoUrlRef = useRef<string | null>(null);
   photoUrlRef.current = photoUrl;
+  // The decoded photo, EXIF applied: Continue cuts its crop from this.
+  const bitmapRef = useRef<ImageBitmap | null>(null);
   const stagedBytesRef = useRef<Uint8Array | null>(null);
   const stagedDimsRef = useRef<{ width: number; height: number } | null>(null);
   const stagedTokenRef = useRef<string | null>(null);
@@ -240,7 +309,6 @@ export function usePhotoState(model: QuiltModel | null): PhotoFlowState {
 
   // ---- S6 photo reverse flow (issue #46) ---------------------------------
   //
-  // The state machine is idle(dropzone) -> progress -> results -> corners.
   // `active` is the app-level "in the photo flow" bit: idle doubles as the
   // dropzone, so App routes to PhotoFlow on `active`, not on state alone.
   // The session bitmap (photoUrl) is never persisted (PARITY item 7).
@@ -256,6 +324,15 @@ export function usePhotoState(model: QuiltModel | null): PhotoFlowState {
     }
     photoUrlRef.current = url;
     setPhotoUrl(url);
+  }, []);
+
+  /** Forgets the decoded photo and everything staged from it (web-09, ux-16). */
+  const dropStaged = useCallback(() => {
+    closeBitmap(bitmapRef.current);
+    bitmapRef.current = null;
+    stagedBytesRef.current = null;
+    stagedDimsRef.current = null;
+    stagedTokenRef.current = null;
   }, []);
 
   // Mirror the RPC vision state onto <body> for the e2e and the loading bar,
@@ -376,113 +453,165 @@ export function usePhotoState(model: QuiltModel | null): PhotoFlowState {
     [],
   );
 
-  /** Stage the photo's bytes into the worker once; the token is reused by
-   * detect_quad and analyze, and re-staged if a worker restart wiped it. */
+  /** Stage the staged crop's bytes into the worker once; the token is
+   * reused by analyze and re-staged if a worker restart wiped it. */
   const ensureStagedToken = useCallback(async (): Promise<string | null> => {
     if (stagedTokenRef.current) return stagedTokenRef.current;
     const bytes = stagedBytesRef.current;
     if (!bytes) return null;
     const staged = await engineRef.current.call<{ token: string }>("stage_photo", bytes);
-    stagedTokenRef.current = staged.token;
+    // Bytes replaced while this staged (a newer photo or crop) keep their own
+    // token slot empty, so a later read never reuses this one (web-09).
+    if (stagedBytesRef.current === bytes) stagedTokenRef.current = staged.token;
     return staged.token;
   }, []);
 
-  // S2 stage(): the photo and default pins render IMMEDIATELY (no engine on
-  // the critical path); detection resolves in the background and snaps in
-  // unless the user already moved a pin (the machine owns that race).
+  // C3b stage(): the dropzone stays up while the file decodes; only a photo
+  // the browser can decode opens the confirm screen (ux-16).
   const stage = useCallback(
     async (file: File): Promise<void> => {
+      const flow = confirmRef.current;
+      const seq = flow.newPhoto();
+      dropStaged();
+      setSessionPhoto(null);
       setPhotoActive(true);
       setPhotoResult(null);
-      stagedTokenRef.current = null;
       sizeRef.current.reset();
-      const seq = machineRef.current.enterCrop();
       syncPhoto();
-      setSessionPhoto(URL.createObjectURL(file));
+      let bitmap: ImageBitmap;
       try {
-        const bitmap = await createImageBitmap(file);
-        const size = targetSize(bitmap.width, bitmap.height, classifyDevice(window.innerWidth));
-        const canvas = document.createElement("canvas");
-        canvas.width = size.width;
-        canvas.height = size.height;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) throw new Error("no 2d canvas context");
-        ctx.drawImage(bitmap, 0, 0, size.width, size.height);
-        if (typeof bitmap.close === "function") bitmap.close();
-        const bytes = await canvasToPngBytes(canvas);
-        stagedBytesRef.current = bytes;
-        stagedDimsRef.current = { width: size.width, height: size.height };
-        const token = await ensureStagedToken();
-        if (!token) throw new Error("no staged photo");
-        const detected = await engineRef.current.call<DetectQuadResult>("detect_quad", token);
-        machineRef.current.detectionResolved(seq, {
-          quad: detected.quad,
-          tier: detected.tier,
-          confidence: detected.confidence,
-        });
-        sizeRef.current.suggest(detected.predicted_size?.preset ?? null);
-        syncPhoto();
-      } catch {
-        // the crop screen stays fully usable on default pins; the finding-
-        // your-quilt affordance simply disappears (cold-start contract)
-        machineRef.current.detectionFailed(seq);
-        syncPhoto();
+        bitmap = await decodePhoto(file);
+      } catch (error) {
+        const message =
+          error instanceof Error && error.message
+            ? error.message
+            : "This file could not be opened as a photo. Try another one.";
+        if (flow.decodeFailed(seq, message)) syncPhoto();
+        return;
       }
+      if (!flow.decoded(seq, { width: bitmap.width, height: bitmap.height })) {
+        closeBitmap(bitmap);
+        return;
+      }
+      bitmapRef.current = bitmap;
+      // The img element honors EXIF orientation as createImageBitmap does, so
+      // the pins' pixel frame is the decoded photo's.
+      setSessionPhoto(URL.createObjectURL(file));
+      const machineSeq = machineRef.current.enterCrop();
+      machineRef.current.detectionFailed(machineSeq);
+      syncPhoto();
     },
-    [ensureStagedToken, setSessionPhoto, syncPhoto],
+    [dropStaged, setSessionPhoto, syncPhoto],
   );
 
-  // S2 analyze(): reverse via the staged token; corners ride along ONLY when
-  // the user moved a pin (see photoFlow.ts for the honesty rationale).
+  // A10's default square size for typed band widths (C3a carried item, #149):
+  // sized from the read's own estimate; a failure leaves it unset.
+  const loadSquareSize = useCallback(
+    async (model: QuiltModel, seq: number): Promise<void> => {
+      let eighths: number | null = null;
+      try {
+        const raw = await engineRef.current.call<unknown>(
+          "size_pattern",
+          JSON.stringify(model),
+          JSON.stringify({ source: "default" }),
+        );
+        eighths = parseSizeResult(raw).model.center.cell_size;
+      } catch {
+        eighths = null;
+      }
+      const flow = confirmRef.current;
+      if (!flow.isCurrent(seq)) return;
+      flow.setSquareEighths(eighths);
+      syncConfirm();
+    },
+    [syncConfirm],
+  );
+
+  // C3b analyze() (Continue): stage the confirmed crop, then reverse it with
+  // the corners in the crop's pixel frame, moved or not (criteria U3-5).
+  // Every await is followed by a staleness check against the staging
+  // sequence, so a read never finishes into a newer photo (web-09).
   const analyze = useCallback(async (): Promise<void> => {
-    const passed = machineRef.current.analyze();
+    const flow = confirmRef.current;
+    const frame = flow.beginStaging();
+    syncConfirm();
+    if (!frame) return;
+    const { seq } = frame;
+    let plan: CropPlan;
+    try {
+      const bitmap = bitmapRef.current;
+      if (!bitmap) throw new Error("no decoded photo");
+      const squares = frameSquares(frame.mode, frame.across, frame.down, frame.bands);
+      const staged = await stagePhoto(bitmap, frame.corners, squarePx(frame.corners, squares));
+      if (!flow.isCurrent(seq)) return;
+      stagedBytesRef.current = staged.bytes;
+      stagedDimsRef.current = { width: staged.plan.staged.width, height: staged.plan.staged.height };
+      stagedTokenRef.current = null;
+      plan = staged.plan;
+    } catch {
+      if (!flow.isCurrent(seq)) return;
+      flow.endStaging(seq);
+      syncConfirm();
+      toast.push("That photo didn’t come through, try another?", "error");
+      return;
+    }
+    flow.endStaging(seq);
+    machineRef.current.analyze();
     syncPhoto();
     setPhotoResult(null);
     const token = { cancelled: false };
     reverseTokenRef.current = token;
+    const stale = () => token.cancelled || !flow.isCurrent(seq);
     try {
-      const dims = stagedDimsRef.current ?? { width: 1, height: 1 };
-      const options: Record<string, unknown> = {};
-      if (passed) {
-        options.corners = passed.map(([x, y]) => [x * dims.width, y * dims.height]);
-      }
+      const options: Record<string, unknown> = {
+        corners: CORNER_NAMES.map((name) => [plan.corners[name].x, plan.corners[name].y]),
+        // Decoded-photo pixels: the old bridge ignores it; B2a's
+        // read_confirmed maps the crop back with it (#101).
+        crop_offset: { x: plan.offset.x, y: plan.offset.y },
+      };
       const sized = sizeRef.current.sizeOptions();
       if (sized) {
         options.finished_width = sized.finished_width;
         options.finished_height = sized.finished_height;
       }
-      const optionsJson = Object.keys(options).length ? JSON.stringify(options) : "{}";
+      const optionsJson = JSON.stringify(options);
       let staged = await ensureStagedToken();
+      if (stale()) return;
       if (!staged) throw new Error("no staged photo");
       let outcome: ReverseOutcome;
       try {
         outcome = await runReverse(staged, optionsJson, token);
       } catch (error) {
+        if (stale()) return;
         // a worker restart wiped MEMFS: the token is stale; re-stage once
-        const stale =
+        const wiped =
           error instanceof EngineError &&
           error.kind === "value" &&
           /not found/i.test(error.message);
-        if (!stale) throw error;
+        if (!wiped) throw error;
         stagedTokenRef.current = null;
         staged = await ensureStagedToken();
+        if (stale()) return;
         if (!staged) throw error;
         outcome = await runReverse(staged, optionsJson, token);
       }
-      if (token.cancelled) return;
+      if (stale()) return;
       applyReverse(outcome.model, outcome.ms, outcome.verdict, outcome.diagnostics, outcome.requested, outcome.achieved);
       machineRef.current.results();
       syncPhoto();
+      void loadSquareSize(outcome.model, seq);
     } catch {
-      if (token.cancelled) return;
+      if (stale()) return;
       toast.push("That photo didn’t come through, try another?", "error");
       machineRef.current.seedFromConfirmed();
       syncPhoto();
     }
-  }, [ensureStagedToken, runReverse, applyReverse, syncPhoto, toast]);
+  }, [ensureStagedToken, runReverse, applyReverse, loadSquareSize, syncConfirm, syncPhoto, toast]);
 
   const startSample = useCallback(async (): Promise<void> => {
     // sample bypass (S2 contract): auto-confirmed full-frame render, no crop
+    confirmRef.current.clear();
+    dropStaged();
     setPhotoActive(true);
     setPhotoResult(null);
     machineRef.current.bypassToProgress();
@@ -521,7 +650,7 @@ export function usePhotoState(model: QuiltModel | null): PhotoFlowState {
       machineRef.current.reset();
       syncPhoto();
     }
-  }, [runReverse, applyReverse, setSessionPhoto, syncPhoto, toast]);
+  }, [dropStaged, runReverse, applyReverse, setSessionPhoto, syncPhoto, toast]);
 
   const cancel = useCallback(() => {
     // PARITY item 14 (sprint 2, frozen): cancel returns to the dropzone;
@@ -529,11 +658,12 @@ export function usePhotoState(model: QuiltModel | null): PhotoFlowState {
     reverseTokenRef.current.cancelled = true;
     retryGateRef.current?.();
     engineRef.current.restart();
-    stagedTokenRef.current = null;
+    confirmRef.current.clear();
+    dropStaged();
     machineRef.current.cancel();
     syncPhoto();
     setPhotoResult(null);
-  }, [syncPhoto]);
+  }, [dropStaged, syncPhoto]);
 
   const retryVision = useCallback(() => {
     engineRef.current.prefetchVision();
@@ -564,7 +694,8 @@ export function usePhotoState(model: QuiltModel | null): PhotoFlowState {
     }
   }, [photoResult, toast]);
 
-  // "Adjust the crop" from results: one pin surface, reachable from both ends
+  // "Adjust the crop" from results: back to the confirm screen, where the
+  // flow still holds the confirmed corners, counts, bands and frame.
   const toCrop = useCallback(() => {
     machineRef.current.seedFromConfirmed();
     syncPhoto();
@@ -584,44 +715,47 @@ export function usePhotoState(model: QuiltModel | null): PhotoFlowState {
   }, [syncPhoto]);
 
   const backFromCrop = useCallback(() => {
-    // Back discards the staged photo (UI-SPEC section 1 flow rules)
+    // Back discards the staged photo (UI-SPEC section 1 flow rules; U3-6)
+    confirmRef.current.clear();
+    dropStaged();
     machineRef.current.backFromCrop();
     syncPhoto();
-    stagedBytesRef.current = null;
-    stagedDimsRef.current = null;
-    stagedTokenRef.current = null;
     setSessionPhoto(null);
-  }, [setSessionPhoto, syncPhoto]);
+  }, [dropStaged, setSessionPhoto, syncPhoto]);
 
   const backToDropzone = useCallback(() => {
+    confirmRef.current.clear();
+    dropStaged();
     setPhotoActive(true);
     machineRef.current.reset();
     syncPhoto();
     setPhotoResult(null);
-    stagedBytesRef.current = null;
-    stagedTokenRef.current = null;
     setSessionPhoto(null);
     // vision prefetch fires on photo-flow ENTRY, not on drop (S2 contract);
     // this is also the entry path from the start screen
     engineRef.current.prefetchVision();
-  }, [setSessionPhoto, syncPhoto]);
+  }, [dropStaged, setSessionPhoto, syncPhoto]);
 
   const exitToEditor = useCallback(() => {
+    // The editor never returns to Confirm, so the decoded bitmap (192 MB for a
+    // 48 MP photo) goes now rather than at the next photo.
+    confirmRef.current.clear();
+    dropStaged();
     setPhotoActive(false);
     setPhotoState("idle");
     // photoUrl stays: the editor compare affordance reads it until reload.
-  }, []);
+  }, [dropStaged]);
 
   const reset = useCallback(() => {
+    confirmRef.current.clear();
+    dropStaged();
     setPhotoActive(false);
     machineRef.current.reset();
     syncPhoto();
     setPhotoResult(null);
-    stagedBytesRef.current = null;
-    stagedTokenRef.current = null;
     setShowUncertain(false);
     setSessionPhoto(null);
-  }, [setSessionPhoto, syncPhoto]);
+  }, [dropStaged, setSessionPhoto, syncPhoto]);
 
   // ---- derived uncertainty for the open (photo-sourced) model --------------
 
@@ -659,6 +793,33 @@ export function usePhotoState(model: QuiltModel | null): PhotoFlowState {
     [sizeView, syncPhoto],
   );
 
+  const confirmActions = useMemo(
+    () => ({
+      setCorner: (name: CornerName, point: Point) => {
+        confirmRef.current.setCorner(name, point);
+        syncConfirm();
+      },
+      setMode: (mode: FrameMode) => {
+        confirmRef.current.setMode(mode);
+        syncConfirm();
+      },
+      setBands: (bands: BorderBand[]) => {
+        confirmRef.current.setBands(bands);
+        syncConfirm();
+      },
+      setCounts: (across: AxisCount, down: AxisCount) => {
+        confirmRef.current.setCounts(across, down);
+        syncConfirm();
+      },
+    }),
+    [syncConfirm],
+  );
+
+  const confirm = useMemo<ConfirmApi>(
+    () => ({ ...confirmView, ...confirmActions }),
+    [confirmView, confirmActions],
+  );
+
   const flow = useMemo<PhotoFlowState["flow"]>(
     () => ({
       active: photoActive,
@@ -671,6 +832,7 @@ export function usePhotoState(model: QuiltModel | null): PhotoFlowState {
       detectedQuad,
       detectPending,
       quadSource,
+      confirm,
       stage,
       analyze,
       size,
@@ -695,6 +857,7 @@ export function usePhotoState(model: QuiltModel | null): PhotoFlowState {
       detectedQuad,
       detectPending,
       quadSource,
+      confirm,
       stage,
       analyze,
       size,

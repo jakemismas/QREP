@@ -27,6 +27,8 @@ export interface PinSpec {
   /** Spoken name, for example "Outer edge, top left". */
   label: string;
   tone?: "corner" | "field" | "band" | "square";
+  /** The pin's data-testid; pin-<id> when absent. */
+  testId?: string;
 }
 
 interface Props {
@@ -331,7 +333,7 @@ export function PinLayer({
               type="button"
               className="cf-pin"
               data-pin-id={pin.id}
-              data-testid={`pin-${pin.id}`}
+              data-testid={pin.testId ?? `pin-${pin.id}`}
               data-tone={pin.tone ?? "corner"}
               data-x={pin.point.x}
               data-y={pin.point.y}

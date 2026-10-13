@@ -1,4 +1,63 @@
-/* Crop screen; the pins and the size block bring their own sheets. */
-.pf-wrap--mid { max-width: 760px; }
-.pf-detecting { display: flex; align-items: center; gap: 9px; margin-top: 12px; font-size: 14px; color: var(--mut); }
-.pf-corner-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 18px; }
+/* The confirm screen (C3b, issue #101). C3a's components bring confirm.css
+   and the size block its own sheet; this sheet lays out the screen.
+   CropScreen.tsx sets --pf-avail, the height the photo may take, on
+   .pf-confirm, and --pf-aspect, the photo's width over its height, on
+   .pf-confirm__photo. */
+.pf-confirm {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "head" "photo" "side" "bar";
+  gap: 14px;
+  max-width: 1380px;
+  margin: 0 auto;
+  animation: qFade .35s ease;
+}
+.pf-confirm__head { grid-area: head; min-width: 0; }
+.pf-confirm__lede { margin: 0; font-size: 15px; line-height: 1.5; color: var(--mut); }
+.pf-confirm__photo { grid-area: photo; min-width: 0; }
+/* PinLayer is its stage, padded by half a pin's hit area (22 px) on every
+   side, over an 8 px gap and a 44 px zoom row: 96 px of height and 44 px of
+   width beyond the photo. Sizing the stage, not the whole layer, keeps the
+   zoom row on one line however narrow a tall photo gets. */
+.pf-confirm__photo .cf-pins__stage {
+  justify-self: center;
+  width: min(100%, calc((var(--pf-avail, 60vh) - 96px) * var(--pf-aspect, 1) + 44px));
+}
+.pf-confirm__photo .cf-pins__zoom { justify-content: center; }
+.pf-confirm__side { grid-area: side; display: grid; gap: 18px; align-content: start; min-width: 0; }
+.pf-confirm__group { display: grid; gap: 8px; min-width: 0; }
+.pf-confirm__h2 { margin: 0; font: 700 18px var(--serif); color: var(--denim); }
+.pf-confirm__field { display: grid; gap: 4px; font-size: 14.5px; color: var(--ink2); }
+.pf-confirm__select { max-width: 100%; min-height: 44px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--ink); font: inherit; }
+/* Sticky, so Continue stays on screen while the controls scroll on a phone
+   (ux-12, ux-20); on a desktop the screen fits the window and it sits below. */
+.pf-confirm__bar {
+  grid-area: bar;
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 -2px 12px var(--shadow);
+}
+.pf-confirm__blocked { margin: 0; font-size: 14px; line-height: 1.45; color: var(--accent); }
+.pf-confirm__actions { display: flex; align-items: center; gap: 12px; }
+.pf-confirm__actions .pf-btn { width: auto; min-height: 44px; }
+.pf-confirm__actions .pf-btn--secondary { padding: 10px 20px; }
+.pf-confirm__actions .pf-btn--primary { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 9px; padding: 11px 28px; }
+.pf-confirm__spin { flex: none; border-color: rgba(255,255,255,0.4); border-top-color: currentColor; }
+
+@media (min-width: 900px) {
+  .pf-confirm {
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 390px);
+    grid-template-areas: "head head" "photo side" "bar bar";
+    gap: 14px 24px;
+  }
+  .pf-confirm__side { max-height: var(--pf-avail, 60vh); overflow-y: auto; padding-right: 6px; }
+  .pf-confirm__actions { justify-content: flex-end; }
+  .pf-confirm__actions .pf-btn--primary { flex: none; min-width: 180px; }
+}

@@ -34,3 +34,31 @@ export function targetSize(
     scaled: true,
   };
 }
+
+/**
+ * The one staging cap, for every viewport (C3b, issue #101; ux-06): the old
+ * desktop cap. A cap picked from the window width gave one photo and one set
+ * of pins different quilts on a phone and a desktop.
+ */
+export const STAGE_CAP = CAP_DESKTOP;
+
+/**
+ * Scales (width, height) so the longest side is at most cap, with integer
+ * sides; scale is out / in along the longest side, and 1 when nothing scales.
+ */
+export function capLongest(
+  width: number,
+  height: number,
+  cap = STAGE_CAP,
+): { width: number; height: number; scale: number; scaled: boolean } {
+  const longest = Math.max(width, height);
+  if (longest <= cap) return { width, height, scale: 1, scaled: false };
+  const scale = cap / longest;
+  // A sliver can round its short side to zero, which no canvas can hold.
+  return {
+    width: Math.max(1, Math.round(width * scale)),
+    height: Math.max(1, Math.round(height * scale)),
+    scale,
+    scaled: true,
+  };
+}

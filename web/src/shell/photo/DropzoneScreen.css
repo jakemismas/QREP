@@ -1,12 +1,27 @@
 .pf-home { background: none; border: none; padding: 2px 0; font: 500 15px var(--sans); color: var(--accent); cursor: pointer; }
+/* The capture tips sit beside the picker from 820 px; below that they follow it. */
+.pf-wrap--dz { max-width: 620px; }
+.pf-dz-row { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 820px) {
+  .pf-wrap--dz { max-width: 880px; }
+  .pf-dz-row { grid-template-columns: minmax(0, 1fr) 270px; gap: 18px; }
+}
+.pf-dz-pick { min-width: 0; }
 .pf-dropzone { display: flex; flex-direction: column; align-items: center; gap: 10px; border: 2.5px dashed var(--line2); border-radius: 18px; background: var(--card2); padding: 40px 26px; text-align: center; cursor: pointer; }
 .pf-dropzone:hover { border-color: var(--accent); background: var(--card); }
 .pf-dropzone:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(165,80,47,0.25); }
+.pf-dropzone[aria-busy="true"] { cursor: progress; }
 .pf-camera { color: var(--mut); }
 .pf-camera rect, .pf-camera path, .pf-camera circle { fill: none; stroke: currentColor; stroke-width: 2.5; }
 .pf-dz-title { font: 700 20px var(--serif); color: var(--ink); }
 .pf-dz-sub { font-size: 14.5px; color: var(--mut); }
+.pf-dz-status { display: flex; align-items: center; gap: 9px; margin: 12px 0 0; font-size: 14.5px; color: var(--mut); }
+.pf-dz-error { margin: 12px 0 0; padding: 10px 14px; border: 1.5px solid var(--accent); border-radius: 12px; background: var(--card2); font-size: 14.5px; color: var(--ink); overflow-wrap: anywhere; }
 .pf-file-input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.pf-capture { padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); }
+.pf-capture-title { margin: 0 0 6px; font: 700 16.5px var(--serif); color: var(--denim); }
+.pf-capture-list { margin: 0; padding-left: 18px; font-size: 14px; line-height: 1.5; color: var(--ink2); }
+.pf-capture-list li + li { margin-top: 6px; }
 .pf-or { text-align: center; font-size: 13.5px; color: var(--faint); margin: 14px 0; }
 .pf-sample { display: flex; flex-direction: column; gap: 3px; width: 100%; text-align: left; padding: 14px 16px; border-radius: 12px; border: 1.5px solid var(--line2); background: var(--card); color: var(--ink2); cursor: pointer; }
 .pf-sample:hover { background: var(--card2); border-color: var(--accent); }
