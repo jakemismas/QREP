@@ -390,3 +390,25 @@ def test_run_eval_decode_stops_when_a_png_was_never_decoded(tmp_path):
             "--resolutions", "phone-1400", "--no-degradations", "--no-photoreal", "--decode", "webkit"]
     with pytest.raises(SystemExit, match="run_decode"):
         run_eval.main(argv, runner=_outside_git)
+
+
+def test_parity_pairs_route_skips_errors_and_reads(monkeypatch):
+    # One unit read by auto and auto-corners. Native and chromium: auto refuses in both
+    # (nothing shown, G9 holds); auto-corners has no frame in either (skipped). WebKit:
+    # auto errors, so its pair is an error, not a comparison.
+    monkeypatch.syspath_prepend(str(Path(run_eval.__file__).parent / "decode"))
+    import run_parity
+
+    unit = _unit(Path("q.jpg"), canvas=(100, 100), cap=None, resolution="phone-1400")
+    refused = {"outcome": "refused", "verdict": "no_grid", "rows": 0, "cols": 0, "colors": [], "cells": None,
+               "confidence": None, "low_confidence_below": 0.9, "seconds": 1.0}
+    skip = {"reader": "auto-corners", "skipped": harness.SKIP_REASON}
+    reads = {("q", "phone-1400", "native"): [{"reader": "auto", **refused}, skip],
+             ("q", "phone-1400", "chromium"): [{"reader": "auto", **refused}, skip],
+             ("q", "phone-1400", "webkit"): [{"reader": "auto", "error": "RuntimeError('x')"}, skip]}
+    rows = run_parity.compare([unit], reads)
+    got = [(r["browser"], r["reader"], r["status"], r.get("match"), r.get("g9")) for r in rows]
+    assert got == [("chromium", "auto", "compared", "nothing shown", True),
+                   ("chromium", "auto-corners", "skipped", None, None),
+                   ("webkit", "auto", "error", None, None),
+                   ("webkit", "auto-corners", "skipped", None, None)]

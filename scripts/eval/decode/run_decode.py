@@ -85,9 +85,8 @@ def _drive(jobs, decoded_dir: Path, browser: str, args, name: str) -> dict:
     return summary
 
 
-def self_check(decoded_dir: Path, browser: str, args) -> str:
-    """Decode two generated PNGs and check what came back, before any corpus image."""
-    folder = decoded_dir / "selfcheck"
+def self_check_inputs(folder: Path) -> tuple[list[decode.Job], dict]:
+    """The generated PNGs and their jobs; the same bytes on every run."""
     folder.mkdir(parents=True, exist_ok=True)
     rng = np.random.default_rng(4)
     jobs, images = [], {}
@@ -99,7 +98,12 @@ def self_check(decoded_dir: Path, browser: str, args) -> str:
         images[key] = image
         jobs.append(decode.Job(key=key, source=str(source), sha256=corpus.sha256_of(source), cap=cap,
                                canvas=(width, height)))
-    _drive(jobs, folder, browser, args, "selfcheck")
+    return jobs, images
+
+
+def self_check_result(folder: Path, browser: str, jobs, images) -> str:
+    """What came back: every pixel of the full-size PNG unchanged, and the capped one at
+    targetSize's size (load_decoded checks the size)."""
     full = decode.load_decoded(folder, browser, jobs[0])
     capped = decode.load_decoded(folder, browser, jobs[1])
     if full.error or capped.error:
@@ -108,9 +112,18 @@ def self_check(decoded_dir: Path, browser: str, args) -> str:
     diff = decode.pixel_diff(images[jobs[0].key], back)
     if diff["differing"]:
         raise SystemExit(f"run_decode: {browser} changed {diff['differing']} pixels of a PNG drawn at its own size")
-    return (f"{browser} {full.browser_version}: a 257 x 129 random PNG at full size came back with 0 of "
-            f"{diff['pixels']} pixels changed; a 3001 x 1999 PNG at the 1400 cap came back "
-            f"{capped.size[0]} x {capped.size[1]}, targetSize's size")
+    return (f"{browser} {full.browser_version}: a {jobs[0].canvas[0]} x {jobs[0].canvas[1]} random PNG at full "
+            f"size came back with 0 of {diff['pixels']} pixels changed; a {jobs[1].canvas[0]} x "
+            f"{jobs[1].canvas[1]} PNG at the {jobs[1].cap} cap came back {capped.size[0]} x {capped.size[1]}, "
+            "targetSize's size")
+
+
+def self_check(decoded_dir: Path, browser: str, args) -> str:
+    """Decode two generated PNGs and check what came back, before any corpus image."""
+    folder = decoded_dir / "selfcheck"
+    jobs, images = self_check_inputs(folder)
+    _drive(jobs, folder, browser, args, "selfcheck")
+    return self_check_result(folder, browser, jobs, images)
 
 
 def main(argv=None) -> int:
@@ -118,7 +131,9 @@ def main(argv=None) -> int:
     cache = args.cache or args.corpus / "private" / "cache"
     decoded_dir = cache / "decoded"
     decoded_dir.mkdir(parents=True, exist_ok=True)
-    jobs = decode.jobs_for(units_for(args, cache))
+    # Smallest decode first, so a stop on free memory leaves every smaller image done.
+    jobs = sorted(decode.jobs_for(units_for(args, cache)),
+                  key=lambda job: (job.canvas[0] * job.canvas[1], job.cap is None))
     for browser in args.browser or decode.BROWSERS:
         print(f"self-check: {self_check(decoded_dir, browser, args)}")
         summary = _drive(jobs, decoded_dir, browser, args, "eval")

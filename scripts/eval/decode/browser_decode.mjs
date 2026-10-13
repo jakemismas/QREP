@@ -29,7 +29,9 @@ const SIDECAR_VERSION = 1;
 const STEPS =
   "createImageBitmap(blob); canvas at targetSize(width, height, cap); " +
   "drawImage(bitmap, 0, 0, width, height); canvas.toBlob(image/png)";
-const LOW_MEMORY = 3;
+// Free memory, in GB, under which a decode in flight is abandoned: the 4 GB floor
+// checked between images, less the headroom one 40 MP decode takes.
+const LOW_MEMORY = 3.5;
 const TYPES = { ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png" };
 
 function parse(argv) {
