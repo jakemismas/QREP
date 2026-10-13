@@ -88,14 +88,24 @@ test.describe("photo-flow components in the editor at 1440 x 900", { tag: "@phon
       timeout: READY_TIMEOUT,
     });
     await page.getByRole("tab", { name: "Pattern" }).click();
-    // The strategy cards fill in from bridge calls, so wait for them before
-    // measuring the settled panel.
-    await expect(page.getByTestId("strategy-card-strip")).toBeVisible();
     const panel = page.getByTestId("roundtrip-panel");
     await expect(panel).toBeVisible();
     // Source: RoundTripPanel.css .pf-rt { display: flex; ... }. Unstyled, the
     // section element computes its default, block.
     await expect(panel).toHaveCSS("display", "flex");
+
+    // The strategy cards and the yardage table above the panel fill in from
+    // bridge calls (each card shows "…" per amount until its plan arrives)
+    // and move the panel as they do, so measure only once they all have.
+    for (const strategy of ["historical", "strip", "modern"]) {
+      const card = page.getByTestId(`strategy-card-${strategy}`);
+      await expect(card).toBeVisible();
+      await expect(card).not.toContainText("…");
+    }
+    for (const row of ["binding", "backing", "batting"]) {
+      await expect(page.getByTestId(`yardage-row-${row}`)).toBeVisible();
+    }
+    await page.evaluate(() => document.fonts.ready);
 
     // The page-level guard cannot pass on this tab yet: once its amounts fill
     // in, the yardage table runs past the side panel and the page (web-01,
@@ -104,12 +114,12 @@ test.describe("photo-flow components in the editor at 1440 x 900", { tag: "@phon
     // own box always fits, but a control that does not wrap spills past its
     // right edge. Every descendant stays inside the panel, the panel's
     // content is no wider than the panel, and the panel ends inside 1440 px.
-    await page.screenshot({
-      path: path.join(layoutDir, "editor-pattern-roundtrip-1440.png"),
-      fullPage: true,
-      animations: "disabled",
-    });
-    const fit = await panel.evaluate((root) => {
+    // One evaluate finds and measures the panel in a single task, so no
+    // re-render can swap it out mid-measure, and a missing panel fails at
+    // once instead of leaving a locator waiting out the test timeout (#232).
+    const fit = await page.evaluate(() => {
+      const root = document.querySelector('[data-testid="roundtrip-panel"]');
+      if (!root) throw new Error("the round-trip panel was gone when measured");
       const box = root.getBoundingClientRect();
       // Sub-pixel spill from layout rounding is not overflow (as in
       // helpers/layout.ts).
@@ -123,5 +133,15 @@ test.describe("photo-flow components in the editor at 1440 x 900", { tag: "@phon
     expect(fit.spill, "round-trip panel content past its edges").toEqual([]);
     expect(fit.scrollWidth).toBeLessThanOrEqual(fit.clientWidth);
     expect(fit.right).toBeLessThanOrEqual(1440);
+
+    // The record comes last. A full-page capture can report a 1 x 1 window
+    // for a moment, which swaps in the phone editor and back and reopens the
+    // desktop editor on its Fabrics tab (#232), so nothing reads the page
+    // after it.
+    await page.screenshot({
+      path: path.join(layoutDir, "editor-pattern-roundtrip-1440.png"),
+      fullPage: true,
+      animations: "disabled",
+    });
   });
 });
