@@ -12,9 +12,11 @@ checkout's gitignored corpus/private/ (plan sections 5.D and 8). For each photo 
   further EXIF block, XMP, IPTC, comments, PNG text chunks, JFIF thumbnails and the secondary
   images an iPhone JPEG carries after its primary image) is dropped without re-encoding a pixel.
   The one exception is the color profile (JPEG APP2, PNG iCCP), kept byte for byte because a
-  decoder applies it to show the photo's colors; it must parse as an ICC profile, whose text
-  names a color space and its maker, not a place or a person. The copy is then re-read and
-  refused if any metadata beyond the allowlist, other pixels or another orientation come back;
+  decoder applies it to show the photo's colors: it must parse as an ICC profile, but its text
+  tags (the profile's description and copyright, which phones fill with their color space's
+  name) are not read. A PNG profile's own name is rewritten, and only the first profile, palette
+  or ancillary chunk of each kind is kept. The copy is then re-read and refused if any metadata
+  beyond the allowlist, other pixels or another orientation come back;
 - keys the manifest to the photo as received: the row's sha256 is the received file's hash,
   which the D3a holdout rule and every in_holdout reader use (corpus/README.md, Manifest
   columns), and file_sha256 is the stored copy's, which the annotation sidecar binds because the
@@ -100,12 +102,19 @@ TEXT_LIMIT = 1 << 24
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 # Image data and color only, the chunks a decoder needs to show the same pixels, each with the
 # payload lengths its definition allows (None: any, for the compressed image data and the
-# profile, whose zlib streams location_traces checks end exactly), so no kept chunk can carry
-# extra bytes.
-PNG_KEEP = {b"IHDR": (13,), b"PLTE": range(3, 769, 3), b"IDAT": None, b"IEND": (0,),
-            b"tRNS": range(1, 257), b"cHRM": (32,), b"gAMA": (4,), b"iCCP": None,
-            b"sBIT": (1, 2, 3, 4), b"sRGB": (1,), b"pHYs": (9,), b"cICP": (4,), b"mDCV": (24,),
-            b"cLLI": (8,)}
+# profile, whose zlib streams location_traces checks end exactly; PLTE and tRNS depend on the
+# color type, which _png_plan reads from IHDR).
+PNG_KEEP = {b"IHDR": (13,), b"PLTE": None, b"IDAT": None, b"IEND": (0,), b"tRNS": None,
+            b"cHRM": (32,), b"gAMA": (4,), b"iCCP": None, b"sBIT": (1, 2, 3, 4), b"sRGB": (1,),
+            b"pHYs": (9,), b"cICP": (4,), b"mDCV": (24,), b"cLLI": (8,)}
+PALETTE = 3  # the IHDR color type of an indexed image, the only one that needs its PLTE
+# tRNS holds one gray sample (color type 0) or one RGB sample (type 2) of 2 bytes each
+# (PNG 3rd edition, 11.3.2.1); an indexed image gives one alpha byte per palette entry.
+TRNS_LENGTH = {0: 2, 2: 6}
+# The name a kept iCCP chunk carries in place of its own, which is free text.
+ICC_NAME = b"ICC Profile"
+# Make and model are kept as the text a viewer shows: up to the first NUL, at most this long.
+TEXT_TAG_LIMIT = 64
 SOI, EOI, SOS = 0xD8, 0xD9, 0xDA
 STANDALONE = frozenset(range(0xD0, 0xD8)) | {0x01}
 DQT, DHT, DAC, DRI = 0xDB, 0xC4, 0xCC, 0xDD
@@ -354,11 +363,52 @@ def _jpeg_kept(marker: int | None, part: bytes) -> bytes | None:
     return None
 
 
-def _png_keeps(kind: bytes, chunk: bytes) -> bool:
-    if kind not in PNG_KEEP:
-        return False
-    lengths = PNG_KEEP[kind]
-    return lengths is None or len(chunk) - 12 in lengths
+def _jpeg_plan(parts: list[tuple[int | None, bytes]]) -> list[bytes | None]:
+    """Each part as the stored copy carries it, or None. Past the first scan header only tables,
+    scan data and markers stay: a decoder reads no APP segment there. JFIF and Adobe count
+    once, as decoders read only the first of each."""
+    plan, seen, scanning = [], set(), False
+    for marker, part in parts:
+        kept = _jpeg_kept(marker, part)
+        if marker is not None and 0xE0 <= marker <= 0xEF:
+            if scanning or (marker in (0xE0, 0xEE) and marker in seen):
+                kept = None
+            elif kept is not None:
+                seen.add(marker)
+        scanning = scanning or marker == SOS
+        plan.append(kept)
+    return plan
+
+
+def _png_plan(chunks: list[tuple[bytes, bytes]]) -> list[bytes | None]:
+    """Each chunk as the stored copy carries it, or None (every eXIf: clean_copy writes the
+    allowlisted one). Only the first chunk of each kind but IDAT stays; PLTE and tRNS only at
+    the lengths the color type gives them; and the iCCP profile's name is rewritten."""
+    ihdr = next((chunk for kind, chunk in chunks if kind == b"IHDR"), b"")
+    color_type = ihdr[17] if len(ihdr) == 25 else None
+    plan, seen, entries = [], set(), 0
+    for kind, chunk in chunks:
+        payload = chunk[8:-4]
+        lengths = PNG_KEEP.get(kind, ())
+        kept = chunk if lengths is None or len(payload) in lengths else None
+        if kind in seen and kind != b"IDAT":
+            kept = None
+        elif kind == b"PLTE":
+            # A truecolor image's suggested palette changes no pixel, so only an indexed image
+            # keeps one.
+            ok = color_type == PALETTE and len(payload) % 3 == 0 and 3 <= len(payload) <= 768
+            kept, entries = (chunk, len(payload) // 3) if ok else (None, entries)
+        elif kind == b"tRNS":
+            limit = range(1, entries + 1) if color_type == PALETTE else (
+                TRNS_LENGTH.get(color_type, -1),)
+            kept = chunk if len(payload) in limit else None
+        elif kind == b"iCCP":
+            _name, sep, rest = payload.partition(b"\x00")
+            kept = _png_chunk(b"iCCP", ICC_NAME + b"\x00" + rest) if sep and rest else None
+        if kept is not None:
+            seen.add(kind)
+        plan.append(kept)
+    return plan
 
 
 def _png_chunk(kind: bytes, payload: bytes) -> bytes:
@@ -372,7 +422,7 @@ def _allowlisted(source: Image.Exif) -> bytes | None:
     kept = Image.Exif()
     for tag in KEPT_TAGS:
         if tag in source:
-            kept[tag] = source[tag]
+            kept[tag] = source[tag] if tag == ORIENTATION else _tag_text(source[tag])
     return kept.tobytes() if len(kept) else None
 
 
@@ -382,7 +432,7 @@ def clean_copy(data: bytes) -> bytes:
     exif = _allowlisted(_primary_exif(_metadata(data)))
     if fmt == "JPEG":
         parts, _after_end = _split_jpeg(data)
-        kept = [(marker, _jpeg_kept(marker, part)) for marker, part in parts]
+        kept = list(zip((marker for marker, _part in parts), _jpeg_plan(parts)))
         # JFIF wants its APP0 first, and EXIF its APP1 next.
         app0 = b"".join(part for marker, part in kept if marker == 0xE0 and part)
         rest = b"".join(part for marker, part in kept if marker != 0xE0 and part)
@@ -390,12 +440,12 @@ def clean_copy(data: bytes) -> bytes:
         return b"\xff\xd8" + app0 + app1 + rest
     chunks, _after_end = _split_png(data)
     out, placed = [PNG_SIGNATURE], exif is None
-    for kind, chunk in chunks:
+    for (kind, _chunk), kept in zip(chunks, _png_plan(chunks)):
         if kind == b"IDAT" and not placed:
             out.append(_png_chunk(b"eXIf", exif[len(EXIF_HEADER):]))
             placed = True
-        if _png_keeps(kind, chunk):
-            out.append(chunk)
+        if kept is not None:
+            out.append(kept)
     return b"".join(out)
 
 
@@ -467,8 +517,8 @@ def location_traces(data: bytes) -> list[str]:
     if fmt == "JPEG":
         parts, after_end = _split_jpeg(data)
         app1 = [part for marker, part in parts if marker == 0xE1]
-        changed = [marker for marker, part in parts
-                   if marker != 0xE1 and _jpeg_kept(marker, part) != part]
+        changed = [marker for (marker, part), kept in zip(parts, _jpeg_plan(parts))
+                   if marker != 0xE1 and kept != part]
         if changed:
             traces.append("JPEG segments " + ", ".join(f"0xff{m:02x}" for m in changed))
         if len(app1) > 1 or any(not part[4:].startswith(EXIF_HEADER) for part in app1):
@@ -478,10 +528,10 @@ def location_traces(data: bytes) -> list[str]:
             traces.append("an ICC segment that does not assemble into a profile")
     else:
         chunks, after_end = _split_png(data)
-        dropped = sorted({kind.decode("latin-1") for kind, chunk in chunks
-                          if kind != b"eXIf" and not _png_keeps(kind, chunk)})
-        if dropped:
-            traces.append("PNG chunks " + ", ".join(dropped))
+        changed = sorted({kind.decode("latin-1") for (kind, chunk), kept
+                          in zip(chunks, _png_plan(chunks)) if kind != b"eXIf" and kept != chunk})
+        if changed:
+            traces.append("PNG chunks " + ", ".join(changed))
         if not _zlib_whole([chunk[8:-4] for kind, chunk in chunks if kind == b"IDAT"]):
             traces.append("IDAT image data that does not end where its zlib stream ends")
         for kind, chunk in chunks:
@@ -543,6 +593,12 @@ def check_root(root: Path) -> Path:
         if "not a git repository" not in top.stderr:
             raise IntakeError(f"git cannot tell whether {root} is in a checkout: "
                               f"{top.stderr.strip()}")
+        # git also says so above GIT_CEILING_DIRECTORIES and past a broken .git file, so a .git
+        # in any enclosing folder refuses: git could stage there once its view comes back.
+        enclosing = next((folder for folder in (probe, *probe.parents)
+                          if (folder / ".git").exists()), None)
+        if enclosing is not None:
+            raise IntakeError(f"git finds no checkout at {root}, but {enclosing} holds a .git")
         if root.name.lower() != "private":
             raise IntakeError(f"{root} is not a folder named private; the intake writes only "
                               "to a private tier")
@@ -554,12 +610,14 @@ def check_root(root: Path) -> Path:
             f"{root} is inside a linked worktree; private photos live only in the main "
             "checkout's corpus/private/, which no worktree teardown touches")
     relative = Path(os.path.relpath(root.resolve(), toplevel)).as_posix()
-    # local-photos/ is also private to corpus-guard, but it is the inbox the photos come from.
-    if (not _corpus_guard().is_private(f"{relative}/probe")
-            or relative.split("/")[0].lower() == "local-photos"):
+    # corpus/private/ itself: corpus-guard's private tier also covers local-photos/, the inbox
+    # the photos come from, and folders inside corpus/private/ that other tickets own (the
+    # museum image cache), which the intake leaves alone.
+    if relative.lower() != "corpus/private" or not _corpus_guard().is_private(
+            f"{relative}/probe"):
         raise IntakeError(
-            f"{relative}/ is outside corpus-guard's private tier (a private/ folder under "
-            "corpus/), the only place in a checkout the intake writes")
+            f"{relative}/ is not corpus/private/, the folder of corpus-guard's private tier the "
+            "intake writes in a checkout")
     if _git(toplevel, "check-ignore", "-q", f"{relative}/probe").returncode:
         raise IntakeError(
             f"git does not ignore {relative}/ in {toplevel}, so a photo written there could be "
@@ -611,6 +669,12 @@ def _text(value) -> str:
     if isinstance(value, bytes):
         value = value.decode("utf-8", "replace")
     return str(value).strip("\x00 \t\r\n") if value is not None else ""
+
+
+def _tag_text(value) -> str:
+    """A make or model as a viewer shows it: text past a NUL goes, and so does anything past a
+    device name's length."""
+    return _text(value).split("\x00")[0][:TEXT_TAG_LIMIT]
 
 
 def _check_intake(intake: Intake) -> str:
@@ -750,7 +814,7 @@ def ingest(photo: Path, intake: Intake, root: Path, *, today: str | None = None,
 
     evidence = _capture_evidence(intake, exifs, meta.xmp)
     exif = exifs[0] if exifs else Image.Exif()
-    make, model = _text(exif.get(MAKE)), _text(exif.get(MODEL))
+    make, model = _tag_text(exif.get(MAKE)), _tag_text(exif.get(MODEL))
     device = _device_class(intake, model)
     orientation = exif.get(ORIENTATION, 1)
     orientation = orientation if orientation in range(1, 9) else 1
@@ -829,17 +893,19 @@ class ReportHeader:
 
 def tally(rows: list[dict[str, str]]) -> dict[tuple[str, str, str], int]:
     table = {(p, t, s): 0 for p in PRIVATE_TIER_NAMES for t in TIERS for s in SPLITS}
-    for row in rows:
+    # The errors name the row by number, never by a cell, which could be private text.
+    for number, row in enumerate(rows, start=1):
         key = (row["private_tier"], row["tier"], row["split"])
         if key not in table:
-            raise IntakeError(f"a manifest row has an unknown private tier, tier or split: {key}")
+            raise IntakeError(f"manifest row {number} has an unknown private tier, tier or split")
         try:
             rule = split_of(row["sha256"])
         except ValueError as err:
-            raise IntakeError(f"a manifest row has no sha256 the holdout rule reads: {err}") from err
+            raise IntakeError(f"manifest row {number} has no sha256 the holdout rule reads") \
+                from err
         if row["split"] != rule:
-            raise IntakeError(f"a manifest row's split is {row['split']}, but the holdout rule "
-                              f"puts its sha256 in {rule}")
+            raise IntakeError(f"manifest row {number}'s split is not the one the holdout rule "
+                              "gives its sha256")
         table[key] += 1
     return table
 

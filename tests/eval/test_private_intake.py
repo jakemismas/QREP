@@ -306,6 +306,8 @@ def test_clean_png_has_no_location_and_the_same_pixels():
         assert dict(im.getexif()) == {MAKE: "FakePhoneCo", MODEL: "iPad Test", ORIENTATION: 1}
         assert im.info["icc_profile"] == ICC
         assert not getattr(im, "text", {})
+    # The eXIf chunk goes before the image data, where a reader that stops there finds it.
+    assert stored.index(b"eXIf") < stored.index(b"IDAT")
 
 
 def test_clean_copy_without_any_exif_writes_none():
@@ -568,6 +570,12 @@ def test_two_photos_in_one_root_keep_both_rows_and_sidecars(tmp_path):
     assert pi.read_manifest(root) == [first, second]
     assert (first["sha256"], second["sha256"]) == (sha(camera.read_bytes()),
                                                   sha(shot.read_bytes()))
+    # The second row's fields, from the intake given above: a nested screenshot is the
+    # screenshot tier, with no screenshot marker in the file, so the operator's word.
+    assert (second["capture"], second["private_tier"], second["tier"], second["class"],
+            second["device_class"], second["capture_evidence"], second["split"]) == (
+        "nested_screenshot", "screenshot", "R", "curve", "phone", "operator",
+        side(sha(shot.read_bytes())))
     for row in (first, second):
         stem = Path(row["file"]).stem
         assert (root / "photos" / Path(row["file"]).name).is_file()
@@ -609,6 +617,8 @@ def test_sidecar_is_a_valid_annotation_with_the_screened_capture(tmp_path):
     # No EXIF make or model: the row says so rather than leaving the cells blank.
     assert (row["device_make"], row["device_model"]) == ("unknown", "unknown")
     assert row["private_tier"] == "screenshot"
+    # No marker in the file (its XMP holds only the fake GPS), so the operator's word.
+    assert row["capture_evidence"] == "operator"
 
 
 @needs_git
@@ -881,8 +891,10 @@ def test_root_must_sit_in_the_private_tier(tmp_path):
     write(repo / ".gitignore", b"build/\nlocal-photos/\ncorpus/private/\n")
     photo = write(tmp_path / "p.jpg", jpeg(extras=False))
     # build/ is ignored but outside corpus-guard's private tier; local-photos/ is the inbox
-    # the photos come from, never where the intake writes.
-    for root in (repo / "build" / "private", repo / "local-photos" / "private"):
+    # the photos come from; corpus/private/cache/ and corpus/x/private/ are in the tier but
+    # are not corpus/private/ itself, whose subfolders other tickets own.
+    for root in (repo / "build" / "private", repo / "local-photos" / "private",
+                 repo / "corpus" / "private" / "cache", repo / "corpus" / "x" / "private"):
         with pytest.raises(pi.IntakeError, match="private tier"):
             pi.ingest(photo, intake(), root)
     # Outside any checkout git cannot stage a file, but the folder still names what it holds.
@@ -1106,3 +1118,285 @@ def test_report_with_free_text_in_its_header_does_not_parse():
                                 "--out Testshop/listing.md")):
         with pytest.raises(pi.IntakeError):
             pi.parse_report(leaked)
+
+
+# ---------------------------------------------------------------------------------------------
+# Regression tests from the self-review of b2fdda5
+# ---------------------------------------------------------------------------------------------
+
+
+def iccp(name: bytes, stream: bytes) -> bytes:
+    # iCCP: a profile name, NUL, compression method 0, then the zlib stream.
+    return chunk(b"iCCP", name + b"\x00\x00" + stream)
+
+
+KEPT_PNG_CASES = {
+    # A profile's name is free text a person may have typed; the stored copy names it anew.
+    "iccp_name": (png_with(before=[iccp(b"Testperson calibration", zlib.compress(ICC))]),
+                  b"Testperson", "iCCP"),
+    # PNG allows one profile; a second, stored at level 0 so its bytes show, goes.
+    "second_iccp": (png_with(before=[iccp(b"ICC Profile", zlib.compress(ICC)),
+                                     iccp(b"ICC Profile", zlib.compress(b"ICCNEEDLE", 0))]),
+                    b"ICCNEEDLE", "iCCP"),
+    # A truecolor image's palette is only a suggestion no decoder needs: 15 bytes, 5 entries.
+    "plte_in_rgb": (png_with(before=[chunk(b"PLTE", b"PLTENEEDLE12345")]), b"PLTENEEDLE",
+                    "PLTE"),
+    # tRNS on a truecolor image is one 6-byte RGB sample; this one is 6 + 10 = 16 bytes.
+    "long_trns": (png_with(before=[chunk(b"tRNS", bytes(6) + b"TRNSNEEDLE")]), b"TRNSNEEDLE",
+                  "tRNS"),
+    # cHRM is 32 bytes and counts once; the second carries a needle in its 32.
+    "second_chrm": (png_with(before=[chunk(b"cHRM", bytes(32)),
+                                     chunk(b"cHRM", b"CHRMNEEDLE" + bytes(22))]),
+                    b"CHRMNEEDLE", "cHRM"),
+}
+
+
+@pytest.mark.parametrize("case", sorted(KEPT_PNG_CASES))
+def test_kept_png_chunks_carry_nothing_extra(case):
+    source, needle, kind = KEPT_PNG_CASES[case]
+    assert needle in source
+    assert f"PNG chunks {kind}" in pi.location_traces(source)
+    stored = pi.clean_copy(source)
+    assert needle not in stored
+    assert pi.location_traces(stored) == []
+    assert decoded(stored) == decoded(source)
+    if kind == "iCCP":
+        with Image.open(io.BytesIO(stored)) as im:
+            assert im.info["icc_profile"] == ICC
+        assert iccp(b"ICC Profile", zlib.compress(ICC)) in stored
+
+
+def test_a_six_byte_trns_on_a_truecolor_png_is_kept():
+    # One 16-bit sample per channel: 3 x 2 = 6 bytes, the length tRNS has on color type 2.
+    trns = chunk(b"tRNS", bytes(6))
+    source = png_with(before=[trns])
+    assert pi.location_traces(source) == []
+    assert trns in pi.clean_copy(source)
+
+
+def jpeg_with_segment(data: bytes, segment_bytes: bytes, *, before_end=False) -> bytes:
+    # After the start-of-image marker, or between the scan data and the end-of-image marker.
+    if before_end:
+        return data[:-2] + segment_bytes + data[-2:]
+    return data[:2] + segment_bytes + data[2:]
+
+
+def test_jpeg_app_segments_past_the_scan_or_repeated_are_dropped():
+    data = plain_jpeg()
+    assert data.count(b"JFIF\x00") == 1 and data.endswith(b"\xff\xd9")
+    after_scan = jpeg_with_segment(
+        data, segment(0xE2, b"ICC_PROFILE\x00\x01\x01" + b"ICCAFTERSCANNEEDLE"), before_end=True)
+    end = 4 + int.from_bytes(data[4:6], "big")
+    # A second JFIF APP0 right after the first, its density fields reading 7 x 7.
+    second_jfif = (data[:end] + segment(0xE0, b"JFIF\x00\x01\x01\x00\x00\x07\x00\x07\x00\x00")
+                   + data[end:])
+    adobe = segment(0xEE, b"Adobe\x00\x64\x00\x00\x00\x00\x01")
+    second_adobe = data[:end] + adobe + adobe + data[end:]
+    # Each source with the bytes to count in its stored copy, and how many times they stay.
+    for source, needle, kept in ((after_scan, b"ICCAFTERSCANNEEDLE", 0),
+                                 (second_jfif, b"JFIF\x00", 1), (second_adobe, b"Adobe", 1)):
+        assert any("JPEG segments" in trace for trace in pi.location_traces(source))
+        stored = pi.clean_copy(source)
+        assert stored.count(needle) == kept
+        assert pi.location_traces(stored) == []
+        assert decoded(stored) == decoded(source)
+
+
+def test_make_and_model_keep_only_the_text_a_viewer_shows():
+    ex = exif(make="FakePhoneCo\x00Testhamlet 0.0003N", model="iPhone " + "9" * 80, gps=False)
+    source = jpeg(ex=ex, extras=False)
+    assert b"Testhamlet" in source
+    stored = pi.clean_copy(source)
+    assert b"Testhamlet" not in stored
+    with Image.open(io.BytesIO(stored)) as im:
+        # The make up to its NUL; the model's first 64 characters: "iPhone " is 7, so 57 nines.
+        assert dict(im.getexif()) == {MAKE: "FakePhoneCo", MODEL: "iPhone " + "9" * 57,
+                                      ORIENTATION: 1}
+    assert pi.location_traces(stored) == []
+
+
+def test_icc_structure_checks_each_refuse():
+    def profile(size_field: int, signature: bytes, count: int, tail: bytes = b"") -> bytes:
+        return (size_field.to_bytes(4, "big") + bytes(32) + signature + bytes(88)
+                + count.to_bytes(4, "big") + tail)
+
+    # One tag entry: signature, offset, size, 12 bytes. 132 + 12 = 144 bytes in all.
+    entry = b"desc" + (140).to_bytes(4, "big") + (10).to_bytes(4, "big")
+    bad = {
+        # "acsp" missing at bytes 36 to 39.
+        "signature": profile(132, b"xxxx", 0),
+        # The size field reads 200 for a 132-byte profile.
+        "size": profile(200, b"acsp", 0),
+        # One tag claimed, but its 12-byte entry would end at 144, past 132.
+        "table": profile(132, b"acsp", 1),
+        # The tag at offset 140 runs 10 bytes, to 150, past the profile's 144.
+        "tag": profile(144, b"acsp", 1, entry),
+    }
+    assert pi._is_icc(ICC)
+    # A tag at offset 132 of 12 bytes ends at 144, the profile's end: inside it.
+    assert pi._is_icc(profile(144, b"acsp", 1, b"desc" + (132).to_bytes(4, "big")
+                              + (12).to_bytes(4, "big")))
+    for name, data in bad.items():
+        assert not pi._is_icc(data), name
+        buf = io.BytesIO()
+        picture().save(buf, "JPEG", quality=90, icc_profile=data)
+        assert any("ICC" in trace for trace in pi.location_traces(buf.getvalue())), name
+
+
+def test_png_zlib_streams_must_end_with_their_chunks():
+    data = plain_png()
+    # A profile stream with bytes after its end.
+    tail_iccp = png_with(before=[iccp(b"ICC Profile", zlib.compress(ICC) + b"ICCPTAIL")])
+    assert any("iCCP" in trace for trace in pi.location_traces(tail_iccp))
+    # A whole extra IDAT chunk after the image data's stream has ended.
+    end = data.rindex(b"IEND") - 4
+    extra_idat = data[:end] + chunk(b"IDAT", b"IDATNEEDLE") + data[end:]
+    assert any("IDAT" in trace for trace in pi.location_traces(extra_idat))
+
+
+def test_the_safety_net_names_each_leftover():
+    make_only = Image.Exif()
+    make_only[MAKE] = "FakePhoneCo"
+    block = exif_payload(make_only)
+    # Two clean blocks are still two: the allowlist builds one.
+    two = png_with(before=[chunk(b"eXIf", block), chunk(b"eXIf", block)])
+    assert "2 EXIF blocks" in pi.location_traces(two)
+    # Allowed tags only, but bytes past the block the allowlist would build.
+    padded = png_with(before=[chunk(b"eXIf", block + b"PADNEEDLE")])
+    assert "an EXIF block with more than make, model and orientation" in pi.location_traces(
+        padded)
+    # 12 bytes after the end-of-image marker.
+    assert "12 bytes after the image's end" in pi.location_traces(plain_jpeg() + b"TAILNEEDLE12")
+
+
+def test_table_lengths_follow_their_definitions():
+    # Source: ITU-T T.81, B.2.2 to B.2.4.4.
+    # DQT: 1 byte of precision and id, then 64 one-byte entries (65) or 64 two-byte ones (129);
+    # both tables in one segment: 65 + 129 = 194. Five stray bytes fit no table.
+    dqt = bytes([0x00]) + bytes(64) + bytes([0x11]) + bytes(128)
+    assert pi._table_length(pi.DQT, dqt) == 194
+    assert pi._table_length(pi.DQT, dqt + bytes(5)) is None
+    # DHT: 1 byte of class and id, 16 code counts (2, 1, then 0s), then 2 + 1 = 3 symbols:
+    # 1 + 16 + 3 = 20.
+    assert pi._table_length(pi.DHT, bytes([0x00, 2, 1]) + bytes(14) + b"abc") == 20
+    # SOF0 with 3 components: 6 + 3 x 3 = 15. SOS with 3: 1 + 2 x 3 + 3 = 10. DRI: 2.
+    # DAC: two 2-byte entries, 4.
+    assert pi._table_length(0xC0, bytes([8, 0, 48, 0, 64, 3]) + bytes(9)) == 15
+    assert pi._table_length(pi.SOS, bytes([3]) + bytes(9)) == 10
+    assert pi._table_length(pi.DRI, b"\x00\x04") == 2
+    assert pi._table_length(pi.DAC, bytes(4)) == 4
+
+
+def test_root_under_an_enclosing_git_is_refused_when_git_sees_none(monkeypatch, tmp_path):
+    def blind(cwd, *args):
+        # What git answers above GIT_CEILING_DIRECTORIES, or past a broken .git file.
+        return subprocess.CompletedProcess(["git", *args], 128, "",
+                                           "fatal: not a git repository\n")
+
+    write(tmp_path / "outer" / ".git", b"gitdir: elsewhere\n")
+    monkeypatch.setattr(pi, "_git", blind)
+    with pytest.raises(pi.IntakeError, match=r"\.git"):
+        pi.check_root(tmp_path / "outer" / "corpus" / "private")
+    # With no .git above it, the same answer clears a folder named private.
+    assert pi.check_root(tmp_path / "plain" / "private") == tmp_path / "plain" / "private"
+
+
+def second_exif_marked() -> bytes:
+    data = jpeg(ex=exif(exposure=False, gps=False), extras=False)
+    start = data.index(b"\xff\xe1")
+    end = start + 2 + int.from_bytes(data[start + 2:start + 4], "big")
+    marked = exif(exposure=False, gps=False, screenshot=True).tobytes()
+    # The marker sits in the second EXIF block, after the first one ends.
+    return data[:end] + segment(0xE1, marked) + data[end:]
+
+
+SCREENSHOT_MARKED = {
+    # A JPEG whose XMP carries the marker, and one whose second EXIF block does.
+    "jpeg_xmp": jpeg_with_segment(
+        jpeg(ex=exif(exposure=False, gps=False), extras=False),
+        segment(0xE1, b"http://ns.adobe.com/xap/1.0/\x00" + SCREENSHOT_XMP.encode())),
+    "jpeg_second_exif": second_exif_marked(),
+    # PNG XMP compressed in iTXt (flag 1, method 0), in tEXt (upper case), and in zTXt.
+    "png_itxt_compressed": png_with(before=[chunk(
+        b"iTXt", b"XML:com.adobe.xmp\x00\x01\x00\x00\x00" + zlib.compress(
+            SCREENSHOT_XMP.encode()))]),
+    "png_text_upper": png_with(before=[chunk(
+        b"tEXt", b"XML:com.adobe.xmp\x00" + SCREENSHOT_XMP.replace(
+            "Screenshot", "SCREENSHOT").encode())]),
+    "png_ztxt": png_with(before=[chunk(
+        b"zTXt", b"XML:com.adobe.xmp\x00\x00" + zlib.compress(SCREENSHOT_XMP.encode()))]),
+}
+
+
+@needs_git
+@pytest.mark.parametrize("case", sorted(SCREENSHOT_MARKED))
+def test_a_screenshot_marker_in_any_block_refuses_a_camera_capture(case, tmp_path):
+    photo = write(tmp_path / f"{case}.bin", SCREENSHOT_MARKED[case])
+    with pytest.raises(pi.IntakeError, match="screenshot"):
+        pi.ingest(photo, intake(capture_confirmed=True, device_class="phone"),
+                  tmp_path / "private")
+    assert not (tmp_path / "private").exists()
+
+
+@needs_git
+def test_claims_on_the_intakes_own_fields_or_with_other_codes_are_refused(tmp_path):
+    photo = write(tmp_path / "a.png", png(ex=exif(make="", model="", exposure=False)))
+    shot = intake(capture="nested_screenshot", device_class="phone")
+    bad = {
+        # The capture is the intake's own claim; a proposal would contradict the row.
+        "not a claim field": {"capture": [{"provenance": "proposed-a", "value": "camera"}]},
+        # Screened is the intake's code, not one a claims file may bring.
+        "provenance": {"construction_class": [{"provenance": "screened", "value": "squares"}]},
+        # Not a construction class, so the sidecar would not validate.
+        "not a valid annotation": {
+            "construction_class": [{"provenance": "proposed-a", "value": "not_a_class"}]},
+    }
+    for message, claims in bad.items():
+        with pytest.raises(pi.IntakeError, match=message):
+            pi.ingest(photo, shot, tmp_path / "private", claims=claims)
+    assert not (tmp_path / "private").exists()
+
+
+@needs_git
+def test_the_same_received_file_is_refused_even_when_the_clean_changes(monkeypatch, tmp_path):
+    root = tmp_path / "private"
+    photo = write(tmp_path / "p.jpg", jpeg(extras=False))
+    pi.ingest(photo, intake(), root)
+    # A later clean that stores other bytes (another make) for the same pixels: the stored
+    # hashes differ, so only the received hash can tell it is the same photo.
+    real = pi.clean_copy
+    other = jpeg(ex=exif(make="OtherCo"), extras=False)
+    monkeypatch.setattr(pi, "clean_copy", lambda data: real(other))
+    assert sha(real(other)) != pi.read_manifest(root)[0]["file_sha256"]
+    with pytest.raises(pi.IntakeError, match="already"):
+        pi.ingest(photo, intake(), root)
+    assert len(pi.read_manifest(root)) == 1
+
+
+@needs_git
+def test_ingest_flags_pass_through_main(monkeypatch, tmp_path):
+    root = tmp_path / "private"
+    monkeypatch.setattr(pi, "default_root", lambda: root)
+    photo = write(tmp_path / "in" / "c.png", png(ex=exif(make="", model="", exposure=False)))
+    claims = write(tmp_path / "in" / "claims.json", json.dumps(
+        {"construction_class": [{"provenance": "proposed-a", "value": "squares"}]}).encode())
+    pins = write(tmp_path / "in" / "pins.json", json.dumps(PINS).encode())
+    argv = ["ingest", str(photo), "--source", "test-phone", "--capture", "camera",
+            "--ownership", "owned by the tester", "--tier", "A", "--class", "squares",
+            "--device-class", "phone", "--capture-confirmed", "--claims", str(claims),
+            "--regression", str(pins)]
+    assert pi.main(argv) == 0
+    (row,) = pi.read_manifest(root)
+    stem = Path(row["file"]).stem
+    # No model and no exposure data: the device class and the capture rest on the flags.
+    assert (row["device_class"], row["capture_evidence"]) == ("phone", "operator")
+    assert an.load(root / "annotations" / f"{stem}.json").construction_class[0].value == "squares"
+    assert json.loads((root / "regression" / f"{stem}.json").read_text())["pins"] == PINS
+
+
+@needs_git
+def test_default_root_is_the_main_checkouts_private_folder():
+    root = pi.default_root()
+    # The folder beside the main checkout's .git, from this checkout or any worktree of it.
+    assert root.parts[-2:] == ("corpus", "private")
+    assert (root.parent.parent / ".git").is_dir()
