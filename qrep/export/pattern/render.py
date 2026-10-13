@@ -96,11 +96,13 @@ PLACEHOLDER_PAD = 6
 # A figure leaves room on its page for a section heading (20 pt and 8 pt after),
 # a subheading with a swatch (a 23 pt row), one line of text with 6 pt after it
 # and the caption (3 pt before and 13 pt): 20 + 8 + 23 + 13 + 6 + 3 + 13 = 86 pt.
-# So the first figure of a section always shares a page with its headings.
+# So the first figure of a section shares a page with its headings when the text
+# that cites it is one line; _keep_headings refuses a longer text that leaves no room.
 MAX_FIGURE_HEIGHT = FRAME_HEIGHT - 86
 
-# reportlab settings an RL_ environment variable or a settings file can change,
-# each of which moves the layout or the bytes; every build runs on these values.
+# Of the reportlab settings an RL_ environment variable or a settings file can
+# change, these four move the layout or the bytes of every build, so every build
+# runs on these values. Others, such as showBoundary, are left as the process has them.
 _PINNED = {"invariant": 1, "overlapAttachedSpace": 1, "useA85": 1, "wrapA85": 0}
 # The settings and SOURCE_DATE_EPOCH are process-wide, so builds take turns.
 _BUILD = threading.Lock()
@@ -141,7 +143,7 @@ Drawer = Callable[[FigureRequest], "Drawing | list[Drawing]"]
 def render_pdf(document: PatternDocument) -> bytes:
     """The document as PDF bytes; identical documents give identical bytes."""
     for text in document.texts():
-        check_text(text)
+        check_text(text, document.name)
     if stringWidth(document.name, FONT, FOOTER_SIZE) > CONTENT_WIDTH:
         raise ValueError(f"the pattern name {document.name!r} is too wide for one footer line")
     probe = _PageProbe()
@@ -223,7 +225,12 @@ def _drawers() -> Mapping[str, Drawer]:
 
 class _Group(list):
     """Flowables that share one page: a step or paragraph with its figure, a step
-    with its details, or one part of a figure."""
+    with its details, or one part of a figure. figure marks a group that holds a
+    figure, which never splits."""
+
+    def __init__(self, items=(), figure: bool = False):
+        super().__init__(items)
+        self.figure = figure
 
 
 def _story(document: PatternDocument, drawers: Mapping[str, Drawer], probe: Flowable) -> list:
@@ -231,13 +238,13 @@ def _story(document: PatternDocument, drawers: Mapping[str, Drawer], probe: Flow
     cover, *rest = document.sections
     items = [_title(document.name)]
     for block in cover.blocks:
-        items += _block(block, numbers, drawers)
+        items += _block(block, numbers, drawers, document.name)
     if rest:
         items += [PageBreak(), probe]
     for section in rest:
         items.append(TextFlowable(escape(section.kind.value), _HEADING))
         for block in section.blocks:
-            items += _block(block, numbers, drawers)
+            items += _block(block, numbers, drawers, document.name)
     return items
 
 
@@ -260,16 +267,17 @@ def _keep_headings(items: list) -> list:
     reportlab's keepWithNext never joins a heading to a KeepTogether
     (doctemplate.py, _ktAllow), so a heading followed by steps or a figure would
     otherwise sit alone at the foot of a page. MAX_FIGURE_HEIGHT leaves room for
-    the headings above a one-line step and its figure; a longer step that leaves
+    the headings above a one-line step and its figure; a figure group that leaves
     none is refused, since its headings would print alone on a page. A text-only
-    group taller than a page splits anyway, with its headings at its start.
+    group taller than the rest of a page starts the next page with its headings
+    and splits there (KeepTogether.split), so it always joins them.
     """
     story, pending = [], []
     for item in items:
         if isinstance(item, _Group):
             if pending:
                 height = _height([*pending, *item])
-                if height > FRAME_HEIGHT and _height(item) <= FRAME_HEIGHT:
+                if item.figure and height > FRAME_HEIGHT:
                     raise ValueError(
                         f"a heading and the step or figure after it need {height:.0f} pt, "
                         f"more than one page holds"
@@ -298,7 +306,7 @@ def _height(parts: list) -> float:
     return total
 
 
-def _block(block: Block, numbers: Iterator[int], drawers: Mapping[str, Drawer]) -> list:
+def _block(block: Block, numbers: Iterator[int], drawers: Mapping[str, Drawer], name: str) -> list:
     if isinstance(block, Subheading):
         return [_subheading(block)]
     if isinstance(block, Paragraph):
@@ -307,7 +315,7 @@ def _block(block: Block, numbers: Iterator[int], drawers: Mapping[str, Drawer]) 
             return [TextFlowable(_markup(block.text), style)]
         number = next(numbers)
         parts = [TextFlowable(_markup(_cite(block.text, number)), style)]
-        return [_with_figure(parts, block.figure, number, drawers, "the paragraph")]
+        return [_with_figure(parts, block.figure, number, drawers, name, "the paragraph")]
     if isinstance(block, Steps):
         groups = []
         for n, step in enumerate(block.items, start=block.start):
@@ -317,12 +325,13 @@ def _block(block: Block, numbers: Iterator[int], drawers: Mapping[str, Drawer]) 
             if step.figure is None:
                 groups.append(_Group(parts))
             else:
-                groups.append(_with_figure(parts, step.figure, number, drawers, f"step {n}"))
+                groups.append(_with_figure(parts, step.figure, number, drawers, name, f"step {n}"))
         return groups
     if isinstance(block, Table):
         return [_table(block)]
     if isinstance(block, Figure):
-        return [_Group([_Spaced(part)]) for part in _figure_parts(block.request, drawers)]
+        return [_Group([_Spaced(part)], figure=True)
+                for part in _figure_parts(block.request, drawers, name)]
     if isinstance(block, PrintScaleSquare):
         return [_print_scale_square(block)]
     raise TypeError(f"no layout for block {block!r}")
@@ -339,14 +348,14 @@ def _cite(text: str, number: int | None) -> str:
 
 
 def _with_figure(parts: list, request: FigureRequest, number: int, drawers: Mapping[str, Drawer],
-                 what: str) -> _Group:
-    figure = _figure_parts(request, drawers)
+                 name: str, what: str) -> _Group:
+    figure = _figure_parts(request, drawers, name)
     if len(figure) != 1:
         raise ValueError(
             f"the figure {request.label!r} is cited from text, so it must be one drawing, "
             f"not {len(figure)}"
         )
-    group = _Group([*parts, figure[0], TextFlowable(f"Fig. {number}", _CAPTION)])
+    group = _Group([*parts, figure[0], TextFlowable(f"Fig. {number}", _CAPTION)], figure=True)
     # KeepTogether falls back to splitting a group taller than a page, so text and
     # its figure that cannot share one page are refused rather than split.
     height = _height(group)
@@ -358,7 +367,7 @@ def _with_figure(parts: list, request: FigureRequest, number: int, drawers: Mapp
 # ---------------------------------------------------------------- figures
 
 
-def _figure_parts(request: FigureRequest, drawers: Mapping[str, Drawer]) -> list:
+def _figure_parts(request: FigureRequest, drawers: Mapping[str, Drawer], name: str) -> list:
     """The drawing for a request, or its parts when one figure spans pages (S10).
 
     Every part fits the requested size, which fits one page's figure area.
@@ -382,12 +391,12 @@ def _figure_parts(request: FigureRequest, drawers: Mapping[str, Drawer]) -> list
                 f"the {request.kind} drawer returned {type(part).__name__} for "
                 f"{request.label!r}; it must return a reportlab Drawing"
             )
-        _check_drawing(part, request)
+        _check_drawing(part, request, name)
         part.hAlign = "CENTER"
     return parts
 
 
-def _check_drawing(drawing: Drawing, request: FigureRequest) -> None:
+def _check_drawing(drawing: Drawing, request: FigureRequest, name: str) -> None:
     width, height = drawing.wrap(CONTENT_WIDTH, FRAME_HEIGHT)
     if width > request.width + 0.5 or height > request.height + 0.5:
         raise ValueError(
@@ -416,7 +425,7 @@ def _check_drawing(drawing: Drawing, request: FigureRequest) -> None:
                 f"figure label {label.text!r} in {request.label!r} is set in "
                 f"{label.fontName}; G-03 allows Helvetica only"
             )
-        check_text(label.text)
+        check_text(label.text, name)
 
 
 def _labels(node, scale: float = 1.0, root: bool = True) -> Iterator[tuple[String, float]]:

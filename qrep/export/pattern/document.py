@@ -14,6 +14,7 @@ and PS-06 forms; the renderer applies it to every string it prints.
 
 from __future__ import annotations
 
+import itertools
 import math
 import re
 from collections.abc import Iterator
@@ -62,8 +63,6 @@ FIGURE_KINDS = {
     "layout_chart": "layout chart",
     "coloring_page": "coloring page",
 }
-# G-05 has a step cite every figure; only these stand alone, without a number.
-UNCITED_KINDS = frozenset({"cover_render", "layout_chart", "coloring_page"})
 
 _HEX = re.compile(r"#[0-9a-fA-F]{6}")
 
@@ -192,16 +191,10 @@ class Table:
 
 @dataclass(frozen=True)
 class Figure:
-    """A figure no text cites, such as the cover render: it gets no Fig. number."""
+    """A figure no text cites, such as the cover render or one part of an assembly
+    figure split across pages (S7): it gets no Fig. number."""
 
     request: FigureRequest
-
-    def __post_init__(self) -> None:
-        if self.request.kind not in UNCITED_KINDS:
-            raise ValueError(
-                f"a {self.request.kind} figure is cited from its step or paragraph (G-05); "
-                f"only {', '.join(sorted(UNCITED_KINDS))} stand alone"
-            )
 
 
 @dataclass(frozen=True)
@@ -352,8 +345,7 @@ _BANNED = [
                 re.IGNORECASE), "a piece total"),
     (re.compile(r"\bf\d+\b"), "an internal fabric id"),
     (_HEX, "a hex color"),
-    # C-07 lets the pattern echo a centimeter size the user typed, such as 152.4 cm.
-    (re.compile(r"\.\d+(?!\d)(?! ?cm\b)"), "a decimal number"),
+    (re.compile(r"\.\d"), "a decimal number"),
     # A hyphen or any Unicode dash between the whole number and the fraction.
     (re.compile(r"\b\d+[-\u2010-\u2015]\d+/\d+\b"), "a hyphenated fraction"),
     (re.compile("[¼-¾⅐-⅞⁄\u2215]"), "a fraction glyph"),
@@ -368,9 +360,13 @@ _BY = re.compile(r"\d by \d")
 # since an inch mark is a straight double quote (C-07).
 _NUMBER = r'(\d+(?: \d+/\d+)?)("?)'
 # Not after a letter, so a piece label such as "each A2 square" is no length.
-_STRIP_OR_SQUARE = re.compile(rf'(?<![\w/.]){_NUMBER} (?:x WOF|squares?)\b')
+_STRIP_OR_SQUARE = re.compile(rf'(?<![\w/.]){_NUMBER} (?:x WOF|square)\b')
+# A number before "squares" is a count ("12 squares were read") unless a cut count
+# in parentheses comes first, as in 'Cut (4) 2" squares.' (S4).
+_CUT_SQUARES = re.compile(rf'\(\d+\) {_NUMBER} squares\b')
 _RECTANGLE = re.compile(rf'(?<![\w/.]){_NUMBER} x {_NUMBER} rectangles?\b')
-_CURLY_MARK = re.compile(r"\d[\N{RIGHT DOUBLE QUOTATION MARK}\N{DOUBLE PRIME}]")
+_CURLY_MARK = re.compile(r"\d(?:[\N{LEFT DOUBLE QUOTATION MARK}\N{RIGHT DOUBLE QUOTATION MARK}"
+                         r"\N{DOUBLE PRIME}]|'')")
 
 
 def check_printable(text: str) -> None:
@@ -387,15 +383,19 @@ def check_printable(text: str) -> None:
         ) from None
 
 
-def check_text(text: str) -> None:
+def check_text(text: str, name: str = "") -> None:
     """Raise PatternTextError when text holds a PS-05 item or breaks PS-06.
 
-    The text is read as section 6 reads it: whitespace collapsed and straight
-    double quotes dropped, so '2"x8"' is caught as "2x8". Nothing is exempt,
-    the pattern name included: PS-05 bans its items anywhere, and the name
-    prints on every page (G-02).
+    The text is read as section 6 reads it: whitespace collapsed, the pattern
+    name left out, and straight double quotes dropped, so '2"x8"' is caught as
+    "2x8". C-01 prints the model's own name verbatim, such as "Double Irish
+    Chain 75x90", and PS-05 and PS-06 judge the text without it. The name is
+    left out only where it stands as its own words, so a name such as "x"
+    cannot hide the x of 2"x 8".
     """
     raw = re.sub(r"\s+", " ", text)
+    if name:
+        raw = re.sub(rf'(?<![\w"/.-]){re.escape(name)}(?![\w"/-])', " ", raw)
     plain = raw.replace('"', "")
     for pattern, what in _BANNED:
         found = pattern.search(plain)
@@ -405,7 +405,7 @@ def check_text(text: str) -> None:
         num, den = int(found.group(1)), int(found.group(2))
         if den not in (2, 4, 8) or not 0 < num < den or math.gcd(num, den) != 1:
             raise PatternTextError(f"fraction {found.group(0)!r} is not in lowest eighths in {text!r}")
-    found = _BARE_FRACTION.search(text)
+    found = _BARE_FRACTION.search(raw)
     if found:
         raise PatternTextError(f"fraction {found.group(0)!r} has no inch mark or yd in {text!r}")
     for found in _SEPARATOR.finditer(plain):
@@ -417,7 +417,7 @@ def check_text(text: str) -> None:
     found = _CURLY_MARK.search(raw)
     if found:
         raise PatternTextError(f"the inch mark in {found.group(0)!r} is not a straight quote in {text!r}")
-    for found in _STRIP_OR_SQUARE.finditer(raw):
+    for found in itertools.chain(_STRIP_OR_SQUARE.finditer(raw), _CUT_SQUARES.finditer(raw)):
         if not found.group(2):
             raise PatternTextError(f"length {found.group(0)!r} has no inch mark in {text!r}")
     for found in _RECTANGLE.finditer(raw):
@@ -441,10 +441,14 @@ def _value(number: str) -> float:
 def check_name(name: str) -> None:
     """Raise when the pattern name cannot print whole on one footer line.
 
-    The name prints in the title and every footer, so it obeys every text rule
-    and is one clean line: control characters or doubled or edge spaces would
-    print in the footer as they are while the title collapses them.
+    The name is one clean line, since control characters or doubled or edge
+    spaces would print in the footer as they are while the title collapses
+    them. It holds no date (G-02) and only characters Helvetica prints. The
+    other text rules leave it out (check_text), since C-01 prints it verbatim.
     """
     if not name or name != " ".join(name.split()) or any(ord(c) < 32 or ord(c) == 127 for c in name):
         raise ValueError(f"a pattern needs a one-line name without extra spaces, got {name!r}")
-    check_text(name)
+    found = _DATE.search(name)
+    if found:
+        raise PatternTextError(f"the pattern name {name!r} holds a date {found.group(0)!r}")
+    check_printable(name)

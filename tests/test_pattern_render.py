@@ -313,12 +313,6 @@ def test_a_long_one_word_title_shrinks_until_the_word_fits_the_line(tmp_path):
         24, 10}
 
 
-def test_a_name_holding_a_date_is_refused():
-    # G-02: no page shows a date, and the name prints in every footer.
-    with pytest.raises(PatternTextError, match="date"):
-        full_document(name="Quilt of 2026-10-13")
-
-
 def test_the_a11_page_checks_pass_on_a_full_document(tmp_path):
     assert_checks_pass(write(tmp_path, full_document()))
 
@@ -477,7 +471,8 @@ def test_source_date_epoch_neither_changes_the_bytes_nor_breaks_a_render(monkeyp
 
 @pytest.mark.parametrize(
     ("setting", "value"),
-    [("pageCompression", 0), ("useA85", 0), ("overlapAttachedSpace", 0), ("invariant", 0)],
+    [("pageCompression", 0), ("useA85", 0), ("overlapAttachedSpace", 0), ("invariant", 0),
+     ("invariant", 1), ("wrapA85", 1)],
 )
 def test_process_reportlab_settings_do_not_change_the_bytes(monkeypatch, setting, value):
     # An RL_ environment variable sets these in rl_config: uncompressed or unencoded
@@ -719,6 +714,34 @@ def test_a_step_too_tall_to_share_a_page_with_its_figure_is_refused():
     step = Step("Sew. " * 120, figure=FigureRequest("hst_unit", 300, 570, "a tall figure"))
     with pytest.raises(ValueError, match="one page"):
         render.render_pdf(small_document(Steps([step])))
+
+
+@pytest.mark.parametrize(
+    ("before", "page"),
+    [((), 2), ((Section(SectionKind.FABRIC_REQUIREMENTS, [Paragraph("Buy 3/4 yd.")]),), 3)],
+)
+def test_a_heading_moves_with_a_step_too_tall_for_the_rest_of_the_page(tmp_path, before, page):
+    # The heading (20 pt, 8 pt after), a swatch subheading (a 23 pt row), the step
+    # (13 pt) and 40 one-line details (3 pt before each, 13 pt) need 20 + 8 + 23 + 13
+    # + 40 x 16 = 704 pt, more than the 666 pt frame, though the step alone needs
+    # 13 + 640 = 653 pt. Text without a figure may split, so the headings start a page
+    # with the step: 64 + 37 x 16 = 656 pt holds 37 details, a 38th would need 672 pt,
+    # so details 38 to 40 print on the next page. First after the cover, the group
+    # starts page 2; after a section that holds a line, it moves to page 3.
+    details = tuple(f"Detail marker {n}." for n in range(1, 41))
+    document = PatternDocument(NAME, [
+        Section(SectionKind.COVER, [Paragraph("3 fabrics, plus backing")]),
+        *before,
+        Section(SectionKind.CUTTING, [
+            Subheading("A Background", swatch=CREAM),
+            Steps([Step("Step marker: cut the background.", details=details)]),
+        ]),
+    ])
+    texts = page_texts(write(tmp_path, document))
+    assert len(texts) == page + 1
+    for text in ["Cutting", "A Background", "1. Step marker", "Detail marker 37."]:
+        assert page_of(texts, text) == page, text
+    assert page_of(texts, "Detail marker 38.") == page + 1
 
 
 def test_a_table_row_never_splits_across_pages(tmp_path):
@@ -1004,14 +1027,12 @@ def test_cited_figures_are_numbered_in_reading_order(tmp_path):
         "Fig. 1", "Fig. 2", "Fig. 3", "Fig. 4"]
 
 
-def test_only_the_cover_render_layout_chart_and_coloring_page_stand_uncited():
-    # G-05: a step cites every figure; the cover render (S1), the layout chart (S10)
-    # and the coloring page (S11) print on their own, without a Fig. number.
-    for kind in ["cover_render", "layout_chart", "coloring_page"]:
-        Figure(FigureRequest(kind, 100, 100, "the quilt"))
-    for kind in ["hst_unit", "block", "sub_unit", "symbol_legend"]:
-        with pytest.raises(ValueError, match="cited"):
-            Figure(FigureRequest(kind, 100, 100, "the quilt"))
+def test_a_figure_of_any_kind_may_stand_uncited(tmp_path):
+    # S7 splits a very large assembly figure into labeled parts (PATTERN-SPEC S7), and
+    # a cited figure must be one drawing, so its parts stand alone as Figure blocks;
+    # which figures a step cites is A4d's (G-05).
+    document = small_document(Figure(FigureRequest("assembly", 300, 200, "rows 1 and 2")))
+    assert "rows 1 and 2" in page_texts(write(tmp_path, document))[1]
 
 
 def test_a_request_with_a_dict_subject_can_key_a_set():
@@ -1134,6 +1155,11 @@ BANNED = [
     "Printed October 2026.",
     "Printed October 13th, 2026.",
     "Printed 13-10-2026.",
+    # Metric output is a Non-goal of #95, and section 6 bans every decimal (PS-05).
+    "Made for a 152.4 cm wide bed.",
+    "Cut (4) 2 squares.",  # C-07: a cut square's length carries its mark
+    "Cut (4) 2\N{LEFT DOUBLE QUOTATION MARK} squares.",
+    "Cut (4) 2'' squares.",  # two apostrophes are not an inch mark either
 ]
 
 
@@ -1166,27 +1192,75 @@ def test_every_block_that_prints_text_is_checked(block):
 
 def test_allowed_text_passes():
     # The guard's own limits: piece counts in parentheses and totals under 100 are
-    # not piece totals; a piece label before "square" is not a length; C-07 lets a
-    # centimeter size the user typed print as typed; ordinals are not dates.
+    # not piece totals; a piece label before "square" is not a length; a count of
+    # squares is not a length unless a cut count comes first, as in "Cut (4) 2"
+    # squares."; ordinals are not dates.
     for text in ['Cut (6) 2 1/2" x WOF strips.', "Sew in rows 1 to 4.", '6 1/2" x 8 3/4"',
                  "Buy 3/4 yd.", 'Cut (120) 2 1/2" squares.', "Press the seam (Fig. 2). 3 rows",
                  "Make 40 pieces.", "Sew the rows one by one.", 'Cut (2) 2" x 8" rectangles.',
-                 "Draw a line on each A2 square.", "Made for a 152.4 cm wide bed.",
+                 "Draw a line on each A2 square.", "12 squares were read with low confidence.",
                  "Sew the 4th row to the 3rd."]:
         check_text(text)
 
 
+@pytest.mark.parametrize("name", ["Double Irish Chain 75x90", "Modern Lanterns", "Waltz in 3/4 Time"])
+def test_the_model_name_prints_verbatim_where_other_text_would_be_refused(
+        tmp_path, monkeypatch, name):
+    # C-01 prints the model's own name, and section 6 reads PS-05 and PS-06 with the
+    # name taken out (tests/pattern_checks.py, _text_without_name). The DIC fixture's
+    # name (qrep/model/fixtures.py) holds 75x90, which C-10 refuses in other text;
+    # "Modern" is a PS-05 word; 3/4 has no inch mark or yd. The name may appear in a
+    # step, a figure label and a drawer's label too.
+    def draw(request):
+        drawing = navy_block(request)
+        drawing.add(String(10, 30, name, fontName="Helvetica", fontSize=8))
+        return drawing
+
+    install_figures(monkeypatch, {"block": draw})
+    document = small_document(
+        Steps([Step(f"Lay out {name} on the floor.",
+                    figure=FigureRequest("block", 300, 90, f"{name}, block 1"))]),
+        name=name,
+    )
+    path = write(tmp_path, document)
+    texts = page_texts(path)
+    # The title and the footer on page 1, then the step, the figure label and the footer.
+    assert texts[0].count(name) == 2
+    assert texts[1].count(name) == 3
+    assert_checks_pass(path, ["PS-03", "PS-05", "PS-06"])
+
+
 @pytest.mark.parametrize(
-    "name",
-    ["Modern Lanterns", "Rows of f2", "Rows 2x8", "Waltz in 3/4 Time", "Lantern\rRows",
-     "Lantern  Rows", " Lantern Rows", "Lantern Rows "],
+    ("name", "message"),
+    [
+        ("", "one-line name"),
+        (f"Lantern{chr(1)}Rows", "one-line name"),
+        (f"Lantern{chr(127)}Rows", "one-line name"),
+        ("Lantern\rRows", "one-line name"),
+        ("Lantern  Rows", "one-line name"),
+        (" Lantern Rows", "one-line name"),
+        ("Lantern Rows ", "one-line name"),
+        ("Quilt of 2026-10-13", "date"),
+        ("Łąka Rows", "Helvetica"),
+    ],
 )
-def test_the_name_obeys_every_text_rule_and_is_one_clean_line(name):
-    # PS-05 bans its items anywhere, and the name prints on every page (G-02), so no
-    # rule exempts it. A control character or an extra space would print as it is in
-    # the footer while the title collapses it.
-    with pytest.raises(ValueError):
+def test_the_name_is_one_clean_printable_line_without_a_date(name, message):
+    # The footer prints the name as it is while the title collapses its spaces, so a
+    # control character or an extra space would differ between the two; G-02 allows
+    # no date on any page; Helvetica prints cp1252 only.
+    with pytest.raises(ValueError, match=message):
         PatternDocument(name, [Section(SectionKind.COVER)])
+
+
+def test_only_the_whole_name_is_left_out_of_the_text_rules():
+    # The name is left out where it stands as its own words. A word character or a
+    # quote beside it means the match is part of something else: a name "x" leaves
+    # the x of 2"x 8" in place, so C-10 still refuses that dimension.
+    check_text("Lay out Rows 2x8 on the floor.", "Rows 2x8")
+    with pytest.raises(PatternTextError, match="' x '"):
+        check_text("Lay out Rows 2x8s on the floor.", "Rows 2x8")
+    with pytest.raises(PatternTextError, match="' x '"):
+        check_text('Cut (2) 2"x 8" rectangles.', "x")
 
 
 def test_a_fraction_glyph_is_refused_as_a_fraction_glyph():
