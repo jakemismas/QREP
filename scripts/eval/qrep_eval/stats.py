@@ -21,8 +21,9 @@ def wilson(k: int, n: int, z: float = Z95) -> tuple[float, float] | None:
 
 
 def rule_of_three(n: int) -> float | None:
-    """The 95 percent upper bound 3/n on a rate whose count is 0 in n trials."""
-    return 3 / n if n else None
+    """The 95 percent upper bound 3/n on a rate whose count is 0 in n trials, capped at
+    1: below 3 trials 3/n exceeds any rate."""
+    return min(1.0, 3 / n) if n else None
 
 
 def rate(k: int, n: int) -> dict:

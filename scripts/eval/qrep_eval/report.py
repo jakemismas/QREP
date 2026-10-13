@@ -20,6 +20,11 @@ OUTCOMES = ("read", "warned", "held", "refused")
 # Rows that never enter a rate's n; every rate carries their counts instead.
 UNSCORED = ("error", "skipped")
 TIER_NAMES = {"A": "museum tier A (in scope)", "B": "museum tier B (stress)", "R": "refusal tier"}
+TRUTH_LABELS = ("gate", "provisional", "conflict")
+# The device column of the G5 entry pooled over every device class.
+POOLED = "all in scope"
+# Why the corner-taking readers score no refusal photo on the v0 corpus.
+G4_CORNERS = "no frame or counts on the v0 refusal photos (#243)"
 # The section 7.2 metrics that wait on another ticket's merge, and the branch prefix
 # that marks it in this tree's history.
 PENDING = {"G3": ("B3", "slice/s5-b3-"), "G6": ("A3b", "slice/s5-a3b-")}
@@ -77,6 +82,8 @@ def _summary(rows) -> dict:
         "skipped": sum(r["outcome"] == "skipped" for r in rows),
         "outcomes": dict(Counter(r["outcome"] for r in scored)),
         "verdicts": dict(Counter(r.get("verdict") for r in scored if r.get("verdict"))),
+        # Tier and device rates pool every truth label; the mix behind the rate's n.
+        "truth_rows": {label: sum(r["truth"] == label for r in scored) for label in TRUTH_LABELS},
     }
     if in_scope:
         out["false_warning"] = _blocked_rate(rows)
@@ -113,7 +120,8 @@ def _at_true_corners(rows):
 
 def _gate_metrics(rows) -> list[dict]:
     """G1, G2, G4 and G5 per reader, device class and resolution over photo rows, gate
-    truth and provisional side by side."""
+    truth and provisional side by side, then G5 pooled over the device classes. A
+    conflict row counts toward neither; the provisional entry carries their count."""
     out = []
     for (reader, device, resolution), group in _group(rows, "reader", "device_class", "resolution").items():
         for label in ("gate", "provisional"):
@@ -123,7 +131,7 @@ def _gate_metrics(rows) -> list[dict]:
             gold = _scored(gold_rows)
             squares = sum(r["squares"] for r in gold)
             wrong = sum(r["confident_wrong"] for r in gold)
-            out.append({
+            entry = {
                 "reader": reader, "device_class": device, "resolution": resolution, "truth": label,
                 "G1": _with_unscored(stats.rate(sum(bool(r["fully_correct"]) for r in gold), len(gold)),
                                      gold_rows),
@@ -131,7 +139,19 @@ def _gate_metrics(rows) -> list[dict]:
                 "G2": {**_with_unscored(stats.rate(wrong, squares), gold_rows), "photos": len(gold)},
                 "G4": _blocked_rate([r for r in part if r["tier"] == "R"]),
                 "G5": _blocked_rate(in_scope),
-            })
+            }
+            if label == "provisional":
+                entry["conflict_rows"] = sum(r["truth"] == "conflict" for r in group)
+            out.append(entry)
+    for (reader, resolution), group in _group(rows, "reader", "resolution").items():
+        in_scope = [r for r in group if r["tier"] == "A"]
+        for label in ("gate", "provisional"):
+            entry = {"reader": reader, "device_class": POOLED, "resolution": resolution, "truth": label,
+                     "G1": None, "G2": None, "G4": None,
+                     "G5": _blocked_rate([r for r in in_scope if r["truth"] == label])}
+            if label == "provisional":
+                entry["conflict_rows"] = sum(r["truth"] == "conflict" for r in in_scope)
+            out.append(entry)
     return out
 
 
@@ -226,6 +246,10 @@ def _outcomes(summary: dict) -> str:
     return " / ".join(str(o.get(name, 0)) for name in OUTCOMES)
 
 
+def _truth_rows(summary: dict) -> str:
+    return " / ".join(str(summary["truth_rows"][label]) for label in TRUTH_LABELS)
+
+
 def _verdicts(summary: dict) -> str:
     return ", ".join(f"{k} {v}" for k, v in sorted(summary["verdicts"].items())) or "none"
 
@@ -239,19 +263,27 @@ def markdown(report: dict) -> str:
               "row per photo, reader, resolution and condition, read at true corners and true counts. "
               "Outcomes read read / warned / held / refused. False warning, refusal recall and G4 and "
               "G5 count holds and refusals only: a warned read still offers the editor and its PDF. "
-              "Provisional rows rest on proposals, never on gate "
-              "truth, and count toward no gate. Nothing here is frozen (plan 7.2).", ""]
+              "Provisional rows rest on proposals, never on gate truth, and conflict rows carry a "
+              "verified class that contradicts their tier; neither counts toward a gate. Nothing here "
+              "is frozen (plan 7.2).", ""]
     lines += ["## Section 7.2 metrics", "",
               "| Reader | Device class | Resolution | Truth | G1 fully correct interior "
               "| G2 confident-wrong squares | G4 refusal recall | G5 false warning (true corners) |",
               "|---|---|---|---|---|---|---|---|"]
     for e in a["gate_metrics"]:
         g2 = e["G2"]
-        lines.append(f"| {e['reader']} | {e['device_class']} | {e['resolution']} | {e['truth']} "
-                     f"| {_fmt(e['G1'])} | {g2['photos']} photos: {_fmt(g2, 'squares', 4)} "
-                     f"| {_fmt(e['G4'])} | {_fmt(e['G5'])} |")
+        truth = e["truth"] + (f" ({e['conflict_rows']} conflict rows)" if e.get("conflict_rows") else "")
+        g4 = "n/a" if e["G4"] is None else _fmt(e["G4"]) + (
+            f"; {G4_CORNERS}" if e["reader"] != "auto" else "")
+        g1 = "n/a" if e["G1"] is None else _fmt(e["G1"])
+        g2_text = "n/a" if g2 is None else f"{g2['photos']} photos: {_fmt(g2, 'squares', 4)}"
+        lines.append(f"| {e['reader']} | {e['device_class']} | {e['resolution']} | {truth} "
+                     f"| {g1} | {g2_text} | {g4} | {_fmt(e['G5'])} |")
     lines += ["", "- G5 for auto counts its read with no corners, since the automatic read takes none; "
-              "auto-corners and confirmed count their 0 px trials.",
+              "auto-corners and confirmed count their 0 px trials. The " + POOLED + " rows pool G5 over "
+              "every device class.",
+              "- G4 for auto-corners and confirmed: these readers take a frame and counts, and the v0 "
+              "annotations give the refusal photos neither, so those photos are skipped, not scored (#243).",
               "- G2 counts squares, which cluster by photo; its interval treats them as independent, so "
               "it is too narrow. The photo count says how many gold photos stand behind it."]
     lines += [f"- {k}: {v}" for k, v in a["pending"].items()]
@@ -260,26 +292,27 @@ def markdown(report: dict) -> str:
               "below carry synthetic cell truth.", ""]
     lines += ["## Per tier and resolution", "",
               "| Reader | Tier | Resolution | Photos | Rows | Errors | Skipped | Outcomes | Rate "
-              "| Count top-1 | Fabric count exact | Verdicts |", "|---|---|---|---|---|---|---|---|---|---|---|---|"]
+              "| Gate / provisional / conflict rows | Count top-1 | Fabric count exact | Verdicts |",
+              "|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for key, s in a["by_tier"].items():
         reader, tier, resolution = key.split(" | ")
         rate = s.get("false_warning") or s.get("refusal_recall")
         label = "false warning " if "false_warning" in s else "refusal recall "
         lines.append(f"| {reader} | {TIER_NAMES.get(tier, tier)} | {resolution} | {s['n_photos']} "
                      f"| {s['n_rows']} | {s['errors']} | {s['skipped']} | {_outcomes(s)} | {label}{_fmt(rate)} "
-                     f"| {_fmt(s.get('count_top1'))} | {_fmt(s.get('fabric_count_exact'))} "
+                     f"| {_truth_rows(s)} | {_fmt(s.get('count_top1'))} | {_fmt(s.get('fabric_count_exact'))} "
                      f"| {_verdicts(s)} |")
     lines += ["", "## Per device class", "",
-              "| Reader | Tier | Device class | Resolution | Photos | Outcomes | Rate |",
-              "|---|---|---|---|---|---|---|"]
+              "| Reader | Tier | Device class | Resolution | Photos | Outcomes | Rate "
+              "| Gate / provisional / conflict rows |", "|---|---|---|---|---|---|---|---|"]
     for key, s in a["by_device_class"].items():
         reader, tier, device, resolution = key.split(" | ")
         rate = (f"false warning {_fmt(s['false_warning'])}" if "false_warning" in s
                 else f"refusal recall {_fmt(s['refusal_recall'])}")
         lines.append(f"| {reader} | {TIER_NAMES.get(tier, tier)} | {device} | {resolution} | {s['n_photos']} "
-                     f"| {_outcomes(s)} | {rate} |")
+                     f"| {_outcomes(s)} | {rate} | {_truth_rows(s)} |")
     for device in a["device_classes_without_photos"]:
-        lines.append(f"| every reader | every tier | {device} | every resolution | 0 | none | n = 0 |")
+        lines.append(f"| every reader | every tier | {device} | every resolution | 0 | none | n = 0 | 0 / 0 / 0 |")
     lines += ["", "## Corner jitter (museum tier A)", "",
               "Trials of one photo are not independent, so these rows give k/n trials and the photo "
               "count, with no interval and no 3/n bound.", "",

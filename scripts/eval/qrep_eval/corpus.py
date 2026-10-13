@@ -58,15 +58,24 @@ class TruthView:
     provenance: dict[str, str] = field(default_factory=dict)
 
     def label_for(self, tier: str) -> str:
-        """gate when the truth a tier is scored on is gate truth (plan 5.D), else
-        provisional. A refusal photo is scored on its class alone. Any other photo
-        needs verified frame, counts and class, and a fabric count, when there is
-        one, from the square-truth codes, since a proposed count would grade k."""
+        """gate when the truth a tier is scored on is gate truth (plan 5.D) and agrees
+        with the tier; conflict when a verified class contradicts the tier, which
+        counts toward no gate; else provisional. A refusal photo is scored on its
+        verified out-of-scope call alone (an out_of_scope class or a refusal class).
+        Any other photo needs a verified in-scope class, verified frame and counts,
+        and a fabric count, when there is one, from the square-truth codes, since a
+        proposed count would grade k."""
         p = self.provenance
+        verified = self.construction if p.get("construction_class") in an.FRAME_TRUTH else None
+        out_of_scope = verified == "out_of_scope" or p.get("refusal_class") in an.FRAME_TRUTH
+        in_scope = verified is not None and verified != "out_of_scope"
         if tier == "R":
-            return "gate" if (p.get("refusal_class") in an.FRAME_TRUTH
-                              or p.get("construction_class") in an.FRAME_TRUTH) else "provisional"
-        framed = all(p.get(name) in an.FRAME_TRUTH for name in ("frame", "counts", "construction_class"))
+            if in_scope:
+                return "conflict"
+            return "gate" if out_of_scope else "provisional"
+        if out_of_scope:
+            return "conflict"
+        framed = in_scope and all(p.get(name) in an.FRAME_TRUTH for name in ("frame", "counts"))
         fabrics_ok = "fabrics" not in p or p["fabrics"] in an.TRUTH
         return "gate" if framed and fabrics_ok else "provisional"
 
@@ -147,18 +156,19 @@ def load_photos(corpus_dir: Path, cache_dir: Path, eval_set: str = "v0", split: 
     source image, in manifest order. A missing or changed source image stops the run:
     a silently skipped photo would shrink n without saying so. The split is chosen
     from the manifest's sha256 before any annotation is read or source hashed, so a
-    dev run never opens a holdout photo. A row that is not a licensed museum scan
-    stops the run unless allow_private: its photo and its report rows stay private
-    (plan 8.2)."""
+    dev run never opens a holdout photo. A row outside the licenses corpus-guard
+    admits stops the run unless allow_private: its photo and its report rows stay
+    private (plan 8.2). Capture is no gate, since plan 8.1 commits CC0 phone captures
+    with manifest rows."""
     with (corpus_dir / "manifest.csv").open(newline="", encoding="utf-8") as handle:
         rows = [row for row in csv.DictReader(handle) if row.get("eval_set") == eval_set]
     if split is not None:
         rows = [row for row in rows if split_of(row["sha256"]) == split]
     if not allow_private:
         for row in rows:
-            if row.get("license") not in an.LICENSES or row.get("capture") != "museum_scan":
-                raise ValueError(f"{Path(row['file']).stem}: licensed {row.get('license')!r}, "
-                                 f"captured {row.get('capture')!r}; a private photo needs --private")
+            if row.get("license") not in an.LICENSES:
+                raise ValueError(f"{Path(row['file']).stem}: licensed {row.get('license')!r}; "
+                                 "a private photo needs --private")
     photos = []
     for row in rows:
         stem = Path(row["file"]).stem

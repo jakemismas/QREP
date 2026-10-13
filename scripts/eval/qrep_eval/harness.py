@@ -1,10 +1,12 @@
 """One unit of eval work: stage one image at one resolution and condition, run every
 reader trial on it, and score each reading into a report row.
 
-Decode path: native. cv2.imread decodes the source, cv2.resize with INTER_AREA
-brings it to the app's cap (corpus.cap_size), a degradation applies on top, and
-the staged pixels go to the reader as a lossless PNG (the untouched source when
-nothing changed). D4b adds the browser decode path.
+Decode path: native. An untouched full-resolution clean image goes to the reader
+as its source file, which the reader decodes with the same cv2.imread flags as
+here, so its pixels are identical. Every other image is decoded by cv2.imread,
+brought to the app's cap (corpus.cap_size) by cv2.resize with INTER_AREA,
+degraded where its condition says, and staged as a lossless PNG. D4b adds the
+browser decode path.
 """
 
 import json
@@ -18,8 +20,11 @@ from qrep.contract import FABRICS_MAX, FABRICS_MIN, BorderBand, Corners, OuterEd
 from qrep_eval import annotation as an
 from qrep_eval import corpus, degrade, readers, scoring, simulate
 
-DECODE_PATH = ("native: cv2.imread (IMREAD_COLOR), cv2.resize INTER_AREA to the cap with the app's "
-               "targetSize rounding, staged to the reader as a lossless PNG")
+DECODE_PATH = ("native: an untouched full-resolution clean image is passed as its source file, which "
+               "the reader decodes with the same cv2.imread flags (IMREAD_COLOR), so its pixels are "
+               "identical; every other image is decoded by cv2.imread (IMREAD_COLOR), resized with "
+               "INTER_AREA to the cap with the app's targetSize rounding, degraded where its condition "
+               "says, and staged as a lossless PNG")
 HARMONICS = (2.0, 3.0, 0.5, 1 / 3)
 # The outcomes that put a pattern in the user's hands: a warned read still offers the
 # editor and its PDF.
@@ -218,8 +223,11 @@ def run_unit(unit: Unit) -> list[dict]:
         try:
             path, size = stage(unit, Path(tmp))
         except Exception as error:  # noqa: BLE001 - recorded on the row, never swallowed
-            return [{**_base_row(unit), "reader": r, "outcome": "error", "error": repr(error)}
-                    for r in unit.readers]
+            # Each reader's true-corner row (no corners for auto, 0 px for the others), so the
+            # tier and jitter tables count the failure where the read would have been.
+            return json.loads(json.dumps([
+                {**_base_row(unit), "reader": r, "radius_px": None if r == "auto" else 0,
+                 "variant": "true", "outcome": "error", "error": repr(error)} for r in unit.readers]))
         corners = (scale_corners(unit.truth.corners, unit.canvas, size)
                    if unit.truth.corners is not None else None)
         pitch = (simulate.square_pitch(corners, unit.truth.counts, unit.truth.bands)
@@ -247,11 +255,15 @@ def run_unit(unit: Unit) -> list[dict]:
                         request = _confirmed_request(unit, path, size, trial.corners)
                         jobs.append((meta, lambda q=request: readers.read_confirmed(q, size)))
                         if trial.radius_px == 0:
-                            variants, _ = simulate.miscount_variants(unit.truth.counts)
+                            variants, skipped = simulate.miscount_variants(unit.truth.counts)
                             for kind, counts in variants:
                                 miscount = request.model_copy(update={"counts": counts})
                                 jobs.append(({**meta, "variant": kind},
                                              lambda q=miscount: readers.read_confirmed(q, size)))
+                            # A miscount no count can express is a row too, so G3's n shows it.
+                            rows.extend({**_base_row(unit), "reader": name, **meta, "variant": kind,
+                                         "outcome": "skipped", "reason": reason,
+                                         "received": {"staged_size": list(size)}} for kind, reason in skipped)
             for meta, call in jobs:
                 row = {**_base_row(unit), "reader": name, **meta}
                 try:

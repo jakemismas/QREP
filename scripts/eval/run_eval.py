@@ -4,8 +4,9 @@
 
 Runs the v0 dev split with the auto and auto-corners readers by default and
 writes <stem>.json and <stem>.md; --holdout runs the holdout instead and writes
-<stem>-holdout.json and .md. Only licensed museum scans run unless --private,
-which writes only where git ignores the report. Report only: it freezes nothing.
+<stem>-holdout.json and .md. Only rows under a license corpus-guard admits run
+unless --private, which writes its reports and staged copies only where git
+ignores them. Report only: it freezes nothing.
 """
 
 import argparse
@@ -55,7 +56,7 @@ def _parse(argv):
     p.add_argument("--start-sha", help="refuse to run unless qrep/vision/ outside read/ equals this SHA's")
     p.add_argument("--workers", type=int, default=1, help="processes for the reads")
     p.add_argument("--private", action="store_true",
-                   help="admit photos that are not licensed museum scans; the report must be git-ignored")
+                   help="admit rows under other licenses; reports and staged copies must be git-ignored")
     return p.parse_args(argv)
 
 
@@ -99,33 +100,36 @@ def report_paths(out: Path, split: str) -> tuple[Path, Path]:
 
 
 def _refuse_unignored(paths, runner) -> None:
-    """A private run's report names private photos, so it may land in a git work tree
-    only where git ignores it; when git cannot answer, the run stops."""
-    folder = paths[0].resolve().parent
-    while not folder.exists():
-        folder = folder.parent
-    try:
-        inside = runner(["git", "rev-parse", "--is-inside-work-tree"], capture_output=True, text=True,
-                        cwd=folder)
-        if inside.returncode != 0 or inside.stdout.strip() != "true":
-            return
-        for path in paths:
-            relative = os.path.relpath(path.resolve(), folder)
-            if runner(["git", "check-ignore", "-q", "--", relative], capture_output=True, text=True,
-                      cwd=folder).returncode != 0:
-                print(f"run_eval: --private would write {path} inside a git work tree where git does "
-                      "not ignore it", file=sys.stderr)
-                raise SystemExit(2)
-    except OSError as error:
-        print(f"run_eval: --private could not ask git whether {folder} is tracked: {error}", file=sys.stderr)
-        raise SystemExit(2) from error
+    """A private run's reports and staged copies show private photos, so each path may
+    land in a git work tree only where git ignores it. Only git's own "not a git
+    repository" or a check-ignore exit 0 lets a path pass; any other answer, or no
+    answer, stops the run."""
+    for path in paths:
+        path = Path(path).resolve()
+        folder = path.parent
+        while not folder.exists():
+            folder = folder.parent
+        try:
+            inside = runner(["git", "rev-parse", "--is-inside-work-tree"], capture_output=True, text=True,
+                            cwd=folder)
+            if inside.returncode != 0 and "not a git repository" in (inside.stderr or ""):
+                continue
+            ignored = inside.returncode == 0 and inside.stdout.strip() == "true" and runner(
+                ["git", "check-ignore", "-q", "--", os.path.relpath(path, folder)], capture_output=True,
+                text=True, cwd=folder).returncode == 0
+        except OSError as error:
+            print(f"run_eval: --private could not ask git whether {path} is tracked: {error}", file=sys.stderr)
+            raise SystemExit(2) from error
+        if not ignored:
+            print(f"run_eval: --private would write {path} where git does not ignore it", file=sys.stderr)
+            raise SystemExit(2)
 
 
-def _manifest_name(manifest: Path) -> str:
+def _repo_relative(path: Path, outside: str) -> str:
     try:
-        return manifest.resolve().relative_to(REPO.resolve()).as_posix()
+        return path.resolve().relative_to(REPO.resolve()).as_posix()
     except ValueError:
-        return "a manifest outside the repo"
+        return outside
 
 
 def _corpus_units(args, photos, readers_, radii, workdir_root=None) -> list[harness.Unit]:
@@ -206,18 +210,20 @@ def main(argv=None, *, runner=subprocess.run) -> int:
             raise SystemExit(2)
     split = "holdout" if args.holdout else "dev"
     json_path, md_path = report_paths(args.out, split)
+    cache = args.cache or args.corpus / "private" / "cache"
+    # A private photo's staged copies stay beside its cache, never in the shared temp.
+    workdir_root = cache.resolve().parent if args.private else None
     if args.private:
-        _refuse_unignored((json_path, md_path), runner)
+        # Staged copies land in qrep-eval-* folders under the staging root; a path inside one
+        # stands for them, since git matches a directory-only ignore rule on its contents.
+        _refuse_unignored((json_path, md_path, workdir_root / "qrep-eval-staging" / "staged.png"), runner)
     check = _start_sha_check(args.start_sha, runner) if args.start_sha else "not run (no --start-sha)"
     radii = tuple(float(r) if "." in r else int(r) for r in args.radii.split(","))
     for resolution in args.resolutions.split(","):
         if resolution not in corpus.RESOLUTIONS:
             raise SystemExit(f"unknown resolution {resolution!r}; choose from {list(corpus.RESOLUTIONS)}")
-    cache = args.cache or args.corpus / "private" / "cache"
     photos = corpus.load_photos(args.corpus, cache, split=split, allow_private=args.private)
-    # A private photo's staged copies stay beside its cache, never in the shared temp.
-    workdir_root = str(cache.resolve().parent) if args.private else None
-    units = _corpus_units(args, photos, readers_, radii, workdir_root)
+    units = _corpus_units(args, photos, readers_, radii, str(workdir_root) if workdir_root else None)
     if not args.no_photoreal and split == "dev":
         units += _photoreal_units(args, readers_)
     try:
@@ -248,9 +254,13 @@ def main(argv=None, *, runner=subprocess.run) -> int:
         "cv2_version": cv2.__version__,
         "decode_path": harness.DECODE_PATH,
         "split": split,
-        "inputs": (f"{_manifest_name(manifest)}, eval_set v0 (sha256 {corpus.sha256_of(manifest)}), "
-                   f"{len(photos)} photos in the {split} split by tier {tiers}, annotations from "
-                   "corpus/annotations/, source images checked against the manifest sha256"),
+        "inputs": (f"{_repo_relative(manifest, 'a manifest outside the repo')}, eval_set v0 (sha256 "
+                   f"{corpus.sha256_of(manifest)}), {len(photos)} photos in the {split} split by tier "
+                   f"{tiers}, annotations from "
+                   f"{_repo_relative(args.corpus / 'annotations', 'an annotations directory outside the repo')}, "
+                   "source images checked against the manifest sha256"),
+        "masks": ("annotation masks are not applied: the reader sees the whole photo and no score "
+                  "excludes them (#243)"),
         "readers": ", ".join(readers_),
         "simulation": (f"corners from the annotation's outer edge (gate truth, else proposed-a, else "
                        f"proposed-b), jitter radii {list(radii)} px, {args.trials} draws per nonzero "
@@ -264,6 +274,7 @@ def main(argv=None, *, runner=subprocess.run) -> int:
             f", applied at {STRESS_RESOLUTION} to museum tier A photos licensed CC0-1.0"),
         "truth": (f"{sum(r['truth'] == 'gate' for r in rows)} gate rows, "
                   f"{sum(r['truth'] == 'provisional' for r in rows)} provisional rows, "
+                  f"{sum(r['truth'] == 'conflict' for r in rows)} conflict rows, "
                   f"{sum(r['truth'] == 'synthetic' for r in rows)} synthetic rows"),
         "proposal_disagreements": (f"{len(disagree)} of {tiers.get('A', 0)} tier A photos have "
                                    f"proposed-a and proposed-b counts or classes that differ: "

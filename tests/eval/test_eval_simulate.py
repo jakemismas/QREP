@@ -10,8 +10,6 @@ import hashlib
 import json
 import math
 import random
-import re
-import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -61,6 +59,19 @@ def test_corner_trials_record_the_displacement_after_clamping():
     for trial in trials[1:]:
         assert 0.0 <= trial.moved_px[0] <= 8.0 + 1e-9
         assert trial.moved_px[1:] == pytest.approx((8.0, 8.0, 8.0))
+    # A direction stays on the image from (0, 0) only within the quarter turn [0, pi/2],
+    # chance 1/4 per draw; all 10 draws doing so has chance (1/4)^10 < 1e-6. So the clamp
+    # shortens the move in at least one of these 10 seeded trials.
+    assert any(trial.moved_px[0] < 8.0 - 1e-9 for trial in trials[1:])
+
+
+def test_each_radius_draws_its_own_directions():
+    # The seed is key, radius and trial: radius 2 and radius 4 at trial 0 draw different
+    # angles, so the corners' unit displacement vectors differ.
+    r2, r4 = simulate.corner_trials(SQUARE, (2, 4), 1, "k", bounds=(1000, 1000))
+    units = [[((x1 - x0) / t.radius_px, (y1 - y0) / t.radius_px) for (x0, y0), (x1, y1) in zip(SQUARE, t.corners)]
+             for t in (r2, r4)]
+    assert any(math.dist(a, b) > 1e-6 for a, b in zip(*units))
 
 
 def test_corner_trials_run_one_trial_at_zero_and_n_per_other_radius():
@@ -160,27 +171,40 @@ def test_split_follows_the_holdout_rule():
     assert corpus.split_of("00000001" + "0" * 56) == "dev"
 
 
-def _annotation(provenance: str, *, frame=True, fabrics=(), refusal=None, built=None) -> an.Annotation:
+def _frame_claim(code: str, inset: float, bands=()) -> dict:
+    a, b, c = inset, 400.0 - inset, 300.0 - inset
+    return {"provenance": code, "value": {"outer_edge": {
+        "kind": "outer_edge", "bands": [{"width_squares": w} for w in bands],
+        "corners": {"top_left": {"x": a, "y": a}, "top_right": {"x": b, "y": a},
+                    "bottom_right": {"x": b, "y": c}, "bottom_left": {"x": a, "y": c}}}}}
+
+
+def _annotation(provenance: str, *, frame=True, fabrics=(), refusal=None, built=None, klass=None,
+                bands=(), capture=None, other_frame=None) -> an.Annotation:
     """fabrics is (provenance, count) pairs; refusal and built name the provenance of a
-    refusal class and of the construction class when it differs from provenance."""
+    refusal class and of the construction class when it differs from provenance, klass
+    the class value; capture is a (provenance, value) claim; other_frame a second
+    frame's provenance, its corners 20 px in where the first frame's are 10 px in."""
     claim = {"provenance": provenance}
     doc = {
         "schema_version": 1,
         "photo": "private/cache/x.jpg",
         "sha256": "1" * 64,
         "canvas": [400, 300],
-        "construction_class": [{"provenance": built or provenance, "value": "squares"}],
+        "construction_class": [{"provenance": built or provenance,
+                                "value": klass or ("out_of_scope" if refusal else "squares")}],
     }
     if fabrics:
         doc["fabrics"] = [{"provenance": code, "value": {"count": n}} for code, n in fabrics]
     if refusal:
-        doc["construction_class"] = [{"provenance": built or provenance, "value": "out_of_scope"}]
-        doc["refusal_class"] = [{"provenance": refusal, "value": "on_point"}]
+        codes = (refusal,) if isinstance(refusal, str) else refusal
+        doc["refusal_class"] = [{"provenance": code, "value": "on_point"} for code in codes]
+    if capture:
+        doc["capture"] = [{"provenance": capture[0], "value": capture[1]}]
     if frame:
-        doc["frame"] = [{**claim, "value": {"outer_edge": {
-            "kind": "outer_edge", "bands": [],
-            "corners": {"top_left": {"x": 10.0, "y": 10.0}, "top_right": {"x": 390.0, "y": 10.0},
-                        "bottom_right": {"x": 390.0, "y": 290.0}, "bottom_left": {"x": 10.0, "y": 290.0}}}}}]
+        # The second frame goes first, so a pick by list order would take it.
+        doc["frame"] = ([_frame_claim(other_frame, 20.0)] if other_frame else []) + [
+            _frame_claim(provenance, 10.0, bands)]
         doc["counts"] = [{**claim, "value": {"blocks_across": 1, "blocks_down": 1,
                                              "squares_per_block_across": 4, "squares_per_block_down": 3}}]
     # JSON mode, as annotation.load reads the page's output.
@@ -215,14 +239,64 @@ def test_a_proposed_fabric_count_keeps_a_photo_provisional():
 
 def test_a_refusal_photo_is_gated_on_its_class():
     # Tier R: a verified-jake refusal class is gate truth even with a proposed
-    # construction class and no frame; tier A on the same annotation is provisional.
+    # construction class and no frame. On tier A the same verified call says out of
+    # scope, which contradicts the tier: conflict.
     view = corpus.truth_view(_annotation("proposed-a", frame=False, refusal="verified-jake"))
     assert view.provenance["refusal_class"] == "verified-jake"
     assert view.label_for("R") == "gate"
-    assert view.label_for("A") == "provisional"
+    assert view.label_for("A") == "conflict"
     # Both classes proposed: provisional.
     view = corpus.truth_view(_annotation("proposed-a", frame=False, refusal="proposed-b"))
     assert view.label_for("R") == "provisional"
+    # A proposed refusal class listed before a verified one: the verified claim is taken.
+    view = corpus.truth_view(_annotation("proposed-a", frame=False, refusal=("proposed-b", "verified-jake")))
+    assert view.provenance["refusal_class"] == "verified-jake" and view.label_for("R") == "gate"
+    # A verified out_of_scope construction class alone also gates a refusal photo.
+    view = corpus.truth_view(_annotation("verified-jake", frame=False, klass="out_of_scope"))
+    assert "refusal_class" not in view.provenance
+    assert view.label_for("R") == "gate"
+
+
+def test_a_verified_class_that_contradicts_the_tier_is_a_conflict():
+    # Verified squares (in scope) on a refusal photo: conflict.
+    assert corpus.truth_view(_annotation("verified-jake")).label_for("R") == "conflict"
+    # Verified out_of_scope on a tier A photo, frame and counts verified too: conflict.
+    view = corpus.truth_view(_annotation("verified-jake", klass="out_of_scope"))
+    assert view.label_for("A") == "conflict" and view.label == "conflict"
+    # Verified frame and counts with a proposed class: nothing verified says the photo is
+    # in scope, so provisional, on either tier.
+    view = corpus.truth_view(_annotation("verified-jake", built="proposed-a"))
+    assert (view.label_for("A"), view.label_for("R")) == ("provisional", "provisional")
+
+
+def test_the_verified_frame_wins_over_a_proposal_listed_first():
+    # A proposed-a frame (corners 20 px in) listed before the verified-jake frame (10 px
+    # in): the truth takes the verified claim, its provenance and its corners.
+    view = corpus.truth_view(_annotation("verified-jake", other_frame="proposed-a"))
+    assert view.provenance["frame"] == "verified-jake"
+    assert view.corners == [(10.0, 10.0), (390.0, 10.0), (390.0, 290.0), (10.0, 290.0)]
+    assert view.label_for("A") == "gate"
+
+
+def test_truth_bands_come_from_the_frame():
+    # The outer edge's bands, outside in, in squares: 1.5 then 0.5.
+    assert corpus.truth_view(_annotation("verified-jake", bands=[1.5, 0.5])).bands == [1.5, 0.5]
+    assert corpus.truth_view(_annotation("verified-jake")).bands == []
+
+
+def test_the_device_class_takes_a_verified_or_screened_capture_claim_first():
+    row = {"file": "private/cache/x.jpg", "capture": "museum_scan", "tier": "A", "sha256": "1" * 64}
+
+    def device(capture):
+        return corpus.Photo("x", row, _annotation("verified-jake", capture=capture), Path("x.jpg")).device_class
+
+    # No claim: the manifest row's museum_scan.
+    assert device(None) == "museum scan"
+    # A verified-jake or screened claim wins over the row.
+    assert device(("verified-jake", "camera")) == "phone camera"
+    assert device(("screened", "nested_screenshot")) == "screenshot"
+    # A proposal is no capture truth: the row's museum_scan stands.
+    assert device(("proposed-a", "camera")) == "museum scan"
 
 
 def test_device_class_comes_from_the_capture():
@@ -316,13 +390,96 @@ def test_every_degradation_states_its_parameters():
     assert not any("homograph" in d.name or "perspective" in d.name for d in degrade.DEGRADATIONS)
 
 
+def test_blur_sigma_is_2_to_six_places_on_a_float_image():
+    # On a float image OpenCV sizes the kernel as 2 x round(4 x 2) + 1 = 17 taps, i = -8..8,
+    # weights exp(-i^2 / 8): the 13 above (sum 5.00812249 to 8 places) plus i = 7:
+    # exp(-6.125) = 0.00218749 and i = 8: exp(-8) = 0.00033546 on both sides:
+    # 5.00812249 + 2 x (0.00218749 + 0.00033546) = 5.00812249 + 0.00504590 = 5.01316839.
+    # Centre 1 / 5.01316839 = 0.19947465, squared 0.03979014 of a pixel of 1.0. Float math
+    # leaves no rounding, so a sigma of 2.1 (centre near 1 / (2 pi 2.1^2) = 0.0361) fails.
+    image = np.zeros((41, 41, 3), dtype=np.float32)
+    image[20, 20] = 1.0
+    out = degrade.gaussian_blur(image)
+    assert float(out[20, 20, 0]) == pytest.approx(0.0397901, abs=1e-5)
+
+
+def test_low_res_jpeg_encodes_at_quality_40(monkeypatch):
+    seen = []
+    encode = cv2.imencode
+
+    def spy(ext, image, params=None):
+        seen.append((ext, list(params or [])))
+        return encode(ext, image, params)
+
+    monkeypatch.setattr(degrade.cv2, "imencode", spy)
+    degrade.low_res_jpeg(np.full((10, 10, 3), 128, dtype=np.uint8))
+    assert seen == [(".jpg", [cv2.IMWRITE_JPEG_QUALITY, 40])]
+
+
+def test_low_res_jpeg_downsamples_by_area():
+    # 1800 x 1800 -> 600 x 600, a factor of 3. Each 3 x 3 block holds one 255 at its
+    # centre (row and column 1 mod 3) and 8 zeros. INTER_AREA averages the block:
+    # 255 / 9 = 28.33 -> 28, on every output pixel. Bilinear and bicubic sample the
+    # source at 3 x d + 1, the bright centre (255); nearest samples 3 x d, a zero (0).
+    # A flat 28 survives the JPEG within 2 levels: its 8 x 8 blocks carry only a DC term,
+    # 8 x (pixel - 128), and at quality 40 the luma DC step is (16 x 125 + 50) / 100 = 20
+    # in integer division, so the DC error is at most 20 / 2 = 10, or 10 / 8 = 1.25
+    # levels per pixel.
+    rows = np.arange(1800) % 3 == 1
+    image = np.zeros((1800, 1800, 3), dtype=np.uint8)
+    image[np.ix_(rows, rows)] = 255
+    out, scale = degrade.low_res_jpeg(image)
+    assert out.shape[:2] == (600, 600) and scale == pytest.approx(1 / 3)
+    assert int(np.abs(out.astype(int) - 28).max()) <= 2
+
+
+def test_glare_sigma_follows_the_shorter_side():
+    # Field box x 0..200, y 0..100: centre (0.35 x 200, 0.35 x 100) = (70, 35), sigma
+    # = 0.15 x min(200, 100) = 15. At (x 85, y 35): d^2 = 15^2 = 225,
+    # alpha = 0.85 x exp(-225 / (2 x 225)) = 0.85 x 0.6065307 = 0.5155511, so
+    # 200 + (255 - 200) x 0.5155511 = 200 + 28.3553 = 228.355 -> 228. With the longer
+    # side (sigma 30): 0.85 x exp(-225 / 1800) = 0.7501224 -> 241.26 -> 241.
+    out = degrade.glare(np.full((100, 200, 3), 200, dtype=np.uint8), (0, 0, 200, 100))
+    assert out[35, 85, 0] == 228
+    # The peak sits at (70, 35): 200 x 0.15 + 255 x 0.85 = 246.75 -> 247.
+    assert out[35, 70, 0] == 247
+
+
+def test_apply_dispatches_each_degradation_by_name():
+    image = (np.arange(60 * 80 * 3) % 251).astype(np.uint8).reshape(60, 80, 3)
+    box = (10.0, 5.0, 70.0, 55.0)
+    direct = {
+        "grayscale": (degrade.grayscale(image), 1.0),
+        "lighting_gradient": (degrade.lighting_gradient(image), 1.0),
+        "low_res_jpeg": degrade.low_res_jpeg(image),
+        "gaussian_blur": (degrade.gaussian_blur(image), 1.0),
+        "glare": (degrade.glare(image, box), 1.0),
+        "occlusion": (degrade.occlusion(image, box), 1.0),
+    }
+    assert set(direct) == {d.name for d in degrade.DEGRADATIONS}
+    for name, (expected, scale) in direct.items():
+        got, got_scale = degrade.apply(name, image, box)
+        assert np.array_equal(got, expected), name
+        assert got_scale == scale, name
+    with pytest.raises(ValueError):
+        degrade.apply("perspective", image, box)
+
+
 def _no_git(args, **kwargs):
     raise OSError("no git in this test")
 
 
 class _Done:
-    def __init__(self, returncode: int, stdout: str = ""):
-        self.returncode, self.stdout = returncode, stdout
+    def __init__(self, returncode: int, stdout: str = "", stderr: str = ""):
+        self.returncode, self.stdout, self.stderr = returncode, stdout, stderr
+
+
+NOT_A_REPO = "fatal: not a git repository (or any of the parent directories): .git"
+
+
+def _outside_git(args, **kwargs):
+    # git answering as it does in a folder outside every work tree.
+    return _Done(128, "", NOT_A_REPO)
 
 
 def _no_read(*args, **kwargs):
@@ -394,7 +551,7 @@ def test_a_photo_with_nothing_to_confirm_is_one_skipped_row(tmp_path):
     text = report.markdown({"header": {"title": "t"}, "aggregate": agg})
     line = next(r for r in text.splitlines() if r.startswith("| auto-corners | museum scan | full | gate |"))
     # Columns: reader, device, resolution, truth, G1, G2, G4, G5.
-    assert line.split("|")[7].strip() == "n = 0, 1 skipped"
+    assert line.split("|")[7].strip() == "n = 0, 1 skipped; no frame or counts on the v0 refusal photos (#243)"
 
 
 def test_the_confirmed_request_gets_the_count_auto_corners_gets():
@@ -588,10 +745,36 @@ def test_load_photos_refuses_a_private_row_unless_allowed(tmp_path):
     assert [p.stem for p in corpus.load_photos(root, cache, split="holdout")] == ["a-hold"]
 
 
-def test_load_photos_refuses_a_phone_capture_unless_allowed(tmp_path):
-    root, cache = _write_corpus(tmp_path / "camera", overrides={"a-dev": {"capture": "camera"}})
+def test_load_photos_gates_on_the_license_not_the_capture(tmp_path):
+    # Plan 8.1 commits CC0 phone captures with manifest rows: a CC0-1.0 camera row loads.
+    root, cache = _write_corpus(tmp_path / "cc0", overrides={"a-dev": {"capture": "camera"}})
+    assert [p.stem for p in corpus.load_photos(root, cache, split="dev")] == ["a-dev", "r-dev"]
+    # The same capture under a license corpus-guard does not admit is refused.
+    root, cache = _write_corpus(tmp_path / "private", overrides={
+        "a-dev": {"capture": "camera", "license": "LicenseRef-private"}})
     with pytest.raises(ValueError, match="a-dev"):
         corpus.load_photos(root, cache, split="dev")
+
+
+def test_load_photos_stops_on_a_changed_or_missing_source(tmp_path):
+    root, cache = _write_corpus(tmp_path)
+    # Bytes that are not the photo the manifest row binds: its sha256 differs.
+    (cache / "a-dev.png").write_bytes(b"not the photo")
+    with pytest.raises(ValueError, match="sha256"):
+        corpus.load_photos(root, cache, split="dev")
+    # A cache without the photo at all.
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    with pytest.raises(FileNotFoundError, match="not in the cache"):
+        corpus.load_photos(root, empty, split="dev")
+
+
+def test_load_photos_reads_only_the_eval_set_in_manifest_order(tmp_path):
+    root, cache = _write_corpus(tmp_path, overrides={"r-dev": {"eval_set": "v1"}})
+    assert [p.stem for p in corpus.load_photos(root, cache, split="dev")] == ["a-dev"]
+    assert [p.stem for p in corpus.load_photos(root, cache, eval_set="v1")] == ["r-dev"]
+    # No split: both splits, in manifest order (a-dev, a-hold).
+    assert [p.stem for p in corpus.load_photos(root, cache)] == ["a-dev", "a-hold"]
 
 
 def test_load_photos_picks_the_split_before_opening_anything(tmp_path):
@@ -603,25 +786,35 @@ def test_load_photos_picks_the_split_before_opening_anything(tmp_path):
         corpus.load_photos(root, cache, split="holdout")
 
 
+FAKE_SHA = "0123456789abcdef0123456789abcdef01234567"
+
+
+def _fake_git(args, **kwargs):
+    # A clean checkout at FAKE_SHA with no merges in its history.
+    return _Done(0, FAKE_SHA + "\n") if args[1:] == ["rev-parse", "HEAD"] else _Done(0, "")
+
+
 def test_a_run_reports_its_provenance_and_keeps_the_holdout_apart(tmp_path):
     root, cache = _write_corpus(tmp_path)
     # A stem with a dot keeps its whole name in the report's file names.
     out = tmp_path / "out" / "v0.4-eval"
     args = ["--corpus", str(root), "--cache", str(cache), "--out", str(out), "--radii", "0,4",
             "--trials", "1", "--resolutions", "full", "--no-photoreal", "--workers", "1"]
-    assert run_eval.main(args) == 0
+    assert run_eval.main(args, runner=_fake_git) == 0
     payload = json.loads((out.parent / "v0.4-eval.json").read_text(encoding="utf-8"))
     header = payload["header"]
     for key in ("date", "command", "qrep_path", "git_sha", "git_status", "cv2_version", "decode_path",
-                "split"):
+                "split", "masks"):
         assert header[key], key
     assert header["split"] == "dev"
-    if sys.platform == "emscripten":
-        assert header["git_sha"] == run_eval.GIT_UNAVAILABLE
-    else:
-        assert re.fullmatch(r"[0-9a-f]{40}", header["git_sha"]), header["git_sha"]
-    # The manifest sits in tmp_path, outside the repo, so the header does not print its path.
+    # The header carries the injected git's answers.
+    assert header["git_sha"] == FAKE_SHA
+    assert header["git_status"] == "git status --porcelain -- qrep/ scripts/eval/: clean"
+    # The manifest and annotations sit in tmp_path, outside the repo, so the header does
+    # not print their paths.
     assert header["inputs"].startswith("a manifest outside the repo")
+    assert "annotations from an annotations directory outside the repo" in header["inputs"]
+    assert "#243" in header["masks"]
     rows = payload["rows"]
     assert payload["aggregate"]["errors"] == []
     assert {row["outcome"] for row in rows} <= {"read", "warned", "held", "refused", "skipped"}
@@ -651,8 +844,294 @@ def test_a_run_reports_its_provenance_and_keeps_the_holdout_apart(tmp_path):
     assert all(row["received"]["staged_size"] == [160, 160] for row in rows)
     assert (out.parent / "v0.4-eval.md").exists()
     # --holdout writes its own report holding only the holdout photo.
-    assert run_eval.main([*args, "--holdout"]) == 0
+    assert run_eval.main([*args, "--holdout"], runner=_fake_git) == 0
     held = json.loads((out.parent / "v0.4-eval-holdout.json").read_text(encoding="utf-8"))
     assert held["header"]["split"] == "holdout"
     assert {row["photo"] for row in held["rows"]} == {"a-hold"}
     assert (out.parent / "v0.4-eval-holdout.md").exists()
+
+
+class _Loaded(Exception):
+    pass
+
+
+def _loaded(*args, **kwargs):
+    raise _Loaded(kwargs)
+
+
+def _private_git(ignore_code, *, inside=None):
+    """git for --private: every folder in a work tree (or inside's answer), and
+    check-ignore exiting ignore_code(path)."""
+    seen = []
+
+    def runner(args, **kwargs):
+        seen.append(args)
+        if args[1] == "rev-parse":
+            return inside or _Done(0, "true\n")
+        if args[1] == "check-ignore":
+            return _Done(ignore_code(args[-1]))
+        return _Done(128, "", "fatal: unexpected")
+
+    runner.seen = seen
+    return runner
+
+
+def test_private_refuses_staging_that_git_would_track(monkeypatch, capsys, tmp_path):
+    monkeypatch.setattr(corpus, "load_photos", _no_read)
+    cache = tmp_path / "corpus" / "private" / "cache"
+    argv = ["--private", "--cache", str(cache), "--out", str(tmp_path / "out" / "r")]
+    # The reports are ignored, the staging root (the cache's parent) is not: exit 2
+    # before any photo loads.
+    git = _private_git(lambda path: 1 if "qrep-eval-staging" in path else 0)
+    with pytest.raises(SystemExit) as stop:
+        run_eval.main(argv, runner=git)
+    assert stop.value.code == 2
+    # Each path is asked from its nearest existing folder, tmp_path: both reports, then a
+    # path inside the staging root, which git matches against a directory ignore rule.
+    asked = [Path(args[-1]) for args in git.seen if args[1] == "check-ignore"]
+    assert asked == [Path("out/r.json"), Path("out/r.md"), Path("corpus/private/qrep-eval-staging/staged.png")]
+    assert "staged.png" in capsys.readouterr().err
+    # Everything ignored: the run goes on to load, with private rows allowed.
+    monkeypatch.setattr(corpus, "load_photos", _loaded)
+    with pytest.raises(_Loaded) as hit:
+        run_eval.main(argv, runner=_private_git(lambda path: 0))
+    assert hit.value.args[0]["allow_private"] is True
+
+
+def test_private_fails_closed_when_git_cannot_say(monkeypatch, tmp_path):
+    monkeypatch.setattr(corpus, "load_photos", _no_read)
+    argv = ["--private", "--out", str(tmp_path / "out" / "r")]
+
+    def missing(args, **kwargs):
+        raise OSError("git is not installed")
+
+    # No git at all, check-ignore failing with 128 (an error, not an answer), and a
+    # rev-parse failure other than "not a git repository" all stop the run with exit 2.
+    for runner in (missing, _private_git(lambda path: 128),
+                   _private_git(lambda path: 0, inside=_Done(128, "", "fatal: detected dubious ownership"))):
+        with pytest.raises(SystemExit) as stop:
+            run_eval.main(argv, runner=runner)
+        assert stop.value.code == 2
+
+
+def test_private_passes_outside_every_work_tree(monkeypatch, tmp_path):
+    # git's own "not a git repository" for every path: nothing can commit the outputs.
+    monkeypatch.setattr(corpus, "load_photos", _loaded)
+    with pytest.raises(_Loaded):
+        run_eval.main(["--private", "--out", str(tmp_path / "out" / "r")], runner=_outside_git)
+
+
+def _fake_reading(*, rows=6, cols=6, received=None):
+    return readers.Reading(outcome="read", verdict=None, rows=rows, cols=cols, colors=["#ff0000", "#0000ff"],
+                           cells=None, confidence=None, cell_size_eighths=16, band_eighths=[],
+                           low_confidence_below=None, flagged_regions=[], seconds=0.0, received=received or {})
+
+
+def _plain_unit(source, *, canvas, corners, counts, readers_, cap=None, radii=(0,), condition="clean"):
+    truth = corpus.TruthView(corners=corners, bands=[], counts=counts, fabric_count=2, construction="squares")
+    return harness.Unit(photo="q", group="corpus", tier="A", split="dev", license="CC0-1.0",
+                        device_class="museum scan", resolution="full" if cap is None else f"cap-{cap}",
+                        cap=cap, condition=condition, source=str(source), canvas=canvas, truth=truth,
+                        truth_label="gate", readers=readers_, radii=radii, trials=1, seed="t")
+
+
+def test_miscounts_no_count_can_express_are_skipped_rows(monkeypatch, tmp_path):
+    source = tmp_path / "q.png"
+    assert cv2.imwrite(str(source), np.full((100, 100, 3), 128, dtype=np.uint8))
+    monkeypatch.setattr(readers, "read_confirmed",
+                        lambda request, size: _fake_reading(received={"request": json.loads(request.model_dump_json())}))
+    # One block of 13 across x 11 down: of the 10 miscount kinds, block -1 across and
+    # block -1 down leave 0 blocks, and half finds 13 and 11 odd with 1 block, so 3 are
+    # skipped and 7 read, beside the true-count read: 1 + 7 + 3 = 11 rows.
+    counts = Counts(blocks_across=1, blocks_down=1, squares_per_block_across=13, squares_per_block_down=11)
+    unit = _plain_unit(source, canvas=(100, 100), corners=[(10.0, 10.0), (90.0, 10.0), (90.0, 90.0), (10.0, 90.0)],
+                       counts=counts, readers_=("confirmed",))
+    rows = harness.run_unit(unit)
+    assert len(rows) == 11
+    skipped = {r["variant"]: r["reason"] for r in rows if r["outcome"] == "skipped"}
+    assert skipped == {"block -1 across": "blocks_across would be 0", "block -1 down": "blocks_down would be 0",
+                       "half": "no whole half across: 1 x 13 squares"}
+    assert all(r["radius_px"] == 0 and r["reader"] == "confirmed" for r in rows)
+    # Every confirmed request carries the fabric count auto-corners gets: 2.
+    assert {r["received"]["request"]["fabric_count"] for r in rows if r["outcome"] == "read"} == {2}
+    # The 10 miscount rows (7 read, 3 skipped) are the miscount trials; none is a photo row.
+    agg = report.aggregate(rows, runner=_no_git)
+    assert agg["miscount_trials"] == 10
+    assert agg["by_tier"]["confirmed | A | full"]["n_rows"] == 1
+
+
+def test_a_stage_error_is_each_readers_true_corner_row(tmp_path):
+    # No such source: cv2 cannot decode it, so every reader gets an error row where its
+    # true-corner read would be (no corners for auto, 0 px for the others).
+    unit = _plain_unit(tmp_path / "missing.png", canvas=(100, 100),
+                       corners=[(10.0, 10.0), (90.0, 10.0), (90.0, 90.0), (10.0, 90.0)],
+                       counts=Counts(blocks_across=1, blocks_down=1, squares_per_block_across=4,
+                                     squares_per_block_down=4),
+                       readers_=("auto", "auto-corners", "confirmed"))
+    rows = harness.run_unit(unit)
+    assert [(r["reader"], r["radius_px"], r["variant"], r["outcome"]) for r in rows] == [
+        ("auto", None, "true", "error"), ("auto-corners", 0, "true", "error"), ("confirmed", 0, "true", "error")]
+    agg = report.aggregate(rows, runner=_no_git)
+    assert agg["by_tier"]["auto | A | full"]["errors"] == 1
+    assert agg["jitter"]["auto-corners | full | 0"]["false_warning"]["errors"] == 1
+
+
+def test_stage_caps_the_image_then_degrades_the_scaled_field(tmp_path):
+    # A 400 x 200 canvas of 200 capped at 100: factor 100 / 400 = 0.25, staged 100 x 50
+    # (INTER_AREA keeps a flat 200). The truth corners (40, 20) .. (360, 180) scale by 0.25
+    # to (10, 5) .. (90, 45): field box x 10..90, y 5..45. Occlusion: patch
+    # floor(0.25 x 80 + 0.5) = 20 wide, floor(0.25 x 40 + 0.5) = 10 tall,
+    # left floor(10 + 0.6 x 80 - 10 + 0.5) = 48, top floor(5 + 0.6 x 40 - 5 + 0.5) = 24:
+    # rows 24..33, columns 48..67, 20 x 10 = 200 pixels of 128. Unscaled corners would put
+    # the patch at column 192, off the image.
+    source = tmp_path / "wide.png"
+    assert cv2.imwrite(str(source), np.full((200, 400, 3), 200, dtype=np.uint8))
+    unit = _plain_unit(source, canvas=(400, 200), cap=100, condition="occlusion",
+                       corners=[(40.0, 20.0), (360.0, 20.0), (360.0, 180.0), (40.0, 180.0)], counts=None,
+                       readers_=("auto",))
+    workdir = tmp_path / "stage"
+    workdir.mkdir()
+    path, size = harness.stage(unit, workdir)
+    assert size == (100, 50) and Path(path).parent == workdir
+    out = cv2.imread(path, cv2.IMREAD_COLOR)
+    assert out.shape[:2] == (50, 100)
+    gray = out[..., 0] == 128
+    assert int(gray.sum()) == 200
+    assert gray[24, 48] and gray[33, 67] and not gray[23, 48] and not gray[34, 48]
+    assert not gray[24, 47] and not gray[24, 68]
+
+
+def test_corner_reads_get_the_staged_corners_and_pitch(monkeypatch, tmp_path):
+    # Canvas 320 x 320 capped at 160: staged 160 x 160, factor 0.5. Truth corners
+    # (40, 40) .. (280, 280) become (20, 20) .. (140, 140): edges 120 px over 6 squares,
+    # pitch 120 / 6 = 20 px, so 4 px is 4 / 20 = 0.2 of a square (the canvas pitch, 40 px,
+    # would give 0.1).
+    source = tmp_path / "q.png"
+    assert cv2.imwrite(str(source), np.full((320, 320, 3), 200, dtype=np.uint8))
+    calls = []
+
+    def fake_auto(path, size, corners=None, fabrics=None):
+        calls.append((tuple(size), corners, fabrics))
+        return _fake_reading(received={"fabrics": fabrics})
+
+    monkeypatch.setattr(readers, "read_auto", fake_auto)
+    counts = Counts(blocks_across=1, blocks_down=1, squares_per_block_across=6, squares_per_block_down=6)
+    unit = _plain_unit(source, canvas=(320, 320), cap=160, radii=(0, 4), counts=counts,
+                       corners=[(40.0, 40.0), (280.0, 40.0), (280.0, 280.0), (40.0, 280.0)],
+                       readers_=("auto-corners",))
+    rows = harness.run_unit(unit)
+    assert calls[0] == ((160, 160), [(20.0, 20.0), (140.0, 20.0), (140.0, 140.0), (20.0, 140.0)], 2)
+    assert {r["radius_px"]: r["radius_squares"] for r in rows} == {0: 0.0, 4: pytest.approx(0.2)}
+
+
+def _capture_units(monkeypatch, argv, runner=_outside_git):
+    """main's units, with no read: _run records them and returns no rows."""
+    units = []
+
+    def record(us, workers):
+        units.extend(us)
+        return []
+
+    monkeypatch.setattr(run_eval, "_run", record)
+    assert run_eval.main(argv, runner=runner) == 0
+    return units
+
+
+def _corpus_argv(root, cache, tmp_path, *extra):
+    return ["--corpus", str(root), "--cache", str(cache), "--out", str(tmp_path / "out" / "r"), *extra]
+
+
+def test_private_staging_goes_beside_the_cache(monkeypatch, tmp_path):
+    root, cache = _write_corpus(tmp_path)
+    units = _capture_units(monkeypatch, _corpus_argv(root, cache, tmp_path, "--no-photoreal", "--private"))
+    assert units and {u.workdir_root for u in units} == {str(cache.resolve().parent)}
+    units = _capture_units(monkeypatch, _corpus_argv(root, cache, tmp_path, "--no-photoreal"))
+    assert {u.workdir_root for u in units} == {None}
+
+
+def test_stress_units_need_a_cc0_tier_a_photo_and_run_at_desktop_2000(monkeypatch, tmp_path):
+    root, cache = _write_corpus(tmp_path / "cc0")
+    units = _capture_units(monkeypatch, _corpus_argv(root, cache, tmp_path, "--no-photoreal",
+                                                     "--resolutions", "full"))
+    stress = [u for u in units if u.group == "stress"]
+    # a-dev is CC0-1.0 tier A with corners: one unit per degradation (6), at desktop-2000
+    # (cap 2000), true corners only. r-dev is tier R: none.
+    assert [u.condition for u in stress] == [d.name for d in degrade.DEGRADATIONS]
+    assert {(u.photo, u.resolution, u.cap, u.radii) for u in stress} == {("a-dev", "desktop-2000", 2000, (0,))}
+    # The same photo licensed PDM-1.0 gets no stress unit, nor as a tier B photo (still
+    # CC0-1.0, still framed), nor with --no-degradations.
+    root, cache = _write_corpus(tmp_path / "pdm", overrides={"a-dev": {"license": "PDM-1.0"}})
+    units = _capture_units(monkeypatch, _corpus_argv(root, cache, tmp_path, "--no-photoreal"))
+    assert not [u for u in units if u.group == "stress"]
+    root, cache = _write_corpus(tmp_path / "tier-b", overrides={"a-dev": {"tier": "B"}})
+    units = _capture_units(monkeypatch, _corpus_argv(root, cache, tmp_path, "--no-photoreal"))
+    assert {u.photo for u in units} == {"a-dev", "r-dev"} and not [u for u in units if u.group == "stress"]
+    root, cache = _write_corpus(tmp_path / "off")
+    units = _capture_units(monkeypatch, _corpus_argv(root, cache, tmp_path, "--no-photoreal", "--no-degradations"))
+    assert not [u for u in units if u.group == "stress"]
+
+
+def test_units_follow_the_resolutions_radii_and_readers(monkeypatch, tmp_path):
+    root, cache = _write_corpus(tmp_path)
+    units = _capture_units(monkeypatch, _corpus_argv(root, cache, tmp_path, "--no-photoreal", "--no-degradations",
+                                                     "--resolutions", "full,phone-1400", "--radii", "0,2.5,4"))
+    # 2 dev photos x 2 resolutions, caps None and 1400 (corpus.RESOLUTIONS).
+    assert [(u.photo, u.resolution, u.cap) for u in units] == [
+        ("a-dev", "full", None), ("a-dev", "phone-1400", 1400), ("r-dev", "full", None), ("r-dev", "phone-1400", 1400)]
+    # Radii as given, whole numbers as int and 2.5 as float; default readers auto and auto-corners.
+    assert units[0].radii == (0, 2.5, 4) and [type(r) for r in units[0].radii] == [int, float, int]
+    assert units[0].readers == ("auto", "auto-corners")
+    # The truth label follows each photo's tier: proposals only, so provisional.
+    assert {u.truth_label for u in units} == {"provisional"}
+    # An unknown resolution stops the run before anything loads.
+    with pytest.raises(SystemExit):
+        run_eval.main(_corpus_argv(root, cache, tmp_path, "--resolutions", "full,tablet"), runner=_outside_git)
+
+
+def test_photoreal_units_join_the_dev_split_only(monkeypatch, tmp_path):
+    root, cache = _write_corpus(tmp_path)
+    named = [u for u in _capture_units(monkeypatch, _corpus_argv(root, cache, tmp_path)) if u.group == "named"]
+    # 2 fixtures x 2 caps = 4 named units in a dev run.
+    assert len(named) == 4
+    assert not [u for u in _capture_units(monkeypatch, _corpus_argv(root, cache, tmp_path, "--holdout"))
+                if u.group == "named"]
+    assert not [u for u in _capture_units(monkeypatch, _corpus_argv(root, cache, tmp_path, "--no-photoreal"))
+                if u.group == "named"]
+
+
+def test_the_start_sha_check_requires_this_trees_qrep(monkeypatch, tmp_path):
+    import qrep
+
+    def clean(args, **kwargs):
+        return _Done(0)
+
+    # qrep imported from outside REPO: refused.
+    monkeypatch.setattr(run_eval, "REPO", tmp_path)
+    with pytest.raises(SystemExit) as stop:
+        run_eval._start_sha_check("abc123", clean)
+    assert "outside" in str(stop.value.code)
+    # REPO set to the folder that holds the imported qrep: both diffs and the location pass.
+    monkeypatch.setattr(run_eval, "REPO", Path(qrep.__file__).resolve().parents[1])
+    text = run_eval._start_sha_check("abc123", clean)
+    assert text.count("exited 0") == 2 and text.endswith("inside the repo")
+
+
+def _proposals(counts_a, counts_b, class_a="squares", class_b="squares", *, both=True):
+    def counts(n):
+        return {"blocks_across": 1, "blocks_down": 1, "squares_per_block_across": n, "squares_per_block_down": n}
+
+    doc = {"schema_version": 1, "photo": "private/cache/x.jpg", "sha256": "1" * 64, "canvas": [400, 300],
+           "counts": [{"provenance": "proposed-a", "value": counts(counts_a)}],
+           "construction_class": [{"provenance": "proposed-a", "value": class_a}]}
+    if both:
+        doc["counts"].append({"provenance": "proposed-b", "value": counts(counts_b)})
+        doc["construction_class"].append({"provenance": "proposed-b", "value": class_b})
+    return an.Annotation.model_validate_json(json.dumps(doc))
+
+
+def test_proposals_agree_compares_the_two_proposals_field_by_field():
+    assert run_eval._proposals_agree(_proposals(4, 4)) == {"counts": True, "construction_class": True}
+    assert run_eval._proposals_agree(_proposals(4, 5, "squares", "hst")) == {
+        "counts": False, "construction_class": False}
+    # One proposal alone has nothing to agree with.
+    assert run_eval._proposals_agree(_proposals(4, 4, both=False)) == {}

@@ -67,8 +67,29 @@ def test_a_flag_or_a_flagged_region_keeps_the_wrong_square_from_being_confident(
     # A region next to it, rows 0..1, cols 0..3, misses (1, 1): 1.
     beside = scoring.score_squares(TRUTH, read, mapping, confidence, flagged_regions=[(0, 0, 1, 3)])
     assert beside.confident_wrong == 1
+    # A region ending at column 1, rows 0..3, cols 0..1 (half-open), stops before (1, 1):
+    # column 1 is not below 1, so the square stays confident-wrong: 1.
+    left = scoring.score_squares(TRUTH, read, mapping, confidence, flagged_regions=[(0, 0, 3, 1)])
+    assert left.confident_wrong == 1
     # Accuracy does not depend on flags: still 8/9 in every case.
-    assert {at.correct, above.correct, region.correct, beside.correct} == {8}
+    assert {at.correct, above.correct, region.correct, beside.correct, left.correct} == {8}
+
+
+def test_many_to_one_breaks_a_tie_toward_the_lower_role():
+    # Two gold roles of one color, #ff0000 and #ff0000: a read #ff0000 lies 0 from each,
+    # a tie, and the lower index wins: role 0.
+    assert scoring.map_many_to_one([RED], [RED, RED]) == [0]
+
+
+def test_a_fabric_index_outside_the_mapping_counts_wrong():
+    # Mapping [0, 1] covers read fabrics 0 and 1. The read puts fabric -1 on (0, 1) and
+    # fabric 2 on (1, 0), both truth role 1: neither indexes the mapping, so both map to
+    # no role and count wrong (Python's mapping[-1] would have been role 1, and
+    # mapping[2] an IndexError). Correct 9 - 2 = 7; wrong and confident-wrong 2.
+    read = [row[:] for row in TRUTH]
+    read[0][1], read[1][0] = -1, 2
+    score = scoring.score_squares(TRUTH, read, [0, 1], ONES)
+    assert (score.correct, score.wrong, score.confident_wrong) == (7, 2, 2)
 
 
 def test_a_perfect_read_is_a_fully_correct_interior():
@@ -245,15 +266,20 @@ def test_rate_reports_n_and_the_rule_of_three_for_zero():
     empty = stats.rate(0, 0)
     assert empty["rate"] is None and empty["wilson95"] is None
     assert math.isclose(stats.rate(14, 15)["wilson95"][0], 0.701835, abs_tol=1e-5)
+    # Capped at 1, since no rate exceeds it: n = 1 -> min(1, 3/1 = 3) = 1; n = 3 ->
+    # min(1, 3/3 = 1) = 1; n = 4 -> min(1, 3/4 = 0.75) = 0.75.
+    assert (stats.rule_of_three(1), stats.rule_of_three(3)) == (1.0, 1.0)
+    assert stats.rule_of_three(4) == pytest.approx(0.75)
 
 
 def _no_git(args, **kwargs):
     raise OSError("no git in this test")
 
 
-def _row(photo, outcome, *, tier="A", truth="gate", device="museum scan", radius=0, variant="true", **extra):
+def _row(photo, outcome, *, tier="A", truth="gate", device="museum scan", radius=0, variant="true",
+         reader="auto-corners", **extra):
     return {"photo": photo, "group": "corpus", "tier": tier, "truth": truth, "device_class": device,
-            "resolution": "full", "condition": "clean", "reader": "auto-corners", "radius_px": radius,
+            "resolution": "full", "condition": "clean", "reader": reader, "radius_px": radius,
             "variant": variant, "outcome": outcome, **extra}
 
 
@@ -284,8 +310,9 @@ def _gate(agg, device, truth):
 def test_gate_metrics_count_photos_at_true_corners_and_split_gate_from_provisional():
     agg = report.aggregate(ROWS, runner=_no_git)
     # Groups: (auto-corners, museum scan, full) and (auto-corners, screenshot, full), each
-    # with a gate and a provisional entry: 2 x 2 = 4.
-    assert len(agg["gate_metrics"]) == 4
+    # with a gate and a provisional entry, then the pooled (auto-corners, full) pair:
+    # 2 x 2 + 2 = 6.
+    assert len(agg["gate_metrics"]) == 6
     gate = _gate(agg, "museum scan", "gate")
     # Photo rows (radius 0, true counts): p1 read, p2 held, p7 read in tier A; p4 refused
     # and p6 skipped in tier R. The 4 px trials never enter.
@@ -300,14 +327,22 @@ def test_gate_metrics_count_photos_at_true_corners_and_split_gate_from_provision
     # G5 at true corners only: p2 held of p1, p2, p7: 1 of 3. Counting the trials would
     # have given 2 of 7.
     assert (gate["G5"]["k"], gate["G5"]["n"]) == (1, 3)
-    # Provisional: p3 warned is no hold or refusal, 0 of 1, so its 3/n bound is 3/1 = 3.0;
-    # its miscount trial (refused) never enters. No gold rows, no refusal photos: n = 0.
+    # Provisional: p3 warned is no hold or refusal, 0 of 1, so its 3/n bound is
+    # min(1, 3/1) = 1.0; its miscount trial (refused) never enters. No gold rows, no
+    # refusal photos: n = 0.
     prov = _gate(agg, "museum scan", "provisional")
-    assert (prov["G5"]["k"], prov["G5"]["n"], prov["G5"]["rule_of_three"]) == (0, 1, 3.0)
+    assert (prov["G5"]["k"], prov["G5"]["n"], prov["G5"]["rule_of_three"]) == (0, 1, 1.0)
     assert prov["G1"]["n"] == 0 and prov["G4"]["n"] == 0
     # The screenshot's only row errored: n = 0 with 1 error.
     shot = _gate(agg, "screenshot", "gate")
     assert (shot["G5"]["n"], shot["G5"]["errors"]) == (0, 1)
+    # Pooled over the device classes, gate: p1, p2, p7 (museum) and p5 (screenshot, an
+    # error): p2 held of 3 scored, 1 error. G1, G2 and G4 are not pooled.
+    pooled = _gate(agg, "all in scope", "gate")
+    assert (pooled["G5"]["k"], pooled["G5"]["n"], pooled["G5"]["errors"]) == (1, 3, 1)
+    assert (pooled["G1"], pooled["G2"], pooled["G4"]) == (None, None, None)
+    pooled = _gate(agg, "all in scope", "provisional")
+    assert (pooled["G5"]["k"], pooled["G5"]["n"], pooled["conflict_rows"]) == (0, 1, 0)
     assert agg["miscount_trials"] == 1
     assert [e["photo"] for e in agg["errors"]] == ["p5"]
 
@@ -324,6 +359,8 @@ def test_tier_and_device_tables_count_photos():
     assert (fw["k"], fw["n"], fw["errors"]) == (1, 4, 1)
     # Count top-1: dims exact for p1, p7, p3, not p2: 3 of 4.
     assert (tier_a["count_top1"]["k"], tier_a["count_top1"]["n"]) == (3, 4)
+    # Truth behind the 4 scored rows: p1, p2, p7 gate; p3 provisional; none in conflict.
+    assert tier_a["truth_rows"] == {"gate": 3, "provisional": 1, "conflict": 0}
     tier_r = agg["by_tier"]["auto-corners | R | full"]
     assert (tier_r["n_photos"], tier_r["refusal_recall"]["k"], tier_r["refusal_recall"]["n"],
             tier_r["refusal_recall"]["skipped"]) == (2, 1, 1, 1)
@@ -364,13 +401,16 @@ def test_markdown_rate_cells_name_errors_and_skips():
     # Columns: reader, device, resolution, truth, G1, G2, G4, G5.
     # G2: 1/29 = 0.0344828 -> 0.0345 at 4 places, behind 3 photos.
     assert cells[5].startswith("3 photos: 1/29 squares = 0.0345 [")
-    # G4: 1/1 = 1.000 with an interval, then the skipped refusal photo.
-    assert cells[6].startswith("1/1 = 1.000 [") and cells[6].endswith(", 1 skipped")
+    # G4: 1/1 = 1.000 with an interval, then the skipped refusal photo, and why a corner
+    # reader skips refusal photos.
+    assert cells[6].startswith("1/1 = 1.000 [")
+    assert cells[6].endswith(", 1 skipped; no frame or counts on the v0 refusal photos (#243)")
     shot = next(row for row in text if row.startswith("| auto-corners | screenshot | full | gate |"))
     assert shot.split("|")[8].strip() == "n = 0, 1 errors"
     tier = next(row for row in text if row.startswith("| auto-corners | museum tier A (in scope) | full |"))
-    # Outcomes read / warned / held / refused: 2 / 1 / 1 / 0.
-    assert "| 2 / 1 / 1 / 0 |" in tier
+    # Outcomes read / warned / held / refused: 2 / 1 / 1 / 0; gate / provisional / conflict
+    # rows 3 / 1 / 0.
+    assert "| 2 / 1 / 1 / 0 |" in tier and "| 3 / 1 / 0 |" in tier
     assert any("G2 counts squares, which cluster by photo" in row for row in text)
     assert any("#237 tracks loading it" in row for row in text)
 
@@ -399,10 +439,10 @@ def test_pending_metrics_ask_git_in_the_repo_through_an_injected_runner():
     assert report._pending(_no_git)["G6"] == "n/a until A3b merges (git unavailable)"
 
 
-def _unit(*, counts=None, cells=TRUTH, fabrics=2) -> harness.Unit:
+def _unit(*, counts=None, cells=TRUTH, fabrics=2, bands=()) -> harness.Unit:
     counts = counts or Counts(blocks_across=1, blocks_down=1, squares_per_block_across=3,
                               squares_per_block_down=3)
-    truth = corpus.TruthView(corners=[(0.0, 0.0), (30.0, 0.0), (30.0, 30.0), (0.0, 30.0)], bands=[],
+    truth = corpus.TruthView(corners=[(0.0, 0.0), (30.0, 0.0), (30.0, 30.0), (0.0, 30.0)], bands=list(bands),
                              counts=counts, fabric_count=fabrics, construction="squares",
                              provenance={"frame": "verified-jake"})
     return harness.Unit(photo="p", group="corpus", tier="A", split="dev", license="CC0-1.0",
@@ -413,11 +453,11 @@ def _unit(*, counts=None, cells=TRUTH, fabrics=2) -> harness.Unit:
 
 
 def _reading(outcome, *, colors=(RED, BLUE), cells=None, confidence=None, verdict=None, received=None,
-             low=0.9) -> readers.Reading:
-    rows = len(cells) if cells else 0
-    return readers.Reading(outcome=outcome, verdict=verdict, rows=rows, cols=len(cells[0]) if cells else 0,
+             low=0.9, bands=(), dims=None) -> readers.Reading:
+    rows, cols = dims or ((len(cells), len(cells[0])) if cells else (0, 0))
+    return readers.Reading(outcome=outcome, verdict=verdict, rows=rows, cols=cols,
                            colors=list(colors), cells=cells, confidence=confidence, cell_size_eighths=16,
-                           band_eighths=[], low_confidence_below=low, flagged_regions=[], seconds=0.0,
+                           band_eighths=list(bands), low_confidence_below=low, flagged_regions=[], seconds=0.0,
                            received=received if received is not None else {"fabrics": None})
 
 
@@ -499,3 +539,171 @@ def test_missing_confidence_flags_no_square():
     stated[1][1] = 0.5
     out = harness.score(_unit(), _reading("read", cells=_swapped(), confidence=stated))
     assert out["confident_wrong"] == 0 and "confidence_missing" not in out
+
+
+def test_r1_reports_the_automatic_read_on_tier_a_photos_only():
+    rows = [
+        # auto on tier A: q1 and q2 periodic, q3 and q4 not; q2 read a doubled grid.
+        _row("q1", "read", reader="auto", radius=None, periodic=True, dims_exact=True, harmonic=False,
+             k_exact=True),
+        _row("q2", "read", reader="auto", radius=None, periodic=True, dims_exact=False, harmonic=True,
+             k_exact=False),
+        _row("q3", "read", reader="auto", radius=None, periodic=False, dims_exact=True, harmonic=False,
+             k_exact=True),
+        _row("q4", "read", reader="auto", radius=None, periodic=False, dims_exact=True, harmonic=False,
+             k_exact=False),
+        # Neither a tier B photo nor another reader enters R1.
+        _row("q5", "read", reader="auto", tier="B", radius=None, periodic=True, dims_exact=False,
+             harmonic=True, k_exact=False),
+        _row("q1", "read", periodic=True, dims_exact=False, harmonic=True, k_exact=False),
+    ]
+    r1 = report.aggregate(rows, runner=_no_git)["r1"]["by_resolution"]
+    assert list(r1) == ["full"]
+    full = r1["full"]
+    # Periodic: q1 exact, q2 not: 1 of 2. Non-periodic: q3 and q4 exact: 2 of 2.
+    # Harmonic: q2 of q1..q4: 1 of 4. Fabric count exact: q1 and q3 of 4: 2 of 4 (count
+    # top-1 over all four is 3 of 4, so the two cannot stand in for each other).
+    # The tier B row or the auto-corners row leaking in would make these 1 of 3, and
+    # 2 of 5 and 2 of 5.
+    got = {key: (full[key]["k"], full[key]["n"]) for key in (
+        "count_top1_periodic", "count_top1_non_periodic", "harmonic_error", "fabric_count_suggestion_exact")}
+    assert got == {"count_top1_periodic": (1, 2), "count_top1_non_periodic": (2, 2),
+                   "harmonic_error": (1, 4), "fabric_count_suggestion_exact": (2, 4)}
+    assert full["count_top3"].startswith("n/a")
+
+
+def test_named_latency_per_photo_and_jitter_take_their_own_rows():
+    named = {**_row("busy", "read", reader="auto", radius=None, seconds=10.0), "group": "named",
+             "tier": "named", "truth": "synthetic"}
+    rows = [
+        named,
+        {**named, "variant": "half", "seconds": 50.0},
+        _row("s1", "read", reader="auto", radius=None, seconds=1.0),
+        _row("s2", "read", seconds=2.0, dims_exact=True),
+        _row("s2", "read", variant="half", seconds=100.0),
+        _row("s1", "read", radius=4, trial=0, seconds=4.0, dims_exact=True),
+        _row("s3", "read", tier="B", radius=4, trial=0, seconds=3.0, dims_exact=True),
+        _row("s4", "error", error="x"),
+        _row("s5", "read", tier="B"),
+    ]
+    agg = report.aggregate(rows, runner=_no_git)
+    # Named: the named row with the true counts only.
+    assert agg["named"] == [named]
+    # Latency: the scored rows with the true counts, every group: 10, 1, 2, 4 and 3 s;
+    # sorted 1, 2, 3, 4, 10, median 3 over 5 reads. The miscount rows (50 and 100 s) and
+    # the error row stay out.
+    latency = agg["r1"]["latency"]
+    assert (latency["native_median_seconds_per_read"], latency["n_reads"]) == (3.0, 5)
+    # Per photo: corpus tier A at true corners only: s1 by auto, s2 and s4 by auto-corners;
+    # not s5, a tier B photo at true corners.
+    picked = [(p["photo"], p["reader"]) for p in report.per_photo(rows)]
+    assert picked == [("s1", "auto"), ("s2", "auto-corners"), ("s4", "auto-corners")]
+    # Jitter: tier A only, so the 4 px group holds s1's trial and not s3's (tier B).
+    assert set(agg["jitter"]) == {"auto-corners | full | 0", "auto-corners | full | 4"}
+    assert agg["jitter"]["auto-corners | full | 4"]["n_rows"] == 1
+
+
+def test_g1_counts_errors_and_skips_among_the_gold_photos_only():
+    rows = [
+        _row("g1", "read", cell_truth=True, squares=4, confident_wrong=0, fully_correct=True),
+        _row("g2", "error", cell_truth=True, error="x"),
+        _row("g3", "error", cell_truth=False, error="x"),
+        _row("g4", "skipped", cell_truth=False),
+        _row("g5", "skipped", cell_truth=True),
+    ]
+    gate = _gate(report.aggregate(rows, runner=_no_git), "museum scan", "gate")
+    # Gold rows g1, g2, g5: G1 1 of 1 scored, with g2's error and g5's skip beside it.
+    assert {k: gate["G1"][k] for k in ("k", "n", "errors", "skipped")} == {
+        "k": 1, "n": 1, "errors": 1, "skipped": 1}
+    # G5 counts every in-scope row: g1 scored, 2 errors (g2, g3) and 2 skipped (g4, g5).
+    assert {k: gate["G5"][k] for k in ("k", "n", "errors", "skipped")} == {
+        "k": 0, "n": 1, "errors": 2, "skipped": 2}
+
+
+def test_conflict_rows_count_toward_no_gate_and_g5_pools_the_devices():
+    rows = [
+        _row("c1", "read"),
+        _row("c2", "held", device="screenshot"),
+        _row("c3", "refused", truth="provisional"),
+        _row("c4", "held", truth="conflict"),
+        _row("c5", "refused", tier="R", truth="conflict"),
+    ]
+    agg = report.aggregate(rows, runner=_no_git)
+    # Museum gate G5: c1 only, 0 of 1. Museum provisional G5: c3 refused, 1 of 1; its G4
+    # has no provisional refusal photo (c5 is a conflict): n = 0. The museum group holds
+    # 2 conflict rows, c4 and c5.
+    gate = _gate(agg, "museum scan", "gate")["G5"]
+    assert (gate["k"], gate["n"]) == (0, 1)
+    prov = _gate(agg, "museum scan", "provisional")
+    assert (prov["G5"]["k"], prov["G5"]["n"], prov["G4"]["n"], prov["conflict_rows"]) == (1, 1, 0, 2)
+    # Pooled gate: c1 (museum) and c2 (screenshot), c2 held: 1 of 2. Pooled provisional:
+    # c3, 1 of 1, beside 1 in-scope conflict row (c4).
+    pooled_gate = _gate(agg, "all in scope", "gate")["G5"]
+    assert (pooled_gate["k"], pooled_gate["n"]) == (1, 2)
+    pooled = _gate(agg, "all in scope", "provisional")
+    assert (pooled["G5"]["k"], pooled["G5"]["n"], pooled["conflict_rows"]) == (1, 1, 1)
+    # The tier table pools labels and names the mix: c1, c2 gate; c3 provisional; c4 conflict.
+    assert agg["by_tier"]["auto-corners | A | full"]["truth_rows"] == {
+        "gate": 2, "provisional": 1, "conflict": 1}
+    text = report.markdown({"header": {"title": "t"}, "aggregate": agg}).splitlines()
+    line = next(r for r in text if r.startswith("| auto-corners | all in scope | full | provisional"))
+    assert line.split("|")[4].strip() == "provisional (1 conflict rows)"
+    assert [c.strip() for c in line.split("|")[5:8]] == ["n/a", "n/a", "n/a"]
+
+
+def test_score_a_refusal_that_matches_the_truth_still_scores_nothing():
+    # A refused reading whose grid (3 x 3) and k (2) equal the truth's: nothing was
+    # shown, so dims and k are not exact.
+    out = harness.score(_unit(), _reading("refused", cells=[row[:] for row in TRUTH], confidence=ONES,
+                                          verdict="no_grid"))
+    assert (out["dims_exact"], out["k_exact"]) == (False, False)
+    # A refused 6 x 3 against the 3 x 3 truth (6 / 3 = 2) is no harmonic either.
+    out = harness.score(_unit(cells=None), _reading("refused", dims=(6, 3)))
+    assert out["harmonic"] is False
+
+
+def test_score_bands_in_inches_at_the_reads_square_size():
+    # Truth band 1.5 squares; the read square is 16 eighths (2 in): 1.5 x 16 / 8 = 3.0 in.
+    # A read band of 24 eighths is 24 / 8 = 3.0 in: a match, and with every square right
+    # and k 2 = 2 the interior is fully correct.
+    cells = [row[:] for row in TRUTH]
+    out = harness.score(_unit(bands=[1.5]), _reading("read", cells=cells, confidence=ONES, bands=[24]))
+    assert (out["bands_ok"], out["fully_correct"]) == (True, True)
+    # 26 eighths = 3.25 in: 0.25 off, inside the inclusive 1/4 in. 27 eighths = 3.375 in:
+    # 0.375 off, not a match, so not fully correct.
+    out = harness.score(_unit(bands=[1.5]), _reading("read", cells=cells, confidence=ONES, bands=[26]))
+    assert out["bands_ok"] is True
+    out = harness.score(_unit(bands=[1.5]), _reading("read", cells=cells, confidence=ONES, bands=[27]))
+    assert (out["bands_ok"], out["fully_correct"]) == (False, False)
+
+
+def test_score_harmonics_on_unequal_axes():
+    # Truth 1 block of 5 across x 6 down: 6 rows, 5 columns.
+    counts = Counts(blocks_across=1, blocks_down=1, squares_per_block_across=5, squares_per_block_down=6)
+    unit = _unit(counts=counts, cells=None)
+    # Read 12 x 5: rows 12 / 6 = 2, a harmonic; columns equal.
+    out = harness.score(unit, _reading("read", dims=(12, 5)))
+    assert out["truth_dims"] == [6, 5]
+    assert (out["dims_exact"], out["harmonic"]) == (False, True)
+    # Read 5 x 12 (the axes swapped): 5 / 6 and 12 / 5 = 2.4 are no harmonics; not exact.
+    out = harness.score(unit, _reading("read", dims=(5, 12)))
+    assert (out["dims_exact"], out["harmonic"]) == (False, False)
+    # Read 0 x 12 against 6 x 6: a zero axis is no grid, so no harmonic, though 12 / 6 = 2.
+    six = Counts(blocks_across=1, blocks_down=1, squares_per_block_across=6, squares_per_block_down=6)
+    out = harness.score(_unit(counts=six, cells=None), _reading("read", dims=(0, 12)))
+    assert out["harmonic"] is False
+
+
+def test_score_periodic_needs_more_than_one_block():
+    # 2 blocks across x 1 down = 2 blocks: periodic. 1 x 1 = 1 block: not.
+    two = Counts(blocks_across=2, blocks_down=1, squares_per_block_across=3, squares_per_block_down=3)
+    assert harness.score(_unit(counts=two, cells=None), _reading("read", dims=(3, 6)))["periodic"] is True
+    assert harness.score(_unit(cells=None), _reading("read", dims=(3, 3)))["periodic"] is False
+
+
+def test_given_fabrics_keeps_the_reads_range():
+    # The read accepts 2 to 12 fabrics (qrep/contract.py FABRICS_MIN, FABRICS_MAX).
+    def view(count):
+        return corpus.TruthView(corners=None, bands=[], counts=None, fabric_count=count, construction=None)
+
+    assert [harness.given_fabrics(view(n)) for n in (None, 1, 2, 12, 13)] == [None, None, 2, 12, None]
