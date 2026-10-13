@@ -22,7 +22,9 @@
  * A failed call's Retry (retryPattern) sends the call again, to the same
  * worker after a bridge error. A failure of the worker itself would meet the
  * same broken worker, so after one the Retry restarts the engine first and
- * the request goes to the fresh worker.
+ * the request goes to the fresh worker. The same Retry sends a failed fabric
+ * census again (state/model.tsx CensusQueue), which no screen would otherwise
+ * ask for once it fails.
  */
 import { parsePatternResult } from "../engine/contract";
 import type { PatternSummary } from "../engine/contract";
@@ -258,28 +260,39 @@ export class PatternSummaryLoader {
   }
 }
 
+/** The fabric census request (state/model.tsx CensusQueue), as Retry sees it. */
+export interface CensusTarget {
+  /** True while the open model's census failed. */
+  readonly failed: boolean;
+  /** True while that failure is the worker's own (isWorkerFailure). */
+  readonly workerDown: boolean;
+  /** Ask for the failed census again. */
+  retry(): void;
+}
+
+/** What Your pattern's Retry runs: reboot the engine, or one failed call again. */
+export type RetryAction = "engine" | "pdf" | "summary" | "census";
+
 export interface RetryTargets {
   loader: PatternSummaryLoader;
   pdf: PatternPdfController;
+  census: CensusTarget;
   /** engine.retry: terminate the worker and boot a fresh one. */
   restart: () => void;
 }
 
 /**
- * Retry for a failed call on Your pattern: `which` names the failure the
- * error line shows. After a bridge error the call goes again to the same
- * worker. After a failure of the worker itself, the engine restarts first,
- * so the call queues for the fresh worker instead of meeting the broken one;
- * a summary that failed too goes again with it, as an engine Retry sends it,
- * because nothing else would ask for it once the engine is back.
+ * Your pattern's one Retry: `which` names what the error line shows. The
+ * engine restarts first for an engine Retry, and after any failure of the
+ * worker itself, so the calls queue for the fresh worker instead of meeting
+ * the broken one; after a bridge error they go again to the same worker. The
+ * PDF goes again only when its failure is the one shown, because it saves a
+ * file. A failed summary and a failed census go again on every Retry, since
+ * nothing else asks for them once they fail.
  */
-export function retryPattern({ loader, pdf, restart }: RetryTargets, which: "pdf" | "summary"): void {
-  if (!pdf.workerDown && !loader.workerDown) {
-    if (which === "pdf") void pdf.retry();
-    else loader.retry();
-    return;
-  }
-  restart();
+export function retryPattern({ loader, pdf, census, restart }: RetryTargets, which: RetryAction): void {
+  if (which === "engine" || pdf.workerDown || loader.workerDown || census.workerDown) restart();
   if (which === "pdf") void pdf.retry();
   if (loader.view.status === "failed") loader.retry();
+  if (census.failed) census.retry();
 }

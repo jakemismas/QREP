@@ -14,11 +14,14 @@ export function FabricCensus({
   lines,
   palette,
   census,
+  countFailed,
 }: {
   lines: FabricLine[];
   palette: Fabric[];
   census: ModelSummary | null;
+  /** The census failed: the error line above offers its Retry. */
+  countFailed: boolean;
 }) {
   const rows = useMemo(() => censusRows(lines, palette, census), [lines, palette, census]);
-  return <FabricsPanel rows={rows} />;
+  return <FabricsPanel rows={rows} countFailed={countFailed} />;
 }

@@ -16,6 +16,7 @@ import {
   PatternPdfController,
   PatternSummaryLoader,
   retryPattern,
+  type CensusTarget,
   type PdfView,
   type SummaryView,
 } from "./patternPdf";
@@ -509,8 +510,17 @@ function failure(kind: string, message: string) {
   return { ok: false, error: { kind, message } };
 }
 
-function targets(client: EngineClient, loader: PatternSummaryLoader, pdf: PatternPdfController) {
-  return { loader, pdf, restart: () => client.restart() };
+// A census that never failed: the Retry cases below that are not about the
+// census pass this one.
+const NO_CENSUS: CensusTarget = { failed: false, workerDown: false, retry: () => {} };
+
+function targets(
+  client: EngineClient,
+  loader: PatternSummaryLoader,
+  pdf: PatternPdfController,
+  census: CensusTarget = NO_CENSUS,
+) {
+  return { loader, pdf, census, restart: () => client.restart() };
 }
 
 describe("Retry after a failed call", () => {
@@ -750,6 +760,142 @@ describe("CensusQueue", () => {
     expect(errors).toEqual([message]);
     expect(summaries).toEqual([]);
     expect(worker.calls()).toHaveLength(1);
+    // The failure stays on record for Retry, and it was the bridge's, not the worker's.
+    expect(queue.failed).toBe(true);
+    expect(queue.workerDown).toBe(false);
+  });
+
+  it("forgets a failed census once a newer model replaces it, so Retry sends nothing", async () => {
+    const { client, worker } = bootedClient();
+    const { queue } = makeCensus(client);
+
+    queue.request(MODEL_JSON);
+    await settle();
+    worker.respond(worker.calls()[0].id!, failure("internal", WORKER_FAILED_SENTENCE));
+    await settle();
+    expect(queue.failed).toBe(true);
+    expect(queue.workerDown).toBe(true);
+
+    queue.replace();
+    expect(queue.failed).toBe(false);
+    expect(queue.workerDown).toBe(false);
+    queue.retry();
+    await settle();
+    // Hand count: the one failed validate, and nothing more.
+    expect(worker.calls()).toHaveLength(1);
+  });
+});
+
+/** The census's answer on a fresh worker, and the summary's to anything else. */
+function answer(call: Sent) {
+  return call.method === "validate" ? { ok: true, result: CENSUS } : ready();
+}
+
+describe("Retry and the fabric census", () => {
+  it("sends a census the broken worker failed again with the summary's Retry, on one restart", async () => {
+    const { client, worker, workers } = bootedClient();
+    const { queue, summaries, errors } = makeCensus(client);
+    const { loader } = makeLoader(client);
+    const { controller } = makeController(client);
+
+    // As on Your pattern: the census is asked for first, then the summary.
+    queue.request(MODEL_JSON);
+    loader.load(MODEL_JSON);
+    await settle();
+    // One call at a time: the worker fails the validate, then the summary.
+    worker.respond(worker.calls()[0].id!, failure("internal", WORKER_FAILED_SENTENCE));
+    await settle();
+    worker.respond(worker.calls()[1].id!, failure("internal", WORKER_FAILED_SENTENCE));
+    await settle();
+    expect(worker.calls().map((call) => call.method)).toEqual(["validate", "export_pattern"]);
+    expect(queue.failed).toBe(true);
+    expect(queue.workerDown).toBe(true);
+    expect(loader.view).toEqual({ status: "failed", message: FAILED_SENTENCE });
+
+    // The error line shows the summary's failure first, so its Retry is the one.
+    retryPattern(targets(client, loader, controller, queue), "summary");
+    await settle();
+    workers[1].bootDone();
+    await settle();
+    // The new worker takes one call at a time: answer the first, then the second.
+    for (let i = 0; i < 2; i++) {
+      const call = workers[1].calls()[i];
+      workers[1].respond(call.id!, answer(call));
+      await settle();
+    }
+
+    // Hand count: two calls failed on the first worker, and the one Retry
+    // restarted the engine once and sent each once more: two workers, the
+    // first holding its two failed calls, the second one validate and one
+    // export_pattern, each with the model JSON alone.
+    expect(workers).toHaveLength(2);
+    expect(worker.calls()).toHaveLength(2);
+    expect(workers[1].calls().map((call) => call.method).sort()).toEqual([
+      "export_pattern",
+      "validate",
+    ]);
+    for (const call of workers[1].calls()) expect(call.args).toEqual([MODEL_JSON]);
+    expect(summaries).toEqual([CENSUS]);
+    expect(queue.failed).toBe(false);
+    expect(loader.view).toEqual({ status: "ready", summary: SUMMARY });
+    // The worker's failure reached the census's error report once, on the
+    // first worker; the Retry added none.
+    expect(errors).toEqual([WORKER_FAILED_SENTENCE]);
+    // No PDF was asked for, so the Retry made none.
+    expect(controller.view).toEqual({ status: "idle", message: null });
+  });
+
+  it("sends a census that failed alone again to the same worker after a bridge error, with no restart", async () => {
+    const { client, worker, workers } = bootedClient();
+    const { queue, summaries } = makeCensus(client);
+    const { loader } = makeLoader(client);
+    const { controller } = makeController(client);
+
+    queue.request(MODEL_JSON);
+    await settle();
+    worker.respond(worker.calls()[0].id!, failure("internal", BRIDGE_INTERNAL_SENTENCE));
+    await settle();
+    expect(queue.failed).toBe(true);
+    expect(queue.workerDown).toBe(false);
+
+    retryPattern(targets(client, loader, controller, queue), "census");
+    await settle();
+    // Hand count: no restart, so one worker, holding the failed validate and
+    // the Retry's one validate; the idle summary and PDF sent nothing.
+    expect(workers).toHaveLength(1);
+    expect(worker.calls()).toHaveLength(2);
+    expect(worker.calls()[1].method).toBe("validate");
+    expect(worker.calls()[1].args).toEqual([MODEL_JSON]);
+    worker.respond(worker.calls()[1].id!, { ok: true, result: CENSUS });
+    await settle();
+    expect(summaries).toEqual([CENSUS]);
+    expect(queue.failed).toBe(false);
+  });
+
+  it("sends a failed census again after an engine Retry", async () => {
+    const { client, worker, workers } = bootedClient();
+    const { queue, summaries } = makeCensus(client);
+    const { loader } = makeLoader(client);
+    const { controller } = makeController(client);
+
+    queue.request(MODEL_JSON);
+    await settle();
+    worker.respond(worker.calls()[0].id!, failure("internal", BRIDGE_INTERNAL_SENTENCE));
+    await settle();
+
+    retryPattern(targets(client, loader, controller, queue), "engine");
+    await settle();
+    workers[1].bootDone();
+    await settle();
+    // Hand count: the engine Retry restarts once, and the failed census goes
+    // once to the new worker.
+    expect(workers).toHaveLength(2);
+    expect(worker.calls()).toHaveLength(1);
+    expect(workers[1].calls()).toHaveLength(1);
+    expect(workers[1].calls()[0].method).toBe("validate");
+    workers[1].respond(workers[1].calls()[0].id!, { ok: true, result: CENSUS });
+    await settle();
+    expect(summaries).toEqual([CENSUS]);
   });
 });
 

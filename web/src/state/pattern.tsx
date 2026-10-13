@@ -16,7 +16,7 @@ import type { ModelSummary, QuiltModel } from "../model/types";
 import type { SeamStrategy } from "../model/seams";
 import { useToast } from "../ui";
 import { PatternPdfController, PatternSummaryLoader, retryPattern } from "../pattern/patternPdf";
-import type { PdfView, SummaryView } from "../pattern/patternPdf";
+import type { PdfView, RetryAction, SummaryView } from "../pattern/patternPdf";
 import type { ModelApi } from "./model";
 import { buildSettingsSummary } from "./patternText";
 import type { StrategyPlan } from "./patternText";
@@ -57,12 +57,11 @@ export interface YourPatternApi {
   showPattern: (source: PatternSource) => void;
   showEditor: () => void;
   summary: SummaryView;
-  retrySummary: () => void;
   pdf: PdfView;
   savePdf: () => void;
-  retryPdf: () => void;
-  /** Reboot a failed engine; Your pattern's waiting calls go again on their own. */
-  retryEngine: () => void;
+  /** The error line's Retry: reboot a failed engine, or send a failed call
+   * again (pattern/patternPdf.ts retryPattern). */
+  retry: (which: RetryAction) => void;
 }
 
 export interface PatternApi {
@@ -155,6 +154,7 @@ export function usePatternState({
   latestModel,
   opened,
   latestOpened,
+  censusRequest,
 }: ModelApi): PatternState {
   const engine = useEngine();
   // ToastProvider rebuilds its value on every toast; keyed on that object,
@@ -287,33 +287,28 @@ export function usePatternState({
     loaderRef.current?.load(JSON.stringify(model));
   }, [screen, model, latestModel, latestOpened]);
 
-  // A failed call goes again; after a failure of the worker itself,
-  // retryPattern restarts the engine first so the call reaches a fresh one.
-  const retryFailed = useCallback((which: "pdf" | "summary") => {
-    const loader = loaderRef.current;
-    const pdf = pdfRef.current;
-    if (!loader || !pdf) return;
-    retryPattern({ loader, pdf, restart: () => engineRef.current.retry() }, which);
-  }, []);
-
-  const retrySummary = useCallback(() => retryFailed("summary"), [retryFailed]);
-
   const savePdf = useCallback(() => {
     if (!model) return;
     void pdfRef.current?.start(JSON.stringify(model), patternPdfName(summary, model));
   }, [model, summary]);
 
-  const retryPdf = useCallback(() => retryFailed("pdf"), [retryFailed]);
-
-  const retryEngine = useCallback(() => {
-    // The restart rejects every waiting call, and the loader and the PDF
-    // controller send theirs again on their own, as after the header's
-    // Retry; sending them here too would post each one twice. Only a summary
-    // that had already failed is asked for again.
-    engineRef.current.retry();
-    const loader = loaderRef.current;
-    if (loader && loader.view.status === "failed") loader.retry();
-  }, []);
+  // Every Retry on Your pattern goes through retryPattern: it restarts the
+  // engine for an engine Retry or after a failure of the worker itself, and
+  // sends the failed calls again. A restart rejects every waiting call, and
+  // the loader, the PDF controller and the census send theirs again on their
+  // own, so only calls that had already failed are sent here.
+  const retry = useCallback(
+    (which: RetryAction) => {
+      const loader = loaderRef.current;
+      const pdf = pdfRef.current;
+      if (!loader || !pdf) return;
+      retryPattern(
+        { loader, pdf, census: censusRequest, restart: () => engineRef.current.retry() },
+        which,
+      );
+    },
+    [censusRequest],
+  );
 
   const yourPattern = useMemo<YourPatternApi>(
     () => ({
@@ -322,24 +317,11 @@ export function usePatternState({
       showPattern,
       showEditor,
       summary: summaryView,
-      retrySummary,
       pdf: pdfView,
       savePdf,
-      retryPdf,
-      retryEngine,
+      retry,
     }),
-    [
-      screen,
-      source,
-      showPattern,
-      showEditor,
-      summaryView,
-      retrySummary,
-      pdfView,
-      savePdf,
-      retryPdf,
-      retryEngine,
-    ],
+    [screen, source, showPattern, showEditor, summaryView, pdfView, savePdf, retry],
   );
 
   const closePattern = useCallback(() => {

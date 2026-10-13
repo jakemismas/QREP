@@ -83,7 +83,7 @@ function useZoomed(rootRef: RefObject<HTMLElement | null>, mounted: boolean): bo
 }
 
 export function YourPatternScreen() {
-  const { model, summary: census } = useModel();
+  const { model, summary: census, censusFailed } = useModel();
   const photo = usePhoto();
   const pattern = useYourPattern();
   const engineStatus = useEngineStatus();
@@ -108,13 +108,9 @@ export function YourPatternScreen() {
   const showFlagged = flags.model !== null;
   const { summary, pdf } = pattern;
 
-  const error = patternError(engineStatus.phase === "failed", summary, pdf);
-  const retries = {
-    engine: pattern.retryEngine,
-    pdf: pattern.retryPdf,
-    summary: pattern.retrySummary,
-  };
-  const retry = error?.retry ? retries[error.retry] : null;
+  const error = patternError(engineStatus.phase === "failed", summary, pdf, censusFailed);
+  const retryAction = error?.retry ?? null;
+  const retry = retryAction !== null ? () => pattern.retry(retryAction) : null;
 
   return (
     <div
@@ -190,6 +186,7 @@ export function YourPatternScreen() {
             lines={summary.summary.fabrics}
             palette={model.palette.fabrics}
             census={census}
+            countFailed={censusFailed}
           />
         ) : null}
       </section>

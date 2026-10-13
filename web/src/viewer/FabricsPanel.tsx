@@ -3,8 +3,10 @@
  * #96). Each row shows the letter and name the pattern PDF prints, the
  * fabric's swatch and its square count; pattern/census.ts builds the rows.
  * Until the census lands a count shows a placeholder WITHOUT the test id, so
- * the e2e waits for the real census before asserting. No fabric id or color
- * code is ever shown as text. Swatch colors are user data and never theme.
+ * the e2e waits for the real census before asserting; a failed census says
+ * so instead, while Your pattern's error line offers the Retry. The letter is
+ * the engine's letter field, which is still the fabric id until A4b (#123);
+ * no color code is shown as text. Swatch colors are user data and never theme.
  */
 // The fp- rules live in pattern/FabricCensus.css, imported by FabricCensus, this
 // panel's one user: plan section 5.C bans injected style strings.
@@ -17,7 +19,7 @@ export interface CensusRow {
   count: number | null;
 }
 
-export function FabricsPanel({ rows }: { rows: CensusRow[] }) {
+export function FabricsPanel({ rows, countFailed = false }: { rows: CensusRow[]; countFailed?: boolean }) {
   return (
     <section className="fp-root" data-testid="fabric-census">
       <header className="fp-head">
@@ -42,7 +44,9 @@ export function FabricsPanel({ rows }: { rows: CensusRow[] }) {
                     {row.count.toLocaleString("en-US")} squares
                   </span>
                 ) : (
-                  <span className="fp-count fp-counting">counting squares…</span>
+                  <span className="fp-count fp-counting">
+                    {countFailed ? "not counted" : "counting squares…"}
+                  </span>
                 )}
               </div>
             </div>

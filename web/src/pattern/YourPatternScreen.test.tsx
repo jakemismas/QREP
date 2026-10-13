@@ -3,7 +3,8 @@
  * #96): the quilt canvas gets the photo read's model, whose cell confidences
  * it outlines, with showUncertain on, never the editor's model. Rendered to a
  * string in Node, so no DOM: a fake QuiltCanvas records the props the screen
- * passes it, and the state hooks return hand-made values.
+ * passes it, and the state hooks return hand-made values. The error line's
+ * census case renders the real FabricsPanel.
  */
 import { renderToString } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -22,13 +23,17 @@ const fakes = vi.hoisted(() => ({
   pattern: null as unknown,
 }));
 
-vi.mock("../viewer", () => ({
-  QuiltCanvas: (props: CanvasProps) => {
-    fakes.canvas.push(props);
-    return null;
-  },
-  FabricsPanel: () => null,
-}));
+vi.mock("../viewer", async () => {
+  const { FabricsPanel } =
+    await vi.importActual<typeof import("../viewer/FabricsPanel")>("../viewer/FabricsPanel");
+  return {
+    QuiltCanvas: (props: CanvasProps) => {
+      fakes.canvas.push(props);
+      return null;
+    },
+    FabricsPanel,
+  };
+});
 vi.mock("../state/model", () => ({ useModel: () => fakes.model }));
 vi.mock("../state/photo", () => ({ usePhoto: () => fakes.photo }));
 vi.mock("../state/pattern", () => ({ useYourPattern: () => fakes.pattern }));
@@ -74,7 +79,7 @@ const EDITOR_CONFIDENCE = [
 
 function setUp(source: "photo" | "sample"): void {
   fakes.canvas = [];
-  fakes.model = { model: quilt(EDITOR_CONFIDENCE), summary: null };
+  fakes.model = { model: quilt(EDITOR_CONFIDENCE), summary: null, censusFailed: false };
   fakes.photo = {
     photoUrl: "blob:read-photo",
     result: {
@@ -91,11 +96,9 @@ function setUp(source: "photo" | "sample"): void {
     showPattern: noop,
     showEditor: noop,
     summary: { status: "loading" },
-    retrySummary: noop,
     pdf: { status: "idle", message: null },
     savePdf: noop,
-    retryPdf: noop,
-    retryEngine: noop,
+    retry: noop,
   };
 }
 
@@ -125,5 +128,31 @@ describe("YourPatternScreen's quilt canvas", () => {
     expect(props.showUncertain).toBe(false);
     expect(props.model.center.cell_confidence).toEqual(EDITOR_CONFIDENCE);
     expect(html).not.toContain('data-testid="flagged-count"');
+  });
+});
+
+describe("YourPatternScreen's error line", () => {
+  it("shows a failed census with its Retry, and the census rows as not counted", () => {
+    setUp("sample");
+    fakes.model = { model: quilt(EDITOR_CONFIDENCE), summary: null, censusFailed: true };
+    (fakes.pattern as { summary: unknown }).summary = {
+      status: "ready",
+      summary: {
+        method: "strip",
+        method_reason: "Blocks repeat.",
+        fabrics: [
+          { fabric_id: "f0", letter: "f0", name: "Fabric 1" },
+          { fabric_id: "f1", letter: "f1", name: "Fabric 2" },
+        ],
+      },
+    };
+    const html = renderToString(<YourPatternScreen />);
+
+    expect(html).toContain("Your fabrics could not be counted this time. Try again.");
+    expect(html).toContain('data-testid="pattern-retry"');
+    expect(html).toContain('data-testid="fabric-census"');
+    // Hand count: two fabric lines, neither with a count, so two placeholders.
+    expect(html.split("not counted")).toHaveLength(3);
+    expect(html).not.toContain("counting squares");
   });
 });

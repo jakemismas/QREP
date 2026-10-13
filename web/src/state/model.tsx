@@ -10,7 +10,8 @@ import { useEngine } from "../engine/useEngine";
 import type { Engine } from "../engine/useEngine";
 import { EngineError } from "../engine/rpc";
 import type { QuiltModel, ModelSummary } from "../model/types";
-import { isEngineRestart } from "../pattern/patternPdf";
+import { isEngineRestart, isWorkerFailure } from "../pattern/patternPdf";
+import type { CensusTarget } from "../pattern/patternPdf";
 import { useToast } from "../ui";
 
 export const DEFAULT_NAME = "My quilt project";
@@ -35,6 +36,10 @@ export interface ModelApi {
   /** `opened` as of the latest replaceModel, ahead of the render that shows
    * it, so a caller can bind to the quilt it has just opened. */
   latestOpened: () => number;
+  /** True while the open model's census failed; Your pattern shows it with a Retry. */
+  censusFailed: boolean;
+  /** The census request, which Your pattern's Retry sends again (retryPattern). */
+  censusRequest: CensusTarget;
 }
 
 export const ModelContext = createContext<ModelApi | null>(null);
@@ -43,6 +48,8 @@ export interface CensusOptions {
   validate: (modelJson: string) => Promise<ModelSummary>;
   onSummary: (summary: ModelSummary) => void;
   onError: (message: string) => void;
+  /** Called whenever `failed` may have changed. */
+  onFailedChange?: (failed: boolean) => void;
 }
 
 /**
@@ -51,15 +58,31 @@ export interface CensusOptions {
  * at a time; newer models overwrite the pending request, and a result applies
  * only if it is still the newest (version === latest), so a late resolve for
  * a replaced model cannot clobber the census.
+ *
+ * A failed validate of the newest model stays on record until a newer request
+ * or model, so Your pattern's Retry (pattern/patternPdf.ts retryPattern) can
+ * send it again: no model change would, and the census would otherwise wait
+ * on "counting squares" for good.
  */
-export class CensusQueue {
+export class CensusQueue implements CensusTarget {
   private readonly options: CensusOptions;
   private version = 0;
   private pending: { json: string; version: number } | null = null;
   private validating = false;
+  private failure: { json: string; version: number; workerDown: boolean } | null = null;
 
   constructor(options: CensusOptions) {
     this.options = options;
+  }
+
+  /** True while the newest model's census failed. */
+  get failed(): boolean {
+    return this.failure !== null && this.failure.version === this.version;
+  }
+
+  /** True while that failure is the worker's own (isWorkerFailure). */
+  get workerDown(): boolean {
+    return this.failed && this.failure!.workerDown;
   }
 
   /** A newer model replaced the open one: drop its waiting request, and any
@@ -67,12 +90,24 @@ export class CensusQueue {
   replace(): void {
     this.version += 1;
     this.pending = null;
+    this.setFailure(null);
   }
 
   /** Ask for the census of the newest model. */
   request(modelJson: string): void {
     this.pending = { json: modelJson, version: this.version };
+    this.setFailure(null);
     this.drain();
+  }
+
+  /** Ask again for the newest model's census, if it failed. */
+  retry(): void {
+    if (this.failed) this.request(this.failure!.json);
+  }
+
+  private setFailure(failure: CensusQueue["failure"]): void {
+    this.failure = failure;
+    this.options.onFailedChange?.(this.failed);
   }
 
   private drain(): void {
@@ -95,6 +130,11 @@ export class CensusQueue {
             // unless a newer model's request already waits.
             this.pending ??= want;
             return;
+          }
+          // A request for the same model that waits behind this one is still
+          // to run, so nothing has failed yet.
+          if (this.pending === null) {
+            this.setFailure({ json: want.json, version: want.version, workerDown: isWorkerFailure(err) });
           }
           this.options.onError(err instanceof EngineError ? err.message : "validation failed");
         },
@@ -126,13 +166,16 @@ export function useModelState(): ModelApi {
   const [summary, setSummary] = useState<ModelSummary | null>(null);
   const [opened, setOpened] = useState(0);
   const openedRef = useRef(0);
+  const [censusFailed, setCensusFailed] = useState(false);
 
   const censusRef = useRef<CensusQueue | null>(null);
   censusRef.current ??= new CensusQueue({
     validate: (json) => engineRef.current.validate(json),
     onSummary: setSummary,
     onError: (message) => toastRef.current.push(message, "error"),
+    onFailedChange: setCensusFailed,
   });
+  const censusRequest: CensusTarget = censusRef.current;
 
   // The model the latest replaceModel installed. A render's effect can run
   // after a newer replaceModel (a non-urgent render's effects wait for a
@@ -165,8 +208,19 @@ export function useModelState(): ModelApi {
   const latestOpened = useCallback(() => openedRef.current, []);
 
   return useMemo(
-    () => ({ model, name, summary, replaceModel, setName, latestModel, opened, latestOpened }),
-    [model, name, summary, replaceModel, latestModel, opened, latestOpened],
+    () => ({
+      model,
+      name,
+      summary,
+      replaceModel,
+      setName,
+      latestModel,
+      opened,
+      latestOpened,
+      censusFailed,
+      censusRequest,
+    }),
+    [model, name, summary, replaceModel, latestModel, opened, latestOpened, censusFailed, censusRequest],
   );
 }
 

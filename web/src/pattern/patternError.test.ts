@@ -11,6 +11,7 @@ import type { PdfView, SummaryView } from "./patternPdf";
 const ENGINE_DOWN_SENTENCE = "The pattern engine did not start, so your pattern is not ready yet.";
 const FAILED_SENTENCE = "Your pattern could not be made this time. Try again.";
 const REFUSAL = "This quilt has too few squares to make a pattern.";
+const CENSUS_FAILED_SENTENCE = "Your fabrics could not be counted this time. Try again.";
 
 const IDLE_PDF: PdfView = { status: "idle", message: null };
 const BUSY_PDF: PdfView = { status: "busy", message: null };
@@ -60,6 +61,25 @@ describe("patternError", () => {
       message: FAILED_SENTENCE,
       retry: "summary",
     });
+  });
+
+  it("keeps Retry for a census that failed, after the PDF's and the summary's lines", () => {
+    // Alone, the census failure shows its own sentence and Retry.
+    expect(patternError(false, READY, IDLE_PDF, true)).toEqual({
+      message: CENSUS_FAILED_SENTENCE,
+      retry: "census",
+    });
+    // Beside a failed summary the summary's line shows; its Retry sends the
+    // census again too (retryPattern), so one Retry covers both.
+    expect(patternError(false, { status: "failed", message: FAILED_SENTENCE }, IDLE_PDF, true)).toEqual({
+      message: FAILED_SENTENCE,
+      retry: "summary",
+    });
+    expect(patternError(false, READY, { status: "failed", message: FAILED_SENTENCE }, true)).toEqual({
+      message: FAILED_SENTENCE,
+      retry: "pdf",
+    });
+    expect(patternError(false, READY, IDLE_PDF, false)).toBeNull();
   });
 
   it("shows a refusal's reason with no Retry", () => {

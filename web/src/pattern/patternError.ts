@@ -5,14 +5,15 @@
  * that reboots the engine; a failed call gets its sentence and a Retry of that
  * call, which restarts the engine first when the worker itself failed
  * (retryPattern in patternPdf.ts); a refusal shows its reason with no Retry,
- * because the same quilt is refused again.
+ * because the same quilt is refused again. A failed fabric census shows last:
+ * any other failure's Retry sends it again too.
  */
-import type { PdfView, SummaryView } from "./patternPdf";
+import type { PdfView, RetryAction, SummaryView } from "./patternPdf";
+
+export type { RetryAction } from "./patternPdf";
 
 export const ENGINE_DOWN = "The pattern engine did not start, so your pattern is not ready yet.";
-
-/** What Retry runs: reboot the engine, or one call again. */
-export type RetryAction = "engine" | "pdf" | "summary";
+export const CENSUS_FAILED = "Your fabrics could not be counted this time. Try again.";
 
 export interface PatternError {
   message: string;
@@ -23,6 +24,7 @@ export function patternError(
   engineFailed: boolean,
   summary: SummaryView,
   pdf: PdfView,
+  censusFailed = false,
 ): PatternError | null {
   const waiting = summary.status === "loading" || pdf.status === "busy";
   if (engineFailed && waiting) return { message: ENGINE_DOWN, retry: "engine" };
@@ -32,5 +34,6 @@ export function patternError(
   if (summary.status === "failed" || summary.status === "refused") {
     return { message: summary.message, retry: summary.status === "failed" ? "summary" : null };
   }
+  if (censusFailed) return { message: CENSUS_FAILED, retry: "census" };
   return null;
 }
