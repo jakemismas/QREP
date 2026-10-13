@@ -7,16 +7,24 @@
  * editor, or Your pattern for the sample or a photo read), the pattern
  * summary that screen shows, and its one pattern PDF. Both engine calls run
  * through the framework-free controllers in pattern/patternPdf.ts.
+ *
+ * C2b (issue #148) adds the size you set and the two fabric widths. Your
+ * pattern makes its summary and PDF from the opened quilt sized by
+ * bridge.size_pattern, with your widths in its settings; the opened quilt
+ * itself, the editor's model, never changes, so every size starts from it.
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useEngine } from "../engine/useEngine";
 import type { Engine } from "../engine/useEngine";
 import { EngineError } from "../engine/rpc";
+import type { SizeRequest } from "../engine/contract";
 import type { ModelSummary, QuiltModel } from "../model/types";
 import type { SeamStrategy } from "../model/seams";
 import { useToast } from "../ui";
 import { PatternPdfController, PatternSummaryLoader, retryPattern } from "../pattern/patternPdf";
 import type { PdfView, RetryAction, SummaryView } from "../pattern/patternPdf";
+import { NO_WIDTHS, PatternSizer, SIZER_IDLE, parsePresets, withWidths } from "../pattern/patternSize";
+import type { Preset, SizerView, Widths } from "../pattern/patternSize";
 import type { ModelApi } from "./model";
 import { buildSettingsSummary } from "./patternText";
 import type { StrategyPlan } from "./patternText";
@@ -62,6 +70,18 @@ export interface YourPatternApi {
   /** The error line's Retry: reboot a failed engine, or send a failed call
    * again (pattern/patternPdf.ts retryPattern). */
   retry: (which: RetryAction) => void;
+  /** The quilt the summary and the PDF are made from: the opened quilt,
+   * sized for the size you set, with your widths; null with no quilt. */
+  model: QuiltModel | null;
+  /** The size you set: the newest sized result, and a size on its way or refused. */
+  sizer: SizerView;
+  /** bridge.presets(), the size chips; empty until it lands. */
+  presets: Preset[];
+  /** The widths you chose; null keeps the model's own. */
+  widths: Widths;
+  /** Size the opened quilt for a request, with no re-read. */
+  setSize: (request: SizeRequest, preset: string | null) => void;
+  setWidths: (widths: Partial<Widths>) => void;
 }
 
 export interface PatternApi {
@@ -243,6 +263,11 @@ export function usePatternState({
     },
     onChange: setPdfView,
   });
+  const [sizerView, setSizerView] = useState<SizerView>(SIZER_IDLE);
+  const sizerRef = useRef<PatternSizer | null>(null);
+  sizerRef.current ??= new PatternSizer({ call: engineCall, onChange: setSizerView });
+  const [widths, setWidthsState] = useState<Widths>(NO_WIDTHS);
+  const [presets, setPresets] = useState<Preset[]>([]);
 
   // While Your pattern shows the open quilt, a failed census is its error
   // line's to report, in a plain sentence with Retry; the editor keeps the
@@ -251,12 +276,19 @@ export function usePatternState({
     quietCensusWhen(() => boundRef.current !== null && boundRef.current === latestOpened());
   }, [quietCensusWhen, latestOpened]);
 
+  // A size and widths belong to the quilt they were set on.
+  const forgetSettings = useCallback(() => {
+    sizerRef.current?.clear();
+    setWidthsState(NO_WIDTHS);
+  }, []);
+
   const leavePattern = useCallback(() => {
     boundRef.current = null;
     setBound(null);
     loaderRef.current?.clear();
     pdfRef.current?.reset();
-  }, []);
+    forgetSettings();
+  }, [forgetSettings]);
 
   // Another quilt opened: drop the bound quilt's summary and any pattern
   // still being made for it, so it is not saved under the new quilt.
@@ -277,8 +309,9 @@ export function usePatternState({
       setSource(next);
       loaderRef.current?.clear();
       pdfRef.current?.reset();
+      forgetSettings();
     },
-    [latestOpened],
+    [latestOpened, forgetSettings],
   );
 
   const showEditor = useCallback(() => {
@@ -289,16 +322,56 @@ export function usePatternState({
   // replaced model's. A render that still shows Your pattern can run this
   // after a newer open (the header's Open), whose quilt goes to the editor
   // and must not cost an engine call.
+  // The quilt the pattern is made from: the sized quilt when you set a size,
+  // else the opened one, with your widths in its settings. A new size or a
+  // new width makes a new object, which asks for the summary again below.
+  const sized = sizerView.sized;
+  const patternModel = useMemo(
+    () => (model && screen === "pattern" ? withWidths(sized?.model ?? model, widths) : model),
+    [model, screen, sized, widths],
+  );
+
   useEffect(() => {
     if (screen !== "pattern" || !model || model !== latestModel()) return;
     if (boundRef.current !== latestOpened()) return;
-    loaderRef.current?.load(JSON.stringify(model));
-  }, [screen, model, latestModel, latestOpened]);
+    if (patternModel) loaderRef.current?.load(JSON.stringify(patternModel));
+  }, [screen, model, patternModel, latestModel, latestOpened]);
+
+  // The chips come from the bridge's one preset table (web-23; engine-22).
+  // A failure leaves no chips; a typed size still works.
+  const wantPresets = screen === "pattern" && presets.length === 0;
+  useEffect(() => {
+    if (!wantPresets) return;
+    let live = true;
+    engineRef.current.call<unknown>("presets").then(
+      (raw) => {
+        if (live) setPresets(parsePresets(raw));
+      },
+      () => undefined,
+    );
+    return () => {
+      live = false;
+    };
+  }, [wantPresets]);
+
+  // Every size starts from the opened quilt, never a sized copy, because
+  // sizing a sized model rounds its borders again (SPEC.md section 6.3).
+  const setSize = useCallback(
+    (request: SizeRequest, preset: string | null) => {
+      if (!model || boundRef.current === null || boundRef.current !== latestOpened()) return;
+      void sizerRef.current?.apply(JSON.stringify(model), request, preset);
+    },
+    [model, latestOpened],
+  );
+
+  const setWidths = useCallback((next: Partial<Widths>) => {
+    setWidthsState((prev) => ({ ...prev, ...next }));
+  }, []);
 
   const savePdf = useCallback(() => {
-    if (!model) return;
-    void pdfRef.current?.start(JSON.stringify(model), patternPdfName(summary, model));
-  }, [model, summary]);
+    if (!patternModel) return;
+    void pdfRef.current?.start(JSON.stringify(patternModel), patternPdfName(summary, patternModel));
+  }, [patternModel, summary]);
 
   // Every Retry on Your pattern goes through retryPattern: it restarts the
   // engine for an engine Retry or after a failure of the worker itself, and
@@ -328,8 +401,29 @@ export function usePatternState({
       pdf: pdfView,
       savePdf,
       retry,
+      model: patternModel,
+      sizer: sizerView,
+      presets,
+      widths,
+      setSize,
+      setWidths,
     }),
-    [screen, source, showPattern, showEditor, summaryView, pdfView, savePdf, retry],
+    [
+      screen,
+      source,
+      showPattern,
+      showEditor,
+      summaryView,
+      pdfView,
+      savePdf,
+      retry,
+      patternModel,
+      sizerView,
+      presets,
+      widths,
+      setSize,
+      setWidths,
+    ],
   );
 
   const closePattern = useCallback(() => {

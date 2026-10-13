@@ -17,6 +17,9 @@ export interface CensusRow {
   name: string;
   color: string | null;
   count: number | null;
+  /** The yards the top needs (C2b, #148): the engine summary's number and
+   * its printed form; absent when the top does not use the fabric. */
+  yards?: { value: number; text: string } | null;
 }
 
 export function FabricsPanel({ rows, countFailed = false }: { rows: CensusRow[]; countFailed?: boolean }) {
@@ -50,6 +53,15 @@ export function FabricsPanel({ rows, countFailed = false }: { rows: CensusRow[];
                 )}
               </div>
             </div>
+            {row.yards ? (
+              <span
+                className="fp-yards"
+                data-testid={`fabric-yards-${row.fabricId}`}
+                data-yards={row.yards.value}
+              >
+                {row.yards.text}
+              </span>
+            ) : null}
           </li>
         ))}
       </ul>

@@ -101,6 +101,13 @@ function setUp(source: "photo" | "sample"): void {
     pdf: { status: "idle", message: null },
     savePdf: noop,
     retry: noop,
+    // C2b's size and widths, idle: no size set, no chips yet.
+    model: null,
+    sizer: { status: "idle", sized: null, message: null },
+    presets: [],
+    widths: { strip: null, backing: null },
+    setSize: noop,
+    setWidths: noop,
   };
 }
 
@@ -135,13 +142,26 @@ describe("YourPatternScreen's quilt canvas", () => {
 
 const READY_SUMMARY = {
   status: "ready",
+  // A whole PatternSummary (C2b renders the size and the shopping lines from
+  // it): the 2 x 2 quilt of 16 e squares is 32 x 32 e, and its batting adds
+  // 64 e per axis, 96 x 96 e.
   summary: {
+    finished_width: 32,
+    finished_height: 32,
+    size_basis: null,
     method: "strip",
     method_reason: "Blocks repeat.",
     fabrics: [
-      { fabric_id: "f0", letter: "f0", name: "Fabric 1" },
-      { fabric_id: "f1", letter: "f1", name: "Fabric 2" },
+      { fabric_id: "f0", letter: "f0", name: "Fabric 1", yards: 0.25 },
+      { fabric_id: "f1", letter: "f1", name: "Fabric 2", yards: 0.25 },
     ],
+    binding: [{ fabric_id: "f0", name: "Binding - Fabric 1", yards: 0.25 }],
+    backing: { fabric_id: null, name: "backing, 42 in wide fabric: one piece 12 in long", yards: 0.5 },
+    wide_back: null,
+    batting: { width: 96, height: 96 },
+    strip_width: 320,
+    backing_width: 336,
+    uncertain_squares: 0,
   },
 };
 

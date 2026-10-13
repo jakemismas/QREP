@@ -86,3 +86,15 @@
   font-style: italic;
   color: var(--faint);
 }
+
+/* The yards column (C2b): the amount keeps its own column at the row's end
+   and never wraps, while the name beside it wraps, so no amount runs past the
+   panel (web-01, ux-09). */
+.fp-yards {
+  flex: none;
+  margin-left: auto;
+  padding-left: 8px;
+  white-space: nowrap;
+  font: 600 16.5px var(--sans, sans-serif);
+  color: var(--ink);
+}

@@ -17,6 +17,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
+import type { PatternSummary } from "../engine/contract";
 import { useEngineStatus } from "../engine/engineStatus";
 import { Lightbox } from "../shell/photo/Lightbox";
 import type { LbTab } from "../shell/photo/Lightbox";
@@ -30,6 +31,11 @@ import { FlaggedOverlay } from "./FlaggedOverlay";
 import { MethodLine } from "./MethodLine";
 import { PatternPdfButton } from "./PatternPdfButton";
 import { patternError } from "./patternError";
+import type { SummaryView } from "./patternPdf";
+import { PatternSettings } from "./PatternSettings";
+import { canvasModel, sizeLine } from "./patternSize";
+import { ShoppingLines } from "./ShoppingLines";
+import { SizeControl } from "./SizeControl";
 import "./YourPatternScreen.css";
 
 /** Tracks whether the quilt view has left Fit, from QuiltCanvas's zoom label,
@@ -82,6 +88,16 @@ function useZoomed(rootRef: RefObject<HTMLElement | null>, mounted: boolean): bo
   return zoomed;
 }
 
+/** The summary to show: the newest one, kept on screen while a new size or
+ * width asks for the next, so the details do not blank out on each change.
+ * A failure or another quilt drops it. */
+function useShownSummary(view: SummaryView): { shown: PatternSummary | null; updating: boolean } {
+  const last = useRef<PatternSummary | null>(null);
+  if (view.status === "ready") last.current = view.summary;
+  else if (view.status !== "loading") last.current = null;
+  return { shown: last.current, updating: view.status === "loading" && last.current !== null };
+}
+
 export function YourPatternScreen() {
   const { model, summary: census, censusFailed } = useModel();
   const photo = usePhoto();
@@ -93,6 +109,7 @@ export function YourPatternScreen() {
 
   const flags = useMemo(() => readFlags(pattern.source, photo.result), [pattern.source, photo.result]);
   const zoomed = useZoomed(quiltRef, model !== null);
+  const { shown, updating } = useShownSummary(pattern.summary);
 
   // The screen it replaces may have been scrolled; Your pattern opens at the
   // top, where the PDF button is.
@@ -102,8 +119,9 @@ export function YourPatternScreen() {
 
   if (model === null) return null;
 
-  // The read's own model carries the cell confidences the outlines need.
-  const quiltModel = flags.model ?? model;
+  // The read's own model carries the cell confidences the outlines need; a
+  // size you set redraws the quilt at that size, true to scale.
+  const quiltModel = canvasModel(pattern.sizer.sized?.model ?? null, model, flags.model);
   const photoUrl = pattern.source === "photo" ? photo.photoUrl : null;
   const showFlagged = flags.model !== null;
   const { summary, pdf } = pattern;
@@ -184,14 +202,39 @@ export function YourPatternScreen() {
             onToggle={() => setShowFlags((value) => !value)}
           />
         ) : null}
-        {summary.status === "ready" ? (
-          <FabricCensus
-            lines={summary.summary.fabrics}
-            palette={model.palette.fabrics}
-            census={census}
-            countFailed={censusFailed}
-          />
+        <SizeControl
+          line={
+            shown !== null
+              ? sizeLine(
+                  pattern.model ?? model,
+                  { width: shown.finished_width, height: shown.finished_height },
+                  pattern.sizer.sized,
+                  pattern.source,
+                )
+              : null
+          }
+          presets={pattern.presets}
+          status={pattern.sizer.status}
+          message={pattern.sizer.message}
+          onSize={pattern.setSize}
+        />
+        {shown !== null ? (
+          <div className="yp-amounts" aria-busy={updating}>
+            <FabricCensus
+              lines={shown.fabrics}
+              palette={model.palette.fabrics}
+              census={census}
+              countFailed={censusFailed}
+            />
+            <ShoppingLines summary={shown} />
+          </div>
         ) : null}
+        <PatternSettings
+          stripWidth={pattern.widths.strip ?? shown?.strip_width ?? null}
+          backingWidth={pattern.widths.backing ?? shown?.backing_width ?? null}
+          disabled={shown === null}
+          onChange={pattern.setWidths}
+        />
       </section>
 
       {lightbox !== null ? (

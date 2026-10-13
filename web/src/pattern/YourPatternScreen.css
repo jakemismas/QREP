@@ -173,3 +173,16 @@
     max-height: clamp(180px, calc(100vh - 270px), 720px);
   }
 }
+
+/* The census and the shopping lines (C2b): they stay on screen, dimmed,
+   while a new size or width asks for the next summary. */
+.yp-amounts {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.yp-amounts[aria-busy="true"] {
+  opacity: 0.6;
+}

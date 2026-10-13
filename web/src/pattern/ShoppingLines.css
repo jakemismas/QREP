@@ -1,0 +1,58 @@
+/* The shopping lines on Your pattern (C2b). An engine line name can be long
+   ("backing, 42 in wide fabric: (2) panels 98 in long, vertical seams"), so
+   the name wraps and the amount keeps its own column: no row is wider than
+   the side column it sits in (web-01, ux-09). */
+.sl-root {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: 0 2px 10px var(--shadow);
+  padding: 18px;
+  min-width: 0;
+  font: 400 16.5px var(--sans, sans-serif);
+  color: var(--ink2);
+}
+
+.sl-title {
+  margin: 0 0 6px;
+  font: 700 21px var(--serif, serif);
+  color: var(--denim);
+}
+
+.sl-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.sl-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 12px;
+  padding: 10px 2px;
+  border-bottom: 1px dashed var(--line);
+}
+
+.sl-row:last-child {
+  border-bottom: none;
+}
+
+.sl-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+}
+
+.sl-amount {
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  text-align: right;
+}
+
+.sl-widths {
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: var(--mut);
+}

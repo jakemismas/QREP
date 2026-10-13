@@ -27,6 +27,22 @@ export function formatCmEquivalent(eighths: number): string {
   return (Math.round((eighths / 8) * 2.54 * 10) / 10).toFixed(1);
 }
 
+/**
+ * One typed length in the unit shown, as integer eighths: inches through the
+ * shared fraction grammar, centimeters through the pinned rule. Null for
+ * blank, malformed or non-positive text. Your pattern's size control (C2b)
+ * and this state machine share it.
+ */
+export function parseSizeInput(text: string, unit: SizeUnit): number | null {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  if (unit === "cm") {
+    const value = Number(trimmed.replace(",", "."));
+    return Number.isFinite(value) && value > 0 ? cmToEighths(value) : null;
+  }
+  return parseFractionInput(trimmed);
+}
+
 function presetByName(name: string): { width: number; height: number } | null {
   const hit = PRESETS.find((p) => p.name === name);
   return hit ? { width: hit.width, height: hit.height } : null;
@@ -95,12 +111,6 @@ export class SizeEntryState {
   }
 
   private parse(text: string): number | null {
-    const trimmed = text.trim();
-    if (!trimmed) return null;
-    if (this.unit === "cm") {
-      const value = Number(trimmed.replace(",", "."));
-      return Number.isFinite(value) && value > 0 ? cmToEighths(value) : null;
-    }
-    return parseFractionInput(trimmed);
+    return parseSizeInput(text, this.unit);
   }
 }
