@@ -1004,9 +1004,9 @@ BANNED = [
     "Pieces: 2479",
     "The quilt uses 2,479 pieces.",  # a total of 100 pieces or more is a piece total
     "Cut 120 pieces from the strips.",
-    'Cut 1∕2" strips.',  # the division slash is a fraction glyph
-    'Cut 1–1/2" squares.',  # an en dash between whole and fraction
-    'Cut 1—1/2" squares.',  # an em dash
+    'Cut 1\u22152" strips.',  # the division slash is a fraction glyph
+    'Cut 1\u20131/2" squares.',  # an en dash between whole and fraction
+    'Cut 1\u20141/2" squares.',  # an em dash
     'Cut 2" by 8" rectangles.',  # C-10: a dimension uses " x "
     "Cut 2 by 8 rectangles.",
 ]
@@ -1058,16 +1058,16 @@ def test_text_helvetica_cannot_print_is_refused():
     # Built-in Helvetica prints the WinAnsi (cp1252) characters only; others print
     # as empty boxes. L and a with ogonek are outside it, in the text or the name.
     with pytest.raises(PatternTextError, match="Helvetica"):
-        check_text("Łąka green")
+        check_text("\u0141\u0105ka green")
     with pytest.raises(PatternTextError):
-        render.render_pdf(small_document(Paragraph("Łąka green")))
+        render.render_pdf(small_document(Paragraph("\u0141\u0105ka green")))
     with pytest.raises(PatternTextError):
-        full_document(name="Łąka Rows")
+        full_document(name="\u0141\u0105ka Rows")
 
 
 def test_an_accented_name_prints_and_extracts_intact(tmp_path):
     # e with acute is in cp1252, so the name prints in the title and every footer.
-    name = "Café Lantern Rows"
+    name = "Caf\u00e9 Lantern Rows"
     texts = page_texts(write(tmp_path, full_document(name=name)))
     assert texts[0].count(name) == 2
     assert all(name in text for text in texts)

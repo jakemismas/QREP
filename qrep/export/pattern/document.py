@@ -331,8 +331,8 @@ _BANNED = [
     (_HEX, "a hex color"),
     (re.compile(r"\.\d"), "a decimal number"),
     # A hyphen or any Unicode dash between the whole number and the fraction.
-    (re.compile(r"\b\d+[-‐-―]\d+/\d+\b"), "a hyphenated fraction"),
-    (re.compile("[¼-¾⅐-⅞⁄∕]"), "a fraction glyph"),
+    (re.compile(r"\b\d+[-\u2010-\u2015]\d+/\d+\b"), "a hyphenated fraction"),
+    (re.compile("[¼-¾⅐-⅞⁄\u2215]"), "a fraction glyph"),
     (_DATE, "a date"),
 ]
 _FRACTION = re.compile(r"\b(\d+)/(\d+)\b")
