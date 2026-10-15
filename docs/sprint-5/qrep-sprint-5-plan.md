@@ -339,14 +339,13 @@ homogeneity for the whole quilt and per region (exp2).
 expanding square tool to highlight part of the quilt that is wrong, this could include a section
 or the whole thing."
 
-Working interpretation, FLAGGED FOR JAKE'S CONFIRMATION (section 9, item 1): on Your pattern the
-user drags or expands a square selection over a wrong region, from a few squares up to the whole
-quilt. QREP re-reads only that region (local grid refit, recount if needed, fabric
-re-assignment) and shows a before and after to accept or discard. It is a re-read, not paint
+Confirmed by Jake on 2026-10-15 (#278; SPEC.md section 5 holds the rule): on Your pattern the
+user selects a wrong area, from a few squares up to the whole quilt. QREP re-reads only that
+region (local alignment, fabric re-assignment; the confirmed counts never change) and shows a before and after to accept or discard. It is a re-read, not paint
 editing. The grid-fit check still runs and flags suspect regions automatically. Tap-to-change
 editing of single squares is not adopted, because Jake chose the re-read (Critique:
-CR-product-10, CR-cv-23). Two sub-questions ride with the confirmation: may a whole-quilt
-selection change the confirmed counts, and may a region re-read add a fabric? Because the one
+CR-product-10, CR-cv-23). Jake answered both sub-questions on 2026-10-15: a whole-quilt
+selection never changes the confirmed counts, and a region re-read may add a fabric within the cap. Because the one
 drift case examined was a color failure (approaches-33), B5 measures whether a local refit helps
 before relying on it.
 
@@ -2044,8 +2043,8 @@ CR-sequencing-14.
   docs/sprint-5/evidence/B5-refit.md, docs/SPEC.md (read section, leased); contract files, leased:
   qrep/bridge.py, qrep/contract.py, web/src/engine/worker.ts, tests/test_bridge.py, the TS
   result-types file
-- Night 1: no (Phase 2), Needs Jake: no (B5 builds the working interpretation; Jake's confirmation
-  is section 9, item 1)
+- Night 1: no (Phase 2), Needs Jake: no (Jake confirmed the interpretation on 2026-10-15; SPEC.md
+  section 5)
 
 **Description**
 
@@ -2063,9 +2062,10 @@ re-verification traced the left-edge misreads on image0 to lightness falloff, no
   with the original read, and return before and after labels and units, per-square confidence and
   the list of changed squares.
 - [ ] Re-assign fabrics in the region against the global palette with a region-local shading
-  correction. Until Jake answers the two sub-questions of section 9, item 1, the re-read changes
-  neither the counts nor the palette: it reports an implied count when the region's seam spacing
-  disagrees with the confirmed grid, and it reports colors that match no palette fabric.
+  correction. Per Jake's answers of 2026-10-15 (SPEC.md section 5), the re-read never changes
+  the counts: it reports an implied count when the region's seam spacing disagrees with the
+  confirmed grid. A color that matches no palette fabric becomes a new fabric, within the
+  12-fabric cap, shown in the before and after.
 - [ ] Compare at least two refit methods on the dev split (none, and banded per-seam snapping),
   ship a refit only where it raises the share of fully correct regions, and publish the table in
   B5-refit.md, because a deformed-lattice refit is a hypothesis, not a known fix.
@@ -2971,8 +2971,8 @@ CR-product-23.
   web/src/pattern/regionState.ts with their stylesheet and tests (an overlay above the quilt view;
   QuiltCanvas.tsx is not edited); web/src/pattern/YourPatternScreen.tsx; new
   web/e2e/region.spec.ts; docs/SPEC.md (web section, leased)
-- Night 1: no, Needs Jake: yes (final acceptance waits for his answer to section 9, item 1: the
-  interpretation and its two sub-questions; the ticket builds the working interpretation meanwhile)
+- Night 1: no, Needs Jake: no (Jake answered section 9, item 1 on 2026-10-15; SPEC.md
+  section 5)
 
 **Description**
 
@@ -2993,12 +2993,12 @@ one-tap selections, so the same tool answers where to look (Critique: CR-cv-23).
 - [ ] Send the selection to reread_region and show before and after side by side, stacked below
   720 px; Accept replaces only that region through state/model.tsx's setter, Discard restores the
   previous result, and nothing outside the region changes.
-- [ ] Show the engine's notes when it reports an implied count or colors that match no palette
-  fabric, and change neither the counts nor the palette until Jake answers the two sub-questions
-  (B5).
+- [ ] Show the engine's note when it reports an implied count, and never change the counts. Show a
+  new fabric in the before and after: Accept keeps it, Discard drops it (SPEC.md section 5, Jake's
+  answers of 2026-10-15).
 - [ ] Assert in region.spec.ts, tagged @phone, that after Accept the model equals the engine's
   after result and after Discard it equals the before result.
-- [ ] Link Jake's answer in the PR, or state that the working interpretation shipped pending it.
+- [ ] Link Jake's answers (#278, 2026-10-15) in the PR.
 - [ ] Update the web section of docs/SPEC.md.
 
 **Non-goals**
@@ -5307,7 +5307,7 @@ CR-sequencing-17). The orchestrator keeps this queue as a comment on #104.
 
 | # | Item | Why | Time | Blocks |
 |---|---|---|---|---|
-| 1 | Confirm or correct the region re-read interpretation (section 2.4), and answer its two sub-questions | His words leave the interaction open | 5 to 10 min | Final acceptance of B5 and C5, which build the working interpretation meanwhile |
+| 1 | Confirm or correct the region re-read interpretation (section 2.4), and answer its two sub-questions | His words leave the interaction open | 5 to 10 min | Answered 2026-10-15 (#278; SPEC.md section 5) |
 | 2 | Read the morning report: BLOCKED items, the list of executed retirements, the before scorecards. Approve, or not, a superseding comment on #70, which REBASELINE.md cites as the freeze record of INTEGER_RATIO_EPSILON and FEEDBACK_REFINE but section 3.2 does not list | He approved REBASELINE.md without seeing its list | 20 min | Unblocking BLOCKED items |
 | 3 | Answer MATH.md Q2 (backing allowance), Q3 (purchase increment) and Q7 (whether 42 in means after trimming selvages, and migrating saved wof 336), plus Q5 (2 in domestic overhang) and Q6 (per-piece or pooled border joins); freeze or accept PATTERN-SPEC L-01 to L-14 | They change expected values and document bytes | 30 min | A6's single bless; A1 and A2 build on the defaults |
 | 4 | Pin-placement test, once C3a lands: about 20 corner placements on his phone with the loupe, on the dev page | It sets the jitter radius the gate simulates, and the pass rate depends on it (exp1) | 15 min | Freezing G1 to G5 |
