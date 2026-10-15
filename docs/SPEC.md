@@ -110,7 +110,7 @@ Your pattern. Plan section 2.1 holds the screen-level rules and copy.
   section 2.1).
 - **Your pattern.** The recovered quilt beside the photo, a fabric census with letters, swatches
   and color names that match the PDF, the finished size (section 6.3), the method with its
-  one-sentence reason, flagged regions with the region re-read tool (section 5), a way back to
+  one-sentence reason, flagged areas with the look-again tool (section 5), a way back to
   Confirm that keeps the corners, counts and bands, and one Download pattern (PDF) button.
   Download pattern (PDF) calls export_pattern with no strategy, shows a busy state and ignores
   repeat clicks while the export runs, names the file from the pattern name in kebab case plus
@@ -215,8 +215,7 @@ Region re-read, as Jake confirmed on 2026-10-15 (#278; his decision of 2026-10-0
 - **It may add a fabric**, up to the 12-fabric cap. The new fabric shows in the before and after,
   where the user keeps or undoes it. Why: a small patch of a rare fabric is what the whole-quilt
   fabric count misses.
-- **The screen never says "re-read" or "region".** It says "Look again at this area"
-  (docs/sprint-5/RESET.md section 6).
+- **The screen never says "re-read" or "region"** (docs/sprint-5/RESET.md section 6).
 
 ## 6. The pattern
 
