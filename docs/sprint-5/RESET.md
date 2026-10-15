@@ -29,7 +29,7 @@ quilter closer to a correct PDF, or keep her from a wrong one, waits on #277.
 | 2 | C2b #148, then C3b #101 | C3b builds the phone Confirm as four steps (SPEC.md section 2). |
 | 3 | B3 #138, then B4a #139, then B4b #140 | Ship squares only if triangles fail on real photos. |
 | 4 | C3c #150, then C4 #151 | The photo flow uses the confirmed read. |
-| 5 | B5 #141, then C5 #152 | The region re-read stays in 0.4.0. Build SPEC.md section 5's working interpretation; Jake's answers to its two sub-questions are on #278. |
+| 5 | B5 #141, then C5 #152 | The region re-read stays in 0.4.0, as Jake confirmed in SPEC.md section 5: counts never change, a new fabric is allowed, and phones get "Look again here" buttons. |
 | 6 | A3b #121, A3c #122, A4b #123, A4c #124 (includes A4d), A5a #126, A5b #127 | Can run beside steps 2 to 5. |
 | 7 | C6a #153, C6b #154, B6a #142, B6b #143 (includes B7) | Removal, after its replacement is live. |
 | 8 | A6 #128, A7 #129 | A6 applies MATH.md Q2, Q3 and Q7 as answered. |

@@ -200,11 +200,23 @@ measured on the corpus (ticket B3), not guessed.
 - Regional suspects: Your pattern outlines them, the download stays available, and the PDF marks
   uncertain squares on its layout chart (PATTERN-SPEC.md, layout chart).
 
-Region re-read, the working interpretation of Jake's decision of 2026-10-06, pending his
-confirmation in the sprint-5 morning report: on Your pattern the user drags or expands a square
-selection over a wrong region, from a few squares up to the whole quilt. QREP re-reads only that
-region (local grid refit, recount if needed, fabric re-assignment) and shows before and after to
-accept or discard. It is a re-read, not paint editing.
+Region re-read, as Jake confirmed on 2026-10-15 (#278; his decision of 2026-10-06 asked for it):
+
+- **What the user does.** On Your pattern, the user selects a wrong area, from a few squares up to
+  the whole quilt.
+  - On a phone, each flagged area offers a 44 px "Look again here" button. "Pick another area"
+    places a box the user moves and resizes.
+  - On a desktop, the user can also drag a box anywhere.
+- **What QREP does.** It reads only that area again, by local alignment and fabric re-assignment,
+  and shows a before and after to accept or discard. It is a re-read, not paint editing.
+- **It never changes the confirmed counts.** A grid that does not fit returns to Confirm with the
+  corners kept, as the fit check does. Why: QREP never decides counts on its own (section 1,
+  rule 1).
+- **It may add a fabric**, up to the 12-fabric cap. The new fabric shows in the before and after,
+  where the user keeps or undoes it. Why: a small patch of a rare fabric is what the whole-quilt
+  fabric count misses.
+- **The screen never says "re-read" or "region".** It says "Look again at this area"
+  (docs/sprint-5/RESET.md section 6).
 
 ## 6. The pattern
 
