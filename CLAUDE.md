@@ -103,7 +103,11 @@ or code. Why: the project board stopped tracking after sprint 1.
   thresholds verbatim. Any failing test not on the record is a bug: fix the
   code, do not edit the test. Why: the narrowing deletes the automatic
   detector and its tests, and a closed list keeps that deletion from becoming
-  a way to weaken anything else.
+  a way to weaken anything else. One standing exception (Jake, 2026-10-15,
+  #278): a PR that deletes code may retire the tests that exercise only that
+  code, naming each by file::test id in its PR body. Why: deleting dead code
+  with its own tests cannot make a wrong answer pass, and stopping for a row
+  each time stalled three tickets.
 - Expected test values flow one way: hand computation (in comments) to
   assertion. Never observed output to assertion, except through bless, once.
 - Every CV-derived value carries a confidence score; hand-authored data is 1.0.

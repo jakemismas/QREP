@@ -87,13 +87,19 @@ Your pattern. Plan section 2.1 holds the screen-level rules and copy.
 - **Photo.** The user picks or drops a photo or screenshot of a quilt that lies flat and faces the
   camera. Try an example opens a committed CC0 or public-domain museum quilt on Confirm, with its
   verified corners, counts and bands pre-filled; the examples replace the synthetic sample photo
-  (C9). See a sample pattern opens the hand-authored demo quilt on Your pattern without a read
+  (C9). 0.4.0 ships two examples, each verified by Jake (#278, decision 5). See a sample pattern opens the hand-authored demo quilt on Your pattern without a read
   (plan section 5.C, decision 2).
 - **Scope picker.** Right after the photo, QREP-drawn diagrams show quilts QREP works with and
   quilts it does not work with yet (section 3). A Not yet pick ends at the refusal screen, so an
   out-of-scope quilt is turned away before the user confirms anything. The pick travels with the
   read as its scope.
-- **Confirm.** One screen with a live grid overlay for the frame and the counts (section 4).
+- **Confirm.** A live grid overlay for the frame and the counts (section 4). On a desktop it is
+  one screen. On a phone (narrower than 720 px) it is four short steps, one question each, with
+  the overlay drawn over the photo throughout: drag the corners of the outer edge; count blocks
+  across and down; count the squares in one block, shown zoomed; answer "Does it have a border?"
+  and, on Yes, set each band. The inputs are the same; only their order and density differ.
+  Why: one dense screen of pins, counts and band widths is too much at once on a phone for a
+  quilter with no technical background (#278, decision 6).
 - **Reading.** One progress line while the engine reads fabrics and units and checks the grid fit
   (sections 4 and 5). A failed fit returns to Confirm with the pins and counts kept, and too few
   pixels per square returns there with advice for a closer photo (sections 3 and 5).
@@ -144,7 +150,7 @@ points) and stitch-and-flip corners (snowball corners, flying geese).
   example (plan section 2.3).
 - Held: with too few pixels per square, QREP returns to Confirm and asks for a closer photo, or for
   a screenshot taken zoomed in on the quilt. The floor is measured, never guessed: B2 sets a
-  provisional one, and D5 and D10 measure the final one. A grid that does not fit withholds the
+  provisional one, and D5's release photo check (section 11) confirms or raises it. A grid that does not fit withholds the
   download (section 5).
 - Not in 0.4.0 (backlog): pieced borders (#15), quilting detection (#16), applique and non-grid
   regions (#17), colorways (#18), machine formats (#20), multi-image fusion (#21), partial views
@@ -290,10 +296,14 @@ MATH.md holds the formulas and vectors. This contract fixes:
   wins. Binding is 2 1/2 in strips, perimeter plus 10 in, counted with its diagonal joins.
 - The finishing defaults, each a setting in eighths (qrep/model/schema.py, Settings): backing width
   42 in (`backing_width`), wide-back width 108 in (`wide_back_width`), 4 in of backing and batting
-  overhang per side (`backing_margin`, 8 in per axis), 1 in lost per backing seam, a 9 in squaring
-  allowance for a backing of two or more panels (`backing_pieced_allowance`) and 4 1/2 in for a
-  one-piece or wide backing (`backing_one_piece_allowance`), and a 1/4 yd purchase increment
-  (`purchase_increment`). A tie between the two layouts keeps vertical seams. The wide-back line
+  overhang per side (`backing_margin`, 8 in per axis), 1 in lost per backing seam, no squaring
+  allowance for a backing of two or more panels (`backing_pieced_allowance`, 0 in) or for a
+  one-piece or wide backing (`backing_one_piece_allowance`, 0 in), and a 1/8 yd purchase increment
+  (`purchase_increment`). The backing width is the usable width after the selvages are trimmed.
+  Jake set the zero allowances, the 1/8 yd increment and the trimmed width on 2026-10-15 (#278,
+  decision 9; MATH.md section 6, Q2, Q3 and Q7), replacing 9 in, 4 1/2 in and 1/4 yd; A6 (#128)
+  moves the settings and their hand-computed vectors. Why: the 4 in overhang is already the
+  margin, and over-buying was the reported fault. A tie between the two layouts keeps vertical seams. The wide-back line
   appears only when the pieced backing needs two or more panels and one backing side fits within
   the wide width. Batting is the backing's size, and the pattern names the smallest of the five
   MATH.md packages that covers it (F12). One module holds this math
@@ -412,13 +422,25 @@ docs/sprint-2/qrep-web-design-doc.md.
 
 ## 11. Release readiness
 
-0.4.0 is ready when the plan's gate passes: the read per corpus tier with n stated (fully correct
-interior rate, confident-wrong squares rate, refusal recall with a false-warning cap; ticket D5);
-calculator parity after the math lands (D7); and a release-candidate PDF review by a virtual quilter
-panel of three refute-framed reviewers with distinct quilter personas, using a rubric built from
-cited quilter sources (D1, D8). Jake's mother's review stays optional if she becomes available.
-Gate numbers are frozen only after the new read is measured. No release is tagged or published
-without Jake, and during sprint 5 Pages deploys only on a release tag or manual dispatch.
+0.4.0 is ready when all of these pass (Jake, 2026-10-15, #278 decision 3; this replaces the
+plan's per-tier gate in section 7.2):
+
+- The MATH.md hand-computed vectors, in the native and the Pyodide test suites.
+- Native and browser parity of the pattern, including the PDF text.
+- Calculator parity after the math lands (D7, #170).
+- The release photo check (D5, #168): about 10 public-domain museum photos and 10 of Jake's phone
+  photos run through the real flow, with corners and counts confirmed. Each run ends in a pattern
+  Jake checks, or in an honest refusal. The check records n, and how many PDFs were right.
+- One review of the release-candidate PDF by a virtual quilter panel of three refute-framed
+  reviewers with distinct quilter personas, using the rubric built from cited quilter sources
+  (D1). It runs once, inside E4 (#98).
+- Jake's phone pass.
+
+Jake's mother's review stays optional if she becomes available. No release is tagged or published
+without Jake, and during sprint 5 Pages deploys only on a release tag or manual dispatch. Why the
+smaller gate: the per-tier statistics, the sealed holdout and the studies cost hours of Jake's time
+and could hold a hobby release indefinitely, while the checks above still prove the math and show
+real quilts reading correctly.
 
 ## 12. Engine surfaces
 

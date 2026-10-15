@@ -1,8 +1,9 @@
 # Sprint 5 reset: how the work runs from 2026-10-15
 
-Status: proposed on #278. It binds once its PR merges, which happens only after Jake records his
-decisions on #278. Where this file conflicts with the sprint-5 plan, ORCHESTRATOR.md or WORKER.md,
-this file wins. CLAUDE.md and docs/SPEC.md still win over this file.
+Status: binding from the merge of its PR. Jake approved the decisions on #278 in his own chat on
+2026-10-15, except decision 4: the region re-read tool (B5, C5) and E6 stay in 0.4.0. Where this
+file conflicts with the sprint-5 plan, ORCHESTRATOR.md or WORKER.md, this file wins. CLAUDE.md
+and docs/SPEC.md still win over this file.
 
 Why this file exists: in 7 days sprint 5 spent about 238 million input tokens per merged PR. 35
 percent of all tokens went to review subagents, and 30 percent to writing and critiquing process
@@ -24,19 +25,20 @@ quilter closer to a correct PDF, or keep her from a wrong one, waits on #277.
 
 | Step | Tickets | Notes |
 |---|---|---|
-| 1 | B2b #137 | Waits on decision 1 on #278. |
-| 2 | C2b #148, then C3b #101 | Confirm screen. Decision 6 may change its phone layout. |
+| 1 | B2b #137 | Decision 1: weigh uncertain squares by confidence, so the vote fixes them. |
+| 2 | C2b #148, then C3b #101 | C3b builds the phone Confirm as four steps (SPEC.md section 2). |
 | 3 | B3 #138, then B4a #139, then B4b #140 | Ship squares only if triangles fail on real photos. |
 | 4 | C3c #150, then C4 #151 | The photo flow uses the confirmed read. |
-| 5 | A3b #121, A3c #122, A4b #123, A4c #124 (includes A4d), A5a #126, A5b #127 | Can run beside steps 2 to 4. |
-| 6 | C6a #153, C6b #154, B6a #142, B6b #143 (includes B7) | Removal, after its replacement is live. |
-| 7 | A6 #128, A7 #129 | Fixtures and cleanup. |
-| 8 | C8a #155 (includes C8b), C11 #160, C7 #97, C8c #157 | Polish. C8c owns the friendliness criteria. |
-| 9 | D7 #170, D5 #168 | Release checks, as decision 3 on #278 sets them. |
-| 10 | E2 #176, E4 #98 | Docs and release. Jake does the phone pass and tags. |
+| 5 | B5 #141, then C5 #152 | The region re-read stays in 0.4.0. Build SPEC.md section 5's working interpretation; Jake's answers to its two sub-questions are on #278. |
+| 6 | A3b #121, A3c #122, A4b #123, A4c #124 (includes A4d), A5a #126, A5b #127 | Can run beside steps 2 to 5. |
+| 7 | C6a #153, C6b #154, B6a #142, B6b #143 (includes B7) | Removal, after its replacement is live. |
+| 8 | A6 #128, A7 #129 | A6 applies MATH.md Q2, Q3 and Q7 as answered. |
+| 9 | C8a #155 (includes C8b), C11 #160, C7 #97, C8c #157, C9 #158, E6 #179 | Polish. C8c owns the friendliness criteria; C9 ships two examples Jake verifies. |
+| 10 | D7 #170, D5 #168 | The release photo check (SPEC.md section 11). |
+| 11 | E2 #176, E3 #177 (one round), E4 #98 (includes D8's single panel run) | Docs, one final review, release. Jake does the phone pass and tags. |
 
-Held until Jake decides (#278, decisions 3 to 5): B5 #141, C5 #152, C9 #158, D3b #164,
-D4b #167, D6 #169, D8 #171, D9 #172, D10 #173, E3 #177, E6 #179. Do not launch a held ticket.
+Closed by decision 3: D3b #164, D4b #167, D6 #169, D9 #172 and D10 #173. Their branches stay on
+the remote.
 
 ## 3. How a worker runs a ticket
 
@@ -178,4 +180,5 @@ Nobody reads these during a ticket. They stay in the repo as history:
 - docs/sprint-5/evidence/.
 
 REBASELINE.md stays binding until the tickets that carry out its rows merge (A7, B6a, B6b, C3c,
-C6a, C6b). Decision 8 on #278 proposes how it ends.
+C6a, C6b). Its section "Amendments Jake approved on 2026-10-15" adds one standing rule: a PR that
+deletes code may retire the tests that exercise only that code, naming them in its PR body.
