@@ -29,6 +29,9 @@ PLAN = ROOT / "docs" / "sprint-5" / "qrep-sprint-5-plan.md"
 MATH = ROOT / "docs" / "sprint-5" / "MATH.md"
 PATTERN_SPEC = ROOT / "docs" / "sprint-5" / "PATTERN-SPEC.md"
 DEFAULT_OUT = ROOT / ".claude" / "sprint" / "briefs"
+CHATTER = ("Launched", "PLAN", "PROGRESS", "HANDOFF", "MEASUREMENT", "Close-out",
+           "IMPLEMENTATION NOTES", "Relaunch", "Orchestrator rotation")
+COMMENT_CAP = 6000
 ENTRY_CAP = 2500
 ENTRIES_CAP = 16000
 MATH_ID = r"F\d{1,2}|V-[A-Z]+-\d+|D-\d{2}|Q\d{1,2}"
@@ -42,22 +45,26 @@ def plan_section(plan: str, ticket: str) -> str | None:
     return m.group(0).rstrip() if m else None
 
 
-def select_comments(comments: list[dict]) -> list[dict]:
-    """Keep criteria, reset decisions and the latest resume note, in their order.
+def _kind(comment: dict) -> str:
+    return comment["body"].lstrip("*# ")
 
-    The resume note is the latest HANDOFF, else the latest PROGRESS, else the
-    latest PLAN: a ticket stopped mid-build may never have written a HANDOFF.
+
+def select_comments(comments: list[dict]) -> list[dict]:
+    """Keep every comment except routine run chatter, plus the latest resume note.
+
+    Carried criteria, rulings on BLOCKED questions, folded criteria, Jake's
+    decisions and APPROACH FAILED notes bind the ticket whatever their wording,
+    so the rule drops only the bulky notes a run leaves behind. The resume
+    note is the latest HANDOFF, else PROGRESS, else PLAN: a ticket stopped
+    mid-build may never have written a HANDOFF.
     """
     latest = None
     for kind in ("HANDOFF", "PROGRESS", "PLAN"):
-        notes = [c for c in comments if c["body"].lstrip("*# ").startswith(kind)]
+        notes = [c for c in comments if _kind(c).startswith(kind)]
         if notes:
             latest = notes[-1]
             break
-    return [
-        c for c in comments
-        if c is latest or "- [ ]" in c["body"] or "#278" in c["body"]
-    ]
+    return [c for c in comments if c is latest or not _kind(c).startswith(CHATTER)]
 
 
 def folded_tickets(comments: list[dict]) -> list[str]:
@@ -112,9 +119,12 @@ def build_brief(ticket: str, issue: dict, plan: str, math: str, spec: str) -> st
         issue["body"].strip(),
     ]
     if comments:
-        parts.append("## Criteria, decisions and handoff from the comments")
+        parts.append("## Criteria, rulings, decisions and the latest resume note")
         for c in comments:
-            parts.append(f"### Comment of {c.get('createdAt', '')[:16]}\n\n{c['body'].strip()}")
+            body = c["body"].strip()
+            if len(body) > COMMENT_CAP:
+                body = body[:COMMENT_CAP] + "\n[cut; read the rest on the issue]"
+            parts.append(f"### Comment of {c.get('createdAt', '')[:16]}\n\n{body}")
     parts.append("## Plan section")
     parts.append(section or f"No `#### {ticket}:` section in the plan; the issue is the contract.")
     for folded in folded_tickets(comments):

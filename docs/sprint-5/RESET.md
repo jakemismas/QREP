@@ -158,8 +158,10 @@ $p=$PID; while($p){$x=Get-CimInstance Win32_Process -Filter "ProcessId=$p"; if(!
 
 ## 5. Orchestration
 
-- One orchestrator runs at most 3 workers at once. Close each worker tab on DONE. Why: about 50
-  open Claude processes tripped the memory launch stop on 2026-10-13.
+- One orchestrator runs at most 3 workers at once. A worker stays open after DONE to fix review
+  findings. The orchestrator ends its session after the merge, by the pid in its DONE report
+  (ORCHESTRATOR-BRIEF.md section 7). Why: about 50 open Claude processes tripped the memory
+  launch stop on 2026-10-13.
 - ORCHESTRATOR-BRIEF.md condenses the parts of ORCHESTRATOR.md that still apply: launching
   (section 8), the handshake (9), merge and close-out (12), stalls and pauses (13), rotation
   (14) and the failure protocol (17). ORCHESTRATOR.md stays as the full reference wherever the

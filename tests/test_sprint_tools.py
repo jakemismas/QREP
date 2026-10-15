@@ -5,6 +5,7 @@ Expected values are worked by hand from the synthetic inputs built here.
 
 from __future__ import annotations
 
+import datetime as dt
 import importlib.util
 import json
 from pathlib import Path
@@ -197,3 +198,54 @@ def test_status_names_the_latest_progress_note():
         {"body": "Jake's decision 1 on #278", "createdAt": "2026-10-15T17:30:00Z"},
     ]
     assert status.latest_note(comments) == "BLOCKED 10-13"
+
+
+def test_spend_reads_the_real_wrapped_role_prompt_and_the_new_format():
+    wrapped = (
+        'Another Claude session sent a message:\n<cross-session-message from="uds:pipe-x" '
+        'from-name="qrep-9b" from-mode="bypass">\nQREP sprint 5 worker. Follow this prompt and '
+        "docs/sprint-5/WORKER.md.\n\nTab name:          qrep-66 [1c6afa]\nRole:              build\n"
+        "Ticket:            C3b \nBranch: slice/s5-c3b-confirm-screen\n"
+    )
+    assert spend.classify([wrapped]) == ("worker", "C3b")
+    brief_format = "QREP sprint 5 worker. Follow RESET.md.\nTicket: A4c, issue #124 | Role: build"
+    assert spend.classify([brief_format]) == ("worker", "A4c")
+
+
+def test_spend_since_uses_the_session_start_not_the_file_time(tmp_path):
+    def line(kind, day, extra):
+        return json.dumps({"type": kind, "timestamp": f"{day}T10:00:00Z", **extra})
+
+    role = {"message": {"role": "user", "content": "QREP sprint 5 worker\nTicket: B3 "}}
+    use = {"message": {"id": "a", "usage": {"input_tokens": 1, "cache_creation_input_tokens": 0,
+                                            "cache_read_input_tokens": 0, "output_tokens": 1}}}
+    _write(tmp_path / "old.jsonl", [line("user", "2026-10-10", role), line("assistant", "2026-10-16", use)])
+    # The file is written today, but the session started on 2026-10-10, before the restart.
+    assert "B3" not in spend.collect(tmp_path, dt.date(2026, 10, 15))
+    assert spend.collect(tmp_path, dt.date(2026, 10, 1))["B3"]["effective"] == 1
+
+
+def test_brief_keeps_binding_comments_without_checkboxes_and_drops_run_chatter():
+    comments = [
+        {"body": "Carried item for this ticket, from C3a: stage the crop first.", "createdAt": "1"},
+        {"body": "Launched 2026-10-13: build tab qrep-66", "createdAt": "2"},
+        {"body": "PLAN C3b: approach", "createdAt": "3"},
+        {"body": "Ruling on BLOCKED C3b (comment 1): criterion 4 stands.", "createdAt": "4"},
+        {"body": "IMPLEMENTATION NOTES C2a", "createdAt": "5"},
+    ]
+    # Kept: the carried item, the ruling, and PLAN as the only resume note.
+    assert [c["createdAt"] for c in brief.select_comments(comments)] == ["1", "3", "4"]
+
+
+def test_brief_finds_folded_ticket_ids_only_in_ticket_headings():
+    comments = [{"body": "Folded in.\n\n### From #125: A4d: Construction steps, borders and finishing\n\n"
+                         "### From #188: Degenerate corner pins report an engine error", "createdAt": "1"}]
+    assert brief.folded_tickets(comments) == ["A4d"]
+
+
+def test_status_reads_pending_contexts_as_running_and_startup_failures_as_red():
+    pending = [{"context": "deploy", "state": "PENDING"}]
+    assert status.checks_summary(pending) == "running"
+    broken = [{"name": "web-spike", "status": "COMPLETED", "conclusion": "STARTUP_FAILURE",
+               "startedAt": "2026-10-15T10:00:00Z"}]
+    assert status.checks_summary(broken) == "red: web-spike"

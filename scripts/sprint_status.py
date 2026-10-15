@@ -25,6 +25,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 RESET = ROOT / "docs" / "sprint-5" / "RESET.md"
 REPO = ("jakemismas", "QREP")
+IN_FLIGHT = ("Launched", "PLAN", "PROGRESS", "MEASUREMENT")
 NOTE_KINDS = ("APPROACH FAILED", "HANDOFF", "PROGRESS", "UNBLOCKED", "BLOCKED", "QUESTION",
               "PLAN", "MEASUREMENT", "DONE", "Launched", "Close-out")
 
@@ -50,11 +51,13 @@ def checks_summary(rollup: list[dict]) -> str:
         if name not in latest or (c.get("startedAt") or "") >= (latest[name].get("startedAt") or ""):
             latest[name] = c
     rollup = list(latest.values())
+    red = ("FAILURE", "ERROR", "CANCELLED", "TIMED_OUT", "STARTUP_FAILURE", "ACTION_REQUIRED")
     failed = [c.get("name") or c.get("context") for c in rollup
-              if (c.get("conclusion") or c.get("state")) in ("FAILURE", "ERROR", "CANCELLED", "TIMED_OUT")]
+              if (c.get("conclusion") or c.get("state")) in red]
     if failed:
         return "red: " + ", ".join(sorted(failed))
-    if any(c.get("status") not in (None, "COMPLETED") for c in rollup):
+    if any(c.get("status") not in (None, "COMPLETED") or c.get("state") in ("PENDING", "EXPECTED")
+           for c in rollup):
         return "running"
     return "green"
 
@@ -129,7 +132,7 @@ def main(argv: list[str] | None = None) -> int:
         labels = {lab["name"] for lab in issue["labels"]["nodes"]}
         if state == "open" and ("blocked" in labels or note.startswith("BLOCKED")):
             blocked.append(f"{ticket} #{n}")
-        elif state == "open" and not pr:
+        elif state == "open" and not pr and not note.startswith(IN_FLIGHT):
             ready.append(f"{ticket} #{n}")
         s = spend.get(ticket)
         spent = f"{_m(s['effective'])}/{_m(s['output_tokens'])}" if s else ""

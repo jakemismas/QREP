@@ -10,7 +10,7 @@ ticket. Orchestrator sessions are totalled on their own line. Usage repeats on
 streamed message blocks, so each message id counts once.
 
 Usage:
-    python scripts/ticket_spend.py [--since 2026-10-15] [--ticket C3b]
+    python scripts/ticket_spend.py [--since 2026-10-15 (session start date)] [--ticket C3b]
         [--cap-effective N] [--cap-output N] [--json] [--projects-dir DIR]
 
 Effective input is input plus cache writes plus cache reads: the context each
@@ -61,6 +61,16 @@ def _user_texts(path: Path) -> list[str]:
     return texts
 
 
+def started(path: Path) -> dt.date | None:
+    """The date of a session's first timestamped line (UTC), or None."""
+    with path.open("rb") as fh:
+        for raw in fh:
+            m = re.search(rb'"timestamp":\s*"(\d{4}-\d{2}-\d{2})', raw[:2000])
+            if m:
+                return dt.date.fromisoformat(m.group(1).decode())
+    return None
+
+
 def classify(texts: list[str]) -> tuple[str, str | None]:
     """Return ("worker", ticket), ("orchestrator", None) or ("other", None)."""
     for text in texts:
@@ -108,7 +118,7 @@ def collect(projects: Path, since: dt.date | None = None) -> dict[str, dict]:
     """Totals per ticket, plus "orchestrator" and "other" buckets."""
     out: dict[str, dict] = {}
     for session in sorted(projects.glob("*.jsonl")):
-        if since and dt.date.fromtimestamp(session.stat().st_mtime) < since:
+        if since and (started(session) or dt.date.min) < since:
             continue
         kind, ticket = classify(_user_texts(session))
         key = ticket if kind == "worker" else kind
