@@ -1450,6 +1450,33 @@ contract" is qrep-claude-code-prompt.md.
    (MATH.md vectors). Nothing else re-captures observed output, including the legacy byte pins,
    which become semantic checks in A8. Why: expected values flow one way (CLAUDE.md).
 
+## Amendments Jake approved on 2026-10-15
+
+Jake approved these in his own chat on 2026-10-15 ("I agree w all but 4"), answering the
+decisions on #278. They are hand-written and change no generated table.
+
+1. Deleted code takes its own tests (decision 8). A PR that deletes code may retire the tests
+   that exercise only that code, naming each by file::test id in its PR body. This adds to
+   binding rules 2 and 7; every other retirement still needs a row. Why: deleting dead code with
+   its own tests cannot make a wrong answer pass. Three named cases:
+   - `tests/test_bridge_v2.py::test_interim_pattern_picks_strip_or_historical` retires in A4c
+     (#124, which now includes A4d), in the PR that switches `build_pattern` to the new document.
+   - The two tests in `web/e2e/lightbox.spec.ts` that drive the editor's Compare lightbox and the
+     Pattern tab round-trip panel retire in C6a (#153), in the PR that removes the editor. The
+     phone lightbox spec C7 (#97) adds is a new test, outside this record.
+2. Borders scale with the square (decision 9, #275). `size_at` with no borders given scales the
+   borders with the square by the pattern rule, as `size_pattern` does. These tests are
+   re-expressed in C2b (#148), with expected values hand-computed from that rule:
+   - `tests/test_sizing.py::test_size_at_a_chosen_square_counts_whole_squares_and_blocks`
+   - `tests/test_sizing.py::test_size_at_snaps_kept_borders_and_drops_the_basis`
+3. The dropzone line drops the shop-listing claim (decision 9). C3b (#101) re-expresses
+   `web/src/copy-audit-verdicts.test.ts` "S8 entry copy present verbatim > dropzone sub-copy" to
+   the new sentence. This supersedes the A3-11 row's "The dropzone line stays".
+4. MATH.md Q2, Q3 and Q7 are answered (decision 9; MATH.md section 6). A6 (#128) re-expresses
+   every test whose expected value depends on the backing allowance or the purchase increment,
+   naming each in its PR body. The new values come from MATH.md vectors, rewritten by hand before
+   the code changes.
+
 ## Amending this record
 
 1. Change the declared data in scripts/rebaseline_inventory.py (fate maps, overrides, e2e

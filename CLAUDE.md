@@ -5,8 +5,12 @@ patterns. The product surface is the web app (web/, live at
 https://jakemismas.github.io/QREP/); the Python library and CLI remain the
 developer and test surface. The binding docs, in reading order:
 docs/SPEC.md (the product contract for 0.4.0; it wins over every older doc
-below and names the sections it supersedes), docs/sprint-5/qrep-sprint-5-plan.md
-(the sprint-5 work: tickets, file owners, dependencies and gates),
+below and names the sections it supersedes), docs/sprint-5/RESET.md (how
+sprint-5 work runs from 2026-10-15: the remaining tickets, what a worker
+reads, review limits and the plain-language UI rules; it wins over the plan,
+ORCHESTRATOR.md and WORKER.md), docs/sprint-5/qrep-sprint-5-plan.md
+(the sprint-5 work: tickets, file owners, dependencies and gates; read only
+your ticket's section),
 qrep-design-doc.md (v1 engine), docs/sprint-2/qrep-web-design-doc.md (the
 web app; its Amendments section supersedes the v1 "no web app" scope line),
 and docs/design/sprint-2/PARITY.md (UI behavior annex, partly suspended in
@@ -63,6 +67,12 @@ or code. Why: the project board stopped tracking after sprint 1.
   Direct pushes to main are blocked by policy; do not attempt them.
 - Log discovered work as new issues (no `S<n>:` title prefix; that prefix is
   reserved for ordered sprint slices). Never leave a code-only TODO.
+- A review finding is not discovered work: fix it in the PR or drop it, and
+  never open an issue for it (docs/sprint-5/RESET.md section 4). Ideas that
+  0.4.0 does not need go on #277 as one line, not as a new issue. Why: reviews
+  filed 47 follow-up issues in 6 days, faster than tickets closed.
+- Read issues with `gh issue view N --json body --jq .body`; pull comments
+  only by filter, never a whole thread (#104 alone holds 148 KB).
 
 ## Non-negotiables
 
@@ -93,7 +103,11 @@ or code. Why: the project board stopped tracking after sprint 1.
   thresholds verbatim. Any failing test not on the record is a bug: fix the
   code, do not edit the test. Why: the narrowing deletes the automatic
   detector and its tests, and a closed list keeps that deletion from becoming
-  a way to weaken anything else.
+  a way to weaken anything else. One standing exception (Jake, 2026-10-15,
+  #278): a PR that deletes code may retire the tests that exercise only that
+  code, naming each by file::test id in its PR body. Why: deleting dead code
+  with its own tests cannot make a wrong answer pass, and stopping for a row
+  each time stalled three tickets.
 - Expected test values flow one way: hand computation (in comments) to
   assertion. Never observed output to assertion, except through bless, once.
 - Every CV-derived value carries a confidence score; hand-authored data is 1.0.

@@ -1188,6 +1188,19 @@ comparison and reports aggregates only.
 Q2, Q3, Q4, Q6 and Q7 change expected values when answered against the default, so decide them
 before A1 and A2 start. If there is no answer, the defaults in this file stand.
 
+**Answered by Jake on 2026-10-15 (#278, decision 9).** These replace the defaults below. A6 (#128)
+moves the settings and rewrites every vector they touch, with the arithmetic worked by hand before
+the code changes:
+
+- Q2: drop the backing allowance. `backing_pieced_allowance` and `backing_one_piece_allowance`
+  default to 0. Why: the 4 in overhang per side is already the margin, and over-buying was the
+  reported fault.
+- Q3: round purchases to 1/8 yd. `purchase_increment` defaults to 1/8 yd (36 e). With Q2, both
+  planning cases match the calculator exactly (8 3/8 and 3 7/8 yd).
+- Q7: "42 in backing" means the usable width after the selvages are trimmed. Saved projects that
+  store `wof: 336` need no migration, because 0.4.0 removes project files (SPEC.md section 9).
+- Q4, Q5 and Q6 were not asked; their defaults stand.
+
 - Q1. Jake's mother's exact case, the reported over-estimate: quilt size, QREP's backing number,
   which calculator, and its number. It becomes V-MOM-01, a failing hand-computed test written
   before the fix. She is not available (J16 in the plan), so D1 quilter-voice research stands in
