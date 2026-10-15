@@ -47,12 +47,16 @@ table (section 4.1).
 
 **Read, and nothing else, before you write code:**
 
-1. The issue body, plus its comments that start with "Folded in", "Carried" or "HANDOFF". Use
-   `gh issue view N --json body --jq .body`, and fetch only those comments with `--jq` filters.
-2. Your ticket's section of the plan only: `grep -n '^#### <ID>' docs/sprint-5/qrep-sprint-5-plan.md`,
-   then read that range.
-3. The MATH.md and PATTERN-SPEC.md ids your criteria cite, by id, never the whole file.
-4. The code you will change.
+1. Your brief, `.claude/sprint/briefs/<ID>.md`. The orchestrator writes it before your launch
+   with `python scripts/ticket_brief.py <ID>`, and your role prompt names it. It holds:
+   - the issue body;
+   - the comments that carry criteria, Jake's decisions and the latest resume note;
+   - your plan section, and the plan sections of any ticket folded into yours;
+   - every MATH.md and PATTERN-SPEC.md entry the text cites.
+
+   If it is missing, run that command yourself.
+2. This file's sections 3, 4 and 6.
+3. The code you will change.
 
 Do not read ORCHESTRATOR.md, STATE.md, OVERNIGHT-REPORT.md, REVIEW.md, the plan outside your
 ticket, or #104's comments. Why: a worker read a median 133K tokens before its first code edit,
@@ -79,6 +83,25 @@ and most of it was other people's instructions.
 
 CI runs everything on the PR, and CI is the gate that counts.
 
+**The quilter journey.** `web/e2e/journey.spec.ts` (#280) drives the built site as a quilter
+does, at phone and desktop sizes:
+
+- It checks the outcome against hand-computed values.
+- It runs the plain-language check (`web/e2e/helpers/grandma.ts`) on every screen.
+- It writes one contact-sheet image.
+
+A UI ticket extends the journey with its own steps and outcome checks, and its PR does not merge
+unless the journey passes. Never add an entry to `web/e2e/grandma-allowlist.json`; it only
+shrinks, as the tickets named in it fix their entries. Why: CI was green while a real photo
+dead-ended, because no test checked what a quilter actually gets.
+
+**Use a cheaper model for mechanical sub-work.** Your tab runs on Jake's default model, because
+a link-launched tab cannot pick one (ORCHESTRATOR.md:39-40). Give each Agent call the model the
+work needs:
+- `model: "sonnet"`: bulk renames, deleting dead code and its tests, doc updates, and running a
+  suite to summarize it.
+- `model: "opus"`: reasoning about vision, math or the pattern.
+
 **Keep output small.** Pipe long output through `tail -40` or `head -60`. Use
 `git diff --stat` before any full diff, and read a full diff one file at a time. Never `cat` a
 file over 40 KB; grep it, then read a range. Run pytest with `-q`, and re-run only the failing
@@ -97,10 +120,21 @@ costs once.
 - The gates you ran, with their result lines.
 - Anything skipped, with the reason.
 
-**When you finish**, report DONE to the orchestrator and exit. Close the tab.
+**When you finish**, send the orchestrator "DONE <ID>: PR #<n>, head <sha>, <pid line>" with
+your gate result lines, under 1 KB, then wait. Fix any review findings it sends on the same
+branch, and send DONE again. The orchestrator ends your session after the merge, so finished
+tabs never pile up. Get the pid line with the PowerShell tool:
+
+```powershell
+$p=$PID; while($p){$x=Get-CimInstance Win32_Process -Filter "ProcessId=$p"; if(!$x){break}; if($x.Name -eq 'claude.exe'){"pid $($x.ProcessId) started $($x.CreationDate.ToString('s'))"; break}; $p=$x.ParentProcessId}
+```
 
 ## 4. Review
 
+- The reviewer runs on `model: "sonnet"` for a standard PR, and the 3-lens panel on
+  `model: "opus"`. It returns a JSON verdict: `{"verdict": "approve" | "changes", "findings":
+  [{"severity", "file", "line", "summary"}]}`. On a UI PR it also views the journey's contact
+  sheet, a single image.
 - Each PR gets **one** independent reviewer subagent. It checks:
   - every acceptance criterion against the diff;
   - that the tests' expected values are hand-worked and fail without the change;
@@ -126,9 +160,38 @@ costs once.
 
 - One orchestrator runs at most 3 workers at once. Close each worker tab on DONE. Why: about 50
   open Claude processes tripped the memory launch stop on 2026-10-13.
-- ORCHESTRATOR.md still governs launching (section 8), the handshake (9), merge and close-out
-  (12), stalls and pauses (13) and the failure protocol (17). This file replaces its review
-  (section 11), context (10 and 14) and morning report (16) rules, and suspends section 15.
+- ORCHESTRATOR-BRIEF.md condenses the parts of ORCHESTRATOR.md that still apply: launching
+  (section 8), the handshake (9), merge and close-out (12), stalls and pauses (13), rotation
+  (14) and the failure protocol (17). ORCHESTRATOR.md stays as the full reference wherever the
+  brief cites it. This file replaces its review (section 11), context (10) and morning report
+  (16) rules, and suspends section 15.
+- **The orchestrator's working document is ORCHESTRATOR-BRIEF.md** (15 KB or less), not the
+  79 KB ORCHESTRATOR.md. Why: each takeover used to cost 140K to 150K tokens before the new
+  orchestrator could act.
+- **Each tick runs two commands.** `python scripts/sprint_status.py` prints the board.
+  `python scripts/ticket_spend.py --since <restart date> --cap-effective 150000000
+  --cap-output 1200000` checks spend.
+
+  A ticket over a cap is told to write its HANDOFF and stop. It is then marked BLOCKED, with its
+  numbers, in the daily question for Jake.
+
+  These caps are provisional. In last week's transcripts the median ticket used about 90M
+  effective input and 450K output, and the 75th percentile was about 150M. After the first 3
+  tickets under this file, the orchestrator re-sets the caps from their actual spend and records
+  the new numbers here.
+- **Wait in the background, never by polling.** Use `gh pr checks <n> --watch` as a background
+  command, and task notifications. Do not loop on ListAgents or short ScheduleWakeup calls. Why:
+  last week had 569 wakes at about 292K of context each.
+
+  The one exception is a heartbeat. The orchestrator runs under `/loop` and ends each tick with
+  one ScheduleWakeup of 1800 to 3600 s, so a usage-limit pause or a lost notification still
+  resumes without Jake.
+- **Read only short results.** That means a worker's DONE report (1 KB or less), the reviewer's
+  JSON verdict and CI pass or fail lines. Never read diffs, logs or test output; the reviewer and
+  the worker do that.
+- **Check-ins with Jake** are answered from `sprint_status.py`, in 10 lines or fewer.
+- **Answered blockers.** When Jake answers a BLOCKED item, post a comment that starts with
+  "UNBLOCKED" on its issue, so the board shows it.
 - Rotate the orchestrator at 200K of context.
 - **STATE.md stays under 15 KB.** It holds only:
   - the current orchestrator;
@@ -140,8 +203,8 @@ costs once.
   - a resume prompt of 2 KB or less.
 
   At each takeover, move anything older to one comment on #104, then delete it from the file.
-  The first takeover under this file renames the 392 KB file of 2026-10-13 to
-  STATE-2026-10-13.md (untracked, kept as history) and starts a fresh one.
+  The 392 KB file of 2026-10-13 is archived as STATE-2026-10-13.md (untracked, kept as
+  history). Nobody reads it during the sprint.
 - **Questions for Jake go into one batched comment on #278 per day**, each with a recommended
   answer. A question that touches no non-negotiable and no SPEC "Jake only" item is not BLOCKED:
   take the option that makes the PDF correct and simpler, and record it in the PR body for his
